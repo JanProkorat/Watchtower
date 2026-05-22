@@ -16,6 +16,10 @@ coverage/
 # Local databases
 data.db*
 
+# Stray compiled output if tsc ever runs with the wrong outDir
+shared/*.js
+shared/*.js.map
+
 # Logs and misc runtime
 *.log
 
