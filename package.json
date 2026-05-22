@@ -5,10 +5,11 @@
   "type": "module",
   "main": "dist-electron/electron/main.js",
   "scripts": {
-    "dev": "concurrently -k -n main,renderer,orch -c blue,magenta,cyan \"npm:dev:main\" \"npm:dev:renderer\" \"npm:dev:orch\"",
+    "dev": "npm run build:main && npm run build:orch && concurrently -k -n vite,main,orch,app -c magenta,blue,cyan,green \"npm:dev:renderer\" \"npm:dev:main\" \"npm:dev:orch\" \"npm:dev:electron\"",
     "dev:main": "tsc -p electron/tsconfig.json --watch --preserveWatchOutput",
     "dev:renderer": "vite --config client/vite.config.ts",
     "dev:orch": "tsc -p orchestrator/tsconfig.json --watch --preserveWatchOutput",
+    "dev:electron": "wait-on -t 30000 tcp:5173 && cross-env WATCHTOWER_DEV_URL=http://localhost:5173 electron .",
     "build:main": "tsc -p electron/tsconfig.json",
     "build:orch": "tsc -p orchestrator/tsconfig.json && node -e \"const fs=require('node:fs'); if (fs.existsSync('orchestrator/db/schema.sql')) { fs.mkdirSync('dist-orchestrator/orchestrator/db',{recursive:true}); fs.copyFileSync('orchestrator/db/schema.sql','dist-orchestrator/orchestrator/db/schema.sql'); }\"",
     "build:renderer": "vite build --config client/vite.config.ts",
@@ -27,6 +28,8 @@
     "@fastify/cors": "^9.0.1",
     "@mui/icons-material": "^5.16.7",
     "@mui/material": "^5.16.7",
+    "@react-buddy/ide-toolbox": "^2.5.0",
+    "@react-buddy/palette-mui": "^5.0.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
@@ -54,7 +57,8 @@
     "tsx": "^4.19.1",
     "typescript": "^5.6.2",
     "vite": "^5.4.8",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "wait-on": "^9.0.10"
   },
   "build": {
     "appId": "cz.greencode.watchtower",
