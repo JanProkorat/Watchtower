@@ -64,6 +64,42 @@ function mapHookEventToStateEvent(name: string, body: unknown): StateEvent | nul
   }
 }
 
+interface PtySpawnArgs {
+  id: string;
+  cwd: string;
+  extraArgs: string[];
+  /** If present, spawn via `claude --resume <id>` instead of `--session-id <id>`. */
+  resumeSessionId?: string;
+}
+
+function spawnPtyForInstance(opts: PtySpawnArgs): void {
+  const cmdArgs = opts.resumeSessionId
+    ? ['--resume', opts.resumeSessionId, ...opts.extraArgs]
+    : ['--session-id', opts.id, ...opts.extraArgs];
+  pty.spawn({
+    id: opts.id,
+    command: 'claude',
+    args: cmdArgs,
+    cwd: opts.cwd,
+    env: { ...(process.env as Record<string, string>), WATCHTOWER_INSTANCE_ID: opts.id },
+    onData: (chunk) => {
+      api?.push({ kind: 'ptyData', payload: { instanceId: opts.id, chunk } });
+      applyTransition(opts.id, { kind: 'ptyData' });
+    },
+    onExit: (code) => {
+      api?.push({ kind: 'ptyExit', payload: { instanceId: opts.id, code } });
+      const r = repo();
+      const inst = r.get(opts.id);
+      if (inst) {
+        const result = transition(inst.status, { kind: 'ptyExit', code });
+        r.updateStatus(opts.id, result.state, Date.now());
+        r.setTermination(opts.id, code === 0 ? 'session-end' : 'crash', code);
+        api?.push({ kind: 'stateChanged', payload: { instanceId: opts.id, status: result.state } });
+      }
+    },
+  });
+}
+
 async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']> {
   switch (req.kind) {
     case 'ping':
@@ -82,7 +118,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           id,
           cwd: expandedCwd,
           status: 'spawning',
-          claudeSessionId: id, // we set --session-id <uuid> so the Claude session ID matches the row ID
+          claudeSessionId: id, // --session-id <uuid> => Claude session id matches row id
           spawnedAt: now,
           lastActivityAt: now,
           exitCode: null,
@@ -91,28 +127,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           jiraKeyHint: null,
           argsJson: req.payload.args ? JSON.stringify(req.payload.args) : null,
         });
-        pty.spawn({
-          id,
-          command: 'claude',
-          args: ['--session-id', id, ...(req.payload.args ?? [])],
-          cwd: expandedCwd,
-          env: { ...(process.env as Record<string, string>), WATCHTOWER_INSTANCE_ID: id },
-          onData: (chunk) => {
-            api?.push({ kind: 'ptyData', payload: { instanceId: id, chunk } });
-            applyTransition(id, { kind: 'ptyData' });
-          },
-          onExit: (code) => {
-            api?.push({ kind: 'ptyExit', payload: { instanceId: id, code } });
-            const r = repo();
-            const inst = r.get(id);
-            if (inst) {
-              const result = transition(inst.status, { kind: 'ptyExit', code });
-              r.updateStatus(id, result.state, Date.now());
-              r.setTermination(id, code === 0 ? 'session-end' : 'crash', code);
-              api?.push({ kind: 'stateChanged', payload: { instanceId: id, status: result.state } });
-            }
-          },
-        });
+        spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [] });
         return { instanceId: id };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -169,21 +184,47 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
   }
 }
 
-function reapOrphansFromPreviousRun(): void {
-  // Any instance still marked as live (spawning / working / waiting-* / idle-notify)
-  // when the orchestrator boots is an orphan from a previous run — its pty
-  // died with the previous orchestrator process. Mark them crashed with
-  // termination_reason='crash' so the renderer treats them as terminal.
-  // Phase 8 turns this into proper claude --resume recovery for rows that
-  // captured a session id; for now we just mark them dead.
+function resumeOrCrashFromPreviousRun(): void {
+  // Any instance still marked live (spawning/working/waiting-*/idle-notify)
+  // is an orphan from a previous run — its pty died with the previous
+  // orchestrator process. If we captured a Claude session id, respawn via
+  // `claude --resume <id>` so the conversation continues. Otherwise the
+  // session is unrecoverable — mark crashed.
+  //
+  // Status is kept on the original row (we don't flip to 'resuming') so
+  // the tab strip's color doesn't flicker; once the resumed pty's
+  // SessionStart hook fires the state machine settles on 'working' anyway.
   const r = repo();
   const orphans = r.listLive();
+  let resumed = 0;
+  let crashed = 0;
   for (const o of orphans) {
-    r.updateStatus(o.id, 'crashed', Date.now());
-    r.setTermination(o.id, 'crash', null);
+    if (o.claudeSessionId) {
+      try {
+        spawnPtyForInstance({
+          id: o.id,
+          cwd: o.cwd,
+          extraArgs: [],
+          resumeSessionId: o.claudeSessionId,
+        });
+        resumed++;
+      } catch (err) {
+        console.error('[orchestrator] resume failed for', o.id, err);
+        r.updateStatus(o.id, 'crashed', Date.now());
+        r.setTermination(o.id, 'resume-failed', null);
+        crashed++;
+      }
+    } else {
+      r.updateStatus(o.id, 'crashed', Date.now());
+      r.setTermination(o.id, 'crash', null);
+      crashed++;
+    }
   }
   if (orphans.length > 0) {
-    console.log(`[orchestrator] reaped ${orphans.length} orphan(s) from previous run`);
+    console.log(
+      `[orchestrator] previous run had ${orphans.length} live instance(s): ` +
+        `${resumed} resumed, ${crashed} crashed`,
+    );
   }
 }
 
@@ -199,11 +240,13 @@ function reapOrphansFromPreviousRun(): void {
         if (stateEvent) applyTransition(instanceId, stateEvent);
       },
     });
-    reapOrphansFromPreviousRun();
     api = new PortApi(
       event.ports[0] as unknown as ConstructorParameters<typeof PortApi>[0],
     );
     api.onRequest(async (req) => handleRequest(req as OrchRequest));
+    // Resume after api is ready so the pty's first output/exit can push
+    // through to the renderer immediately.
+    resumeOrCrashFromPreviousRun();
     void statusOf; // referenced for future use; quiet TS unused warning
   },
 );

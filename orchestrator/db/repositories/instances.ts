@@ -62,7 +62,9 @@ export class InstancesRepo {
   }
 
   listAll(): InstanceRow[] {
-    return (this.db.prepare(`SELECT * FROM instances ORDER BY spawned_at DESC`).all() as DbInstanceRow[]).map(toRow);
+    // ASC so new spawns append to the right of the tab strip, matching
+    // browser-tab idioms.
+    return (this.db.prepare(`SELECT * FROM instances ORDER BY spawned_at ASC`).all() as DbInstanceRow[]).map(toRow);
   }
 
   listLive(): InstanceRow[] {
