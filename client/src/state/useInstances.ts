@@ -60,5 +60,14 @@ export function useInstances(): {
     [refresh],
   );
 
-  return { instances, activeId, setActive: setActiveId, spawn, kill, refresh };
+  const remove = useCallback(
+    async (instanceId: string) => {
+      await window.watchtower.invoke('removeInstance', { instanceId });
+      setActiveId((curr) => (curr === instanceId ? null : curr));
+      await refresh();
+    },
+    [refresh],
+  );
+
+  return { instances, activeId, setActive: setActiveId, spawn, kill, remove, refresh };
 }

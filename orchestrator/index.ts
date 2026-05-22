@@ -6,6 +6,8 @@ import { PortApi, type OrchRequest, type OrchResponse } from '../shared/messageP
 import { bootstrap, type BootstrapHandle } from './bootstrap.js';
 import { PtyManager } from './ptyManager.js';
 import { InstancesRepo } from './db/repositories/instances.js';
+import { HookEventsRepo } from './db/repositories/hookEvents.js';
+import { NotificationsRepo } from './db/repositories/notifications.js';
 import { transition } from './stateMachine.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
@@ -136,6 +138,22 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
     case 'killInstance':
       pty.get(req.payload.instanceId)?.kill();
       return { ok: true };
+
+    case 'removeInstance': {
+      // Kill the pty if it's still alive — best-effort, no grace period because
+      // the row gets deleted right after either way.
+      try {
+        pty.get(req.payload.instanceId)?.kill();
+      } catch {
+        /* pty already dead */
+      }
+      // Cascade: hook_events + notifications reference instances.id but the
+      // schema doesn't have ON DELETE CASCADE, so we clean child rows first.
+      new HookEventsRepo(handle!.db).deleteForInstance(req.payload.instanceId);
+      new NotificationsRepo(handle!.db).deleteForInstance(req.payload.instanceId);
+      repo().delete(req.payload.instanceId);
+      return { ok: true };
+    }
 
     case 'listInstances': {
       const rows = repo().listAll();

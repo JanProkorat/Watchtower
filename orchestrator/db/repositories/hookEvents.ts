@@ -19,4 +19,8 @@ export class HookEventsRepo {
   pruneOlderThan(cutoff: number): void {
     this.db.prepare(`DELETE FROM hook_events WHERE received_at < ?`).run(cutoff);
   }
+
+  deleteForInstance(instanceId: string): void {
+    this.db.prepare(`DELETE FROM hook_events WHERE instance_id = ?`).run(instanceId);
+  }
 }

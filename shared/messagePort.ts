@@ -4,6 +4,7 @@ export type OrchRequest =
   | { id: string; kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { id: string; kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
   | { id: string; kind: 'killInstance'; payload: { instanceId: string } }
+  | { id: string; kind: 'removeInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'listInstances'; payload: Record<string, never> };
 
 export type OrchResponse =
@@ -12,6 +13,7 @@ export type OrchResponse =
   | { kind: 'ptyWrite'; payload: { ok: true } }
   | { kind: 'ptyResize'; payload: { ok: true } }
   | { kind: 'killInstance'; payload: { ok: true } }
+  | { kind: 'removeInstance'; payload: { ok: true } }
   | {
       kind: 'listInstances';
       payload: {

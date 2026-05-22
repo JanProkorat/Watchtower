@@ -1,8 +1,17 @@
 import { Box, IconButton, Tab, Tabs, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import type { InstanceView } from '../state/useInstances.js';
 
 const DASHBOARD_TAB = '__dashboard__';
+const LIVE_STATUSES = new Set([
+  'spawning',
+  'working',
+  'waiting-permission',
+  'waiting-input',
+  'idle-notify',
+  'resuming',
+]);
 
 function basename(p: string): string {
   if (!p) return '';
@@ -37,15 +46,17 @@ interface Props {
   activeId: string | null;
   onSelect(id: string): void;
   onNew(): void;
+  onRemove(id: string, isLive: boolean): void;
 }
 
-export function TabStrip({ instances, activeId, onSelect, onNew }: Props) {
-  const tabs: Array<{ id: string; label: string; status: string }> = [
-    { id: DASHBOARD_TAB, label: 'Dashboard', status: 'dashboard' },
+export function TabStrip({ instances, activeId, onSelect, onNew, onRemove }: Props) {
+  const tabs: Array<{ id: string; label: string; status: string; closable: boolean }> = [
+    { id: DASHBOARD_TAB, label: 'Dashboard', status: 'dashboard', closable: false },
     ...instances.map((i) => ({
       id: i.id,
       label: basename(i.cwd) || i.cwd,
       status: i.status,
+      closable: true,
     })),
   ];
 
@@ -73,7 +84,7 @@ export function TabStrip({ instances, activeId, onSelect, onNew }: Props) {
           <Tab
             key={t.id}
             value={t.id}
-            sx={{ minHeight: 40, textTransform: 'none', fontSize: 13 }}
+            sx={{ minHeight: 40, textTransform: 'none', fontSize: 13, pr: t.closable ? 0.5 : 2 }}
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {t.status !== 'dashboard' && (
@@ -87,6 +98,30 @@ export function TabStrip({ instances, activeId, onSelect, onNew }: Props) {
                   />
                 )}
                 {t.label}
+                {t.closable && (
+                  <Box
+                    component="span"
+                    role="button"
+                    aria-label={`close ${t.label}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(t.id, LIVE_STATUSES.has(t.status));
+                    }}
+                    sx={{
+                      ml: 0.5,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 18,
+                      height: 18,
+                      borderRadius: '4px',
+                      color: 'text.disabled',
+                      ':hover': { backgroundColor: 'action.hover', color: 'text.primary' },
+                    }}
+                  >
+                    <CloseIcon sx={{ fontSize: 14 }} />
+                  </Box>
+                )}
               </Box>
             }
           />

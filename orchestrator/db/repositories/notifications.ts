@@ -12,4 +12,8 @@ export class NotificationsRepo {
   dismiss(id: number, now: number): void {
     this.db.prepare(`UPDATE notifications SET dismissed_at = ? WHERE id = ?`).run(now, id);
   }
+
+  deleteForInstance(instanceId: string): void {
+    this.db.prepare(`DELETE FROM notifications WHERE instance_id = ?`).run(instanceId);
+  }
 }

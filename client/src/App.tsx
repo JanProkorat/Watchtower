@@ -1,5 +1,18 @@
 import { useState } from 'react';
-import { Alert, Box, CssBaseline, Snackbar, ThemeProvider, Typography } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  CssBaseline,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Snackbar,
+  ThemeProvider,
+  Typography,
+} from '@mui/material';
 import { watchtowerTheme } from './theme.js';
 import { useInstances } from './state/useInstances.js';
 import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
@@ -54,8 +67,18 @@ declare global {
 }
 
 export function App() {
-  const { instances, activeId, setActive, spawn } = useInstances();
+  const { instances, activeId, setActive, spawn, remove } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
+  const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
+
+  const handleRemove = (id: string, isLive: boolean) => {
+    if (!isLive) {
+      void remove(id);
+      return;
+    }
+    const inst = instances.find((i) => i.id === id);
+    setConfirmClose({ id, cwd: inst?.cwd ?? id });
+  };
 
   const handleNew = async () => {
     try {
@@ -86,6 +109,7 @@ export function App() {
           activeId={activeId}
           onSelect={(id) => setActive(id === DASHBOARD_TAB ? null : id)}
           onNew={() => void handleNew()}
+          onRemove={handleRemove}
         />
         <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {onDashboard ? (
@@ -113,6 +137,37 @@ export function App() {
           )}
         </Box>
       </Box>
+      <Dialog
+        open={Boolean(confirmClose)}
+        onClose={() => setConfirmClose(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Close this session?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Claude in{' '}
+            <Box component="code" sx={{ fontFamily: 'monospace', fontSize: 12 }}>
+              {confirmClose?.cwd}
+            </Box>{' '}
+            is still running. Closing the tab kills the pty and forgets the
+            session. Use Cancel to keep it alive.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmClose(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              if (confirmClose) void remove(confirmClose.id);
+              setConfirmClose(null);
+            }}
+          >
+            Kill &amp; close
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Snackbar
         open={Boolean(spawnError)}
         autoHideDuration={10000}

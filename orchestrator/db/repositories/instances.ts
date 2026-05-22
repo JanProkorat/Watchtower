@@ -87,4 +87,8 @@ export class InstancesRepo {
       .prepare(`UPDATE instances SET termination_reason = ?, exit_code = ? WHERE id = ?`)
       .run(reason, exitCode, id);
   }
+
+  delete(id: string): void {
+    this.db.prepare(`DELETE FROM instances WHERE id = ?`).run(id);
+  }
 }
