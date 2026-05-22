@@ -42,10 +42,48 @@ Watchtower won because it fits the MVP function *literally* (you watch from a to
 |---|---|
 | Brainstorming | Done — 2026-05-22 |
 | Design spec | Approved — see `docs/superpowers/specs/2026-05-22-watchtower-instance-watcher-design.md` |
-| Implementation plan | Pending |
+| Implementation plan | Done — 37 tasks across 11 phases |
+| Visual prototype | Done — `prototype.html` |
+| GitHub repo | https://github.com/JanProkorat/Watchtower (private) |
+| GitHub issues | 11 phase issues open (see Tracking below) |
+| TimeTracker project | Created (id 4, non-billable, 11 epics, 37 tasks) |
 | MVP implementation | Not started |
 | First runnable build | — |
 | First daily-use build | — |
+
+---
+
+## Tracking
+
+### GitHub issues (phase ↔ issue number)
+
+| Phase | Issue |
+|---|---|
+| Phase 1 — Foundation | [#5](https://github.com/JanProkorat/Watchtower/issues/5) |
+| Phase 2 — Orchestrator skeleton | [#10](https://github.com/JanProkorat/Watchtower/issues/10) |
+| Phase 3 — State machine + notification rules | [#11](https://github.com/JanProkorat/Watchtower/issues/11) |
+| Phase 4 — Hook listener + helper binary | [#9](https://github.com/JanProkorat/Watchtower/issues/9) |
+| Phase 5 — PTY management + terminal UI | [#2](https://github.com/JanProkorat/Watchtower/issues/2) |
+| Phase 6 — Spawn polish + rail + dashboard | [#6](https://github.com/JanProkorat/Watchtower/issues/6) |
+| Phase 7 — Tray + notifications + snooze | [#1](https://github.com/JanProkorat/Watchtower/issues/1) |
+| Phase 8 — Suspend / resume / crash recovery | [#8](https://github.com/JanProkorat/Watchtower/issues/8) |
+| Phase 9 — First-run wizard + settings | [#7](https://github.com/JanProkorat/Watchtower/issues/7) |
+| Phase 10 — Error handling polish | [#3](https://github.com/JanProkorat/Watchtower/issues/3) |
+| Phase 11 — Build & ship | [#4](https://github.com/JanProkorat/Watchtower/issues/4) |
+
+(GitHub assigned the numbers in parallel-creation order — the phase number remains the canonical ordering.)
+
+### TimeTracker (project 4, non-billable)
+
+Watchtower time is tracked in the existing TimeTracker app, **not billable**, so total hours show up on the dashboard without affecting any invoice projection.
+
+- **DB:** `~/Library/Application Support/timetracker/data.db`
+- **Project ID:** 4 (`Watchtower`, kind `work`, `is_billable=0`, color `#7aa7ff`)
+- **Epics:** 11, one per phase (IDs 29–39)
+- **Tasks:** 37, named `WT-T1`..`WT-T37` (IDs 788–824), one per plan-Task
+- **Worklog convention:** insert into `worklogs` with `source='watchtower-impl'` and `external_id=<commit-sha>` so the unique `(source, external_id)` index dedupes re-runs.
+
+Seed script (for reference): [`/Users/jan/Projects/TimeTracker/scripts/setup-watchtower-project.mjs`](../TimeTracker/scripts/setup-watchtower-project.mjs).
 
 ---
 
@@ -193,7 +231,9 @@ Append-only record of key calls. Each entry: date, decision, rationale, alternat
 
 Append entries as the project advances. Format: `YYYY-MM-DD — short summary`. Link commits / PRs / spec updates as relevant.
 
-- 2026-05-22 — Brainstorming complete. Design spec written and approved. Repo created. Prototype tracker (this file) created. Awaiting implementation plan.
+- **2026-05-22** — Brainstorming complete. Design spec written and approved. Repo scaffolded at `/Users/jan/Projects/Watchtower`. Prototype tracker (this file) created.
+- **2026-05-22** — 37-task implementation plan written across 11 phases. Visual prototype (`prototype.html`) created with 8 scenes.
+- **2026-05-22** — Initial commit pushed to GitHub: https://github.com/JanProkorat/Watchtower (private). 11 phase issues opened. TimeTracker project 4 + 11 epics + 37 tasks seeded for time tracking. Ready to start Phase 1.
 
 ---
 
