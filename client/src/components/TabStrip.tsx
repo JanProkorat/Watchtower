@@ -1,6 +1,22 @@
-import { Box, IconButton, Tab, Tabs, Tooltip } from '@mui/material';
+import type { CSSProperties } from 'react';
+import { Box, IconButton, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  horizontalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { InstanceView } from '../state/useInstances.js';
 
 const DASHBOARD_TAB = '__dashboard__';
@@ -19,19 +35,17 @@ function basename(p: string): string {
   return parts[parts.length - 1] ?? p;
 }
 
-// Per-instance palette — picked to be saturated enough to stand out on a
-// dark background and distinct under a quick glance.
 const INSTANCE_PALETTE = [
-  '#7aa7ff', // soft blue
-  '#f0a868', // amber-orange
-  '#66bb6a', // green
-  '#ce93d8', // lavender
-  '#4dd0e1', // cyan
-  '#ffd54f', // yellow
-  '#a1887f', // taupe
-  '#90caf9', // pale blue
-  '#ef9a9a', // pink-red
-  '#80cbc4', // teal
+  '#7aa7ff',
+  '#f0a868',
+  '#66bb6a',
+  '#ce93d8',
+  '#4dd0e1',
+  '#ffd54f',
+  '#a1887f',
+  '#90caf9',
+  '#ef9a9a',
+  '#80cbc4',
 ];
 
 function instanceColor(id: string): string {
@@ -40,9 +54,6 @@ function instanceColor(id: string): string {
   return INSTANCE_PALETTE[Math.abs(hash) % INSTANCE_PALETTE.length] ?? '#7aa7ff';
 }
 
-// Attention states keep their canonical color (red = needs me now, amber = end
-// of turn waiting). Non-attention states use the per-instance color so two
-// "working" tabs are distinguishable at a glance.
 const ATTENTION_COLORS: Record<string, string> = {
   'waiting-permission': '#ef5350',
   'waiting-input': '#ffb74d',
@@ -56,92 +67,190 @@ function dotColor(id: string, status: string): string {
   return ATTENTION_COLORS[status] ?? instanceColor(id);
 }
 
+interface TabButtonProps {
+  id: string;
+  label: string;
+  status: string; // 'dashboard' for the pinned tab
+  active: boolean;
+  draggable: boolean;
+  dragRef?: (node: HTMLElement | null) => void;
+  dragListeners?: React.HTMLAttributes<HTMLElement>;
+  dragStyle?: CSSProperties;
+  onClick(): void;
+  onClose?(): void;
+}
+
+function TabButton({
+  id,
+  label,
+  status,
+  active,
+  draggable,
+  dragRef,
+  dragListeners,
+  dragStyle,
+  onClick,
+  onClose,
+}: TabButtonProps) {
+  return (
+    <Box
+      ref={dragRef}
+      onClick={onClick}
+      style={dragStyle}
+      {...(dragListeners ?? {})}
+      role="tab"
+      aria-selected={active}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        minHeight: 40,
+        px: 1.5,
+        cursor: draggable ? 'grab' : 'pointer',
+        userSelect: 'none',
+        color: active ? 'text.primary' : 'text.secondary',
+        backgroundColor: active ? 'background.default' : 'transparent',
+        borderBottom: 2,
+        borderBottomColor: active ? 'primary.main' : 'transparent',
+        ':hover': { backgroundColor: active ? 'background.default' : 'action.hover' },
+        ':active': { cursor: draggable ? 'grabbing' : 'pointer' },
+        fontSize: 13,
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+      }}
+    >
+      {status !== 'dashboard' && (
+        <Box
+          sx={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: dotColor(id, status),
+            flexShrink: 0,
+          }}
+        />
+      )}
+      <span>{label}</span>
+      {onClose && (
+        <Box
+          component="span"
+          role="button"
+          aria-label={`close ${label}`}
+          // Stop drag listeners + tab click from firing when the user clicks ×.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          sx={{
+            ml: 0.5,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 18,
+            height: 18,
+            borderRadius: '4px',
+            color: 'text.disabled',
+            ':hover': { backgroundColor: 'action.hover', color: 'text.primary' },
+          }}
+        >
+          <CloseIcon sx={{ fontSize: 14 }} />
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+interface SortableTabProps extends Omit<TabButtonProps, 'dragRef' | 'dragListeners' | 'dragStyle' | 'draggable'> {
+  id: string;
+}
+
+function SortableTab(props: SortableTabProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.id,
+  });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 1 : 'auto',
+    position: 'relative',
+  };
+  return (
+    <TabButton
+      {...props}
+      draggable
+      dragRef={setNodeRef}
+      dragListeners={{ ...attributes, ...listeners }}
+      dragStyle={style}
+    />
+  );
+}
+
 interface Props {
   instances: InstanceView[];
   activeId: string | null;
   onSelect(id: string): void;
   onNew(): void;
   onRemove(id: string, isLive: boolean): void;
+  onReorder(orderedIds: string[]): void;
 }
 
-export function TabStrip({ instances, activeId, onSelect, onNew, onRemove }: Props) {
-  const tabs: Array<{ id: string; label: string; status: string; closable: boolean }> = [
-    { id: DASHBOARD_TAB, label: 'Dashboard', status: 'dashboard', closable: false },
-    ...instances.map((i) => ({
-      id: i.id,
-      label: basename(i.cwd) || i.cwd,
-      status: i.status,
-      closable: true,
-    })),
-  ];
-
+export function TabStrip({ instances, activeId, onSelect, onNew, onRemove, onReorder }: Props) {
+  // 5px activation distance — clicks (no drag) still toggle the tab, but a
+  // 5+ px drag picks the tab up. Otherwise every click would start a drag.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const value = activeId ?? DASHBOARD_TAB;
+  const ids = instances.map((i) => i.id);
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIndex = ids.indexOf(String(active.id));
+    const newIndex = ids.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    onReorder(arrayMove(ids, oldIndex, newIndex));
+  };
 
   return (
     <Box
       sx={{
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'stretch',
         borderBottom: 1,
         borderColor: 'divider',
         backgroundColor: 'background.paper',
         flexShrink: 0,
+        overflowX: 'auto',
+        overflowY: 'hidden',
       }}
     >
-      <Tabs
-        value={value}
-        onChange={(_e, v: string) => onSelect(v)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{ minHeight: 40, flex: 1 }}
-      >
-        {tabs.map((t) => (
-          <Tab
-            key={t.id}
-            value={t.id}
-            sx={{ minHeight: 40, textTransform: 'none', fontSize: 13, pr: t.closable ? 0.5 : 2 }}
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {t.status !== 'dashboard' && (
-                  <Box
-                    sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      backgroundColor: dotColor(t.id, t.status),
-                    }}
-                  />
-                )}
-                {t.label}
-                {t.closable && (
-                  <Box
-                    component="span"
-                    role="button"
-                    aria-label={`close ${t.label}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemove(t.id, LIVE_STATUSES.has(t.status));
-                    }}
-                    sx={{
-                      ml: 0.5,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: 18,
-                      height: 18,
-                      borderRadius: '4px',
-                      color: 'text.disabled',
-                      ':hover': { backgroundColor: 'action.hover', color: 'text.primary' },
-                    }}
-                  >
-                    <CloseIcon sx={{ fontSize: 14 }} />
-                  </Box>
-                )}
-              </Box>
-            }
-          />
-        ))}
-      </Tabs>
+      <TabButton
+        id={DASHBOARD_TAB}
+        label="Dashboard"
+        status="dashboard"
+        active={value === DASHBOARD_TAB}
+        draggable={false}
+        onClick={() => onSelect(DASHBOARD_TAB)}
+      />
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
+          <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+            {instances.map((i) => (
+              <SortableTab
+                key={i.id}
+                id={i.id}
+                label={basename(i.cwd) || i.cwd}
+                status={i.status}
+                active={value === i.id}
+                onClick={() => onSelect(i.id)}
+                onClose={() => onRemove(i.id, LIVE_STATUSES.has(i.status))}
+              />
+            ))}
+          </Box>
+        </SortableContext>
+      </DndContext>
+      <Box sx={{ flex: 1, minWidth: 0 }} />
       <Tooltip title="New instance" placement="left">
         <IconButton
           onClick={onNew}

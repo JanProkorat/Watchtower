@@ -69,5 +69,26 @@ export function useInstances(): {
     [refresh],
   );
 
-  return { instances, activeId, setActive: setActiveId, spawn, kill, remove, refresh };
+  const reorder = useCallback(async (orderedIds: string[]) => {
+    // Optimistic local update so the drop lands instantly. The server is the
+    // source of truth and will confirm on the next refresh; if it disagrees,
+    // a subsequent listInstances rolls us back.
+    setInstances((curr) => {
+      const byId = new Map(curr.map((i) => [i.id, i] as const));
+      const reordered: InstanceView[] = [];
+      for (const id of orderedIds) {
+        const inst = byId.get(id);
+        if (inst) reordered.push(inst);
+      }
+      // Any instances not present in the ordered list keep their relative
+      // order at the end — shouldn't happen in practice but is a safe fallback.
+      for (const inst of curr) {
+        if (!orderedIds.includes(inst.id)) reordered.push(inst);
+      }
+      return reordered;
+    });
+    await window.watchtower.invoke('reorderInstances', { orderedIds });
+  }, []);
+
+  return { instances, activeId, setActive: setActiveId, spawn, kill, remove, reorder, refresh };
 }

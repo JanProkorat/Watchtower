@@ -68,7 +68,7 @@ declare global {
 }
 
 export function App() {
-  const { instances, activeId, setActive, spawn, remove } = useInstances();
+  const { instances, activeId, setActive, spawn, remove, reorder } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
 
@@ -111,6 +111,7 @@ export function App() {
           onSelect={(id) => setActive(id === DASHBOARD_TAB ? null : id)}
           onNew={() => void handleNew()}
           onRemove={handleRemove}
+          onReorder={(ids) => void reorder(ids)}
         />
         <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {onDashboard ? (

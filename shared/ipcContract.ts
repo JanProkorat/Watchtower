@@ -5,6 +5,7 @@ export type IpcRequest =
   | { kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
   | { kind: 'killInstance'; payload: { instanceId: string } }
   | { kind: 'removeInstance'; payload: { instanceId: string } }
+  | { kind: 'reorderInstances'; payload: { orderedIds: string[] } }
   | { kind: 'listInstances'; payload: Record<string, never> }
   | { kind: 'chooseDirectory'; payload: { defaultPath?: string } };
 
@@ -15,6 +16,7 @@ export type IpcResponse =
   | { kind: 'ptyResize'; payload: { ok: true } }
   | { kind: 'killInstance'; payload: { ok: true } }
   | { kind: 'removeInstance'; payload: { ok: true } }
+  | { kind: 'reorderInstances'; payload: { ok: true } }
   | {
       kind: 'listInstances';
       payload: {

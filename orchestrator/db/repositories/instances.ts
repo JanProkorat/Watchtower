@@ -36,10 +36,16 @@ export class InstancesRepo {
   constructor(private db: SqliteLike) {}
 
   insert(row: InstanceRow): void {
+    // Append at the end of the user's tab order. Steps of 1000 leave room to
+    // splice between two rows later without renumbering everything.
+    const maxRow = this.db
+      .prepare('SELECT COALESCE(MAX(display_order), 0) AS m FROM instances')
+      .get() as { m: number };
+    const displayOrder = (maxRow.m ?? 0) + 1000;
     this.db
       .prepare(
-        `INSERT INTO instances (id, cwd, status, claude_session_id, spawned_at, last_activity_at, exit_code, termination_reason, resumed_from_instance_id, jira_key_hint, args_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO instances (id, cwd, status, claude_session_id, spawned_at, last_activity_at, exit_code, termination_reason, resumed_from_instance_id, jira_key_hint, args_json, display_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         row.id,
@@ -53,6 +59,7 @@ export class InstancesRepo {
         row.resumedFromInstanceId,
         row.jiraKeyHint,
         row.argsJson,
+        displayOrder,
       );
   }
 
@@ -62,9 +69,17 @@ export class InstancesRepo {
   }
 
   listAll(): InstanceRow[] {
-    // ASC so new spawns append to the right of the tab strip, matching
-    // browser-tab idioms.
-    return (this.db.prepare(`SELECT * FROM instances ORDER BY spawned_at ASC`).all() as DbInstanceRow[]).map(toRow);
+    // ASC so new spawns append to the right of the tab strip. display_order
+    // is set on insert (and rewritten on user reorder) so this reflects the
+    // user's tab layout; spawned_at is a fallback for any pre-v2 rows that
+    // somehow ended up with NULL.
+    return (
+      this.db
+        .prepare(
+          `SELECT * FROM instances ORDER BY COALESCE(display_order, spawned_at) ASC, spawned_at ASC`,
+        )
+        .all() as DbInstanceRow[]
+    ).map(toRow);
   }
 
   listLive(): InstanceRow[] {
@@ -92,5 +107,22 @@ export class InstancesRepo {
 
   delete(id: string): void {
     this.db.prepare(`DELETE FROM instances WHERE id = ?`).run(id);
+  }
+
+  reorder(orderedIds: string[]): void {
+    // Normalize: rows in the supplied order get display_order = 1000, 2000, ...
+    // Anything missing from the array keeps its current value, but in practice
+    // the renderer always sends the full list of live ids.
+    this.db.exec('BEGIN');
+    try {
+      const stmt = this.db.prepare(`UPDATE instances SET display_order = ? WHERE id = ?`);
+      orderedIds.forEach((id, i) => {
+        stmt.run((i + 1) * 1000, id);
+      });
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 }

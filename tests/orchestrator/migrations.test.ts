@@ -40,6 +40,12 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(1);
+    expect(version.v).toBe(2);
+  });
+
+  it('v2 adds the display_order column with spawned_at as default', () => {
+    runMigrations(db as unknown as SqliteLike);
+    const cols = db.prepare(`PRAGMA table_info(instances)`).all() as Array<{ name: string }>;
+    expect(cols.map((c) => c.name)).toContain('display_order');
   });
 });

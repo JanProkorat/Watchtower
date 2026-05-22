@@ -52,6 +52,16 @@ describe('repositories', () => {
     expect(repo.listLive().map((r) => r.id)).toEqual(['1']);
   });
 
+  it('InstancesRepo.reorder rewrites display_order so listAll honors the new order', () => {
+    const repo = new InstancesRepo(sqlite);
+    repo.insert(makeRow({ id: 'a', cwd: '/a' }));
+    repo.insert(makeRow({ id: 'b', cwd: '/b' }));
+    repo.insert(makeRow({ id: 'c', cwd: '/c' }));
+    expect(repo.listAll().map((r) => r.id)).toEqual(['a', 'b', 'c']);
+    repo.reorder(['c', 'a', 'b']);
+    expect(repo.listAll().map((r) => r.id)).toEqual(['c', 'a', 'b']);
+  });
+
   it('InstancesRepo.updateStatus + setTermination + setClaudeSessionId', () => {
     const repo = new InstancesRepo(sqlite);
     repo.insert(makeRow({ id: '1' }));

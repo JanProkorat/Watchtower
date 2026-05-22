@@ -191,6 +191,10 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       return { ok: true };
     }
 
+    case 'reorderInstances':
+      repo().reorder(req.payload.orderedIds);
+      return { ok: true };
+
     case 'listInstances': {
       const rows = repo().listAll();
       return {
