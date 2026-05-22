@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Box,
@@ -22,6 +22,7 @@ import { TerminalErrorBoundary } from './components/TerminalErrorBoundary.js';
 import { NewInstanceModal } from './components/NewInstanceModal.js';
 import { ModuleRail, type ModuleId } from './components/ModuleRail.js';
 import { DashboardTab } from './components/DashboardTab.js';
+import { FirstRunWizard } from './components/FirstRunWizard.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
 const TERMINAL_STATES = new Set(['finished', 'crashed', 'suspended']);
@@ -98,6 +99,33 @@ export function App() {
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [activeModule, setActiveModule] = useState<ModuleId>('instances');
+  const [wizardOpen, setWizardOpen] = useState(false);
+
+  // Show the first-run wizard until the user explicitly finishes or skips it.
+  useEffect(() => {
+    if (!loaded) return;
+    let cancelled = false;
+    void window.watchtower.invoke('getSetting', { key: 'first_run_completed_at' }).then((r) => {
+      if (!cancelled && !r.value) setWizardOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded]);
+
+  // Tell the orchestrator which tab the user is currently viewing so the
+  // notifier can suppress notifications for that instance.
+  useEffect(() => {
+    const id = activeId && activeId !== DASHBOARD_TAB ? activeId : null;
+    void window.watchtower.invoke('focusChanged', { instanceId: id });
+  }, [activeId]);
+
+  // Notification-click → main fires activateInstance → activate that tab.
+  useEffect(() => {
+    return window.watchtower.on('activateInstance', (p) => {
+      setActive(p.instanceId);
+    });
+  }, [setActive]);
 
   const handleRemove = (id: string, isLive: boolean) => {
     if (!isLive) {
@@ -187,6 +215,7 @@ export function App() {
         onClose={() => setNewOpen(false)}
         onSpawn={(cwd) => void doSpawn(cwd)}
       />
+      <FirstRunWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />
       <Dialog
         open={Boolean(confirmClose)}
         onClose={() => setConfirmClose(null)}

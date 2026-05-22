@@ -1,13 +1,30 @@
 import { ipcMain, dialog } from 'electron';
 import type { IpcRequest, IpcResponse } from '../shared/ipcContract.js';
-import { getMainWindow } from './window.js';
+import { getMainWindow, createMainWindow } from './window.js';
 import { getOrchestrator } from './orchestratorHost.js';
+import { fireMacNotification, fireTestNotification } from './notifications.js';
 
-const ELECTRON_ONLY_KINDS = new Set<IpcRequest['kind']>(['chooseDirectory']);
+const ELECTRON_ONLY_KINDS = new Set<IpcRequest['kind']>([
+  'chooseDirectory',
+  'sendTestNotification',
+]);
 
 export function registerIpc(): void {
-  // Push events from the orchestrator are forwarded to the renderer verbatim.
+  // Push events from the orchestrator are forwarded to the renderer verbatim;
+  // a few also trigger native side-effects (macOS notifications) in main.
   getOrchestrator().onPush((msg) => {
+    if (msg.kind === 'notify') {
+      const p = msg.payload as { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
+      fireMacNotification({
+        instanceId: p.instanceId,
+        cwd: p.cwd,
+        kind: p.kind,
+        onClick: (instanceId) => {
+          // Tell the renderer to activate this tab.
+          pushToRenderer('activateInstance', { instanceId });
+        },
+      });
+    }
     pushToRenderer(msg.kind, msg.payload);
   });
 
@@ -29,12 +46,17 @@ export function registerIpc(): void {
 
       if (kind === 'chooseDirectory') {
         const { defaultPath } = payload as { defaultPath?: string };
-        const win = getMainWindow() ?? undefined;
-        const res = await dialog.showOpenDialog(win as Electron.BrowserWindow, {
+        const win = getMainWindow() ?? createMainWindow();
+        const res = await dialog.showOpenDialog(win, {
           properties: ['openDirectory', 'createDirectory'],
           defaultPath,
         });
         return { path: res.canceled || !res.filePaths[0] ? null : res.filePaths[0] };
+      }
+
+      if (kind === 'sendTestNotification') {
+        fireTestNotification();
+        return { ok: true };
       }
 
       if (ELECTRON_ONLY_KINDS.has(kind)) {
