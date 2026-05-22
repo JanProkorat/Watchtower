@@ -205,46 +205,60 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
   }
 }
 
-function resumeOrCrashFromPreviousRun(): void {
-  // Any instance still marked live (spawning/working/waiting-*/idle-notify)
-  // is an orphan from a previous run — its pty died with the previous
-  // orchestrator process. If we captured a Claude session id, respawn via
-  // `claude --resume <id>` so the conversation continues. Otherwise the
-  // session is unrecoverable — mark crashed.
+function respawnIncompleteRowsOnBoot(): void {
+  // For every row that isn't definitely finished or definitely user-killed,
+  // try to bring it back to life on app start. This covers both fresh orphans
+  // (status was live when the previous orchestrator died) AND stale crashed
+  // rows from older versions of this code. Strategy per row:
   //
-  // Status is kept on the original row (we don't flip to 'resuming') so
-  // the tab strip's color doesn't flicker; once the resumed pty's
-  // SessionStart hook fires the state machine settles on 'working' anyway.
+  //   • status='finished'           → leave alone (claude exited cleanly)
+  //   • termination_reason='user-kill' → leave alone (user clicked ×)
+  //   • session_id present          → reset to 'spawning' then respawn via
+  //                                   `claude --resume <id>`; the spawn
+  //                                   helper's fast-fail fallback handles
+  //                                   sessions that have nothing to restore
+  //                                   by re-spawning fresh in the same cwd.
+  //   • no session_id               → unrecoverable, mark crashed.
+  //
+  // Resetting status before respawn matters: the state machine treats
+  // 'crashed' as terminal, so an incoming SessionStart hook would be
+  // ignored if we left the row crashed. 'spawning' is non-terminal so the
+  // state machine transitions normally as claude reconnects.
   const r = repo();
-  const orphans = r.listLive();
-  let resumed = 0;
+  const allRows = r.listAll();
+  let respawned = 0;
   let crashed = 0;
-  for (const o of orphans) {
-    if (o.claudeSessionId) {
-      try {
-        spawnPtyForInstance({
-          id: o.id,
-          cwd: o.cwd,
-          extraArgs: [],
-          resumeSessionId: o.claudeSessionId,
-        });
-        resumed++;
-      } catch (err) {
-        console.error('[orchestrator] resume failed for', o.id, err);
-        r.updateStatus(o.id, 'crashed', Date.now());
-        r.setTermination(o.id, 'resume-failed', null);
-        crashed++;
+  for (const row of allRows) {
+    if (row.status === 'finished') continue;
+    if (row.terminationReason === 'user-kill') continue;
+    if (!row.claudeSessionId) {
+      if (row.status !== 'crashed') {
+        r.updateStatus(row.id, 'crashed', Date.now());
+        r.setTermination(row.id, 'crash', null);
       }
-    } else {
-      r.updateStatus(o.id, 'crashed', Date.now());
-      r.setTermination(o.id, 'crash', null);
+      crashed++;
+      continue;
+    }
+    try {
+      r.updateStatus(row.id, 'spawning', Date.now());
+      r.setTermination(row.id, null, null);
+      spawnPtyForInstance({
+        id: row.id,
+        cwd: row.cwd,
+        extraArgs: [],
+        resumeSessionId: row.claudeSessionId,
+      });
+      respawned++;
+    } catch (err) {
+      console.error('[orchestrator] respawn failed for', row.id, err);
+      r.updateStatus(row.id, 'crashed', Date.now());
+      r.setTermination(row.id, 'resume-failed', null);
       crashed++;
     }
   }
-  if (orphans.length > 0) {
+  if (respawned + crashed > 0) {
     console.log(
-      `[orchestrator] previous run had ${orphans.length} live instance(s): ` +
-        `${resumed} resumed, ${crashed} crashed`,
+      `[orchestrator] previous run: ${respawned} respawned, ${crashed} crashed (no session id)`,
     );
   }
 }
@@ -265,9 +279,9 @@ function resumeOrCrashFromPreviousRun(): void {
       event.ports[0] as unknown as ConstructorParameters<typeof PortApi>[0],
     );
     api.onRequest(async (req) => handleRequest(req as OrchRequest));
-    // Resume after api is ready so the pty's first output/exit can push
-    // through to the renderer immediately.
-    resumeOrCrashFromPreviousRun();
+    // Respawn after api is ready so the resumed pty's first output/exit can
+    // push through to the renderer immediately.
+    respawnIncompleteRowsOnBoot();
     void statusOf; // referenced for future use; quiet TS unused warning
   },
 );

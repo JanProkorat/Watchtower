@@ -17,6 +17,7 @@ import { watchtowerTheme } from './theme.js';
 import { useInstances } from './state/useInstances.js';
 import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
 import { Terminal } from './components/Terminal.js';
+import { TerminalErrorBoundary } from './components/TerminalErrorBoundary.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
 const TERMINAL_STATES = new Set(['finished', 'crashed', 'suspended']);
@@ -131,7 +132,14 @@ export function App() {
                   cwd={i.cwd}
                 />
               ) : (
-                <Terminal key={i.id} instanceId={i.id} active={i.id === activeId} />
+                <TerminalErrorBoundary
+                  key={i.id}
+                  instanceId={i.id}
+                  cwd={i.cwd}
+                  active={i.id === activeId}
+                >
+                  <Terminal instanceId={i.id} active={i.id === activeId} />
+                </TerminalErrorBoundary>
               ),
             )
           )}
