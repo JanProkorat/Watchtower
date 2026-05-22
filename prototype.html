@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1320, initial-scale=1" />
+<title>Watchtower — Visual Prototype</title>
+<!--
+  Watchtower — Visual Prototype
+  Self-contained static mockup. Open in a browser, click the scene buttons at the top to switch views.
+  Colors and typography mirror the MUI dark theme defined in the design spec.
+-->
+<style>
+  :root {
+    --bg-default: #0e0f12;
+    --bg-paper: #15171c;
+    --bg-paper-2: #1c1f26;
+    --bg-elevated: #20242c;
+    --text-primary: #e5e7eb;
+    --text-secondary: #9aa1ab;
+    --text-disabled: #5a6068;
+    --border: #232730;
+    --border-strong: #2e333d;
+    --primary: #7aa7ff;
+    --primary-soft: rgba(122, 167, 255, 0.12);
+    --secondary: #f0a868;
+    --error: #ef5350;
+    --warning: #ffb74d;
+    --success: #66bb6a;
+    --neutral: #9e9e9e;
+    --radius: 6px;
+    --radius-lg: 10px;
+    --terminal-font: 'Menlo', 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+    --ui-font: 'Inter', -apple-system, 'SF Pro Text', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(circle at 30% 0%, #1a1d24 0%, #06070a 50%);
+    font-family: var(--ui-font);
+    color: var(--text-primary);
+    padding: 32px 24px 64px;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── Scene picker (outside the app frame) ─── */
+  .scene-picker {
+    max-width: 1280px;
+    margin: 0 auto 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+  .scene-picker strong { color: var(--text-primary); margin-right: 16px; }
+  .scene-picker button {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: 4px;
+    font: inherit;
+    cursor: pointer;
+    transition: background 100ms, color 100ms, border-color 100ms;
+  }
+  .scene-picker button:hover { background: rgba(255, 255, 255, 0.04); color: var(--text-primary); }
+  .scene-picker button[data-active="true"] {
+    background: var(--primary-soft);
+    color: var(--primary);
+    border-color: rgba(122, 167, 255, 0.4);
+  }
+  .scene-picker .spacer { flex: 1; }
+  .scene-picker .hint { color: var(--text-disabled); font-size: 12px; }
+
+  /* ─── App window frame ─── */
+  .window {
+    width: 1280px;
+    max-width: 100%;
+    margin: 0 auto;
+    height: 820px;
+    background: var(--bg-default);
+    border-radius: 12px;
+    box-shadow:
+      0 40px 100px rgba(0, 0, 0, 0.7),
+      0 0 0 1px rgba(255, 255, 255, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ─── Title bar (macOS-ish) ─── */
+  .titlebar {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    background: linear-gradient(180deg, #1b1e25, #15171c);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    flex-shrink: 0;
+    -webkit-app-region: drag;
+  }
+  .traffic { display: flex; gap: 8px; }
+  .tl { width: 12px; height: 12px; border-radius: 50%; display: block; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.3); }
+  .tl.close { background: #ff5f57; }
+  .tl.min   { background: #febc2e; }
+  .tl.max   { background: #28c840; }
+  .titlebar .title {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.2px;
+  }
+  .titlebar .right { width: 60px; }
+
+  /* ─── Body ─── */
+  .body { flex: 1; display: flex; min-height: 0; }
+
+  /* ─── Module rail ─── */
+  .rail {
+    width: 56px;
+    background: var(--bg-paper);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .rail-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    cursor: pointer;
+    position: relative;
+    transition: background 120ms, color 120ms;
+  }
+  .rail-btn:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.04); }
+  .rail-btn.active { color: var(--primary); background: var(--primary-soft); }
+  .rail-btn.disabled { color: var(--text-disabled); cursor: not-allowed; }
+  .rail-btn.disabled:hover { background: transparent; }
+  .rail-btn svg { width: 20px; height: 20px; }
+  .rail-btn .rail-badge {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background: var(--error);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid var(--bg-paper);
+  }
+  .rail-divider { width: 24px; height: 1px; background: var(--border); margin: 8px 0; }
+
+  /* ─── Content column ─── */
+  .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  /* ─── Tab strip ─── */
+  .tabs {
+    display: flex;
+    align-items: center;
+    background: var(--bg-paper);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    padding: 0 4px;
+    overflow-x: auto;
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color 100ms, background 100ms;
+  }
+  .tab:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.02); }
+  .tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--primary);
+    background: var(--bg-default);
+  }
+  .tab.dashboard { font-weight: 500; }
+  .tab .x {
+    width: 14px;
+    height: 14px;
+    color: var(--text-disabled);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    margin-left: 4px;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .tab .x:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-primary); }
+
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+  }
+  .dot.waiting-permission { background: var(--error); box-shadow: 0 0 8px rgba(239, 83, 80, 0.7); }
+  .dot.waiting-input      { background: var(--warning); }
+  .dot.idle-notify        { background: var(--neutral); }
+  .dot.working            { background: var(--primary); animation: pulse 1.6s ease-in-out infinite; }
+  .dot.finished           { background: var(--success); }
+  .dot.crashed            { background: var(--error); }
+  .dot.suspended          { background: var(--text-disabled); }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.45; transform: scale(0.85); }
+    50%      { opacity: 1;    transform: scale(1.05); }
+  }
+
+  .tab-add {
+    width: 32px; height: 32px;
+    margin: 4px 4px 4px 6px;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .tab-add:hover { background: rgba(255, 255, 255, 0.05); color: var(--primary); }
+  .tab-add svg { width: 16px; height: 16px; }
+
+  /* ─── Terminal view ─── */
+  .terminal {
+    flex: 1;
+    background: var(--bg-default);
+    padding: 16px 20px;
+    font-family: var(--terminal-font);
+    font-size: 13px;
+    line-height: 1.55;
+    overflow: auto;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+  }
+  .terminal .p-user    { color: #6dd9b3; }
+  .terminal .p-claude  { color: #c5a4ff; }
+  .terminal .p-tool    { color: #f0a868; }
+  .terminal .p-dim     { color: var(--text-secondary); }
+  .terminal .p-good    { color: var(--success); }
+  .terminal .p-warn    { color: var(--warning); }
+  .terminal .p-err     { color: var(--error); }
+  .terminal .p-key     { color: #7aa7ff; }
+  .terminal .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 1.1em;
+    background: #e5e7eb;
+    vertical-align: text-top;
+    margin-left: 1px;
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ─── Status bar ─── */
+  .statusbar {
+    height: 28px;
+    background: var(--bg-paper);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .statusbar .sep { color: var(--text-disabled); }
+  .statusbar .item { display: inline-flex; align-items: center; gap: 6px; }
+  .statusbar .item.ok    { color: var(--success); }
+  .statusbar .item.warn  { color: var(--warning); }
+  .statusbar .item.err   { color: var(--error); }
+  .statusbar .spacer { flex: 1; }
+
+  /* ─── Dashboard view ─── */
+  .dashboard {
+    flex: 1;
+    overflow: auto;
+    padding: 32px 36px;
+  }
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+  }
+  .dashboard-header h1 {
+    margin: 0 0 4px 0;
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .dashboard-header .meta {
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+  .dashboard-actions { display: flex; gap: 8px; }
+  .btn {
+    appearance: none;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text-primary);
+    padding: 7px 14px;
+    border-radius: var(--radius);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 100ms, border-color 100ms;
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.04); }
+  .btn.primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #0a0d14;
+    font-weight: 600;
+  }
+  .btn.primary:hover { background: #93b7ff; }
+  .btn.danger { color: var(--error); border-color: rgba(239, 83, 80, 0.3); }
+  .btn.danger:hover { background: rgba(239, 83, 80, 0.08); }
+  .btn.ghost { border-color: transparent; color: var(--text-secondary); }
+  .btn.ghost:hover { color: var(--text-primary); }
+
+  .dash-list { display: flex; flex-direction: column; gap: 8px; }
+  .dash-card {
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .dash-card .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 12px;
+    letter-spacing: 0.2px;
+    text-transform: lowercase;
+  }
+  .chip.waiting-permission { background: rgba(239, 83, 80, 0.15); color: var(--error); }
+  .chip.waiting-input      { background: rgba(255, 183, 77, 0.15); color: var(--warning); }
+  .chip.idle-notify        { background: rgba(158, 158, 158, 0.15); color: var(--neutral); }
+  .chip.working            { background: rgba(122, 167, 255, 0.15); color: var(--primary); }
+  .chip.finished           { background: rgba(102, 187, 106, 0.15); color: var(--success); }
+  .chip.crashed            { background: rgba(239, 83, 80, 0.15); color: var(--error); }
+  .chip.suspended          { background: rgba(90, 96, 104, 0.25); color: var(--text-secondary); }
+  .dash-card .info { flex: 1; min-width: 0; }
+  .dash-card .name { font-family: var(--terminal-font); font-size: 13px; color: var(--text-primary); }
+  .dash-card .path { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .dash-card .time { font-size: 11px; color: var(--text-disabled); font-variant-numeric: tabular-nums; }
+  .dash-card .actions { display: flex; gap: 4px; }
+
+  .dash-section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-disabled);
+    margin: 24px 0 8px;
+  }
+
+  /* ─── Settings module (preview) ─── */
+  .settings-pane { display: none; flex: 1; padding: 32px 40px; overflow: auto; max-width: 720px; }
+  .settings-pane h2 { margin: 0 0 24px 0; }
+
+  /* ─── Modal backdrop ─── */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(4, 6, 10, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    z-index: 10;
+  }
+  .modal {
+    background: var(--bg-paper);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+    width: 100%;
+    max-width: 560px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal.wide { max-width: 720px; }
+  .modal-header {
+    padding: 20px 24px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-header h2 { margin: 0; font-size: 17px; font-weight: 600; }
+  .modal-header .sub { margin-top: 4px; font-size: 13px; color: var(--text-secondary); }
+  .modal-body { padding: 20px 24px; overflow: auto; }
+  .modal-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .input-row { display: flex; gap: 8px; align-items: stretch; }
+  .input {
+    flex: 1;
+    background: var(--bg-default);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    font: inherit;
+    font-size: 13px;
+    font-family: var(--terminal-font);
+  }
+  .input:focus { outline: none; border-color: var(--primary); }
+
+  .recent-list {
+    margin-top: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-height: 220px;
+    overflow: auto;
+  }
+  .recent-list .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.1px;
+    color: var(--text-disabled);
+    padding: 8px 12px 4px;
+  }
+  .recent-list .item {
+    padding: 8px 12px;
+    font-family: var(--terminal-font);
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-top: 1px solid var(--border);
+  }
+  .recent-list .item:hover { background: rgba(255, 255, 255, 0.03); color: var(--text-primary); }
+
+  /* ─── Wizard ─── */
+  .wizard-steps {
+    display: flex;
+    gap: 4px;
+    padding: 16px 24px 0;
+  }
+  .wizard-step {
+    flex: 1;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border-strong);
+  }
+  .wizard-step.active { background: var(--primary); }
+  .wizard-step.done   { background: var(--success); }
+
+  .diff-block {
+    background: var(--bg-default);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-family: var(--terminal-font);
+    font-size: 12px;
+    line-height: 1.55;
+    max-height: 280px;
+    overflow: auto;
+    margin-top: 12px;
+  }
+  .diff-add { color: var(--success); }
+  .diff-dim { color: var(--text-secondary); }
+
+  .alert {
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .alert.info    { background: rgba(122, 167, 255, 0.08); color: var(--primary); border: 1px solid rgba(122, 167, 255, 0.2); }
+  .alert.warn    { background: rgba(255, 183, 77, 0.08); color: var(--warning); border: 1px solid rgba(255, 183, 77, 0.2); }
+  .alert.success { background: rgba(102, 187, 106, 0.08); color: var(--success); border: 1px solid rgba(102, 187, 106, 0.2); }
+
+  /* ─── Tray popup mock (above the window) ─── */
+  .tray-popup {
+    position: absolute;
+    top: -10px;
+    right: 60px;
+    width: 280px;
+    background: rgba(28, 31, 38, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    padding: 6px 0;
+    font-size: 13px;
+    display: none;
+    z-index: 5;
+  }
+  .tray-popup.show { display: block; }
+  .tray-row { padding: 6px 14px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .tray-row:hover { background: var(--primary-soft); }
+  .tray-row.header { color: var(--text-secondary); font-size: 12px; cursor: default; }
+  .tray-row.header:hover { background: transparent; }
+  .tray-divider { height: 1px; background: rgba(255, 255, 255, 0.08); margin: 4px 0; }
+  .tray-popup .arrow {
+    position: absolute;
+    top: -6px;
+    right: 22px;
+    width: 12px;
+    height: 12px;
+    background: rgba(28, 31, 38, 0.95);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    transform: rotate(45deg);
+  }
+
+  /* ─── Resume-failed inline panel ─── */
+  .resume-failed {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 60px;
+    gap: 16px;
+    background: var(--bg-default);
+  }
+  .resume-failed h2 { margin: 0; font-weight: 500; }
+  .resume-failed p { margin: 0; color: var(--text-secondary); max-width: 540px; font-size: 13px; line-height: 1.5; }
+  .resume-failed code { font-family: var(--terminal-font); color: var(--text-primary); background: var(--bg-paper); padding: 2px 6px; border-radius: 4px; }
+
+  /* ─── Crash banner (above rail/content) ─── */
+  .crash-banner {
+    display: none;
+    background: rgba(239, 83, 80, 0.15);
+    color: #ff9b98;
+    border-bottom: 1px solid rgba(239, 83, 80, 0.3);
+    padding: 8px 16px;
+    font-size: 13px;
+    align-items: center;
+    gap: 10px;
+  }
+  .crash-banner.show { display: flex; }
+
+  /* ─── Settings preview (for the settings module pseudo-state) ─── */
+  .settings-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 24px;
+  }
+  .settings-row label { font-size: 14px; font-weight: 500; }
+  .settings-row .desc { font-size: 12px; color: var(--text-secondary); }
+  .settings-divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+</style>
+</head>
+<body>
+
+<div class="scene-picker">
+  <strong>Watchtower — visual prototype</strong>
+  <button data-scene="terminal" data-active="true">Terminal view</button>
+  <button data-scene="dashboard">Dashboard</button>
+  <button data-scene="new">New-instance modal</button>
+  <button data-scene="wizard">First-run wizard</button>
+  <button data-scene="resume-failed">Resume-failed panel</button>
+  <button data-scene="settings">Settings module</button>
+  <button data-scene="tray">Tray menu open</button>
+  <button data-scene="crash">Orchestrator crash banner</button>
+  <span class="spacer"></span>
+  <span class="hint">click a scene to swap</span>
+</div>
+
+<div class="window" id="window">
+
+  <!-- ── Title bar ── -->
+  <div class="titlebar">
+    <div class="traffic">
+      <span class="tl close"></span>
+      <span class="tl min"></span>
+      <span class="tl max"></span>
+    </div>
+    <div class="title">Watchtower</div>
+    <div class="right"></div>
+  </div>
+
+  <!-- ── Crash banner (toggleable) ── -->
+  <div class="crash-banner" id="crashBanner">
+    <strong>Orchestrator crashed — restarting…</strong>
+    <span style="color: rgba(255, 255, 255, 0.6); font-size: 12px;">Attempt 1 of 3. Instances will reappear automatically.</span>
+  </div>
+
+  <div class="body">
+
+    <!-- ── Module rail ── -->
+    <div class="rail">
+      <div class="rail-btn" title="Dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="3" width="7" height="9" rx="1.5"/>
+          <rect x="14" y="3" width="7" height="5" rx="1.5"/>
+          <rect x="3" y="16" width="7" height="5" rx="1.5"/>
+          <rect x="14" y="12" width="7" height="9" rx="1.5"/>
+        </svg>
+      </div>
+      <div class="rail-btn active" title="Instances" id="railInstances">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M4 17l5-5-5-5"/>
+          <path d="M12 19h8"/>
+        </svg>
+        <span class="rail-badge">1</span>
+      </div>
+      <div class="rail-btn disabled" title="TimeTracker (coming soon)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="13" r="8"/>
+          <path d="M12 9v4l3 2"/>
+          <path d="M9 2h6"/>
+        </svg>
+      </div>
+      <div class="rail-divider"></div>
+      <div class="rail-btn" title="Settings" id="railSettings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- ── Content column ── -->
+    <div class="content">
+
+      <!-- Tab strip -->
+      <div class="tabs" id="tabs">
+        <div class="tab dashboard" data-tab="dashboard">Dashboard</div>
+        <div class="tab active" data-tab="capacity-planning">
+          <span class="dot working"></span>capacity-planning
+          <span class="x">×</span>
+        </div>
+        <div class="tab" data-tab="technology">
+          <span class="dot waiting-permission"></span>technology
+          <span class="x">×</span>
+        </div>
+        <div class="tab" data-tab="machinery">
+          <span class="dot waiting-input"></span>machinery
+          <span class="x">×</span>
+        </div>
+        <div class="tab" data-tab="jira-sync">
+          <span class="dot idle-notify"></span>jira-sync
+          <span class="x">×</span>
+        </div>
+        <div class="tab-add" title="New instance" id="tabAdd">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </div>
+      </div>
+
+      <!-- Terminal view -->
+      <pre class="terminal" id="terminalView"><span class="p-dim">Watchtower · session <span class="p-key">f4e2-…-a18b</span> · cwd <span class="p-key">~/Projects/PPS/capacity-planning</span></span>
+
+<span class="p-user">jan@m1pro</span> <span class="p-dim">~/Projects/PPS/capacity-planning</span> <span class="p-user">$</span> claude
+<span class="p-claude">Welcome to Claude Code</span>
+<span class="p-dim">Type your message or `/help` for commands.</span>
+
+<span class="p-user">&gt;</span> Update the worklog quick drawer to support multi-day entries.
+
+<span class="p-claude">I'll start by reading the current worklog drawer to see how the date field is wired.</span>
+
+<span class="p-tool">⏺ Read</span> <span class="p-key">client/src/components/WorklogQuickDrawer.tsx</span>
+  <span class="p-dim">⎿ Read 247 lines</span>
+
+<span class="p-claude">The form uses a single `dayjs` date field bound via React Hook Form. To support multi-day:</span>
+
+  1. swap the single <span class="p-key">DateField</span> for a <span class="p-key">DateRangePicker</span>
+  2. extend the Zod schema with <span class="p-key">endDate</span> (defaulting to <span class="p-key">startDate</span>)
+  3. teach the submit handler to expand the range into one worklog per day
+
+<span class="p-tool">⏺ Read</span> <span class="p-key">server/validators.ts</span>
+  <span class="p-dim">⎿ Read 89 lines (lines 1-89)</span>
+
+<span class="p-claude">Found the existing `worklogCreateSchema`. I'll widen it now.</span><span class="cursor"></span>
+</pre>
+
+      <!-- Dashboard view -->
+      <div class="dashboard" id="dashboardView" style="display: none">
+        <div class="dashboard-header">
+          <div>
+            <h1>Instances</h1>
+            <div class="meta">4 running · 1 waiting · last activity 14 s ago</div>
+          </div>
+          <div class="dashboard-actions">
+            <button class="btn">Snooze all</button>
+            <button class="btn primary">New instance</button>
+          </div>
+        </div>
+
+        <div class="dash-section-label">Needs attention</div>
+        <div class="dash-list">
+          <div class="dash-card">
+            <span class="chip waiting-permission"><span class="dot waiting-permission"></span>waiting permission</span>
+            <div class="info">
+              <div class="name">technology</div>
+              <div class="path">~/Projects/PPS/technology · TEH-2841</div>
+            </div>
+            <div class="time">asked 18 s ago</div>
+            <div class="actions">
+              <button class="btn">Open</button>
+              <button class="btn danger">Kill</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-section-label">Live</div>
+        <div class="dash-list">
+          <div class="dash-card">
+            <span class="chip working"><span class="dot working"></span>working</span>
+            <div class="info">
+              <div class="name">capacity-planning</div>
+              <div class="path">~/Projects/PPS/capacity-planning · FIE1933-18887</div>
+            </div>
+            <div class="time">streaming · 4 s</div>
+            <div class="actions">
+              <button class="btn">Open</button>
+              <button class="btn danger">Kill</button>
+            </div>
+          </div>
+          <div class="dash-card">
+            <span class="chip waiting-input"><span class="dot waiting-input"></span>waiting input</span>
+            <div class="info">
+              <div class="name">machinery</div>
+              <div class="path">~/Projects/PPS/machinery</div>
+            </div>
+            <div class="time">idle 47 s · quietTimer 43 s</div>
+            <div class="actions">
+              <button class="btn">Open</button>
+              <button class="btn danger">Kill</button>
+            </div>
+          </div>
+          <div class="dash-card">
+            <span class="chip idle-notify"><span class="dot idle-notify"></span>idle</span>
+            <div class="info">
+              <div class="name">jira-sync</div>
+              <div class="path">~/Projects/TimeTracker</div>
+            </div>
+            <div class="time">idle 12 m</div>
+            <div class="actions">
+              <button class="btn">Open</button>
+              <button class="btn danger">Kill</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-section-label">Recent</div>
+        <div class="dash-list">
+          <div class="dash-card">
+            <span class="chip finished"><span class="dot finished"></span>finished</span>
+            <div class="info">
+              <div class="name">manufactory</div>
+              <div class="path">~/Projects/PPS/manufactory · VYR-1102</div>
+            </div>
+            <div class="time">ended 28 m ago</div>
+            <div class="actions">
+              <button class="btn ghost">Reopen in cwd</button>
+            </div>
+          </div>
+          <div class="dash-card">
+            <span class="chip suspended"><span class="dot suspended"></span>suspended</span>
+            <div class="info">
+              <div class="name">quality-control</div>
+              <div class="path">~/Projects/PPS/quality-control · KONTROLA-217</div>
+            </div>
+            <div class="time">suspended 2 h ago · will resume on launch</div>
+            <div class="actions">
+              <button class="btn ghost">Discard</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resume-failed inline panel -->
+      <div class="resume-failed" id="resumeFailedView">
+        <h2>Couldn't resume session</h2>
+        <p>Claude rejected the resume attempt for session <code>00000000-0000-0000-0000-000000000000</code>. The session may have expired or been deleted from <code>~/.claude</code>.</p>
+        <p>You can keep the row for history, or open a fresh <code>claude</code> in the same working directory.</p>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn primary">Open fresh claude in ~/Projects/PPS/machinery</button>
+          <button class="btn">Dismiss</button>
+        </div>
+      </div>
+
+      <!-- Settings module -->
+      <div class="settings-pane" id="settingsView">
+        <h2>Settings</h2>
+
+        <div class="settings-row">
+          <label>Notification quiet timer</label>
+          <div class="desc">How long Claude stays at end-of-turn before Watchtower pings. Default 90 s.</div>
+          <div class="input-row" style="margin-top: 8px;">
+            <input class="input" value="90000" />
+            <span style="align-self: center; color: var(--text-secondary); font-size: 12px;">ms</span>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <label>Default working directory</label>
+          <div class="desc">Pre-filled in the New Instance modal.</div>
+          <div class="input-row" style="margin-top: 8px;">
+            <input class="input" value="~/Projects" />
+            <button class="btn">Browse…</button>
+          </div>
+        </div>
+
+        <div class="settings-divider"></div>
+
+        <div class="settings-row">
+          <label>Hooks</label>
+          <div class="desc">5 hooks currently installed in <code style="font-family: var(--terminal-font); font-size: 12px;">~/.claude/settings.json</code>.</div>
+          <div style="margin-top: 8px; display: flex; gap: 8px;">
+            <button class="btn">Reinstall hooks</button>
+            <button class="btn danger">Uninstall hooks</button>
+            <button class="btn ghost">Regenerate token</button>
+          </div>
+        </div>
+
+        <div class="settings-divider"></div>
+
+        <div class="settings-row">
+          <label>Diagnostics</label>
+          <div class="desc">Listener port <code style="font-family: var(--terminal-font); font-size: 12px;">:7421</code> · Orchestrator pid <code style="font-family: var(--terminal-font); font-size: 12px;">31488</code> · DB <code style="font-family: var(--terminal-font); font-size: 12px;">~/Library/Application Support/Watchtower/data.db</code></div>
+          <div style="margin-top: 8px; display: flex; gap: 8px;">
+            <button class="btn">Send test notification</button>
+            <button class="btn ghost">Open log directory</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status bar -->
+      <div class="statusbar">
+        <span class="item">4 instances</span>
+        <span class="sep">·</span>
+        <span class="item warn">1 waiting</span>
+        <span class="sep">·</span>
+        <span class="item ok">hook listener :7421 ✓</span>
+        <span class="sep">·</span>
+        <span class="item">orchestrator up · 03h 14m</span>
+        <span class="spacer"></span>
+        <span class="item">Watchtower 0.0.1</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── New-instance modal ── -->
+  <div class="overlay" id="modalNew" style="display: none">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>New Claude Code instance</h2>
+        <div class="sub">A new pty will spawn <code>claude --session-id &lt;uuid&gt;</code> in the chosen directory.</div>
+      </div>
+      <div class="modal-body">
+        <div class="input-row">
+          <input class="input" value="~/Projects/PPS/technology" />
+          <button class="btn">Browse…</button>
+        </div>
+        <div class="recent-list">
+          <div class="label">Recent</div>
+          <div class="item">~/Projects/PPS/capacity-planning</div>
+          <div class="item">~/Projects/PPS/manufactory</div>
+          <div class="item">~/Projects/TimeTracker</div>
+          <div class="item">~/Projects/Watchtower</div>
+          <div class="item">~/Projects/PPS/quality-control</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="setScene('terminal')">Cancel</button>
+        <button class="btn primary" onclick="setScene('terminal')">Spawn</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── First-run wizard ── -->
+  <div class="overlay" id="modalWizard" style="display: none">
+    <div class="modal wide">
+      <div class="modal-header">
+        <h2>Welcome to Watchtower</h2>
+        <div class="sub">Step 2 of 3 — Install Claude Code hooks</div>
+      </div>
+      <div class="wizard-steps">
+        <div class="wizard-step done"></div>
+        <div class="wizard-step active"></div>
+        <div class="wizard-step"></div>
+      </div>
+      <div class="modal-body">
+        <div class="alert info">
+          <span>Watchtower will add five entries to <code style="font-family: var(--terminal-font); font-size: 12px;">~/.claude/settings.json</code>. Your existing file will be backed up to <code style="font-family: var(--terminal-font); font-size: 12px;">settings.json.watchtower-bak.1716368412</code> first.</span>
+        </div>
+        <div class="diff-block">
+<span class="diff-dim">{
+  ...
+  "hooks": {</span>
+<span class="diff-add">    "SessionStart": [{ "hooks": [{ "type": "command", "command": "node \"~/Library/.../watchtower-hook.mjs\" SessionStart" }]}],</span>
+<span class="diff-add">    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node \"~/Library/.../watchtower-hook.mjs\" UserPromptSubmit" }]}],</span>
+<span class="diff-add">    "Notification": [{ "hooks": [{ "type": "command", "command": "node \"~/Library/.../watchtower-hook.mjs\" Notification" }]}],</span>
+<span class="diff-add">    "Stop": [{ "hooks": [{ "type": "command", "command": "node \"~/Library/.../watchtower-hook.mjs\" Stop" }]}],</span>
+<span class="diff-add">    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "node \"~/Library/.../watchtower-hook.mjs\" SessionEnd" }]}]</span>
+<span class="diff-dim">  }
+}</span>
+        </div>
+        <div class="alert warn" style="margin-top: 12px;">
+          <span>Existing non-Watchtower hooks (if any) are preserved. Uninstall later from Settings → Hooks.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn ghost" onclick="setScene('terminal')">Cancel</button>
+        <button class="btn">Back</button>
+        <button class="btn primary" onclick="setScene('terminal')">Install hooks</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tray menu (anchored to the title bar) ── -->
+  <div class="tray-popup" id="trayPopup">
+    <div class="arrow"></div>
+    <div class="tray-row header">4 running · 1 waiting</div>
+    <div class="tray-divider"></div>
+    <div class="tray-row"><span class="dot working"></span>capacity-planning</div>
+    <div class="tray-row"><span class="dot waiting-permission"></span>technology <span style="margin-left: auto; color: var(--text-secondary); font-size: 11px;">18 s</span></div>
+    <div class="tray-row"><span class="dot waiting-input"></span>machinery</div>
+    <div class="tray-row"><span class="dot idle-notify"></span>jira-sync <span style="margin-left: auto; color: var(--text-secondary); font-size: 11px;">12 m</span></div>
+    <div class="tray-divider"></div>
+    <div class="tray-row">New instance…</div>
+    <div class="tray-row">Snooze all ▸</div>
+    <div class="tray-row">Settings…</div>
+    <div class="tray-divider"></div>
+    <div class="tray-row" style="color: var(--error);">Quit (suspend 4 sessions)</div>
+  </div>
+
+</div>
+
+<script>
+  const scenes = {
+    terminal: () => {
+      show('terminalView', true);
+      show('dashboardView', false);
+      show('resumeFailedView', false);
+      show('settingsView', false);
+      hideOverlays();
+      setRail('railInstances');
+      setActiveTab('capacity-planning');
+    },
+    dashboard: () => {
+      show('terminalView', false);
+      show('dashboardView', true);
+      show('resumeFailedView', false);
+      show('settingsView', false);
+      hideOverlays();
+      setRail('railInstances');
+      setActiveTab('dashboard');
+    },
+    new: () => {
+      scenes.terminal();
+      document.getElementById('modalNew').style.display = 'flex';
+    },
+    wizard: () => {
+      scenes.terminal();
+      document.getElementById('modalWizard').style.display = 'flex';
+    },
+    'resume-failed': () => {
+      show('terminalView', false);
+      show('dashboardView', false);
+      show('settingsView', false);
+      show('resumeFailedView', true, 'flex');
+      hideOverlays();
+      setRail('railInstances');
+      setActiveTab('machinery');
+    },
+    settings: () => {
+      show('terminalView', false);
+      show('dashboardView', false);
+      show('resumeFailedView', false);
+      show('settingsView', true, 'block');
+      hideOverlays();
+      setRail('railSettings');
+    },
+    tray: () => {
+      scenes.terminal();
+      document.getElementById('trayPopup').classList.add('show');
+    },
+    crash: () => {
+      scenes.terminal();
+      document.getElementById('crashBanner').classList.add('show');
+    },
+  };
+
+  function show(id, on, displayValue) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = on ? (displayValue || (el.tagName === 'PRE' ? 'block' : (el.classList.contains('settings-pane') ? 'block' : (el.classList.contains('resume-failed') ? 'flex' : 'block')))) : 'none';
+  }
+
+  function hideOverlays() {
+    document.getElementById('modalNew').style.display = 'none';
+    document.getElementById('modalWizard').style.display = 'none';
+    document.getElementById('trayPopup').classList.remove('show');
+    document.getElementById('crashBanner').classList.remove('show');
+  }
+
+  function setRail(activeId) {
+    document.querySelectorAll('.rail-btn').forEach((b) => b.classList.remove('active'));
+    const el = document.getElementById(activeId);
+    if (el) el.classList.add('active');
+  }
+
+  function setActiveTab(name) {
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+  }
+
+  function setScene(name) {
+    document.querySelectorAll('.scene-picker button').forEach((b) =>
+      b.setAttribute('data-active', String(b.dataset.scene === name))
+    );
+    const fn = scenes[name];
+    if (fn) fn();
+  }
+
+  document.querySelectorAll('.scene-picker button').forEach((b) => {
+    b.addEventListener('click', () => setScene(b.dataset.scene));
+  });
+
+  // Click tabs to switch (within terminal scene)
+  document.querySelectorAll('.tab').forEach((t) => {
+    t.addEventListener('click', () => {
+      if (t.dataset.tab === 'dashboard') return setScene('dashboard');
+      setScene('terminal');
+      setActiveTab(t.dataset.tab);
+    });
+  });
+
+  document.getElementById('tabAdd').addEventListener('click', () => setScene('new'));
+  window.setScene = setScene;
+</script>
+
+</body>
+</html>

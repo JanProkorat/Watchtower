@@ -1,0 +1,205 @@
+# Watchtower — Prototype Tracker
+
+> A living document. Updated as the prototype evolves. The single page that tells the story of what Watchtower is, why it exists, where it stands, and where it's going.
+
+---
+
+## TL;DR
+
+**Watchtower** is a macOS platform — built as an Electron app — that becomes the center of my daily work with Claude Code. Its first capability is the one that hurts the most today: a *watcher* that knows the state of every running Claude Code instance and notifies me when one of them is waiting for input. Over time, additional modules (TimeTracker integration, settings/hooks/skills editors, memory inspector, scheduler dashboard, etc.) slot into the same shell.
+
+The platform is named after Watchtower because the first capability literally watches my work — and because, as a metaphor, a watchtower is a personal vantage point: lone, fortified, full of instruments, and the place from which everything else is monitored.
+
+---
+
+## The pitch — why this exists
+
+I run multiple Claude Code instances in parallel across different VS Code terminals. When one needs my input — a permission prompt, an `AskUserQuestion`, an idle end-of-turn — it sits silently. I forget which terminal is which, switch away, and lose hours (sometimes a full day) before I remember to check it. The cost of that forgetting compounds with every new instance I start.
+
+Watchtower solves this directly: every instance lives in a tab inside the app, its state is tracked from Claude Code's own hook events, and macOS notifies me the moment one of them needs me — no matter which app is in the foreground.
+
+That's the MVP. But the same app becomes the natural home for everything else I touch in the Claude Code ecosystem: settings, hooks, skills, agents, memory, MCP servers, cron schedules, plus the existing TimeTracker as a sibling module.
+
+---
+
+## Name — origin
+
+The name was chosen on 2026-05-22 after brainstorming several directions:
+
+- **Atelier** — craftsman's studio (refined, scales to multi-module)
+- **Forge** — Stark / Iron Man energy (overused in dev tools)
+- **Bastion** — fortified stronghold (Fortress-of-Solitude vibe)
+- **Sanctum** — Doctor Strange hideout (mystical, private)
+- **Watchtower** ← chosen
+
+Watchtower won because it fits the MVP function *literally* (you watch from a tower) and the platform metaphor *mythically* (Justice League's Watchtower is a space station packed with instruments where the team operates from). It scales: today the tower has one instrument (the instance watcher); tomorrow it has many.
+
+---
+
+## Status
+
+| Phase | State |
+|---|---|
+| Brainstorming | Done — 2026-05-22 |
+| Design spec | Approved — see `docs/superpowers/specs/2026-05-22-watchtower-instance-watcher-design.md` |
+| Implementation plan | Pending |
+| MVP implementation | Not started |
+| First runnable build | — |
+| First daily-use build | — |
+
+---
+
+## Architecture at a glance
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Watchtower.app (Electron)                                   │
+│                                                              │
+│  ┌─────────────────┐    IPC     ┌──────────────────────┐     │
+│  │ Renderer        │ ◄────────► │ Electron main        │     │
+│  │  React + MUI +  │            │  • window / tray     │     │
+│  │  xterm.js       │            │  • macOS notifications│    │
+│  └─────────────────┘            └────────┬─────────────┘     │
+│                                          │ MessagePort       │
+│                                 ┌────────▼─────────────┐     │
+│                                 │ Orchestrator         │     │
+│                                 │  Node child process  │     │
+│                                 │  • pty sessions      │     │
+│                                 │  • hook HTTP listener│     │
+│                                 │  • SQLite store      │     │
+│                                 │  • state machine     │     │
+│                                 └────────┬─────────────┘     │
+│                                          │ spawn pty         │
+└──────────────────────────────────────────┼───────────────────┘
+                                           ▼
+                                   ┌────────────────┐
+                                   │ claude (pty)   │  ◄──┐
+                                   │  …per instance │     │ hook scripts
+                                   └────────────────┘     │ (~/.claude/
+                                           │              │  settings.json)
+                                           ▼              │
+                                   curl POST localhost ───┘
+```
+
+Three processes inside one Electron app:
+
+- **Renderer** — React UI; hosts `xterm.js` terminals, tab strip, module rail.
+- **Electron main** — windowing, tray, macOS notifications. Thin proxy.
+- **Orchestrator** (Node `utilityProcess` child) — single source of truth. Owns pty sessions, the localhost HTTP listener that hook events POST to, the SQLite store, and the per-instance state machine.
+
+Plus a bundled **`watchtower-hook`** helper binary that's installed into `~/.claude/settings.json` and forwards Claude Code's hook events to the orchestrator.
+
+Full detail: [`docs/superpowers/specs/2026-05-22-watchtower-instance-watcher-design.md`](docs/superpowers/specs/2026-05-22-watchtower-instance-watcher-design.md).
+
+---
+
+## MVP scope
+
+In scope:
+
+- Standalone Electron app, separate from TimeTracker
+- Multi-tab embedded terminals — one Claude Code instance per tab
+- Hook scripts in `~/.claude/settings.json` that POST to a local orchestrator
+- macOS notifications + tray badge when an instance needs attention
+- Snooze, clear-on-focus
+- Quit-with-suspend, restart-with-resume (using `claude --resume <session-id>`)
+- Crash recovery — live instances resume on next launch even after a crash
+- Platform shell with a left module rail (only "Instances" filled at MVP; Dashboard / TimeTracker / Settings as stubs)
+
+Out of scope for MVP (deferred to later modules — see "Roadmap"):
+
+- Other modules: settings / hooks / skills / agents / MCP editors, memory inspector, cron dashboard
+- TimeTracker integration (auto-log when an instance touches a Jira key)
+- Slack / email notification fallback
+- Token / cost tracking per instance
+- launchd LaunchAgent promotion of the orchestrator
+- Cross-instance message routing
+- Plugin / skill marketplace browser
+- Session transcript browser / search
+- Templates for new instances
+- Tear-off windows, split panes inside a tab
+- Persistent terminal scrollback across restarts
+- In-app auto-update
+
+---
+
+## Roadmap — future modules
+
+The platform's left module rail will eventually host:
+
+1. **Dashboard** — cross-module home. Aggregate status, recent activity, quick actions.
+2. **Instances** (MVP) — terminal sessions, instance watcher, notifications.
+3. **TimeTracker** — integration with the existing TimeTracker app. Auto-log a worklog when an instance is detected to be working on a Jira key.
+4. **Settings / Hooks / Skills / Agents** — GUI for `~/.claude/settings.json`, per-project overrides, hook editor with templates and dry-run preview, skill enable/disable per project, MCP server config.
+5. **Memory inspector** — navigate `~/.claude/projects/<slug>/memory/`, search across all projects.
+6. **Scheduler** — visualize `/schedule` and `/loop` routines, show next-fire times.
+7. **Cost / usage** — token spend per project / session / model, weekly-limit gauge, cost-per-Jira-ticket.
+8. **Notification fallbacks** — Slack / email (lift the `ask-user-async` pattern into the platform).
+9. **Plugin marketplace browser** — discover and install community skills / agents / plugins.
+
+Ordering after MVP is TBD; "Settings / Hooks" is the most likely second module because the wins are immediate and daily.
+
+---
+
+## Decision log
+
+Append-only record of key calls. Each entry: date, decision, rationale, alternatives considered.
+
+### 2026-05-22 — Initial brainstorming session
+
+| # | Decision | Rationale | Alternatives |
+|---|---|---|---|
+| 1 | **MVP = instance watcher + notifications** | Solves the highest-cost pain (forgotten waiting instances) first. | Config editor first; launcher first; full design pass first. |
+| 2 | **Embedded terminals (own the pty)** | Full I/O visibility without changing how `claude` is invoked elsewhere. User asked for this directly. | Hook-only detection while keeping VS Code terminal; platform-launches-via-pty exclusively. |
+| 3 | **Notification trigger = `Notification` hook immediate + `Stop` hook after 90 s** | Matches the actual pain: explicit asks ping immediately; turn-ends ping only when truly forgotten. | Only `Notification`; every `Stop`; configurable per-project rules. |
+| 4 | **New Electron app, separate from TimeTracker** | Clean boundaries; no risk of breaking TimeTracker; future-proof for multi-module growth. | Extend TimeTracker; two Electron apps + standalone daemon. |
+| 5 | **Internal architecture = Electron + Node `utilityProcess` child for orchestrator** | Lifecycle separation; testable in isolation; clean seam to later promote to launchd. | Single Electron process; jump straight to launchd daemon. |
+| 6 | **UI: module rail (far left) + tab strip = instance list** | One UI dimension per concept; no double-rail redundancy. Tabs are familiar terminal idiom. | Inner left rail of instances + tab strip (both — rejected as redundant). |
+| 7 | **Tabs are 1:1 with running instances; closing a tab kills the pty** | Removes "detached but running" ambiguity. Confirm-on-close prevents accidental Cmd+W loss. | Allow detached running instances; separate "park" action. |
+| 8 | **Quit-with-suspend, start-with-resume via `claude --resume`** | Preserve work across app quits and crashes. Any live instance with a known `session_id` gets resumed; sessions without one (or explicitly killed) do not. | Kill on quit, no resume. |
+| 9 | **Single confirm dialog on quit, with per-row "don't resume" checkboxes** | One friction point covers the whole batch; opt-out granularity per session. | Per-session confirm; resume-everything-no-choice. |
+| 10 | **Name = Watchtower** | Fits the MVP function literally + the platform metaphor mythically. Scales to many modules. | Atelier (refined / craft); Bastion (fortified); Sanctum (mystical); Forge (overused). |
+| 11 | **Repo location: `/Users/jan/Projects/Watchtower`, separate GitHub repo** | Clean separation from TimeTracker; independent versioning, CI, release cadence. | Subfolder of TimeTracker (rejected). |
+
+---
+
+## Open questions / risks
+
+1. **Does `claude --resume <session-id>` exist and behave as expected?** The entire resume flow rests on this. Verify before any code lands.
+2. **`SessionStart` hook timing.** If it fires after the first pty `data` event, our `spawning → working` debouncer might transition before pairing. Verify with a real `claude` run.
+3. **Hook payload schema stability across Claude Code versions.** Mitigated by event-name-agnostic helper + raw-payload storage.
+4. **xterm.js color / scrollback fidelity inside Electron** — usually fine; verify with long streaming outputs Claude produces.
+5. **macOS Login Item permission** — adding to login items at first run vs from Settings only; default off is safer.
+6. **`utilityProcess` ergonomics for SQLite + native modules** — needs the same `electron-rebuild` step TimeTracker already uses; verify `better-sqlite3` loads cleanly inside the child.
+
+---
+
+## Glossary
+
+- **Watchtower** — this app / platform.
+- **Instance** — one running `claude` process under Watchtower's pty management. 1:1 with a tab.
+- **Session ID** — Claude Code's identifier for a conversation, used with `claude --resume`. Recorded via the `SessionStart` hook.
+- **Orchestrator** — the Node child process inside Watchtower that owns pty, hooks, state, and SQLite. The "brain".
+- **Hook helper** — the small bundled binary `watchtower-hook` installed into `~/.claude/settings.json`; forwards Claude Code's hook payloads to the orchestrator.
+- **Module rail** — the left-side navigation strip inside the platform that switches between modules (Dashboard, Instances, TimeTracker, Settings…).
+- **Tab strip** — the horizontal row of instance tabs inside the Instances module.
+- **`quietTimer`** — the per-instance timer that starts on `Stop` hook and fires a notification after a quiet threshold (default 90 s) if the instance hasn't been re-engaged.
+- **Suspend** — graceful kill of a pty at app quit, with intent to resume via `claude --resume` on next start.
+- **Resume** — re-spawn a previously-suspended (or crashed) instance using `claude --resume <session_id>`, restoring the conversation context.
+
+---
+
+## Build log
+
+Append entries as the project advances. Format: `YYYY-MM-DD — short summary`. Link commits / PRs / spec updates as relevant.
+
+- 2026-05-22 — Brainstorming complete. Design spec written and approved. Repo created. Prototype tracker (this file) created. Awaiting implementation plan.
+
+---
+
+## References
+
+- Design spec: [`docs/superpowers/specs/2026-05-22-watchtower-instance-watcher-design.md`](docs/superpowers/specs/2026-05-22-watchtower-instance-watcher-design.md)
+- Implementation plan: [`docs/superpowers/plans/2026-05-22-watchtower-instance-watcher-plan.md`](docs/superpowers/plans/2026-05-22-watchtower-instance-watcher-plan.md)
+- Visual prototype (open in browser): [`prototype.html`](prototype.html) — scene switcher across Terminal view, Dashboard, New-Instance modal, First-Run wizard, Resume-failed panel, Settings, Tray menu, Crash banner
+- Sibling app (TimeTracker): `/Users/jan/Projects/TimeTracker`

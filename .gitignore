@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist-electron/
+dist-orchestrator/
+dist-renderer/
+dist-helper/
+dist-shared/
+dist-helper-src/
+release/
+
+# Test / coverage
+coverage/
+
+# Local databases
+data.db*
+
+# Logs and misc runtime
+*.log
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
