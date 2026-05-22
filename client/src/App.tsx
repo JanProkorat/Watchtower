@@ -170,7 +170,11 @@ export function App() {
                   cwd={i.cwd}
                   active={i.id === activeId}
                 >
-                  <Terminal instanceId={i.id} active={i.id === activeId} />
+                  <Terminal
+                    instanceId={i.id}
+                    active={i.id === activeId}
+                    status={i.status}
+                  />
                 </TerminalErrorBoundary>
               ),
             )

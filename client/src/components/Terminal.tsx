@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -7,16 +7,21 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 interface Props {
   instanceId: string;
   active: boolean;
+  /**
+   * Current instance status. We show the "Starting claude…" overlay while
+   * the status is 'spawning' or 'resuming'; once SessionStart fires the
+   * state machine transitions out of those and the overlay hides.
+   */
+  status: string;
 }
 
-export function Terminal({ instanceId, active }: Props) {
+const STARTING_STATUSES = new Set(['spawning', 'resuming']);
+
+export function Terminal({ instanceId, active, status }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
-  // Stays false until the pty emits its first byte. Used to render a spinner
-  // overlay on top of the (still empty) xterm canvas — covers the gap between
-  // spawning claude and seeing its welcome banner.
-  const [hasOutput, setHasOutput] = useState(false);
+  const isStarting = STARTING_STATUSES.has(status);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -53,7 +58,6 @@ export function Terminal({ instanceId, active }: Props) {
     const offData = window.watchtower.on('ptyData', (p) => {
       if (p.instanceId !== instanceId) return;
       term.write(p.chunk);
-      setHasOutput(true);
     });
 
     const inputDisp = term.onData((data) => {
@@ -122,7 +126,7 @@ export function Terminal({ instanceId, active }: Props) {
       }}
     >
       <Box ref={containerRef} sx={{ position: 'absolute', inset: 0, backgroundColor: '#0e0f12' }} />
-      {!hasOutput && (
+      {isStarting && (
         <Box
           sx={{
             position: 'absolute',
@@ -137,7 +141,9 @@ export function Terminal({ instanceId, active }: Props) {
           }}
         >
           <CircularProgress size={22} thickness={4} />
-          <Typography variant="caption">Starting claude…</Typography>
+          <Typography variant="caption">
+            {status === 'resuming' ? 'Resuming claude…' : 'Starting claude…'}
+          </Typography>
         </Box>
       )}
     </Box>
