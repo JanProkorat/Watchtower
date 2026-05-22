@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -16,12 +16,28 @@ interface Props {
 }
 
 const STARTING_STATUSES = new Set(['spawning', 'resuming']);
+// Safety net: if the SessionStart hook never fires (claude was spawned before
+// Watchtower installed its hooks, or the listener can't reach us) the spinner
+// would hang forever. After this many ms we hide it regardless and trust that
+// claude is up.
+const SPINNER_FALLBACK_MS = 10_000;
 
 export function Terminal({ instanceId, active, status }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
-  const isStarting = STARTING_STATUSES.has(status);
+  const [fallbackElapsed, setFallbackElapsed] = useState(false);
+  const isStarting = STARTING_STATUSES.has(status) && !fallbackElapsed;
+
+  // Arm the fallback timer the first time we mount in a starting state.
+  useEffect(() => {
+    if (!STARTING_STATUSES.has(status)) return;
+    const t = setTimeout(() => setFallbackElapsed(true), SPINNER_FALLBACK_MS);
+    return () => clearTimeout(t);
+    // intentionally only runs once per mount — we don't reset if status flips
+    // back to a starting variant later (shouldn't happen, but safe).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
