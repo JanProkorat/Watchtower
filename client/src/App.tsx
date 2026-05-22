@@ -127,6 +127,11 @@ export function App() {
     });
   }, [setActive]);
 
+  // Tray's "New instance…" → opens the same modal as the + button.
+  useEffect(() => {
+    return window.watchtower.on('triggerNewInstance', () => setNewOpen(true));
+  }, []);
+
   const handleRemove = (id: string, isLive: boolean) => {
     if (!isLive) {
       void remove(id);
@@ -171,6 +176,12 @@ export function App() {
           onNew={() => setNewOpen(true)}
           onRemove={handleRemove}
           onReorder={(ids) => void reorder(ids)}
+          onSnooze={(id, ms) => {
+            void window.watchtower.invoke('snooze', {
+              instanceId: id,
+              untilMs: Date.now() + ms,
+            });
+          }}
         />
         <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {onDashboard ? (

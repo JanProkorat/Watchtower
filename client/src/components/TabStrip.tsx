@@ -1,5 +1,5 @@
-import type { CSSProperties } from 'react';
-import { Box, IconButton, Tooltip } from '@mui/material';
+import { useState, type CSSProperties } from 'react';
+import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import {
@@ -194,14 +194,16 @@ interface Props {
   onNew(): void;
   onRemove(id: string, isLive: boolean): void;
   onReorder(orderedIds: string[]): void;
+  onSnooze(id: string, durationMs: number): void;
 }
 
-export function TabStrip({ instances, activeId, onSelect, onNew, onRemove, onReorder }: Props) {
+export function TabStrip({ instances, activeId, onSelect, onNew, onRemove, onReorder, onSnooze }: Props) {
   // 5px activation distance — clicks (no drag) still toggle the tab, but a
   // 5+ px drag picks the tab up. Otherwise every click would start a drag.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const value = activeId ?? DASHBOARD_TAB;
   const ids = instances.map((i) => i.id);
+  const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -211,6 +213,12 @@ export function TabStrip({ instances, activeId, onSelect, onNew, onRemove, onReo
     if (oldIndex < 0 || newIndex < 0) return;
     onReorder(arrayMove(ids, oldIndex, newIndex));
   };
+
+  const openContext = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    setCtxMenu({ id, x: e.clientX, y: e.clientY });
+  };
+  const closeContext = () => setCtxMenu(null);
 
   return (
     <Box
@@ -237,15 +245,16 @@ export function TabStrip({ instances, activeId, onSelect, onNew, onRemove, onReo
         <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
           <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
             {instances.map((i) => (
-              <SortableTab
-                key={i.id}
-                id={i.id}
-                label={basename(i.cwd) || i.cwd}
-                status={i.status}
-                active={value === i.id}
-                onClick={() => onSelect(i.id)}
-                onClose={() => onRemove(i.id, LIVE_STATUSES.has(i.status))}
-              />
+              <Box key={i.id} onContextMenu={(e) => openContext(e, i.id)}>
+                <SortableTab
+                  id={i.id}
+                  label={basename(i.cwd) || i.cwd}
+                  status={i.status}
+                  active={value === i.id}
+                  onClick={() => onSelect(i.id)}
+                  onClose={() => onRemove(i.id, LIVE_STATUSES.has(i.status))}
+                />
+              </Box>
             ))}
           </Box>
         </SortableContext>
@@ -260,6 +269,47 @@ export function TabStrip({ instances, activeId, onSelect, onNew, onRemove, onReo
           <AddIcon fontSize="small" />
         </IconButton>
       </Tooltip>
+      <Menu
+        open={Boolean(ctxMenu)}
+        onClose={closeContext}
+        anchorReference="anchorPosition"
+        anchorPosition={ctxMenu ? { left: ctxMenu.x, top: ctxMenu.y } : undefined}
+      >
+        <MenuItem
+          onClick={() => {
+            if (ctxMenu) onSelect(ctxMenu.id);
+            closeContext();
+          }}
+        >
+          Open
+        </MenuItem>
+        <Divider />
+        {[5, 30, 60].map((m) => (
+          <MenuItem
+            key={m}
+            onClick={() => {
+              if (ctxMenu) onSnooze(ctxMenu.id, m * 60_000);
+              closeContext();
+            }}
+          >
+            Snooze {m} min
+          </MenuItem>
+        ))}
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            if (ctxMenu) {
+              const inst = instances.find((i) => i.id === ctxMenu.id);
+              const isLive = inst ? LIVE_STATUSES.has(inst.status) : false;
+              onRemove(ctxMenu.id, isLive);
+            }
+            closeContext();
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          Close tab
+        </MenuItem>
+      </Menu>
     </Box>
   );
 }

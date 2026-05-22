@@ -1,0 +1,8 @@
+A real tray-template.png (16×16 + 32×32 @2x, black-on-transparent so macOS
+re-tints it for the menu bar appearance) goes here. Generate from any
+small monochrome glyph (a tower/eye/lookout outline) and drop it as
+tray-template.png + tray-template@2x.png in this directory.
+
+In dev the tray code falls back to a built-in nativeImage if the file
+isn't present, so the menu bar shows a tiny default icon until you
+replace this.
