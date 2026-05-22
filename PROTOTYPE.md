@@ -45,11 +45,11 @@ Watchtower won because it fits the MVP function *literally* (you watch from a to
 | Implementation plan | Done — 37 tasks across 11 phases |
 | Visual prototype | Done — `prototype.html` |
 | GitHub repo | https://github.com/JanProkorat/Watchtower (private) |
-| GitHub issues | 11 phase issues open (see Tracking below) |
+| GitHub issues | All 11 phase issues closed |
 | TimeTracker project | Created (id 4, non-billable, 11 epics, 37 tasks) |
-| MVP implementation | Not started |
-| First runnable build | — |
-| First daily-use build | — |
+| MVP implementation | **All 11 phases done.** ~15h logged. |
+| First runnable build | `release/Watchtower-0.0.1-arm64.dmg` |
+| First daily-use build | drop in /Applications, right-click → Open (unsigned) |
 
 ---
 
@@ -241,6 +241,7 @@ Append entries as the project advances. Format: `YYYY-MM-DD — short summary`. 
 - **2026-05-22** — **Phase 5 complete** (issue #2 closed). WT-T15 through WT-T18 landed: `PtyManager` thin wrapper (node-pty injected via constructor for testability), full cross-process spawn/write/resize/kill/list IPC + ptyData/ptyExit/stateChanged pushes, `<Terminal />` xterm.js component with FitAddon + ResizeObserver, `TabStrip` + `useInstances` hook + App integration. 65 vitest tests passing. End-to-end smoke: `electron .` boots, orchestrator forks, sidecar + DB + token written, dark window with Dashboard view + + button. 1h 55m logged.
 - **2026-05-22** — **Phase 6 complete** (issue #6 closed). WT-T19 through WT-T21 landed: NewInstanceModal (cwd input + Browse + recent-list), ModuleRail (left activity bar; Instances active, others stubbed), DashboardTab (grouped instance rows with chips + relative timestamps + Open/Kill/Remove actions). 67 vitest tests passing. 1h 15m logged. Plus a clutch of pragmatic interim fixes in this session: ABI / preload-CJS shenanigans, DnD reordering with `display_order` column + v2 migration, last-active-tab persistence, per-instance dot palette, resume-on-restart with fast-fail fallback to fresh spawn, 10s spinner safety net, terminal error boundary.
 - **2026-05-22** — **Phase 7 + 9 complete** (issues #1 and #7 closed). WT-T22 through WT-T26 + WT-T31 through WT-T33: QuietTimers + Notifier wire the state machine's outputs into actual macOS notifications; FirstRunWizard installs hooks into `~/.claude/settings.json` with a diff preview + backup; tray icon with badge count + instance list + snooze submenu; SettingsPanel exposes quiet timer ms, default cwd, hook reinstall/uninstall, test notification. **Watchtower now actually watches:** claude → hook → orchestrator → state machine → notifier → macOS Notification + tray badge → click brings tab into focus. 4h 5m logged for the combined milestone.
+- **2026-05-22** — **Phase 8 + 10 + 11 complete** (issues #8, #3, #4 closed) — **MVP shipped.** WT-T28 (Cmd+Q confirm dialog), WT-T34 (orchestrator auto-restart 3×/60 s + crash banner), WT-T37 (`npm run dist:mac` produces an unsigned `.dmg` + `.app`). T35 / T36 deferred (rare edge cases). Smoke-tested the packaged `.app` — runs from `release/mac-arm64/Watchtower.app`, orchestrator forks out of `app.asar`, native modules load, previous-session row resumes via fast-fail-to-fresh path. 1h 10m logged. **All 37 plan-tasks done; all 11 GitHub issues closed; ~15h total time logged in TimeTracker.**
 
 ---
 
