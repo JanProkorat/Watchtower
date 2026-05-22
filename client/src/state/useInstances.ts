@@ -41,8 +41,11 @@ export function useInstances(): {
     async (cwd: string, args?: string[]) => {
       const res = await window.watchtower.invoke('spawnInstance', { cwd, args });
       if (res.instanceId) {
-        setActiveId(res.instanceId);
+        // Refresh the instance list BEFORE activating the new tab — otherwise
+        // MUI's Tabs validator runs against stale children and warns:
+        // "value provided to Tabs is invalid, none of children match <uuid>".
         await refresh();
+        setActiveId(res.instanceId);
       }
       return res;
     },
