@@ -234,6 +234,7 @@ Append entries as the project advances. Format: `YYYY-MM-DD — short summary`. 
 - **2026-05-22** — Brainstorming complete. Design spec written and approved. Repo scaffolded at `/Users/jan/Projects/Watchtower`. Prototype tracker (this file) created.
 - **2026-05-22** — 37-task implementation plan written across 11 phases. Visual prototype (`prototype.html`) created with 8 scenes.
 - **2026-05-22** — Initial commit pushed to GitHub: https://github.com/JanProkorat/Watchtower (private). 11 phase issues opened. TimeTracker project 4 + 11 epics + 37 tasks seeded for time tracking. Ready to start Phase 1.
+- **2026-05-22** — **Phase 1 complete** (issue #5 closed). WT-T1 through WT-T5 landed: package.json + Electron main + Vite/React/MUI renderer + preload `contextBridge` IPC + Vitest. App opens a dark window; ping round-trip from renderer → main works; sanity test passes. 1h 45m logged.
 
 ---
 
