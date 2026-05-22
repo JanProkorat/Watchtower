@@ -7,6 +7,25 @@ export interface InstanceView {
   lastActivityAt: number;
 }
 
+const ACTIVE_ID_KEY = 'watchtower.activeId';
+
+function readPersistedActiveId(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedActiveId(id: string | null): void {
+  try {
+    if (id) localStorage.setItem(ACTIVE_ID_KEY, id);
+    else localStorage.removeItem(ACTIVE_ID_KEY);
+  } catch {
+    /* private browsing or quota exceeded — best-effort */
+  }
+}
+
 export function useInstances(): {
   instances: InstanceView[];
   activeId: string | null;
@@ -16,7 +35,23 @@ export function useInstances(): {
   refresh(): Promise<void>;
 } {
   const [instances, setInstances] = useState<InstanceView[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  // Seed from localStorage so the last-active tab reappears across restarts.
+  // The validation effect below clears it if it doesn't match any live row.
+  const [activeId, setActiveId] = useState<string | null>(readPersistedActiveId);
+
+  // Mirror activeId to localStorage on every change. Cheap; tiny string.
+  useEffect(() => {
+    writePersistedActiveId(activeId);
+  }, [activeId]);
+
+  // If the persisted id no longer matches any instance (user killed it before
+  // closing the app, or the row was forgotten), fall back to Dashboard rather
+  // than render TabStrip's `value` against a missing child.
+  useEffect(() => {
+    if (activeId && instances.length > 0 && !instances.some((i) => i.id === activeId)) {
+      setActiveId(null);
+    }
+  }, [instances, activeId]);
 
   const refresh = useCallback(async () => {
     const res = await window.watchtower.invoke('listInstances', {});
