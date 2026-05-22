@@ -1,11 +1,28 @@
 export type OrchRequest =
-  | { id: string; kind: 'ping'; payload: { now: number } };
+  | { id: string; kind: 'ping'; payload: { now: number } }
+  | { id: string; kind: 'spawnInstance'; payload: { cwd: string; args?: string[] } }
+  | { id: string; kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
+  | { id: string; kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
+  | { id: string; kind: 'killInstance'; payload: { instanceId: string } }
+  | { id: string; kind: 'listInstances'; payload: Record<string, never> };
 
 export type OrchResponse =
-  | { kind: 'ping'; payload: { now: number; orch: number } };
+  | { kind: 'ping'; payload: { now: number; orch: number } }
+  | { kind: 'spawnInstance'; payload: { instanceId: string } }
+  | { kind: 'ptyWrite'; payload: { ok: true } }
+  | { kind: 'ptyResize'; payload: { ok: true } }
+  | { kind: 'killInstance'; payload: { ok: true } }
+  | {
+      kind: 'listInstances';
+      payload: {
+        instances: Array<{ id: string; cwd: string; status: string; lastActivityAt: number }>;
+      };
+    };
 
 export type OrchPush =
-  | { kind: 'state-changed'; payload: { instanceId: string; status: string } };
+  | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
+  | { kind: 'ptyExit'; payload: { instanceId: string; code: number } }
+  | { kind: 'stateChanged'; payload: { instanceId: string; status: string } };
 
 type AnyPort = {
   postMessage(data: unknown): void;
