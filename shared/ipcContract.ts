@@ -8,7 +8,7 @@ export type IpcRequest =
 
 export type IpcResponse =
   | { kind: 'ping'; payload: { now: number; main: number; orch: number } }
-  | { kind: 'spawnInstance'; payload: { instanceId: string } }
+  | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
   | { kind: 'ptyWrite'; payload: { ok: true } }
   | { kind: 'ptyResize'; payload: { ok: true } }
   | { kind: 'killInstance'; payload: { ok: true } }

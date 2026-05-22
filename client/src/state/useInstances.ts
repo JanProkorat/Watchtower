@@ -40,9 +40,11 @@ export function useInstances(): {
   const spawn = useCallback(
     async (cwd: string, args?: string[]) => {
       const res = await window.watchtower.invoke('spawnInstance', { cwd, args });
-      setActiveId(res.instanceId);
-      await refresh();
-      return res.instanceId;
+      if (res.instanceId) {
+        setActiveId(res.instanceId);
+        await refresh();
+      }
+      return res;
     },
     [refresh],
   );

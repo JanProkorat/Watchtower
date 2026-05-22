@@ -70,42 +70,59 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
     case 'spawnInstance': {
       const id = randomUUID();
       const now = Date.now();
-      repo().insert({
-        id,
-        cwd: req.payload.cwd,
-        status: 'spawning',
-        claudeSessionId: id, // we set --session-id <uuid> so the Claude session ID matches the row ID
-        spawnedAt: now,
-        lastActivityAt: now,
-        exitCode: null,
-        terminationReason: null,
-        resumedFromInstanceId: null,
-        jiraKeyHint: null,
-        argsJson: req.payload.args ? JSON.stringify(req.payload.args) : null,
-      });
-      pty.spawn({
-        id,
-        command: 'claude',
-        args: ['--session-id', id, ...(req.payload.args ?? [])],
-        cwd: req.payload.cwd,
-        env: { ...(process.env as Record<string, string>), WATCHTOWER_INSTANCE_ID: id },
-        onData: (chunk) => {
-          api?.push({ kind: 'ptyData', payload: { instanceId: id, chunk } });
-          applyTransition(id, { kind: 'ptyData' });
-        },
-        onExit: (code) => {
-          api?.push({ kind: 'ptyExit', payload: { instanceId: id, code } });
-          const r = repo();
-          const inst = r.get(id);
-          if (inst) {
-            const result = transition(inst.status, { kind: 'ptyExit', code });
-            r.updateStatus(id, result.state, Date.now());
-            r.setTermination(id, code === 0 ? 'session-end' : 'crash', code);
-            api?.push({ kind: 'stateChanged', payload: { instanceId: id, status: result.state } });
-          }
-        },
-      });
-      return { instanceId: id };
+      const expandedCwd = req.payload.cwd.startsWith('~/')
+        ? path.join(homedir(), req.payload.cwd.slice(2))
+        : req.payload.cwd === '~'
+        ? homedir()
+        : req.payload.cwd;
+      try {
+        repo().insert({
+          id,
+          cwd: expandedCwd,
+          status: 'spawning',
+          claudeSessionId: id, // we set --session-id <uuid> so the Claude session ID matches the row ID
+          spawnedAt: now,
+          lastActivityAt: now,
+          exitCode: null,
+          terminationReason: null,
+          resumedFromInstanceId: null,
+          jiraKeyHint: null,
+          argsJson: req.payload.args ? JSON.stringify(req.payload.args) : null,
+        });
+        pty.spawn({
+          id,
+          command: 'claude',
+          args: ['--session-id', id, ...(req.payload.args ?? [])],
+          cwd: expandedCwd,
+          env: { ...(process.env as Record<string, string>), WATCHTOWER_INSTANCE_ID: id },
+          onData: (chunk) => {
+            api?.push({ kind: 'ptyData', payload: { instanceId: id, chunk } });
+            applyTransition(id, { kind: 'ptyData' });
+          },
+          onExit: (code) => {
+            api?.push({ kind: 'ptyExit', payload: { instanceId: id, code } });
+            const r = repo();
+            const inst = r.get(id);
+            if (inst) {
+              const result = transition(inst.status, { kind: 'ptyExit', code });
+              r.updateStatus(id, result.state, Date.now());
+              r.setTermination(id, code === 0 ? 'session-end' : 'crash', code);
+              api?.push({ kind: 'stateChanged', payload: { instanceId: id, status: result.state } });
+            }
+          },
+        });
+        return { instanceId: id };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[orchestrator] spawnInstance failed:', message);
+        try {
+          repo().updateStatus(id, 'crashed', Date.now());
+          repo().setTermination(id, 'crash', null);
+        } catch {
+          /* row may not have been inserted yet */
+        }
+        return { instanceId: null, error: message };
+      }
     }
 
     case 'ptyWrite':

@@ -31,6 +31,7 @@ export function createMainWindow(): BrowserWindow {
   });
   if (process.env.WATCHTOWER_DEV_URL) {
     void mainWindow.loadURL(process.env.WATCHTOWER_DEV_URL);
+    mainWindow.webContents.openDevTools({ mode: 'right' });
   } else {
     void mainWindow.loadFile(path.join(__dirname, '../../dist-renderer/index.html'));
   }

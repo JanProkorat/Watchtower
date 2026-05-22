@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, CssBaseline, ThemeProvider, Typography } from '@mui/material';
+import { Alert, Box, CssBaseline, Snackbar, ThemeProvider, Typography } from '@mui/material';
 import { watchtowerTheme } from './theme.js';
 import { useInstances } from './state/useInstances.js';
 import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
@@ -14,11 +14,20 @@ declare global {
 
 export function App() {
   const { instances, activeId, setActive, spawn } = useInstances();
+  const [spawnError, setSpawnError] = useState<string | null>(null);
 
   const handleNew = async () => {
     // Quick prompt for the first end-to-end smoke. The proper modal lands in WT-T19.
     const cwd = window.prompt('Working directory for new claude instance?', '~/Projects');
-    if (cwd) await spawn(cwd);
+    if (!cwd) return;
+    try {
+      const res = await spawn(cwd);
+      if (!res.instanceId) {
+        setSpawnError(res.error ?? 'spawn failed — no instance id returned');
+      }
+    } catch (err) {
+      setSpawnError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const onDashboard = activeId === null || activeId === DASHBOARD_TAB;
@@ -50,6 +59,20 @@ export function App() {
           )}
         </Box>
       </Box>
+      <Snackbar
+        open={Boolean(spawnError)}
+        autoHideDuration={10000}
+        onClose={() => setSpawnError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          severity="error"
+          onClose={() => setSpawnError(null)}
+          sx={{ maxWidth: 720, fontFamily: 'Menlo, monospace', fontSize: 12 }}
+        >
+          spawn failed: {spawnError}
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   );
 }
