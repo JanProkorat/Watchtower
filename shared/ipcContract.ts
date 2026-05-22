@@ -2,7 +2,7 @@ export type IpcRequest =
   | { kind: 'ping'; payload: { now: number } };
 
 export type IpcResponse =
-  | { kind: 'ping'; payload: { now: number; main: number } };
+  | { kind: 'ping'; payload: { now: number; main: number; orch: number } };
 
 export type IpcPush =
   | { kind: 'hello'; payload: { version: string } };

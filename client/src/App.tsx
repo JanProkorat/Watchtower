@@ -11,13 +11,15 @@ declare global {
 
 export function App() {
   const [helloVersion, setHelloVersion] = useState<string | null>(null);
-  const [pingMs, setPingMs] = useState<number | null>(null);
+  const [mainMs, setMainMs] = useState<number | null>(null);
+  const [orchMs, setOrchMs] = useState<number | null>(null);
 
   useEffect(() => {
     const off = window.watchtower.on('hello', (p) => setHelloVersion(p.version));
     const sent = Date.now();
     void window.watchtower.invoke('ping', { now: sent }).then((res) => {
-      setPingMs(res.main - sent);
+      setMainMs(res.main - sent);
+      setOrchMs(res.orch - sent);
     });
     return off;
   }, []);
@@ -28,7 +30,7 @@ export function App() {
       <Box sx={{ p: 6 }}>
         <Typography variant="h4">Watchtower</Typography>
         <Typography variant="body2" color="text.secondary">
-          hello: {helloVersion ?? '…'} · ping: {pingMs ?? '…'} ms
+          hello: {helloVersion ?? '…'} · main: {mainMs ?? '…'} ms · orch: {orchMs ?? '…'} ms
         </Typography>
       </Box>
     </ThemeProvider>
