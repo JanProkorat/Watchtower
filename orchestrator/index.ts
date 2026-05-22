@@ -72,10 +72,13 @@ interface PtySpawnArgs {
   resumeSessionId?: string;
 }
 
+const RESUME_FAIL_FAST_MS = 2000;
+
 function spawnPtyForInstance(opts: PtySpawnArgs): void {
   const cmdArgs = opts.resumeSessionId
     ? ['--resume', opts.resumeSessionId, ...opts.extraArgs]
     : ['--session-id', opts.id, ...opts.extraArgs];
+  const spawnedAt = Date.now();
   pty.spawn({
     id: opts.id,
     command: 'claude',
@@ -87,6 +90,24 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
       applyTransition(opts.id, { kind: 'ptyData' });
     },
     onExit: (code) => {
+      const lifespan = Date.now() - spawnedAt;
+      // If --resume fails fast, the session probably never had any persisted
+      // content (e.g. the user closed the app right after launching claude,
+      // before sending any prompt). Claude has nothing to restore. Fall back
+      // to a fresh spawn in the same cwd, reusing the same row id +
+      // session id (via --session-id) so future resumes still work.
+      if (opts.resumeSessionId && code !== 0 && lifespan < RESUME_FAIL_FAST_MS) {
+        console.log(
+          `[orchestrator] resume failed for ${opts.id} (exit ${code} in ${lifespan}ms) — spawning fresh`,
+        );
+        spawnPtyForInstance({
+          id: opts.id,
+          cwd: opts.cwd,
+          extraArgs: opts.extraArgs,
+          // no resumeSessionId — break the recursion guard, full fresh spawn
+        });
+        return;
+      }
       api?.push({ kind: 'ptyExit', payload: { instanceId: opts.id, code } });
       const r = repo();
       const inst = r.get(opts.id);

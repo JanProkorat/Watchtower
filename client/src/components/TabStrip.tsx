@@ -19,26 +19,41 @@ function basename(p: string): string {
   return parts[parts.length - 1] ?? p;
 }
 
-function statusColor(status: string): string {
-  switch (status) {
-    case 'waiting-permission':
-    case 'crashed':
-      return '#ef5350';
-    case 'waiting-input':
-      return '#ffb74d';
-    case 'idle-notify':
-      return '#9e9e9e';
-    case 'working':
-    case 'spawning':
-    case 'resuming':
-      return '#7aa7ff';
-    case 'finished':
-      return '#66bb6a';
-    case 'suspended':
-      return '#5a6068';
-    default:
-      return '#666';
-  }
+// Per-instance palette — picked to be saturated enough to stand out on a
+// dark background and distinct under a quick glance.
+const INSTANCE_PALETTE = [
+  '#7aa7ff', // soft blue
+  '#f0a868', // amber-orange
+  '#66bb6a', // green
+  '#ce93d8', // lavender
+  '#4dd0e1', // cyan
+  '#ffd54f', // yellow
+  '#a1887f', // taupe
+  '#90caf9', // pale blue
+  '#ef9a9a', // pink-red
+  '#80cbc4', // teal
+];
+
+function instanceColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  return INSTANCE_PALETTE[Math.abs(hash) % INSTANCE_PALETTE.length] ?? '#7aa7ff';
+}
+
+// Attention states keep their canonical color (red = needs me now, amber = end
+// of turn waiting). Non-attention states use the per-instance color so two
+// "working" tabs are distinguishable at a glance.
+const ATTENTION_COLORS: Record<string, string> = {
+  'waiting-permission': '#ef5350',
+  'waiting-input': '#ffb74d',
+  'idle-notify': '#9e9e9e',
+  crashed: '#ef5350',
+  finished: '#66bb6a',
+  suspended: '#5a6068',
+};
+
+function dotColor(id: string, status: string): string {
+  return ATTENTION_COLORS[status] ?? instanceColor(id);
 }
 
 interface Props {
@@ -93,7 +108,7 @@ export function TabStrip({ instances, activeId, onSelect, onNew, onRemove }: Pro
                       width: 8,
                       height: 8,
                       borderRadius: '50%',
-                      backgroundColor: statusColor(t.status),
+                      backgroundColor: dotColor(t.id, t.status),
                     }}
                   />
                 )}
