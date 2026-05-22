@@ -21,6 +21,7 @@ import { Terminal } from './components/Terminal.js';
 import { TerminalErrorBoundary } from './components/TerminalErrorBoundary.js';
 import { NewInstanceModal } from './components/NewInstanceModal.js';
 import { ModuleRail, type ModuleId } from './components/ModuleRail.js';
+import { DashboardTab } from './components/DashboardTab.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
 const TERMINAL_STATES = new Set(['finished', 'crashed', 'suspended']);
@@ -145,14 +146,13 @@ export function App() {
         />
         <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {onDashboard ? (
-            <Box sx={{ p: 4 }}>
-              <Typography variant="h5">Watchtower</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {instances.length} instance{instances.length === 1 ? '' : 's'}.
-                {' '}
-                Click <strong>+</strong> in the tab strip to spawn a new claude.
-              </Typography>
-            </Box>
+            <DashboardTab
+              instances={instances}
+              onOpen={(id) => setActive(id)}
+              onKill={(id) => void remove(id)}
+              onRemove={(id) => void remove(id)}
+              onNew={() => setNewOpen(true)}
+            />
           ) : (
             instances.map((i) =>
               isTerminalState(i.status) ? (
