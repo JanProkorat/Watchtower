@@ -17,11 +17,15 @@ export function App() {
   const [spawnError, setSpawnError] = useState<string | null>(null);
 
   const handleNew = async () => {
-    // Quick prompt for the first end-to-end smoke. The proper modal lands in WT-T19.
-    const cwd = window.prompt('Working directory for new claude instance?', '~/Projects');
-    if (!cwd) return;
     try {
-      const res = await spawn(cwd);
+      // Native folder picker — works in Electron (electron-only IPC) and falls
+      // through to the stub's "error: standalone browser mode" path in plain
+      // browser dev. window.prompt isn't supported in Electron, hence the picker.
+      const pick = await window.watchtower.invoke('chooseDirectory', {
+        defaultPath: '~/Projects',
+      });
+      if (!pick.path) return; // user cancelled
+      const res = await spawn(pick.path);
       if (!res.instanceId) {
         setSpawnError(res.error ?? 'spawn failed — no instance id returned');
       }

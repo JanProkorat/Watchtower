@@ -46,6 +46,9 @@ function installStub(): void {
             instanceId: null,
             error: 'Running in browser preview — launch the Watchtower app to spawn real claude instances.',
           } as Out;
+        case 'chooseDirectory':
+          // No native picker in plain browser. Returning null cancels the spawn flow.
+          return { path: null } as Out;
         default:
           return { ok: true } as Out;
       }

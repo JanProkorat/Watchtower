@@ -4,7 +4,8 @@ export type IpcRequest =
   | { kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
   | { kind: 'killInstance'; payload: { instanceId: string } }
-  | { kind: 'listInstances'; payload: Record<string, never> };
+  | { kind: 'listInstances'; payload: Record<string, never> }
+  | { kind: 'chooseDirectory'; payload: { defaultPath?: string } };
 
 export type IpcResponse =
   | { kind: 'ping'; payload: { now: number; main: number; orch: number } }
@@ -17,7 +18,8 @@ export type IpcResponse =
       payload: {
         instances: Array<{ id: string; cwd: string; status: string; lastActivityAt: number }>;
       };
-    };
+    }
+  | { kind: 'chooseDirectory'; payload: { path: string | null } };
 
 export type IpcPush =
   | { kind: 'hello'; payload: { version: string } }
