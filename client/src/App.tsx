@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
-import { CssBaseline, ThemeProvider, Box, Typography } from '@mui/material';
+import { useState } from 'react';
+import { Box, CssBaseline, ThemeProvider, Typography } from '@mui/material';
 import { watchtowerTheme } from './theme.js';
+import { useInstances } from './state/useInstances.js';
+import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
+import { Terminal } from './components/Terminal.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
 declare global {
@@ -10,28 +13,42 @@ declare global {
 }
 
 export function App() {
-  const [helloVersion, setHelloVersion] = useState<string | null>(null);
-  const [mainMs, setMainMs] = useState<number | null>(null);
-  const [orchMs, setOrchMs] = useState<number | null>(null);
+  const { instances, activeId, setActive, spawn } = useInstances();
 
-  useEffect(() => {
-    const off = window.watchtower.on('hello', (p) => setHelloVersion(p.version));
-    const sent = Date.now();
-    void window.watchtower.invoke('ping', { now: sent }).then((res) => {
-      setMainMs(res.main - sent);
-      setOrchMs(res.orch - sent);
-    });
-    return off;
-  }, []);
+  const handleNew = async () => {
+    // Quick prompt for the first end-to-end smoke. The proper modal lands in WT-T19.
+    const cwd = window.prompt('Working directory for new claude instance?', '~/Projects');
+    if (cwd) await spawn(cwd);
+  };
+
+  const onDashboard = activeId === null || activeId === DASHBOARD_TAB;
 
   return (
     <ThemeProvider theme={watchtowerTheme}>
       <CssBaseline />
-      <Box sx={{ p: 6 }}>
-        <Typography variant="h4">Watchtower</Typography>
-        <Typography variant="body2" color="text.secondary">
-          hello: {helloVersion ?? '…'} · main: {mainMs ?? '…'} ms · orch: {orchMs ?? '…'} ms
-        </Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+        <TabStrip
+          instances={instances}
+          activeId={activeId}
+          onSelect={(id) => setActive(id === DASHBOARD_TAB ? null : id)}
+          onNew={() => void handleNew()}
+        />
+        <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          {onDashboard ? (
+            <Box sx={{ p: 4 }}>
+              <Typography variant="h5">Watchtower</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                {instances.length} instance{instances.length === 1 ? '' : 's'}.
+                {' '}
+                Click <strong>+</strong> in the tab strip to spawn a new claude.
+              </Typography>
+            </Box>
+          ) : (
+            instances.map((i) => (
+              <Terminal key={i.id} instanceId={i.id} active={i.id === activeId} />
+            ))
+          )}
+        </Box>
       </Box>
     </ThemeProvider>
   );
