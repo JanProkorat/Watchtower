@@ -1,0 +1,40 @@
+export type InstanceStatus =
+  | 'spawning'
+  | 'working'
+  | 'waiting-permission'
+  | 'waiting-input'
+  | 'idle-notify'
+  | 'finished'
+  | 'crashed'
+  | 'suspended'
+  | 'resuming';
+
+export const LIVE_STATUSES: ReadonlyArray<InstanceStatus> = [
+  'spawning',
+  'working',
+  'waiting-permission',
+  'waiting-input',
+  'idle-notify',
+];
+
+export type TerminationReason =
+  | 'session-end'
+  | 'user-kill'
+  | 'app-quit-suspend'
+  | 'crash'
+  | 'resume-failed'
+  | 'no-session-id';
+
+export interface InstanceRow {
+  id: string;
+  cwd: string;
+  status: InstanceStatus;
+  claudeSessionId: string | null;
+  spawnedAt: number;
+  lastActivityAt: number;
+  exitCode: number | null;
+  terminationReason: TerminationReason | null;
+  resumedFromInstanceId: string | null;
+  jiraKeyHint: string | null;
+  argsJson: string | null;
+}
