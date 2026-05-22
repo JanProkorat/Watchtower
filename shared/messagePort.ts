@@ -71,7 +71,11 @@ type Envelope = ResponseEnvelope | RequestEnvelope | OrchPush;
 export class PortApi {
   private pending = new Map<string, (value: unknown) => void>();
   private requestHandler: ((req: OrchRequest) => Promise<unknown>) | null = null;
-  private pushHandler: ((msg: OrchPush) => void) | null = null;
+  // onPush is event-emitter-style: every call to .onPush() registers an
+  // additional subscriber. Previously this was a single-handler setter, which
+  // silently broke when two callers (electron/ipc.ts forwarding to the
+  // renderer + electron/main.ts driving the tray) both wanted notifications.
+  private pushHandlers: Array<(msg: OrchPush) => void> = [];
 
   constructor(private port: AnyPort) {
     if (port.on) {
@@ -101,8 +105,11 @@ export class PortApi {
     this.requestHandler = handler;
   }
 
-  onPush(handler: (msg: OrchPush) => void): void {
-    this.pushHandler = handler;
+  onPush(handler: (msg: OrchPush) => void): () => void {
+    this.pushHandlers.push(handler);
+    return () => {
+      this.pushHandlers = this.pushHandlers.filter((h) => h !== handler);
+    };
   }
 
   private async handle(data: unknown): Promise<void> {
@@ -133,7 +140,14 @@ export class PortApi {
     }
 
     if ('kind' in msg) {
-      this.pushHandler?.(msg as OrchPush);
+      const push = msg as OrchPush;
+      for (const handler of this.pushHandlers) {
+        try {
+          handler(push);
+        } catch (err) {
+          console.error('[PortApi] push handler threw:', err);
+        }
+      }
     }
   }
 }
