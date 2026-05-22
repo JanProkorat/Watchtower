@@ -133,6 +133,19 @@ export function App() {
     return window.watchtower.on('triggerNewInstance', () => setNewOpen(true));
   }, []);
 
+  // Surface orchestrator crash + auto-restart status as a thin top banner.
+  const [orchDown, setOrchDown] = useState<null | { code: number | null; restarting: boolean }>(null);
+  useEffect(() => {
+    return window.watchtower.on('orchestratorCrashed', (p) => {
+      setOrchDown(p);
+      if (p.restarting) {
+        // Auto-clear the banner shortly after the restart attempt — the
+        // renderer's next refresh will resync state when the child is back.
+        setTimeout(() => setOrchDown(null), 3000);
+      }
+    });
+  }, []);
+
   const handleRemove = (id: string, isLive: boolean) => {
     if (!isLive) {
       void remove(id);
@@ -167,7 +180,33 @@ export function App() {
   return (
     <ThemeProvider theme={watchtowerTheme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', height: '100vh' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      {orchDown && (
+        <Box
+          sx={{
+            backgroundColor: orchDown.restarting ? 'warning.dark' : 'error.dark',
+            color: 'common.white',
+            px: 2,
+            py: 0.75,
+            fontSize: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+          }}
+        >
+          <strong>
+            {orchDown.restarting
+              ? 'Orchestrator crashed — restarting…'
+              : 'Orchestrator crashed repeatedly.'}
+          </strong>
+          <span style={{ opacity: 0.85 }}>
+            {orchDown.restarting
+              ? 'Instances will reappear in a moment.'
+              : 'Manual restart needed (Cmd+Q + relaunch).'}
+          </span>
+        </Box>
+      )}
+      <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <ModuleRail active={activeModule} onSelect={setActiveModule} />
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {activeModule === 'settings' ? (
@@ -226,6 +265,7 @@ export function App() {
           </>
         )}
         </Box>
+      </Box>
       </Box>
       <NewInstanceModal
         open={newOpen}

@@ -62,7 +62,11 @@ export type IpcPush =
   | { kind: 'clearAttention'; payload: { instanceId: string } }
   | { kind: 'badge'; payload: { count: number } }
   | { kind: 'activateInstance'; payload: { instanceId: string } }
-  | { kind: 'triggerNewInstance'; payload: Record<string, never> };
+  | { kind: 'triggerNewInstance'; payload: Record<string, never> }
+  | {
+      kind: 'orchestratorCrashed';
+      payload: { code: number | null; restarting: boolean };
+    };
 
 export interface WatchtowerBridge {
   invoke<T extends IpcRequest['kind']>(
