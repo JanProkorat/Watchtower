@@ -6,7 +6,14 @@ export type OrchRequest =
   | { id: string; kind: 'killInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'removeInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'reorderInstances'; payload: { orderedIds: string[] } }
-  | { id: string; kind: 'listInstances'; payload: Record<string, never> };
+  | { id: string; kind: 'listInstances'; payload: Record<string, never> }
+  | { id: string; kind: 'getSetting'; payload: { key: string } }
+  | { id: string; kind: 'setSetting'; payload: { key: string; value: string } }
+  | { id: string; kind: 'previewHookInstall'; payload: Record<string, never> }
+  | { id: string; kind: 'installHooks'; payload: Record<string, never> }
+  | { id: string; kind: 'uninstallHooks'; payload: Record<string, never> }
+  | { id: string; kind: 'snooze'; payload: { instanceId: string | '*'; untilMs: number } }
+  | { id: string; kind: 'focusChanged'; payload: { instanceId: string | null } };
 
 export type OrchResponse =
   | { kind: 'ping'; payload: { now: number; orch: number } }
@@ -21,12 +28,34 @@ export type OrchResponse =
       payload: {
         instances: Array<{ id: string; cwd: string; status: string; lastActivityAt: number }>;
       };
-    };
+    }
+  | { kind: 'getSetting'; payload: { value: string | null } }
+  | { kind: 'setSetting'; payload: { ok: true } }
+  | {
+      kind: 'previewHookInstall';
+      payload: {
+        settingsPath: string;
+        helperPath: string;
+        alreadyInstalled: boolean;
+        entries: Array<{ event: string; command: string; alreadyPresent: boolean }>;
+        preserved: Array<{ event: string; command: string }>;
+      };
+    }
+  | { kind: 'installHooks'; payload: { changed: boolean; backedUp: string | null } }
+  | { kind: 'uninstallHooks'; payload: { changed: boolean } }
+  | { kind: 'snooze'; payload: { ok: true } }
+  | { kind: 'focusChanged'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
   | { kind: 'ptyExit'; payload: { instanceId: string; code: number } }
-  | { kind: 'stateChanged'; payload: { instanceId: string; status: string } };
+  | { kind: 'stateChanged'; payload: { instanceId: string; status: string } }
+  | {
+      kind: 'notify';
+      payload: { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
+    }
+  | { kind: 'clearAttention'; payload: { instanceId: string } }
+  | { kind: 'badge'; payload: { count: number } };
 
 type AnyPort = {
   postMessage(data: unknown): void;

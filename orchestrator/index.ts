@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { homedir } from 'node:os';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { PortApi, type OrchRequest, type OrchResponse } from '../shared/messagePort.js';
 import { bootstrap, type BootstrapHandle } from './bootstrap.js';
@@ -8,18 +9,49 @@ import { PtyManager } from './ptyManager.js';
 import { InstancesRepo } from './db/repositories/instances.js';
 import { HookEventsRepo } from './db/repositories/hookEvents.js';
 import { NotificationsRepo } from './db/repositories/notifications.js';
+import { SettingsRepo } from './db/repositories/settings.js';
 import { transition } from './stateMachine.js';
+import { Notifier } from './notifier.js';
+import { QuietTimers } from './quietTimers.js';
+import {
+  previewHookInstall,
+  ensureHooksInstalled,
+  uninstallHooks,
+} from './hookInstaller.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let api: PortApi | null = null;
 let handle: BootstrapHandle | null = null;
 const pty = new PtyManager();
+let notifier: Notifier | null = null;
+let quietTimers: QuietTimers | null = null;
+
+const DEFAULT_QUIET_MS = 90_000;
 
 function supportDir(): string {
   const dir = path.join(homedir(), 'Library', 'Application Support', 'Watchtower');
   mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+function userSettingsPath(): string {
+  return path.join(homedir(), '.claude', 'settings.json');
+}
+
+function resolveHelperPath(): string {
+  if (process.env.WATCHTOWER_HELPER_DIR) {
+    return path.join(process.env.WATCHTOWER_HELPER_DIR, 'watchtower-hook.mjs');
+  }
+  // process.resourcesPath is set in packaged Electron builds but not typed in @types/node.
+  const resPath = (process as unknown as { resourcesPath?: string }).resourcesPath;
+  if (resPath) {
+    const packaged = path.join(resPath, 'app.asar.unpacked', 'dist-helper', 'watchtower-hook.mjs');
+    if (existsSync(packaged)) return packaged;
+  }
+  return path.join(__dirname, '..', '..', 'dist-helper', 'watchtower-hook.mjs');
 }
 
 function repo(): InstancesRepo {
@@ -33,16 +65,23 @@ function statusOf(id: string): InstanceStatus {
 function applyTransition(instanceId: string, event: StateEvent): void {
   const inst = repo().get(instanceId);
   if (!inst) return;
-  const result = transition(inst.status, event);
-  if (result.state !== inst.status) {
+  const prevStatus = inst.status;
+  const result = transition(prevStatus, event);
+  if (result.state !== prevStatus) {
     repo().updateStatus(instanceId, result.state, Date.now());
     api?.push({ kind: 'stateChanged', payload: { instanceId, status: result.state } });
+    if (notifier) notifier.apply(instanceId, inst.cwd, prevStatus, result.state, Date.now());
   }
   for (const out of result.outputs) {
     if (out.kind === 'storeClaudeSessionId') {
       repo().setClaudeSessionId(instanceId, out.sessionId);
+    } else if (out.kind === 'startQuietTimer') {
+      quietTimers?.start(instanceId);
+    } else if (out.kind === 'clearQuietTimer') {
+      quietTimers?.clear(instanceId);
+    } else if (out.kind === 'clearAttention') {
+      notifier?.clearAttention(instanceId);
     }
-    // startQuietTimer / clearQuietTimer / clearAttention are wired in Phase 7.
   }
 }
 
@@ -206,6 +245,39 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
         })),
       };
     }
+
+    case 'getSetting': {
+      const value = new SettingsRepo(handle!.db).getString(req.payload.key, '') || null;
+      return { value };
+    }
+
+    case 'setSetting': {
+      new SettingsRepo(handle!.db).set(req.payload.key, req.payload.value);
+      if (req.payload.key === 'quiet_timer_ms' && quietTimers) {
+        const n = Number(req.payload.value);
+        if (Number.isFinite(n) && n >= 1000) quietTimers.setDuration(n);
+      }
+      return { ok: true };
+    }
+
+    case 'previewHookInstall':
+      return previewHookInstall(userSettingsPath(), resolveHelperPath());
+
+    case 'installHooks': {
+      const result = ensureHooksInstalled(userSettingsPath(), resolveHelperPath());
+      return { changed: result.changed, backedUp: result.backedUp };
+    }
+
+    case 'uninstallHooks':
+      return uninstallHooks(userSettingsPath(), resolveHelperPath());
+
+    case 'snooze':
+      notifier?.snooze(req.payload.instanceId, req.payload.untilMs);
+      return { ok: true };
+
+    case 'focusChanged':
+      notifier?.setFocused(req.payload.instanceId);
+      return { ok: true };
   }
 }
 
@@ -283,6 +355,31 @@ function respawnIncompleteRowsOnBoot(): void {
       event.ports[0] as unknown as ConstructorParameters<typeof PortApi>[0],
     );
     api.onRequest(async (req) => handleRequest(req as OrchRequest));
+
+    // Wire the notifier + quiet timer now that api is available.
+    notifier = new Notifier({
+      notify: (p) => {
+        api?.push({ kind: 'notify', payload: p });
+        try {
+          new NotificationsRepo(handle!.db).log(
+            p.instanceId,
+            p.kind,
+            `Claude in ${path.basename(p.cwd) || p.cwd} ${p.kind === 'waiting-permission' ? 'needs permission' : 'is waiting'}`,
+            Date.now(),
+          );
+        } catch {
+          /* best-effort logging */
+        }
+      },
+      clearAttention: (instanceId) => api?.push({ kind: 'clearAttention', payload: { instanceId } }),
+      setBadge: (count) => api?.push({ kind: 'badge', payload: { count } }),
+    });
+    const settings = new SettingsRepo(handle!.db);
+    const quietMs = settings.getNumber('quiet_timer_ms', DEFAULT_QUIET_MS);
+    quietTimers = new QuietTimers(quietMs, (instanceId) => {
+      applyTransition(instanceId, { kind: 'quietTimerFired' });
+    });
+
     // Respawn after api is ready so the resumed pty's first output/exit can
     // push through to the renderer immediately.
     respawnIncompleteRowsOnBoot();
