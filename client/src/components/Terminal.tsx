@@ -33,7 +33,16 @@ export function Terminal({ instanceId, active }: Props) {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(containerRef.current);
-    fit.fit();
+    // xterm's renderService isn't always ready synchronously after open();
+    // calling fit() too early triggers "Cannot read properties of undefined
+    // (reading 'dimensions')". Defer to next frame.
+    requestAnimationFrame(() => {
+      try {
+        fit.fit();
+      } catch {
+        /* element hidden or term torn down before paint */
+      }
+    });
     termRef.current = term;
     fitRef.current = fit;
 

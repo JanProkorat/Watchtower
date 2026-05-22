@@ -6,6 +6,47 @@ import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
 import { Terminal } from './components/Terminal.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
+const TERMINAL_STATES = new Set(['finished', 'crashed', 'suspended']);
+function isTerminalState(status: string): boolean {
+  return TERMINAL_STATES.has(status);
+}
+
+function DeadInstancePane({
+  active,
+  status,
+  cwd,
+}: {
+  active: boolean;
+  status: string;
+  cwd: string;
+}) {
+  return (
+    <Box
+      sx={{
+        position: 'absolute',
+        inset: 0,
+        display: active ? 'flex' : 'none',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        gap: 1.5,
+        p: 6,
+        backgroundColor: 'background.default',
+      }}
+    >
+      <Typography variant="h6">Session is {status}</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 12 }}>
+        {cwd}
+      </Typography>
+      <Typography variant="caption" color="text.disabled" sx={{ maxWidth: 540 }}>
+        The pty for this session ended (or never started under this orchestrator run).
+        Use <strong>+</strong> to spawn a fresh claude in the same directory. Suspend / resume
+        across restarts arrives in Phase 8.
+      </Typography>
+    </Box>
+  );
+}
+
 declare global {
   interface Window {
     watchtower: WatchtowerBridge;
@@ -57,9 +98,18 @@ export function App() {
               </Typography>
             </Box>
           ) : (
-            instances.map((i) => (
-              <Terminal key={i.id} instanceId={i.id} active={i.id === activeId} />
-            ))
+            instances.map((i) =>
+              isTerminalState(i.status) ? (
+                <DeadInstancePane
+                  key={i.id}
+                  active={i.id === activeId}
+                  status={i.status}
+                  cwd={i.cwd}
+                />
+              ) : (
+                <Terminal key={i.id} instanceId={i.id} active={i.id === activeId} />
+              ),
+            )
           )}
         </Box>
       </Box>

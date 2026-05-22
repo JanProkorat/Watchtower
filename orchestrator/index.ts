@@ -151,6 +151,24 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
   }
 }
 
+function reapOrphansFromPreviousRun(): void {
+  // Any instance still marked as live (spawning / working / waiting-* / idle-notify)
+  // when the orchestrator boots is an orphan from a previous run — its pty
+  // died with the previous orchestrator process. Mark them crashed with
+  // termination_reason='crash' so the renderer treats them as terminal.
+  // Phase 8 turns this into proper claude --resume recovery for rows that
+  // captured a session id; for now we just mark them dead.
+  const r = repo();
+  const orphans = r.listLive();
+  for (const o of orphans) {
+    r.updateStatus(o.id, 'crashed', Date.now());
+    r.setTermination(o.id, 'crash', null);
+  }
+  if (orphans.length > 0) {
+    console.log(`[orchestrator] reaped ${orphans.length} orphan(s) from previous run`);
+  }
+}
+
 (process as unknown as { parentPort?: NodeJS.EventEmitter }).parentPort?.on(
   'message',
   async (event: { data: { kind: string }; ports?: MessagePort[] }) => {
@@ -163,6 +181,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
         if (stateEvent) applyTransition(instanceId, stateEvent);
       },
     });
+    reapOrphansFromPreviousRun();
     api = new PortApi(
       event.ports[0] as unknown as ConstructorParameters<typeof PortApi>[0],
     );
