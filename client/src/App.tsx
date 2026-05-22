@@ -19,6 +19,7 @@ import { useInstances } from './state/useInstances.js';
 import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
 import { Terminal } from './components/Terminal.js';
 import { TerminalErrorBoundary } from './components/TerminalErrorBoundary.js';
+import { NewInstanceModal } from './components/NewInstanceModal.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
 const TERMINAL_STATES = new Set(['finished', 'crashed', 'suspended']);
@@ -93,6 +94,7 @@ export function App() {
   const { instances, activeId, loaded, setActive, spawn, remove, reorder } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
 
   const handleRemove = (id: string, isLive: boolean) => {
     if (!isLive) {
@@ -103,16 +105,9 @@ export function App() {
     setConfirmClose({ id, cwd: inst?.cwd ?? id });
   };
 
-  const handleNew = async () => {
+  const doSpawn = async (cwd: string) => {
     try {
-      // Native folder picker — works in Electron (electron-only IPC) and falls
-      // through to the stub's "error: standalone browser mode" path in plain
-      // browser dev. window.prompt isn't supported in Electron, hence the picker.
-      const pick = await window.watchtower.invoke('chooseDirectory', {
-        defaultPath: '~/Projects',
-      });
-      if (!pick.path) return; // user cancelled
-      const res = await spawn(pick.path);
+      const res = await spawn(cwd);
       if (!res.instanceId) {
         setSpawnError(res.error ?? 'spawn failed — no instance id returned');
       }
@@ -140,7 +135,7 @@ export function App() {
           instances={instances}
           activeId={activeId}
           onSelect={(id) => setActive(id === DASHBOARD_TAB ? null : id)}
-          onNew={() => void handleNew()}
+          onNew={() => setNewOpen(true)}
           onRemove={handleRemove}
           onReorder={(ids) => void reorder(ids)}
         />
@@ -181,6 +176,12 @@ export function App() {
           )}
         </Box>
       </Box>
+      <NewInstanceModal
+        open={newOpen}
+        defaultCwd="~/Projects"
+        onClose={() => setNewOpen(false)}
+        onSpawn={(cwd) => void doSpawn(cwd)}
+      />
       <Dialog
         open={Boolean(confirmClose)}
         onClose={() => setConfirmClose(null)}
