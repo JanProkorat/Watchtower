@@ -38,7 +38,14 @@ function installStub(): void {
         case 'listInstances':
           return { instances: [] } as Out;
         case 'spawnInstance':
-          return { instanceId: 'stub-not-spawned' } as Out;
+          // Returning an instanceId would make the renderer activate a tab
+          // that has no matching <Tab /> child — MUI's Tabs validator
+          // complains. The error path (null id + message) routes through
+          // App.tsx's Snackbar instead.
+          return {
+            instanceId: null,
+            error: 'Running in browser preview — launch the Watchtower app to spawn real claude instances.',
+          } as Out;
         default:
           return { ok: true } as Out;
       }
