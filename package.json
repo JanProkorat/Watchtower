@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "main": "dist-electron/main.js",
+  "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev": "concurrently -k -n main,renderer,orch -c blue,magenta,cyan \"npm:dev:main\" \"npm:dev:renderer\" \"npm:dev:orch\"",
     "dev:main": "tsc -p electron/tsconfig.json --watch --preserveWatchOutput",

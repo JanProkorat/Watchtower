@@ -1,13 +1,17 @@
 import { app } from 'electron';
 import { createMainWindow } from './window.js';
+import { registerIpc, pushToRenderer } from './ipc.js';
 
 app.setName('Watchtower');
 
 app.whenReady().then(() => {
-  createMainWindow();
+  registerIpc();
+  const win = createMainWindow();
+  win.webContents.once('did-finish-load', () => {
+    pushToRenderer('hello', { version: app.getVersion() });
+  });
 });
 
 app.on('window-all-closed', () => {
-  // Keep the orchestrator alive in the background — do NOT quit on window close.
-  // Tray menu and Cmd+Q drive real quit (wired up in a later task).
+  // intentionally no-op — orchestrator + tray will keep the app alive
 });

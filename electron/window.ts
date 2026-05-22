@@ -32,7 +32,7 @@ export function createMainWindow(): BrowserWindow {
   if (process.env.WATCHTOWER_DEV_URL) {
     void mainWindow.loadURL(process.env.WATCHTOWER_DEV_URL);
   } else {
-    void mainWindow.loadFile(path.join(__dirname, '../dist-renderer/index.html'));
+    void mainWindow.loadFile(path.join(__dirname, '../../dist-renderer/index.html'));
   }
   mainWindow.on('closed', () => {
     mainWindow = null;
