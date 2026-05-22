@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import { Box } from '@mui/material';
+import { Box, CircularProgress, Typography } from '@mui/material';
 
 interface Props {
   instanceId: string;
@@ -13,6 +13,10 @@ export function Terminal({ instanceId, active }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  // Stays false until the pty emits its first byte. Used to render a spinner
+  // overlay on top of the (still empty) xterm canvas — covers the gap between
+  // spawning claude and seeing its welcome banner.
+  const [hasOutput, setHasOutput] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -47,7 +51,9 @@ export function Terminal({ instanceId, active }: Props) {
     fitRef.current = fit;
 
     const offData = window.watchtower.on('ptyData', (p) => {
-      if (p.instanceId === instanceId) term.write(p.chunk);
+      if (p.instanceId !== instanceId) return;
+      term.write(p.chunk);
+      setHasOutput(true);
     });
 
     const inputDisp = term.onData((data) => {
@@ -107,15 +113,33 @@ export function Terminal({ instanceId, active }: Props) {
 
   return (
     <Box
-      ref={containerRef}
       sx={{
         position: 'absolute',
         inset: 0,
-        backgroundColor: '#0e0f12',
         // Hide inactive terminals via visibility (not display:none) so xterm's
         // canvas dimensions stay valid; we re-fit when they become active.
         visibility: active ? 'visible' : 'hidden',
       }}
-    />
+    >
+      <Box ref={containerRef} sx={{ position: 'absolute', inset: 0, backgroundColor: '#0e0f12' }} />
+      {!hasOutput && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1.5,
+            backgroundColor: '#0e0f12',
+            color: 'text.secondary',
+          }}
+        >
+          <CircularProgress size={22} thickness={4} />
+          <Typography variant="caption">Starting claude…</Typography>
+        </Box>
+      )}
+    </Box>
   );
 }
