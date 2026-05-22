@@ -20,6 +20,7 @@ import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
 import { Terminal } from './components/Terminal.js';
 import { TerminalErrorBoundary } from './components/TerminalErrorBoundary.js';
 import { NewInstanceModal } from './components/NewInstanceModal.js';
+import { ModuleRail, type ModuleId } from './components/ModuleRail.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
 const TERMINAL_STATES = new Set(['finished', 'crashed', 'suspended']);
@@ -95,6 +96,7 @@ export function App() {
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [activeModule, setActiveModule] = useState<ModuleId>('instances');
 
   const handleRemove = (id: string, isLive: boolean) => {
     if (!isLive) {
@@ -130,7 +132,9 @@ export function App() {
   return (
     <ThemeProvider theme={watchtowerTheme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <Box sx={{ display: 'flex', height: '100vh' }}>
+        <ModuleRail active={activeModule} onSelect={setActiveModule} />
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <TabStrip
           instances={instances}
           activeId={activeId}
@@ -174,6 +178,7 @@ export function App() {
               ),
             )
           )}
+        </Box>
         </Box>
       </Box>
       <NewInstanceModal
