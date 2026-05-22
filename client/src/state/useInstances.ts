@@ -29,12 +29,14 @@ function writePersistedActiveId(id: string | null): void {
 export function useInstances(): {
   instances: InstanceView[];
   activeId: string | null;
+  loaded: boolean;
   setActive(id: string | null): void;
   spawn(cwd: string, args?: string[]): Promise<string>;
   kill(instanceId: string): Promise<void>;
   refresh(): Promise<void>;
 } {
   const [instances, setInstances] = useState<InstanceView[]>([]);
+  const [loaded, setLoaded] = useState(false);
   // Seed from localStorage so the last-active tab reappears across restarts.
   // The validation effect below clears it if it doesn't match any live row.
   const [activeId, setActiveId] = useState<string | null>(readPersistedActiveId);
@@ -56,6 +58,7 @@ export function useInstances(): {
   const refresh = useCallback(async () => {
     const res = await window.watchtower.invoke('listInstances', {});
     setInstances(res.instances);
+    setLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -125,5 +128,5 @@ export function useInstances(): {
     await window.watchtower.invoke('reorderInstances', { orderedIds });
   }, []);
 
-  return { instances, activeId, setActive: setActiveId, spawn, kill, remove, reorder, refresh };
+  return { instances, activeId, loaded, setActive: setActiveId, spawn, kill, remove, reorder, refresh };
 }

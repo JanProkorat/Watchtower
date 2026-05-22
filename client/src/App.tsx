@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   CssBaseline,
   Dialog,
   DialogActions,
@@ -67,8 +68,29 @@ declare global {
   }
 }
 
+function LoadingScreen() {
+  return (
+    <Box
+      sx={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 1.75,
+        backgroundColor: 'background.default',
+        color: 'text.secondary',
+      }}
+    >
+      <CircularProgress size={22} thickness={4} />
+      <Typography variant="body2">Watchtower</Typography>
+    </Box>
+  );
+}
+
 export function App() {
-  const { instances, activeId, setActive, spawn, remove, reorder } = useInstances();
+  const { instances, activeId, loaded, setActive, spawn, remove, reorder } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
 
@@ -100,6 +122,15 @@ export function App() {
   };
 
   const onDashboard = activeId === null || activeId === DASHBOARD_TAB;
+
+  if (!loaded) {
+    return (
+      <ThemeProvider theme={watchtowerTheme}>
+        <CssBaseline />
+        <LoadingScreen />
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider theme={watchtowerTheme}>
