@@ -23,6 +23,7 @@ import { NewInstanceModal } from './components/NewInstanceModal.js';
 import { ModuleRail, type ModuleId } from './components/ModuleRail.js';
 import { DashboardTab } from './components/DashboardTab.js';
 import { FirstRunWizard } from './components/FirstRunWizard.js';
+import { SettingsPanel } from './components/SettingsPanel.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
 const TERMINAL_STATES = new Set(['finished', 'crashed', 'suspended']);
@@ -169,6 +170,10 @@ export function App() {
       <Box sx={{ display: 'flex', height: '100vh' }}>
         <ModuleRail active={activeModule} onSelect={setActiveModule} />
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {activeModule === 'settings' ? (
+          <SettingsPanel />
+        ) : (
+          <>
         <TabStrip
           instances={instances}
           activeId={activeId}
@@ -218,6 +223,8 @@ export function App() {
             )
           )}
         </Box>
+          </>
+        )}
         </Box>
       </Box>
       <NewInstanceModal
