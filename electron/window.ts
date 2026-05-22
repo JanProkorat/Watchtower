@@ -23,7 +23,7 @@ export function createMainWindow(): BrowserWindow {
     title: 'Watchtower',
     backgroundColor: '#0e0f12',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
