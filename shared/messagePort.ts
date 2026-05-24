@@ -33,7 +33,51 @@ export type OrchRequest =
   | { id: string; kind: 'worklogs:list'; payload: OrchWorklogListFilter }
   | { id: string; kind: 'worklogs:create'; payload: OrchWorklogInput }
   | { id: string; kind: 'worklogs:update'; payload: { id: number; input: Partial<OrchWorklogInput> } }
-  | { id: string; kind: 'worklogs:delete'; payload: { id: number } };
+  | { id: string; kind: 'worklogs:delete'; payload: { id: number } }
+  | { id: string; kind: 'contracts:listForProject'; payload: { projectId: number } }
+  | { id: string; kind: 'contracts:create'; payload: OrchContractInput }
+  | { id: string; kind: 'contracts:update'; payload: { id: number; input: Partial<OrchContractInput> } }
+  | { id: string; kind: 'contracts:delete'; payload: { id: number } };
+
+export interface OrchContractInput {
+  projectId: number;
+  effectiveFrom: string;
+  rateType: 'hourly' | 'daily';
+  rateAmount: number;
+  currency: string;
+  hoursPerDay?: number;
+  endDate?: string | null;
+  mdLimit?: number | null;
+}
+
+export interface OrchContractView {
+  id: number;
+  projectId: number;
+  effectiveFrom: string;
+  endDate: string | null;
+  rateType: 'hourly' | 'daily';
+  rateAmount: number;
+  currency: string;
+  hoursPerDay: number;
+  mdLimit: number | null;
+  createdAt: string;
+  minutesLogged: number;
+  mdsUsed: number;
+  mdsRemaining: number | null;
+  elapsedWorkdays: number;
+  totalWorkdays: number | null;
+  workdaysRemaining: number | null;
+  projectedTotalMds: number | null;
+  isActive: boolean;
+  isCompleted: boolean;
+}
+
+export interface OrchOverlapError {
+  error: 'overlap';
+  conflictingId: number;
+  conflictingFrom: string;
+  conflictingTo: string | null;
+}
 
 export interface OrchWorklogListFilter {
   projectId?: number;
@@ -200,7 +244,11 @@ export type OrchResponse =
   | { kind: 'worklogs:list'; payload: { worklogs: OrchWorklogView[] } }
   | { kind: 'worklogs:create'; payload: { worklog: OrchWorklogView } }
   | { kind: 'worklogs:update'; payload: { worklog: OrchWorklogView } }
-  | { kind: 'worklogs:delete'; payload: { ok: true } };
+  | { kind: 'worklogs:delete'; payload: { ok: true } }
+  | { kind: 'contracts:listForProject'; payload: { contracts: OrchContractView[] } }
+  | { kind: 'contracts:create'; payload: { contract: OrchContractView } | OrchOverlapError }
+  | { kind: 'contracts:update'; payload: { contract: OrchContractView } | OrchOverlapError }
+  | { kind: 'contracts:delete'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

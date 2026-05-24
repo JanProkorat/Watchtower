@@ -1,0 +1,178 @@
+import type { SqliteLike } from './migrations.js';
+import { ProjectRatesRepo, type ProjectRateRow } from './repositories/projectRates.js';
+
+export interface ContractStatus {
+  rateId: number;
+  projectId: number;
+  effectiveFrom: string;
+  endDate: string | null;
+  hoursPerDay: number;
+  mdLimit: number | null;
+  /** Total billable minutes logged inside the contract period (so far). */
+  minutesLogged: number;
+  /** minutesLogged ÷ 60 ÷ hoursPerDay, rounded to 2dp. */
+  mdsUsed: number;
+  /** mdLimit - mdsUsed when mdLimit set, else null. */
+  mdsRemaining: number | null;
+  /** Approximate elapsed workdays inside the contract period (today included). */
+  elapsedWorkdays: number;
+  /** Approximate total workdays in the contract period (or null when open-ended). */
+  totalWorkdays: number | null;
+  /** Workdays remaining until end_date (or null when open-ended). */
+  workdaysRemaining: number | null;
+  /**
+   * mdsUsed extrapolated to the end of the contract period. Computed only
+   * when the contract has an end_date and at least one elapsed workday.
+   */
+  projectedTotalMds: number | null;
+  /** Whether `asOf` (default = today) lies inside this contract's range. */
+  isActive: boolean;
+  /** True if end_date < asOf. */
+  isCompleted: boolean;
+}
+
+/**
+ * Computes the live status of a project's *active* contract — or any
+ * specific rate when an `asOf` date is supplied — from worklogs + a simple
+ * Mon-Fri workday counter. Phase 19 will replace the workday counter with
+ * one that also subtracts public holidays and days_off; that swap is
+ * isolated to `countWorkdays()` below.
+ */
+export class ContractStatusService {
+  private rates: ProjectRatesRepo;
+
+  constructor(private db: SqliteLike) {
+    this.rates = new ProjectRatesRepo(db);
+  }
+
+  /** Status for the active contract on this project, or null if none. */
+  forProject(projectId: number, asOf?: string): ContractStatus | null {
+    const rate = this.rates.activeForProject(projectId, asOf);
+    if (!rate) return null;
+    return this.forRate(rate, asOf);
+  }
+
+  /** Status for a specific contract row — used when listing all contracts. */
+  forRate(rate: ProjectRateRow, asOf?: string): ContractStatus {
+    const today = asOf ?? todayStr();
+    const periodEnd = rate.endDate ?? today; // for "elapsed" we cap at today
+    const effectiveTo = rate.endDate ?? null;
+
+    // Only billable worklogs (project.kind = 'work') count toward MD usage —
+    // mirrors how TT's reports computed earnings. Joined through tasks → epics
+    // → projects so the project filter applies to every worklog.
+    const row = this.db
+      .prepare(
+        `SELECT COALESCE(SUM(w.minutes), 0) AS minutes
+           FROM worklogs w
+           JOIN tasks t  ON t.id = w.task_id
+           JOIN epics e  ON e.id = t.epic_id
+           JOIN projects p ON p.id = e.project_id
+          WHERE e.project_id = ?
+            AND p.kind = 'work'
+            AND w.work_date >= ?
+            AND w.work_date <= ?`,
+      )
+      .get(rate.projectId, rate.effectiveFrom, periodEnd) as { minutes: number };
+
+    const minutesLogged = row.minutes ?? 0;
+    const mdsUsed = round2(minutesLogged / 60 / rate.hoursPerDay);
+    const mdsRemaining = rate.mdLimit != null ? round2(rate.mdLimit - mdsUsed) : null;
+
+    const elapsedWorkdays = countWorkdays(rate.effectiveFrom, minDate(today, periodEnd));
+    const totalWorkdays = effectiveTo ? countWorkdays(rate.effectiveFrom, effectiveTo) : null;
+    const workdaysRemaining =
+      effectiveTo && today <= effectiveTo
+        ? countWorkdays(addDay(today), effectiveTo)
+        : effectiveTo
+          ? 0
+          : null;
+
+    const projectedTotalMds =
+      totalWorkdays != null && elapsedWorkdays > 0
+        ? round2((mdsUsed / elapsedWorkdays) * totalWorkdays)
+        : null;
+
+    const isActive =
+      today >= rate.effectiveFrom && (effectiveTo == null || today <= effectiveTo);
+    const isCompleted = effectiveTo != null && today > effectiveTo;
+
+    return {
+      rateId: rate.id,
+      projectId: rate.projectId,
+      effectiveFrom: rate.effectiveFrom,
+      endDate: rate.endDate,
+      hoursPerDay: rate.hoursPerDay,
+      mdLimit: rate.mdLimit,
+      minutesLogged,
+      mdsUsed,
+      mdsRemaining,
+      elapsedWorkdays,
+      totalWorkdays,
+      workdaysRemaining,
+      projectedTotalMds,
+      isActive,
+      isCompleted,
+    };
+  }
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function todayStr(): string {
+  const d = new Date();
+  return ymd(d);
+}
+
+function ymd(d: Date): string {
+  return (
+    d.getFullYear() +
+    '-' +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(d.getDate()).padStart(2, '0')
+  );
+}
+
+function addDay(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  if (y === undefined || m === undefined || d === undefined) return date;
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + 1);
+  return ymd(dt);
+}
+
+function minDate(a: string, b: string): string {
+  return a <= b ? a : b;
+}
+
+/**
+ * Counts Monday-through-Friday days in [from, to] inclusive. Phase 19 will
+ * extend this to also subtract Czech public holidays and days_off; the
+ * signature stays stable so the swap is mechanical.
+ */
+function countWorkdays(from: string, to: string): number {
+  if (from > to) return 0;
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  if (
+    fy === undefined ||
+    fm === undefined ||
+    fd === undefined ||
+    ty === undefined ||
+    tm === undefined ||
+    td === undefined
+  ) {
+    return 0;
+  }
+  const start = new Date(fy, fm - 1, fd);
+  const end = new Date(ty, tm - 1, td);
+  let count = 0;
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  return count;
+}
