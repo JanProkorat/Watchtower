@@ -577,6 +577,1303 @@
   }
   .crash-banner.show { display: flex; }
 
+  /* ─── TimeTracker module ─── */
+  .tt-pane {
+    display: none;
+    padding: 24px 28px 28px;
+    overflow: auto;
+  }
+  .tt-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tt-tab {
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    user-select: none;
+  }
+  .tt-tab:hover { color: var(--text-primary); }
+  .tt-tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--primary);
+  }
+
+  .tt-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .tt-toolbar .grow { flex: 1; }
+  .tt-toolbar .meta { color: var(--text-secondary); font-size: 12px; }
+  .tt-select, .tt-search {
+    background: var(--bg-paper);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-family: var(--ui-font);
+  }
+  .tt-search { min-width: 200px; }
+
+  .tt-sub { display: none; }
+  .tt-sub.active { display: block; }
+
+  /* Projects list */
+  .tt-project-row {
+    display: grid;
+    grid-template-columns: 16px 1fr 130px 140px 90px auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .tt-project-row .pdot { width: 12px; height: 12px; border-radius: 50%; }
+  .tt-project-row .pname { font-weight: 500; color: var(--text-primary); }
+  .tt-project-row .psub { color: var(--text-secondary); font-size: 11px; margin-top: 2px; }
+  .tt-project-row .ptotal { color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .tt-project-row .pmap {
+    font-family: var(--terminal-font);
+    color: var(--text-secondary);
+    font-size: 11px;
+  }
+  .tt-project-row .pepics { color: var(--text-secondary); font-size: 11px; }
+  .tt-project-row .actions { display: flex; gap: 6px; }
+
+  /* Worklog day groups */
+  .tt-day { margin-bottom: 22px; }
+  .tt-day-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 6px 0 10px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .tt-day-label strong { color: var(--text-primary); font-weight: 500; }
+  .tt-worklog-row {
+    display: grid;
+    grid-template-columns: 12px 1fr 110px 70px 110px 90px auto;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 14px;
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .tt-worklog-row .wcolor { width: 10px; height: 10px; border-radius: 50%; }
+  .tt-worklog-row .wcomment {
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tt-worklog-row .wkey {
+    font-family: var(--terminal-font);
+    color: var(--text-secondary);
+    font-size: 11px;
+  }
+  .tt-worklog-row .wkey.live { color: var(--primary); }
+  .tt-worklog-row .wduration { font-variant-numeric: tabular-nums; color: var(--text-primary); }
+  .tt-worklog-row .wtime { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .tt-worklog-row .wsource {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    padding: 2px 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    text-align: center;
+  }
+  .tt-worklog-row .wsource.auto { color: var(--primary); border-color: rgba(122, 167, 255, 0.35); }
+  .tt-worklog-row .wsource.jira { color: var(--secondary); border-color: rgba(240, 168, 104, 0.35); }
+  .tt-worklog-row .actions { display: flex; gap: 6px; }
+
+  /* Reports */
+  .tt-report-card {
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 22px;
+    margin-bottom: 14px;
+  }
+  .tt-report-card .card-title {
+    font-size: 11px;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .tt-report-card .card-value {
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+  }
+  .tt-bar-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 80px 50px;
+    align-items: center;
+    gap: 12px;
+    padding: 5px 0;
+    font-size: 13px;
+  }
+  .tt-bar-row .bar-name { color: var(--text-primary); }
+  .tt-bar-row .bar-track {
+    height: 8px;
+    background: var(--bg-elevated);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .tt-bar-row .bar-fill { height: 100%; border-radius: 999px; }
+  .tt-bar-row .bar-value {
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .tt-bar-row .bar-pct {
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-size: 12px;
+  }
+  .tt-split-track {
+    height: 10px;
+    background: var(--bg-elevated);
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .tt-jira-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--primary-soft);
+    border: 1px solid rgba(122, 167, 255, 0.25);
+    border-radius: var(--radius);
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .tt-jira-banner .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 3px rgba(102, 187, 106, 0.18);
+  }
+  .tt-jira-banner .spacer { flex: 1; }
+
+  /* ─── Project detail page ─── */
+  .tt-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    user-select: none;
+  }
+  .tt-back:hover { color: var(--text-primary); }
+  .tt-back svg { width: 12px; height: 12px; }
+
+  .tt-detail-header {
+    display: grid;
+    grid-template-columns: 48px 1fr auto auto;
+    gap: 18px;
+    align-items: center;
+    padding: 18px 22px;
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 18px;
+  }
+  .tt-detail-header .pdot-lg { width: 36px; height: 36px; border-radius: 50%; }
+  .tt-detail-header h2 { margin: 0; font-weight: 500; font-size: 20px; }
+  .tt-detail-header .meta { color: var(--text-secondary); font-size: 12px; margin-top: 4px; }
+  .tt-detail-header .meta code {
+    font-family: var(--terminal-font);
+    color: var(--text-primary);
+    background: var(--bg-paper-2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+  }
+  .tt-stats { display: flex; gap: 24px; }
+  .tt-stats .stat { text-align: right; }
+  .tt-stats .stat .label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tt-stats .stat .value {
+    font-size: 17px;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+  }
+  .tt-detail-header .actions { display: flex; flex-direction: column; gap: 6px; }
+
+  /* Epics & Tasks tree */
+  .tt-epic {
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .tt-epic-header {
+    display: grid;
+    grid-template-columns: 14px 1fr 90px 80px 110px auto;
+    gap: 14px;
+    align-items: center;
+    padding: 12px 14px;
+    cursor: pointer;
+  }
+  .tt-epic-header:hover { background: var(--bg-paper-2); }
+  .tt-epic-header .chevron {
+    color: var(--text-secondary);
+    transition: transform 100ms;
+    width: 12px; height: 12px;
+  }
+  .tt-epic.expanded .tt-epic-header .chevron { transform: rotate(90deg); }
+  .tt-epic-header .ename { font-weight: 500; color: var(--text-primary); font-size: 13px; }
+  .tt-epic-header .esub { color: var(--text-secondary); font-size: 11px; margin-top: 2px; }
+  .tt-epic-header .ekey {
+    font-family: var(--terminal-font);
+    color: var(--text-secondary);
+    font-size: 11px;
+    text-align: right;
+  }
+  .tt-epic-header .estat {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .tt-epic-header .estatus {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-align: center;
+  }
+  .tt-epic-header .estatus.active { color: var(--primary); border: 1px solid rgba(122,167,255,0.4); }
+  .tt-epic-header .estatus.done { color: var(--success); border: 1px solid rgba(102,187,106,0.4); }
+  .tt-epic-header .estatus.planned { color: var(--text-secondary); border: 1px solid var(--border-strong); }
+  .tt-epic-header .actions { display: flex; gap: 4px; }
+  .tt-epic-tasks {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg-paper-2);
+    padding: 6px 14px 12px 32px;
+  }
+  .tt-epic.expanded .tt-epic-tasks { display: block; }
+  .tt-task-row {
+    display: grid;
+    grid-template-columns: 10px 1fr 110px 70px 90px auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .tt-task-row:last-of-type { border-bottom: none; }
+  .tt-task-row .tdot { width: 8px; height: 8px; border-radius: 50%; }
+  .tt-task-row .tname { color: var(--text-primary); }
+  .tt-task-row .tkey { font-family: var(--terminal-font); color: var(--text-secondary); font-size: 11px; }
+  .tt-task-row .tdur { font-variant-numeric: tabular-nums; color: var(--text-primary); text-align: right; }
+  .tt-task-row .tstatus {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-align: center;
+  }
+  .tt-task-row .tstatus.todo { color: var(--text-secondary); border: 1px solid var(--border-strong); }
+  .tt-task-row .tstatus.doing { color: var(--primary); border: 1px solid rgba(122,167,255,0.4); }
+  .tt-task-row .tstatus.done { color: var(--success); border: 1px solid rgba(102,187,106,0.4); }
+  .tt-task-row .actions { display: flex; gap: 4px; }
+  .tt-add-task {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 7px 12px;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius);
+    text-align: center;
+  }
+  .tt-add-task:hover { color: var(--primary); border-color: rgba(122,167,255,0.4); }
+
+  /* ─── Drawer (right-side slide-over) ─── */
+  .drawer-backdrop {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(4, 6, 10, 0.55);
+    backdrop-filter: blur(3px);
+    z-index: 20;
+  }
+  .drawer-backdrop.show { display: block; }
+  .drawer {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 480px;
+    background: var(--bg-paper);
+    border-left: 1px solid var(--border-strong);
+    box-shadow: -20px 0 60px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+  }
+  .drawer.wide { width: 560px; }
+  .drawer-header {
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .drawer-header h2 { margin: 0; font-size: 16px; font-weight: 500; }
+  .drawer-header .sub { color: var(--text-secondary); font-size: 12px; margin-top: 4px; }
+  .drawer-header .close {
+    position: absolute;
+    top: 14px; right: 18px;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px 6px;
+  }
+  .drawer-header .close:hover { color: var(--text-primary); }
+  .drawer-body { flex: 1; overflow: auto; padding: 18px 22px; }
+  .drawer-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 22px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-paper-2);
+  }
+  .drawer-footer .danger-side { margin-right: auto; }
+
+  /* Form primitives */
+  .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .form-row > label { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+  .form-row .desc { font-size: 11px; color: var(--text-secondary); }
+  .form-row .field,
+  .form-row select,
+  .form-row textarea {
+    width: 100%;
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-family: var(--ui-font);
+  }
+  .form-row textarea { resize: vertical; min-height: 70px; }
+  .form-row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatches .swatch {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    box-sizing: content-box;
+  }
+  .swatches .swatch.selected { border-color: var(--text-primary); }
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+  .check-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); }
+  .glob-list { display: flex; flex-direction: column; gap: 6px; }
+  .glob-row { display: flex; gap: 6px; }
+  .glob-row .field { font-family: var(--terminal-font); font-size: 12px; }
+  .glob-row .x-btn {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    width: 32px;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .glob-row .x-btn:hover { color: var(--error); border-color: rgba(239,83,80,0.35); }
+  .add-link {
+    color: var(--primary);
+    font-size: 12px;
+    cursor: pointer;
+    margin-top: 4px;
+    display: inline-block;
+  }
+  .source-badge {
+    display: inline-block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--primary);
+    padding: 2px 8px;
+    border: 1px solid rgba(122,167,255,0.4);
+    border-radius: 999px;
+  }
+
+  /* Contracts (project rates) inside the project drawer */
+  .form-section {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+  .form-section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .form-section-header h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .form-section-header .hint { color: var(--text-secondary); font-size: 11px; }
+  .contract-card {
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .contract-card.active {
+    border-left: 3px solid var(--success);
+    padding-left: 11px;
+  }
+  .contract-card .c-dates { color: var(--text-primary); font-weight: 500; font-size: 12px; }
+  .contract-card .c-rate {
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .contract-card .c-meta { color: var(--text-secondary); font-size: 11px; margin-top: 2px; }
+  .contract-card .c-meta code {
+    font-family: var(--terminal-font);
+    color: var(--text-primary);
+    font-size: 11px;
+  }
+  .contract-card .c-actions { display: flex; gap: 4px; align-items: flex-start; }
+  .active-chip {
+    display: inline-block;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--success);
+    border: 1px solid rgba(102,187,106,0.4);
+    padding: 1px 6px;
+    border-radius: 999px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .ended-chip {
+    display: inline-block;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-strong);
+    padding: 1px 6px;
+    border-radius: 999px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .path-row { display: flex; gap: 6px; }
+  .path-row .field {
+    flex: 1;
+    font-family: var(--terminal-font);
+    font-size: 12px;
+  }
+
+  /* Launch-project button (project row → Instances) */
+  .btn.launch { gap: 6px; display: inline-flex; align-items: center; }
+  .btn.launch svg { width: 12px; height: 12px; }
+  .btn.launch .run-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--success);
+    margin-right: 4px;
+    box-shadow: 0 0 0 2px rgba(102,187,106,0.18);
+  }
+  .btn.launch.has-running {
+    border-color: rgba(102,187,106,0.35);
+    color: var(--text-primary);
+  }
+
+  /* Choice modal (open existing / create new) */
+  .choice-card {
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    cursor: pointer;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    transition: background 100ms, border-color 100ms;
+  }
+  .choice-card:hover {
+    background: var(--bg-elevated);
+    border-color: rgba(122,167,255,0.4);
+  }
+  .choice-card + .choice-card { margin-top: 10px; }
+  .choice-card .ico {
+    width: 38px; height: 38px;
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--primary);
+    flex-shrink: 0;
+  }
+  .choice-card .ico svg { width: 16px; height: 16px; }
+  .choice-card .info { flex: 1; min-width: 0; }
+  .choice-card .ctitle {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 13px;
+  }
+  .choice-card .csub {
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .choice-card .csub code {
+    font-family: var(--terminal-font);
+    color: var(--text-primary);
+    font-size: 11px;
+  }
+  .choice-card .arrow {
+    color: var(--text-secondary);
+    font-size: 18px;
+  }
+
+  /* ─── Reports tab (TimeTracker-style layout) ─── */
+  .report-filterbar {
+    background: rgba(21, 23, 28, 0.85);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .filter-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .filter-group > label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+  }
+  .report-date {
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-family: var(--ui-font);
+    width: 140px;
+  }
+  .preset-group {
+    display: inline-flex;
+    align-self: flex-end;
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .preset-group .preset-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    border-right: 1px solid var(--border-strong);
+  }
+  .preset-group .preset-btn:last-child { border-right: none; }
+  .preset-group .preset-btn.active { background: var(--primary-soft); color: var(--primary); }
+  .preset-group .preset-btn:hover:not(.active) { color: var(--text-primary); }
+  .toggle-group {
+    display: inline-flex;
+    align-self: flex-end;
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .toggle-group .toggle-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    border-right: 1px solid var(--border-strong);
+  }
+  .toggle-group .toggle-btn:last-child { border-right: none; }
+  .toggle-group .toggle-btn.active { background: var(--primary-soft); color: var(--primary); }
+  .toggle-group .toggle-btn:hover:not(.active) { color: var(--text-primary); }
+
+  .chart-card { padding: 18px 20px; margin-bottom: 14px; }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+    gap: 10px;
+  }
+  .chart-title {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .chart-subtitle {
+    color: var(--text-secondary);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+  .chart-aside {
+    color: var(--text-secondary);
+    font-size: 11px;
+  }
+
+  .report-two-up {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 0;
+  }
+  .report-two-up > .chart-card { margin-bottom: 0; }
+
+  /* Trend SVG */
+  .trend-svg { display: block; width: 100%; height: auto; }
+  .trend-bar { fill: var(--primary); }
+  .trend-bar.dim { fill: rgba(122, 167, 255, 0.5); }
+  .trend-axis-line { stroke: var(--border); stroke-width: 1; }
+  .trend-axis-text { fill: var(--text-secondary); font-size: 10px; font-family: var(--ui-font); }
+  .trend-marker-line { stroke: var(--secondary); stroke-width: 1; stroke-dasharray: 3 3; }
+  .trend-marker-label { fill: var(--secondary); font-size: 10px; font-family: var(--terminal-font); }
+
+  /* Donut */
+  .donut-body {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 24px;
+    align-items: center;
+    padding: 4px 0;
+  }
+  .donut-svg { width: 180px; height: 180px; }
+  .donut-center-label {
+    fill: var(--text-primary);
+    font-size: 22px;
+    font-weight: 500;
+    font-family: var(--ui-font);
+    text-anchor: middle;
+    dominant-baseline: middle;
+  }
+  .donut-center-sub {
+    fill: var(--text-secondary);
+    font-size: 10px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .donut-legend { display: flex; flex-direction: column; gap: 7px; }
+  .legend-row {
+    display: grid;
+    grid-template-columns: 12px 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .legend-row .ldot { width: 10px; height: 10px; border-radius: 2px; }
+  .legend-row .lname { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend-row .ltime { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .legend-row .lpct { color: var(--text-secondary); font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; }
+
+  /* Earnings card */
+  .earnings-body { display: flex; flex-direction: column; gap: 14px; }
+  .earnings-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .earnings-stat .stat-label {
+    color: var(--text-secondary);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .earnings-stat .stat-value {
+    color: var(--text-primary);
+    font-size: 22px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    margin-top: 4px;
+  }
+  .earnings-stat .stat-value .unit { font-size: 12px; color: var(--text-secondary); font-weight: 400; margin-left: 4px; }
+  .earnings-stat .stat-meta { color: var(--text-secondary); font-size: 11px; margin-top: 2px; }
+  .earnings-byproject {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .earnings-byproject .ebp-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+  .earnings-byproject .ebp-row .ebp-name { color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+  .earnings-byproject .ebp-row .ebp-name .ldot { width: 10px; height: 10px; border-radius: 2px; }
+  .earnings-byproject .ebp-row .ebp-amount { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .earnings-byproject .ebp-row .ebp-amount.muted { color: var(--text-disabled); }
+
+  /* Active contracts grid */
+  .contracts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .contract-status-card {
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .csc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .csc-header .csc-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .csc-header .csc-name { color: var(--text-primary); font-weight: 500; font-size: 13px; }
+  .csc-rate { color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; margin-bottom: 10px; }
+  .csc-progress-track {
+    height: 8px;
+    background: var(--bg-elevated);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 2px 0 8px;
+  }
+  .csc-progress-fill { height: 100%; border-radius: 999px; }
+  .csc-stat-row { display: flex; justify-content: space-between; font-size: 11px; margin-top: 4px; }
+  .csc-stat-row .label { color: var(--text-secondary); }
+  .csc-stat-row .value { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .csc-status-chip {
+    display: inline-block;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    margin-left: auto;
+  }
+  .csc-status-chip.ok { color: var(--success); border: 1px solid rgba(102,187,106,0.4); }
+  .csc-status-chip.risk { color: var(--warning); border: 1px solid rgba(255,183,77,0.4); }
+  .csc-status-chip.over { color: var(--error); border: 1px solid rgba(239,83,80,0.4); }
+
+  /* Heatmap */
+  .heatmap-body {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 4px 0;
+    overflow-x: auto;
+  }
+  .heatmap-day-labels {
+    display: grid;
+    grid-template-rows: repeat(7, 14px);
+    gap: 3px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    padding-top: 18px;
+  }
+  .heatmap-day-labels span { line-height: 14px; }
+  .heatmap-cols { display: flex; gap: 3px; }
+  .heatmap-col { display: flex; flex-direction: column; gap: 3px; align-items: center; }
+  .heatmap-week-label {
+    font-size: 9px;
+    color: var(--text-secondary);
+    height: 15px;
+    line-height: 15px;
+  }
+  .heatmap-cell {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    background: var(--bg-elevated);
+  }
+  .heatmap-cell.l1 { background: rgba(122, 167, 255, 0.22); }
+  .heatmap-cell.l2 { background: rgba(122, 167, 255, 0.42); }
+  .heatmap-cell.l3 { background: rgba(122, 167, 255, 0.65); }
+  .heatmap-cell.l4 { background: rgba(122, 167, 255, 0.92); }
+  .heatmap-cell.empty { background: transparent; }
+  .heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-left: auto;
+  }
+  .heatmap-legend .heatmap-cell { width: 11px; height: 11px; }
+
+  /* ─── Task grid (monthly per-task ⇄ per-day matrix) ─── */
+  .grid-filter-bar {
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .month-nav { display: flex; align-items: center; gap: 4px; }
+  .month-nav .icon-btn {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .month-nav .icon-btn:hover { color: var(--text-primary); border-color: rgba(122,167,255,0.4); }
+  .month-nav .icon-btn svg { width: 14px; height: 14px; }
+  .month-label {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 14px;
+    min-width: 130px;
+    text-align: center;
+    text-transform: capitalize;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .grid-wrap {
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: auto;
+    max-height: 540px;
+    position: relative;
+  }
+  .grid-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    font-size: 12px;
+  }
+  .grid-table th, .grid-table td {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 6px;
+    background: var(--bg-paper);
+    white-space: nowrap;
+    color: var(--text-primary);
+  }
+  .grid-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--bg-paper-2);
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: center;
+    font-size: 11px;
+    padding: 6px 4px;
+  }
+  .grid-table th.col-day, .grid-table td.col-day {
+    min-width: 40px;
+    width: 40px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .grid-table th.col-day .dnum { font-size: 12px; color: var(--text-primary); }
+  .grid-table th.col-day .dow { font-size: 9px; color: var(--text-secondary); text-transform: uppercase; margin-top: 1px; }
+  .grid-table th.col-day.weekend, .grid-table td.col-day.weekend { background: rgba(122, 167, 255, 0.05); }
+  .grid-table th.col-day.today, .grid-table td.col-day.today {
+    background: rgba(239, 83, 80, 0.14);
+  }
+  .grid-table th.col-day.today .dnum,
+  .grid-table th.col-day.today .dow { color: var(--error); }
+  .grid-table th.col-key, .grid-table td.col-key {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    min-width: 180px;
+    width: 180px;
+    text-align: left;
+    background: var(--bg-paper);
+  }
+  .grid-table thead th.col-key { z-index: 4; background: var(--bg-paper-2); text-align: left; padding-left: 10px; }
+  .grid-table th.col-logged, .grid-table td.col-logged {
+    position: sticky;
+    left: 180px;
+    z-index: 2;
+    min-width: 88px;
+    width: 88px;
+    background: var(--bg-paper);
+    border-right: 2px solid var(--border-strong);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  .grid-table thead th.col-logged { z-index: 4; background: var(--bg-paper-2); }
+  .grid-row-key {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .grid-row-key .status-icon {
+    width: 12px; height: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .grid-row-key .status-icon svg { width: 12px; height: 12px; display: block; }
+  .grid-row-key .status-icon.done { color: var(--success); }
+  .grid-row-key .status-icon.doing { color: var(--primary); }
+  .grid-row-key .status-icon.todo { color: var(--text-disabled); }
+  .grid-row-key .pdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .grid-row-key .task-key {
+    color: var(--primary);
+    font-family: var(--terminal-font);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+  }
+  .grid-row-key .task-key:hover { text-decoration: underline; }
+  .grid-table td.col-logged .est { color: var(--text-secondary); font-weight: 400; margin-left: 2px; }
+  .grid-table td.col-logged.over { color: var(--error); }
+  .grid-table td.col-logged.risk { color: var(--warning); }
+  .grid-table td.col-day.cell-empty { color: var(--text-disabled); }
+  .grid-table td.col-day:hover { background: rgba(122, 167, 255, 0.16); cursor: pointer; }
+  .grid-table tr.totals td {
+    position: sticky;
+    bottom: 29px;
+    z-index: 2;
+    font-weight: 600;
+    background: var(--bg-paper-2);
+    border-top: 2px solid var(--border-strong);
+  }
+  .grid-table tr.totals td.col-key,
+  .grid-table tr.totals td.col-logged {
+    z-index: 3;
+  }
+  .grid-table tr.earnings td {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    font-weight: 500;
+    background: var(--bg-paper-2);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+  .grid-table tr.earnings td.col-key,
+  .grid-table tr.earnings td.col-logged {
+    z-index: 3;
+    color: var(--text-secondary);
+  }
+  .grid-table tr.earnings td.cell-empty { color: var(--text-disabled); }
+
+  /* ─── Time off (calendar + upcoming list) ─── */
+  .info-banner {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 12px 16px;
+    background: var(--primary-soft);
+    border: 1px solid rgba(122,167,255,0.25);
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .info-banner .ico {
+    color: var(--primary);
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+  }
+  .info-banner strong { color: var(--text-primary); font-weight: 500; }
+
+  .calendars-card {
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .calendars-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 14px;
+    gap: 6px;
+  }
+  .calendars-header .label {
+    flex-grow: 1;
+    text-align: center;
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 13px;
+    text-transform: capitalize;
+  }
+  .calendars-header .today-btn {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--ui-font);
+  }
+  .calendars-header .today-btn:hover { color: var(--text-primary); border-color: rgba(122,167,255,0.4); }
+  .calendars-header .marking-as {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .calendars-header .marking-as label {
+    color: var(--text-secondary);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .calendars-header .marking-as select { min-width: 140px; }
+  .calendars-header .marking-as + .icon-btn { margin-left: 12px; }
+  .calendars-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  .month-block .month-title {
+    text-align: center;
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 13px;
+    margin-bottom: 10px;
+    text-transform: capitalize;
+  }
+  .month-dow {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    margin-bottom: 4px;
+  }
+  .month-dow span {
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .month-cells {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .day-cell {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 5px;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    color: var(--text-primary);
+    user-select: none;
+    transition: background 100ms, border-color 100ms;
+  }
+  .day-cell.outside { opacity: 0.22; cursor: default; }
+  .day-cell.weekend:not(.kind-vacation):not(.kind-sick):not(.kind-other):not(.holiday-only) {
+    color: var(--text-disabled);
+  }
+  .day-cell.today { border-color: var(--primary); font-weight: 700; }
+  .day-cell:hover:not(.outside):not(.holiday-only) { background: rgba(122, 167, 255, 0.10); }
+  .day-cell.kind-vacation { background: rgba(122, 167, 255, 0.22); color: var(--primary); }
+  .day-cell.kind-sick     { background: rgba(239, 83, 80, 0.22);  color: var(--error); }
+  .day-cell.kind-other    { background: rgba(158, 158, 158, 0.20); color: var(--text-primary); }
+  .day-cell.holiday-only {
+    background: rgba(186, 104, 200, 0.12);
+    border-style: dashed;
+    border-color: rgba(186, 104, 200, 0.55);
+    color: #ce93d8;
+    cursor: default;
+  }
+
+  .upcoming-card {
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .upcoming-card .uc-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    font-size: 14px;
+  }
+  .kind-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .kind-chip {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid;
+    font-variant-numeric: tabular-nums;
+  }
+  .kind-chip.active.vacation { background: rgba(122, 167, 255, 0.18); border-color: rgba(122,167,255,0.5); color: var(--primary); }
+  .kind-chip.active.sick     { background: rgba(239, 83, 80, 0.18);  border-color: rgba(239,83,80,0.5);  color: var(--error); }
+  .kind-chip.active.other    { background: rgba(158, 158, 158, 0.18); border-color: var(--border-strong); color: var(--text-primary); }
+  .kind-chip.active.holiday  { background: rgba(186, 104, 200, 0.18); border-color: rgba(186,104,200,0.5); color: #ce93d8; }
+  .kind-chip.inactive {
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--text-disabled);
+  }
+  .upcoming-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .upcoming-item {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+  }
+  .upcoming-item .uc-ico { width: 18px; height: 18px; }
+  .upcoming-item .uc-ico.vacation { color: var(--primary); }
+  .upcoming-item .uc-ico.sick     { color: var(--error); }
+  .upcoming-item .uc-ico.other    { color: var(--text-secondary); }
+  .upcoming-item .uc-ico.holiday  { color: #ce93d8; }
+  .upcoming-item .uc-date { color: var(--text-primary); font-weight: 500; font-size: 13px; }
+  .upcoming-item .uc-meta { color: var(--text-secondary); font-size: 11px; margin-top: 2px; }
+  .upcoming-item .uc-auto {
+    color: var(--text-disabled);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-right: 6px;
+  }
+  .upcoming-empty {
+    color: var(--text-secondary);
+    font-size: 12px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .paging-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+  .paging-bar .icon-btn {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .paging-bar .icon-btn:disabled { opacity: 0.35; cursor: default; }
+  .paging-bar .icon-btn:hover:not(:disabled) { color: var(--text-primary); border-color: rgba(122,167,255,0.4); }
+  .paging-bar .icon-btn svg { width: 14px; height: 14px; }
+  .paging-bar .info { font-variant-numeric: tabular-nums; }
+  .paging-bar .page-size {
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    padding: 4px 6px;
+    border-radius: var(--radius);
+    font-size: 11px;
+    font-family: var(--ui-font);
+  }
+
   /* ─── Settings preview (for the settings module pseudo-state) ─── */
   .settings-row {
     display: flex;
@@ -600,6 +1897,21 @@
   <button data-scene="wizard">First-run wizard</button>
   <button data-scene="resume-failed">Resume-failed panel</button>
   <button data-scene="settings">Settings module</button>
+  <button data-scene="tt-projects">TimeTracker · Projects</button>
+  <button data-scene="tt-worklogs">TimeTracker · Worklogs</button>
+  <button data-scene="tt-grid">TimeTracker · Task grid</button>
+  <button data-scene="tt-timeoff">TimeTracker · Time off</button>
+  <button data-scene="tt-reports">TimeTracker · Reports</button>
+  <button data-scene="tt-project-edit">TT · Project drawer</button>
+  <button data-scene="tt-detail">TT · Project detail</button>
+  <button data-scene="tt-detail-worklogs">TT · Detail · Worklogs</button>
+  <button data-scene="tt-detail-contracts">TT · Detail · Contracts</button>
+  <button data-scene="tt-epic-edit">TT · Epic drawer</button>
+  <button data-scene="tt-task-edit">TT · Task drawer</button>
+  <button data-scene="tt-worklog-edit">TT · Worklog drawer</button>
+  <button data-scene="tt-contract-edit">TT · Contract drawer</button>
+  <button data-scene="tt-launch-new">TT · Launch (no running)</button>
+  <button data-scene="tt-launch-choose">TT · Launch (has running)</button>
   <button data-scene="tray">Tray menu open</button>
   <button data-scene="crash">Orchestrator crash banner</button>
   <span class="spacer"></span>
@@ -644,7 +1956,7 @@
         </svg>
         <span class="rail-badge">1</span>
       </div>
-      <div class="rail-btn disabled" title="TimeTracker (coming soon)">
+      <div class="rail-btn" title="TimeTracker" id="railTimeTracker">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <circle cx="12" cy="13" r="8"/>
           <path d="M12 9v4l3 2"/>
@@ -866,6 +2178,1108 @@
         </div>
       </div>
 
+      <!-- TimeTracker module -->
+      <div class="tt-pane" id="ttView">
+
+      <!-- ═══ LIST MODE (Projects / Worklogs / Task grid / Time off / Reports) ═══ -->
+      <div id="ttListMode">
+        <div class="tt-tabs">
+          <div class="tt-tab active" data-tt-sub="projects">Projects</div>
+          <div class="tt-tab" data-tt-sub="worklogs">Worklogs</div>
+          <div class="tt-tab" data-tt-sub="grid">Task grid</div>
+          <div class="tt-tab" data-tt-sub="timeoff">Time off</div>
+          <div class="tt-tab" data-tt-sub="reports">Reports</div>
+        </div>
+
+        <!-- ── Projects sub-view ── -->
+        <div class="tt-sub active" data-tt-sub="projects">
+          <div class="tt-toolbar">
+            <input class="tt-search" placeholder="Search projects…" />
+            <select class="tt-select"><option>All kinds</option><option>Work</option><option>Personal</option></select>
+            <select class="tt-select"><option>Active</option><option>Archived</option></select>
+            <span class="grow"></span>
+            <span class="meta">7 projects · 248h 50m total</span>
+            <button class="btn primary" onclick="setScene('tt-project-edit')">+ New project</button>
+          </div>
+
+          <div class="tt-project-row" style="cursor: pointer;" onclick="setScene('tt-detail')">
+            <span class="pdot" style="background: #7aa7ff;"></span>
+            <div>
+              <div class="pname">Watchtower</div>
+              <div class="psub">work · non-billable</div>
+            </div>
+            <div class="ptotal">14h 25m</div>
+            <div class="pmap">WT-* (local)</div>
+            <span class="pepics">11 epics</span>
+            <div class="actions">
+              <button class="btn launch" onclick="event.stopPropagation(); launchProjectNew('Watchtower', '~/Projects/Watchtower');">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                Open
+              </button>
+              <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-project-edit');">Edit</button>
+              <button class="btn ghost" onclick="event.stopPropagation();">Archive</button>
+            </div>
+          </div>
+
+          <div class="tt-project-row">
+            <span class="pdot" style="background: #f0a868;"></span>
+            <div>
+              <div class="pname">PPS Capacity Planning</div>
+              <div class="psub">work · billable · 800 Kč/h</div>
+            </div>
+            <div class="ptotal">87h 30m</div>
+            <div class="pmap">FIE1933-*, KP-*</div>
+            <span class="pepics">5 epics</span>
+            <div class="actions">
+              <button class="btn launch has-running" onclick="event.stopPropagation(); launchProjectChoose('PPS Capacity Planning', '~/Projects/PPS/capacity-planning', 'capacity-planning', 'working', 'FIE1933-18887', '4 s ago');">
+                <span class="run-dot"></span>
+                Open · 1 running
+              </button>
+              <button class="btn ghost">Edit</button>
+              <button class="btn ghost">Archive</button>
+            </div>
+          </div>
+
+          <div class="tt-project-row">
+            <span class="pdot" style="background: #66bb6a;"></span>
+            <div>
+              <div class="pname">PPS Technology</div>
+              <div class="psub">work · billable · 800 Kč/h</div>
+            </div>
+            <div class="ptotal">62h 10m</div>
+            <div class="pmap">TEH-*</div>
+            <span class="pepics">3 epics</span>
+            <div class="actions">
+              <button class="btn launch has-running" onclick="event.stopPropagation(); launchProjectChoose('PPS Technology', '~/Projects/PPS/technology', 'technology', 'waiting permission', 'TEH-2841', '18 s ago');">
+                <span class="run-dot"></span>
+                Open · 1 running
+              </button>
+              <button class="btn ghost">Edit</button>
+              <button class="btn ghost">Archive</button>
+            </div>
+          </div>
+
+          <div class="tt-project-row">
+            <span class="pdot" style="background: #ef5350;"></span>
+            <div>
+              <div class="pname">PPS Manufactory</div>
+              <div class="psub">work · billable · 800 Kč/h</div>
+            </div>
+            <div class="ptotal">41h 45m</div>
+            <div class="pmap">VYR-*</div>
+            <span class="pepics">2 epics</span>
+            <div class="actions">
+              <button class="btn launch" onclick="event.stopPropagation(); launchProjectNew('PPS Manufactory', '~/Projects/PPS/manufactory');">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                Open
+              </button>
+              <button class="btn ghost">Edit</button>
+              <button class="btn ghost">Archive</button>
+            </div>
+          </div>
+
+          <div class="tt-project-row">
+            <span class="pdot" style="background: #ce93d8;"></span>
+            <div>
+              <div class="pname">PPS Machinery</div>
+              <div class="psub">work · billable · 800 Kč/h</div>
+            </div>
+            <div class="ptotal">12h 05m</div>
+            <div class="pmap">STR-*</div>
+            <span class="pepics">1 epic</span>
+            <div class="actions">
+              <button class="btn launch has-running" onclick="event.stopPropagation(); launchProjectChoose('PPS Machinery', '~/Projects/PPS/machinery', 'machinery', 'waiting input', null, '47 s idle');">
+                <span class="run-dot"></span>
+                Open · 1 running
+              </button>
+              <button class="btn ghost">Edit</button>
+              <button class="btn ghost">Archive</button>
+            </div>
+          </div>
+
+          <div class="tt-project-row">
+            <span class="pdot" style="background: #4fc3f7;"></span>
+            <div>
+              <div class="pname">TimeTracker (dogfood)</div>
+              <div class="psub">work · non-billable</div>
+            </div>
+            <div class="ptotal">28h 0m</div>
+            <div class="pmap">— no Jira mapping</div>
+            <span class="pepics">no epics</span>
+            <div class="actions">
+              <button class="btn launch has-running" onclick="event.stopPropagation(); launchProjectChoose('TimeTracker', '~/Projects/TimeTracker', 'jira-sync', 'idle', null, '12 m ago');">
+                <span class="run-dot"></span>
+                Open · 1 running
+              </button>
+              <button class="btn ghost">Edit</button>
+              <button class="btn ghost">Archive</button>
+            </div>
+          </div>
+
+          <div class="tt-project-row">
+            <span class="pdot" style="background: #9e9e9e;"></span>
+            <div>
+              <div class="pname">Personal</div>
+              <div class="psub">personal · non-billable</div>
+            </div>
+            <div class="ptotal">3h 15m</div>
+            <div class="pmap">— no Jira mapping</div>
+            <span class="pepics">no epics</span>
+            <div class="actions">
+              <span style="color: var(--text-disabled); font-size: 11px; margin-right: 6px;">no folder</span>
+              <button class="btn ghost">Edit</button>
+              <button class="btn ghost">Archive</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Worklogs sub-view ── -->
+        <div class="tt-sub" data-tt-sub="worklogs">
+          <div class="tt-toolbar">
+            <select class="tt-select"><option>All projects</option><option>Watchtower</option><option>PPS Capacity Planning</option><option>PPS Technology</option></select>
+            <select class="tt-select"><option>This week</option><option>Today</option><option>This month</option><option>Custom range…</option></select>
+            <select class="tt-select"><option>Source: any</option><option>manual</option><option>watchtower-auto</option><option>jira-sync</option></select>
+            <input class="tt-search" placeholder="Search comment / key…" />
+            <span class="grow"></span>
+            <span class="meta">17 entries · 23h 45m</span>
+            <button class="btn primary" onclick="setScene('tt-worklog-edit')">+ Log work</button>
+          </div>
+
+          <div class="tt-day">
+            <div class="tt-day-label">
+              <span><strong>Today</strong> · 2026-05-24 · <span style="color: var(--text-primary);">4h 15m</span></span>
+              <span>3 entries · 1 still running</span>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #f0a868;"></span>
+              <div class="wcomment">Endpoint dotazu pro náhled NC programu — validace vstupů</div>
+              <span class="wkey">FIE1933-18887</span>
+              <span class="wduration">2h 0m</span>
+              <span class="wtime">09:00 → 11:00</span>
+              <span class="wsource">manual</span>
+              <div class="actions"><button class="btn ghost">Edit</button></div>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #7aa7ff;"></span>
+              <div class="wcomment">ModuleRail sidebar — collapsible toggle + labels + WatchtowerLogo header</div>
+              <span class="wkey">—</span>
+              <span class="wduration">1h 30m</span>
+              <span class="wtime">11:15 → 12:45</span>
+              <span class="wsource auto">watchtower</span>
+              <div class="actions"><button class="btn ghost">Edit</button></div>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #66bb6a;"></span>
+              <div class="wcomment">Code review na PR #482 — concurrency check + edge case write-up</div>
+              <span class="wkey live">TEH-2841</span>
+              <span class="wduration">45m</span>
+              <span class="wtime">14:00 → live</span>
+              <span class="wsource auto">watchtower</span>
+              <div class="actions"><button class="btn ghost">Stop</button></div>
+            </div>
+          </div>
+
+          <div class="tt-day">
+            <div class="tt-day-label">
+              <span><strong>Yesterday</strong> · 2026-05-23 · <span style="color: var(--text-primary);">6h 0m</span></span>
+              <span>4 entries</span>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #f0a868;"></span>
+              <div class="wcomment">Unit testy pro RFP handler + integrace s capacity-planning broker</div>
+              <span class="wkey">FIE1933-18887</span>
+              <span class="wduration">2h 30m</span>
+              <span class="wtime">08:30 → 11:00</span>
+              <span class="wsource">manual</span>
+              <div class="actions"><button class="btn ghost">Edit</button></div>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #ef5350;"></span>
+              <div class="wcomment">Oprava LogComplaintTime — duplicitní eventy v FIFO frontě</div>
+              <span class="wkey">VYR-1102</span>
+              <span class="wduration">1h 15m</span>
+              <span class="wtime">11:30 → 12:45</span>
+              <span class="wsource jira">jira</span>
+              <div class="actions"><button class="btn ghost">Edit</button></div>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #66bb6a;"></span>
+              <div class="wcomment">Migrace TechnologyOperationChanged endpointu na nový kontrakt</div>
+              <span class="wkey">TEH-2841</span>
+              <span class="wduration">1h 45m</span>
+              <span class="wtime">13:30 → 15:15</span>
+              <span class="wsource">manual</span>
+              <div class="actions"><button class="btn ghost">Edit</button></div>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #7aa7ff;"></span>
+              <div class="wcomment">Phase 11 build — packaged .app smoke test + dmg verify</div>
+              <span class="wkey">—</span>
+              <span class="wduration">30m</span>
+              <span class="wtime">16:00 → 16:30</span>
+              <span class="wsource auto">watchtower</span>
+              <div class="actions"><button class="btn ghost">Edit</button></div>
+            </div>
+          </div>
+
+          <div class="tt-day">
+            <div class="tt-day-label">
+              <span><strong>Friday</strong> · 2026-05-22 · <span style="color: var(--text-primary);">5h 30m</span></span>
+              <span>4 entries</span>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #7aa7ff;"></span>
+              <div class="wcomment">Brainstorming — Watchtower name + MVP scope + module roadmap</div>
+              <span class="wkey">—</span>
+              <span class="wduration">2h 0m</span>
+              <span class="wtime">09:00 → 11:00</span>
+              <span class="wsource">manual</span>
+              <div class="actions"><button class="btn ghost">Edit</button></div>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #ce93d8;"></span>
+              <div class="wcomment">Investigate MariaDB tunnel timeout pod zátěží</div>
+              <span class="wkey">STR-301</span>
+              <span class="wduration">1h 30m</span>
+              <span class="wtime">11:30 → 13:00</span>
+              <span class="wsource">manual</span>
+              <div class="actions"><button class="btn ghost">Edit</button></div>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #4fc3f7;"></span>
+              <div class="wcomment">TimeTracker — improve drawer date picker (multi-day support)</div>
+              <span class="wkey">—</span>
+              <span class="wduration">1h 15m</span>
+              <span class="wtime">14:00 → 15:15</span>
+              <span class="wsource">manual</span>
+              <div class="actions"><button class="btn ghost">Edit</button></div>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #f0a868;"></span>
+              <div class="wcomment">Sprint review prep — FIE1933 progress slide</div>
+              <span class="wkey">FIE1933-19001</span>
+              <span class="wduration">45m</span>
+              <span class="wtime">15:30 → 16:15</span>
+              <span class="wsource">manual</span>
+              <div class="actions"><button class="btn ghost">Edit</button></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Task grid sub-view (per-task ⇄ per-day matrix for a month) ── -->
+        <div class="tt-sub" data-tt-sub="grid">
+          <div class="grid-filter-bar">
+            <div class="month-nav">
+              <button class="icon-btn" title="Previous month">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <span class="month-label">May 2026</span>
+              <button class="icon-btn" title="Next month">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+              <button class="icon-btn" title="This month">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </button>
+            </div>
+
+            <select class="tt-select" style="min-width: 220px;">
+              <option>All projects</option>
+              <option>Watchtower</option>
+              <option>PPS Capacity Planning</option>
+              <option>PPS Technology</option>
+              <option>PPS Manufactory</option>
+              <option>PPS Machinery</option>
+              <option>TimeTracker (dogfood)</option>
+              <option>Personal</option>
+            </select>
+
+            <span style="flex: 1;"></span>
+
+            <button class="btn" onclick="setScene('tt-worklog-edit')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; vertical-align: -1px; margin-right: 4px;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              Log work
+            </button>
+            <button class="btn primary" onclick="setScene('tt-task-edit')">+ New task</button>
+          </div>
+
+          <div class="grid-wrap">
+            <table class="grid-table" id="gridTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="desc" style="margin-top: 10px; font-size: 11px; color: var(--text-secondary);">
+            Click a task key → opens task drawer. Click any day cell → opens worklog drawer for that task/date. Weekends and Czech public holidays are tinted; today is highlighted.
+          </div>
+        </div>
+
+        <!-- ── Time off sub-view (3-month calendar + paged upcoming list) ── -->
+        <div class="tt-sub" data-tt-sub="timeoff">
+          <div class="info-banner">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div>Click a weekday to mark it as the selected kind. Click again to clear, or switch the dropdown and click to change the kind. Czech public holidays (dashed outline) are counted automatically. Both reduce <strong>expected workdays</strong> on every active contract.</div>
+          </div>
+
+          <div class="calendars-card">
+            <div class="calendars-header">
+              <div class="marking-as">
+                <label>Marking as</label>
+                <select class="tt-select" id="timeoffKind">
+                  <option value="vacation" selected>● Vacation</option>
+                  <option value="sick">● Sick</option>
+                  <option value="other">● Other</option>
+                </select>
+              </div>
+              <button class="icon-btn" title="Previous month">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <span class="label" id="timeoffWindowLabel">Apr 2026 – Jun 2026</span>
+              <button class="today-btn">Today</button>
+              <button class="icon-btn" title="Next month">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </div>
+            <div class="calendars-grid" id="timeoffCalendars">
+              <!-- filled by JS -->
+            </div>
+          </div>
+
+          <div class="upcoming-card">
+            <div class="uc-title">Upcoming days off</div>
+            <div class="kind-chips" id="upcomingChips">
+              <!-- filled by JS -->
+            </div>
+            <div class="upcoming-list" id="upcomingList">
+              <!-- filled by JS -->
+            </div>
+            <div class="paging-bar">
+              <button class="icon-btn" id="upcomingPrev" title="Previous page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <span class="info" id="upcomingPageInfo">—</span>
+              <button class="icon-btn" id="upcomingNext" title="Next page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+              <span style="margin-left: 14px;">Per page:</span>
+              <select class="page-size" id="upcomingPageSize">
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Reports sub-view (TimeTracker-style layout) ── -->
+        <div class="tt-sub" data-tt-sub="reports">
+
+          <!-- Sticky filter bar -->
+          <div class="report-filterbar">
+            <div class="filter-row">
+              <div class="filter-group">
+                <label>From</label>
+                <input type="date" class="report-date" value="2026-03-26" />
+              </div>
+              <div class="filter-group">
+                <label>To</label>
+                <input type="date" class="report-date" value="2026-05-24" />
+              </div>
+              <div class="preset-group">
+                <button class="preset-btn">7d</button>
+                <button class="preset-btn">30d</button>
+                <button class="preset-btn active">60d</button>
+                <button class="preset-btn">Month</button>
+                <button class="preset-btn">Year</button>
+                <button class="preset-btn">All</button>
+              </div>
+              <span class="grow"></span>
+              <div class="toggle-group">
+                <button class="toggle-btn">Day</button>
+                <button class="toggle-btn active">Week</button>
+                <button class="toggle-btn">Month</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Time trend (full width) -->
+          <div class="tt-report-card chart-card">
+            <div class="chart-header">
+              <div>
+                <div class="chart-title">Time trend</div>
+                <div class="chart-subtitle">Hours logged per week · 9 weeks</div>
+              </div>
+              <span class="chart-aside">total 96h 15m · avg 10h 41m/wk</span>
+            </div>
+            <div class="chart-body">
+              <svg class="trend-svg" viewBox="0 0 720 250" preserveAspectRatio="xMidYMid meet">
+                <!-- Y-grid + labels (5 lines: 0, 6, 12, 18, 24) -->
+                <line x1="40" y1="20"  x2="700" y2="20"  class="trend-axis-line" />
+                <line x1="40" y1="70"  x2="700" y2="70"  class="trend-axis-line" />
+                <line x1="40" y1="120" x2="700" y2="120" class="trend-axis-line" />
+                <line x1="40" y1="170" x2="700" y2="170" class="trend-axis-line" />
+                <line x1="40" y1="220" x2="700" y2="220" class="trend-axis-line" />
+                <text x="34" y="24"  text-anchor="end" class="trend-axis-text">24h</text>
+                <text x="34" y="74"  text-anchor="end" class="trend-axis-text">18h</text>
+                <text x="34" y="124" text-anchor="end" class="trend-axis-text">12h</text>
+                <text x="34" y="174" text-anchor="end" class="trend-axis-text">6h</text>
+                <text x="34" y="224" text-anchor="end" class="trend-axis-text">0h</text>
+
+                <!-- Bars: 9 weeks. Bar height in px = hours / 24 * 200. y = 220 - h. -->
+                <!-- W13: 4.5h → h=37, y=183 -->
+                <rect x="60"  y="183" width="50" height="37"  class="trend-bar dim" rx="2"/>
+                <!-- W14: 9h → h=75, y=145 -->
+                <rect x="135" y="145" width="50" height="75"  class="trend-bar dim" rx="2"/>
+                <!-- W15: 14h → h=117, y=103 -->
+                <rect x="210" y="103" width="50" height="117" class="trend-bar" rx="2"/>
+                <!-- W16: 17.5h → h=146, y=74 -->
+                <rect x="285" y="74"  width="50" height="146" class="trend-bar" rx="2"/>
+                <!-- W17: 10h → h=83, y=137 -->
+                <rect x="360" y="137" width="50" height="83"  class="trend-bar" rx="2"/>
+                <!-- W18: 22h → h=183, y=37 -->
+                <rect x="435" y="37"  width="50" height="183" class="trend-bar" rx="2"/>
+                <!-- W19: 8h → h=67, y=153 -->
+                <rect x="510" y="153" width="50" height="67"  class="trend-bar" rx="2"/>
+                <!-- W20: 11h → h=92, y=128 -->
+                <rect x="585" y="128" width="50" height="92"  class="trend-bar" rx="2"/>
+                <!-- W21: 23.75h → h=198, y=22 -->
+                <rect x="660" y="22"  width="40" height="198" class="trend-bar" rx="2"/>
+
+                <!-- Rate change marker (between W15 and W16) -->
+                <line x1="278" y1="20" x2="278" y2="220" class="trend-marker-line" />
+                <text x="282" y="32" class="trend-marker-label">1 600 CZK/hr · PPS Capacity</text>
+
+                <!-- X-axis labels -->
+                <line x1="40" y1="220" x2="700" y2="220" class="trend-axis-line" />
+                <text x="85"  y="238" text-anchor="middle" class="trend-axis-text">W13</text>
+                <text x="160" y="238" text-anchor="middle" class="trend-axis-text">W14</text>
+                <text x="235" y="238" text-anchor="middle" class="trend-axis-text">W15</text>
+                <text x="310" y="238" text-anchor="middle" class="trend-axis-text">W16</text>
+                <text x="385" y="238" text-anchor="middle" class="trend-axis-text">W17</text>
+                <text x="460" y="238" text-anchor="middle" class="trend-axis-text">W18</text>
+                <text x="535" y="238" text-anchor="middle" class="trend-axis-text">W19</text>
+                <text x="610" y="238" text-anchor="middle" class="trend-axis-text">W20</text>
+                <text x="680" y="238" text-anchor="middle" class="trend-axis-text">W21</text>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Two-up: donut + earnings -->
+          <div class="report-two-up">
+            <div class="tt-report-card chart-card">
+              <div class="chart-header">
+                <div>
+                  <div class="chart-title">Time by project</div>
+                  <div class="chart-subtitle">Selected period</div>
+                </div>
+              </div>
+              <div class="chart-body donut-body">
+                <svg class="donut-svg" viewBox="0 0 200 200">
+                  <!-- Track -->
+                  <circle cx="100" cy="100" r="70" fill="transparent" stroke="var(--bg-elevated)" stroke-width="28" />
+                  <!-- Segments. C = 2πr ≈ 439.82. -->
+                  <!-- Capacity Planning 53% → 233.10 -->
+                  <circle cx="100" cy="100" r="70" fill="transparent" stroke="#f0a868" stroke-width="28"
+                          stroke-dasharray="233.10 439.82" stroke-dashoffset="0"
+                          transform="rotate(-90 100 100)" />
+                  <!-- Technology 21% → 92.36, after 233.10 -->
+                  <circle cx="100" cy="100" r="70" fill="transparent" stroke="#66bb6a" stroke-width="28"
+                          stroke-dasharray="92.36 439.82" stroke-dashoffset="-233.10"
+                          transform="rotate(-90 100 100)" />
+                  <!-- Manufactory 14% → 61.57, after 325.46 -->
+                  <circle cx="100" cy="100" r="70" fill="transparent" stroke="#ef5350" stroke-width="28"
+                          stroke-dasharray="61.57 439.82" stroke-dashoffset="-325.46"
+                          transform="rotate(-90 100 100)" />
+                  <!-- Watchtower 8% → 35.19, after 387.03 -->
+                  <circle cx="100" cy="100" r="70" fill="transparent" stroke="#7aa7ff" stroke-width="28"
+                          stroke-dasharray="35.19 439.82" stroke-dashoffset="-387.03"
+                          transform="rotate(-90 100 100)" />
+                  <!-- Personal 4% → 17.59, after 422.22 -->
+                  <circle cx="100" cy="100" r="70" fill="transparent" stroke="#9e9e9e" stroke-width="28"
+                          stroke-dasharray="17.59 439.82" stroke-dashoffset="-422.22"
+                          transform="rotate(-90 100 100)" />
+                  <!-- Center labels -->
+                  <text x="100" y="92"  class="donut-center-label">96h</text>
+                  <text x="100" y="116" class="donut-center-sub">5 projects</text>
+                </svg>
+                <div class="donut-legend">
+                  <div class="legend-row">
+                    <span class="ldot" style="background: #f0a868;"></span>
+                    <span class="lname">PPS Capacity Planning</span>
+                    <span class="ltime">51h</span>
+                    <span class="lpct">53%</span>
+                  </div>
+                  <div class="legend-row">
+                    <span class="ldot" style="background: #66bb6a;"></span>
+                    <span class="lname">PPS Technology</span>
+                    <span class="ltime">20h</span>
+                    <span class="lpct">21%</span>
+                  </div>
+                  <div class="legend-row">
+                    <span class="ldot" style="background: #ef5350;"></span>
+                    <span class="lname">PPS Manufactory</span>
+                    <span class="ltime">13h 30m</span>
+                    <span class="lpct">14%</span>
+                  </div>
+                  <div class="legend-row">
+                    <span class="ldot" style="background: #7aa7ff;"></span>
+                    <span class="lname">Watchtower</span>
+                    <span class="ltime">7h 45m</span>
+                    <span class="lpct">8%</span>
+                  </div>
+                  <div class="legend-row">
+                    <span class="ldot" style="background: #9e9e9e;"></span>
+                    <span class="lname">Personal</span>
+                    <span class="ltime">4h 0m</span>
+                    <span class="lpct">4%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tt-report-card chart-card">
+              <div class="chart-header">
+                <div>
+                  <div class="chart-title">Earnings &amp; billable summary</div>
+                  <div class="chart-subtitle">Selected period · across active contracts</div>
+                </div>
+              </div>
+              <div class="chart-body earnings-body">
+                <div class="earnings-totals">
+                  <div class="earnings-stat">
+                    <div class="stat-label">Total earned</div>
+                    <div class="stat-value">137 600 <span class="unit">CZK</span></div>
+                    <div class="stat-meta">2 active contracts</div>
+                  </div>
+                  <div class="earnings-stat">
+                    <div class="stat-label">Avg effective rate</div>
+                    <div class="stat-value">1 582 <span class="unit">CZK / hr</span></div>
+                    <div class="stat-meta">billable only</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px;">
+                    <span>Billable <span style="color: var(--success);">87h</span></span>
+                    <span>Non-billable 9h 15m</span>
+                  </div>
+                  <div class="tt-split-track">
+                    <div style="width: 90%; background: var(--success);"></div>
+                    <div style="width: 10%; background: var(--text-disabled);"></div>
+                  </div>
+                </div>
+
+                <div class="earnings-byproject">
+                  <div class="ebp-row">
+                    <span class="ebp-name"><span class="ldot" style="background: #f0a868;"></span>PPS Capacity Planning</span>
+                    <span class="ebp-amount">81 600 CZK</span>
+                  </div>
+                  <div class="ebp-row">
+                    <span class="ebp-name"><span class="ldot" style="background: #66bb6a;"></span>PPS Technology</span>
+                    <span class="ebp-amount">32 000 CZK</span>
+                  </div>
+                  <div class="ebp-row">
+                    <span class="ebp-name"><span class="ldot" style="background: #ef5350;"></span>PPS Manufactory</span>
+                    <span class="ebp-amount">24 000 CZK</span>
+                  </div>
+                  <div class="ebp-row">
+                    <span class="ebp-name"><span class="ldot" style="background: #7aa7ff;"></span>Watchtower</span>
+                    <span class="ebp-amount muted">non-billable</span>
+                  </div>
+                  <div class="ebp-row">
+                    <span class="ebp-name"><span class="ldot" style="background: #9e9e9e;"></span>Personal</span>
+                    <span class="ebp-amount muted">non-billable</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active contracts -->
+          <div class="tt-report-card chart-card" style="margin-top: 14px;">
+            <div class="chart-header">
+              <div>
+                <div class="chart-title">Active contracts</div>
+                <div class="chart-subtitle">Man-day budgets vs. workdays remaining until contract end</div>
+              </div>
+              <span class="chart-aside">3 active</span>
+            </div>
+            <div class="contracts-grid">
+              <div class="contract-status-card">
+                <div class="csc-header">
+                  <span class="csc-dot" style="background: #f0a868;"></span>
+                  <span class="csc-name">PPS Capacity Planning</span>
+                  <span class="csc-status-chip ok">on track</span>
+                </div>
+                <div class="csc-rate">1 600 CZK / hr · 8 h/day · ends 2026-08-31</div>
+                <div class="csc-progress-track">
+                  <div class="csc-progress-fill" style="width: 53%; background: #f0a868;"></div>
+                </div>
+                <div class="csc-stat-row"><span class="label">MD used</span><span class="value">63.7 / 120</span></div>
+                <div class="csc-stat-row"><span class="label">Workdays remaining</span><span class="value">68</span></div>
+                <div class="csc-stat-row"><span class="label">Projected total MD</span><span class="value">118.4</span></div>
+              </div>
+
+              <div class="contract-status-card">
+                <div class="csc-header">
+                  <span class="csc-dot" style="background: #66bb6a;"></span>
+                  <span class="csc-name">PPS Technology</span>
+                  <span class="csc-status-chip risk">at risk</span>
+                </div>
+                <div class="csc-rate">1 600 CZK / hr · 8 h/day · ends 2026-06-30</div>
+                <div class="csc-progress-track">
+                  <div class="csc-progress-fill" style="width: 78%; background: #66bb6a;"></div>
+                </div>
+                <div class="csc-stat-row"><span class="label">MD used</span><span class="value">39.0 / 50</span></div>
+                <div class="csc-stat-row"><span class="label">Workdays remaining</span><span class="value">26</span></div>
+                <div class="csc-stat-row"><span class="label">Projected total MD</span><span class="value" style="color: var(--warning);">52.3</span></div>
+              </div>
+
+              <div class="contract-status-card">
+                <div class="csc-header">
+                  <span class="csc-dot" style="background: #ef5350;"></span>
+                  <span class="csc-name">PPS Manufactory</span>
+                  <span class="csc-status-chip ok">on track</span>
+                </div>
+                <div class="csc-rate">1 500 CZK / hr · 8 h/day · ends 2026-12-31</div>
+                <div class="csc-progress-track">
+                  <div class="csc-progress-fill" style="width: 22%; background: #ef5350;"></div>
+                </div>
+                <div class="csc-stat-row"><span class="label">MD used</span><span class="value">22.0 / 100</span></div>
+                <div class="csc-stat-row"><span class="label">Workdays remaining</span><span class="value">154</span></div>
+                <div class="csc-stat-row"><span class="label">Projected total MD</span><span class="value">88.0</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Heatmap -->
+          <div class="tt-report-card chart-card">
+            <div class="chart-header">
+              <div>
+                <div class="chart-title">Activity heatmap</div>
+                <div class="chart-subtitle">Daily logged time across the selected range</div>
+              </div>
+              <div class="heatmap-legend">
+                <span>less</span>
+                <span class="heatmap-cell"></span>
+                <span class="heatmap-cell l1"></span>
+                <span class="heatmap-cell l2"></span>
+                <span class="heatmap-cell l3"></span>
+                <span class="heatmap-cell l4"></span>
+                <span>more</span>
+              </div>
+            </div>
+            <div class="chart-body heatmap-body">
+              <div class="heatmap-day-labels">
+                <span style="grid-row: 2 / 3;">Mon</span>
+                <span style="grid-row: 4 / 5;">Wed</span>
+                <span style="grid-row: 6 / 7;">Fri</span>
+              </div>
+              <div class="heatmap-cols">
+                <!-- 9 weeks, each with 7 day cells. Week 1 (W13) starts. -->
+                <div class="heatmap-col">
+                  <span class="heatmap-week-label">W13</span>
+                  <div class="heatmap-cell l1"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell"></div><div class="heatmap-cell l1"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell empty"></div><div class="heatmap-cell empty"></div>
+                </div>
+                <div class="heatmap-col">
+                  <span class="heatmap-week-label">W14</span>
+                  <div class="heatmap-cell l3"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell empty"></div><div class="heatmap-cell empty"></div>
+                </div>
+                <div class="heatmap-col">
+                  <span class="heatmap-week-label">W15</span>
+                  <div class="heatmap-cell l3"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell l4"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l1"></div><div class="heatmap-cell empty"></div>
+                </div>
+                <div class="heatmap-col">
+                  <span class="heatmap-week-label">W16</span>
+                  <div class="heatmap-cell l4"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell l4"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell l4"></div><div class="heatmap-cell empty"></div><div class="heatmap-cell empty"></div>
+                </div>
+                <div class="heatmap-col">
+                  <span class="heatmap-week-label">W17</span>
+                  <div class="heatmap-cell l2"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell empty"></div><div class="heatmap-cell empty"></div>
+                </div>
+                <div class="heatmap-col">
+                  <span class="heatmap-week-label">W18</span>
+                  <div class="heatmap-cell l4"></div><div class="heatmap-cell l4"></div><div class="heatmap-cell l4"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell l4"></div><div class="heatmap-cell l1"></div><div class="heatmap-cell empty"></div>
+                </div>
+                <div class="heatmap-col">
+                  <span class="heatmap-week-label">W19</span>
+                  <div class="heatmap-cell l2"></div><div class="heatmap-cell"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell empty"></div><div class="heatmap-cell empty"></div>
+                </div>
+                <div class="heatmap-col">
+                  <span class="heatmap-week-label">W20</span>
+                  <div class="heatmap-cell l3"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l2"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell empty"></div><div class="heatmap-cell empty"></div>
+                </div>
+                <div class="heatmap-col">
+                  <span class="heatmap-week-label">W21</span>
+                  <div class="heatmap-cell l4"></div><div class="heatmap-cell l4"></div><div class="heatmap-cell l4"></div><div class="heatmap-cell l4"></div><div class="heatmap-cell l3"></div><div class="heatmap-cell empty"></div><div class="heatmap-cell empty"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- ═══ /LIST MODE ═══ -->
+
+      <!-- ═══ DETAIL MODE (single project page) ═══ -->
+      <div id="ttDetailMode" style="display: none;">
+        <div class="tt-back" onclick="setScene('tt-projects')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          Back to projects
+        </div>
+
+        <div class="tt-detail-header">
+          <span class="pdot-lg" style="background: #7aa7ff;"></span>
+          <div>
+            <h2>Watchtower</h2>
+            <div class="meta">
+              work · non-billable · Jira mapping <code>WT-*</code> (local TimeTracker only)
+            </div>
+          </div>
+          <div class="tt-stats">
+            <div class="stat">
+              <div class="label">Total</div>
+              <div class="value">14h 25m</div>
+            </div>
+            <div class="stat">
+              <div class="label">This week</div>
+              <div class="value">2h 0m</div>
+            </div>
+            <div class="stat">
+              <div class="label">Epics · Tasks</div>
+              <div class="value">11 · 37</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn" onclick="openDrawer('Project')">Edit project</button>
+            <button class="btn ghost">Archive</button>
+          </div>
+        </div>
+
+        <div class="tt-tabs">
+          <div class="tt-tab active" data-tt-detail-sub="epics">Epics &amp; Tasks</div>
+          <div class="tt-tab" data-tt-detail-sub="worklogs">Worklogs</div>
+          <div class="tt-tab" data-tt-detail-sub="contracts">Contracts</div>
+        </div>
+
+        <!-- Epics & Tasks sub-view -->
+        <div class="tt-sub active" data-tt-detail-sub="epics">
+          <div class="tt-toolbar">
+            <select class="tt-select"><option>All statuses</option><option>Active</option><option>Done</option><option>Planned</option></select>
+            <input class="tt-search" placeholder="Search epics / tasks…" />
+            <span class="grow"></span>
+            <button class="btn ghost" onclick="setScene('tt-task-edit')">+ Quick task</button>
+            <button class="btn primary" onclick="setScene('tt-epic-edit')">+ New epic</button>
+          </div>
+
+          <div class="tt-epic expanded">
+            <div class="tt-epic-header">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+              <div>
+                <div class="ename">Phase 6 — Spawn polish + rail + dashboard</div>
+                <div class="esub">3 of 3 tasks done · 1h 15m logged</div>
+              </div>
+              <span class="estat">1h 15m</span>
+              <span class="ekey">epic #34</span>
+              <span class="estatus done">done</span>
+              <div class="actions">
+                <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-task-edit');">+ Task</button>
+                <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-epic-edit');">Edit</button>
+              </div>
+            </div>
+            <div class="tt-epic-tasks">
+              <div class="tt-task-row">
+                <span class="tdot" style="background: var(--success);"></span>
+                <div>
+                  <div class="tname">WT-T19 — NewInstanceModal (cwd input + Browse + recent-list)</div>
+                </div>
+                <span class="tkey">task #788</span>
+                <span class="tdur">35m</span>
+                <span class="tstatus done">done</span>
+                <div class="actions">
+                  <button class="btn ghost" onclick="setScene('tt-task-edit')">Edit</button>
+                </div>
+              </div>
+              <div class="tt-task-row">
+                <span class="tdot" style="background: var(--success);"></span>
+                <div>
+                  <div class="tname">WT-T20 — ModuleRail (left activity bar; Instances active, others stubbed)</div>
+                </div>
+                <span class="tkey">task #789</span>
+                <span class="tdur">25m</span>
+                <span class="tstatus done">done</span>
+                <div class="actions">
+                  <button class="btn ghost" onclick="setScene('tt-task-edit')">Edit</button>
+                </div>
+              </div>
+              <div class="tt-task-row">
+                <span class="tdot" style="background: var(--success);"></span>
+                <div>
+                  <div class="tname">WT-T21 — DashboardTab (grouped rows + chips + relative timestamps)</div>
+                </div>
+                <span class="tkey">task #790</span>
+                <span class="tdur">15m</span>
+                <span class="tstatus done">done</span>
+                <div class="actions">
+                  <button class="btn ghost" onclick="setScene('tt-task-edit')">Edit</button>
+                </div>
+              </div>
+              <div class="tt-add-task" onclick="setScene('tt-task-edit')">+ Add task to this epic</div>
+            </div>
+          </div>
+
+          <div class="tt-epic expanded">
+            <div class="tt-epic-header">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+              <div>
+                <div class="ename">Phase 12 — TimeTracker module (post-MVP)</div>
+                <div class="esub">1 of 4 tasks done · 1h 30m logged · started 2026-05-24</div>
+              </div>
+              <span class="estat">1h 30m</span>
+              <span class="ekey">epic #40</span>
+              <span class="estatus active">active</span>
+              <div class="actions">
+                <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-task-edit');">+ Task</button>
+                <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-epic-edit');">Edit</button>
+              </div>
+            </div>
+            <div class="tt-epic-tasks">
+              <div class="tt-task-row">
+                <span class="tdot" style="background: var(--success);"></span>
+                <div>
+                  <div class="tname">WT-T38 — ModuleRail sidebar: collapsible toggle, labels, logo header</div>
+                </div>
+                <span class="tkey">task #825</span>
+                <span class="tdur">1h 30m</span>
+                <span class="tstatus done">done</span>
+                <div class="actions">
+                  <button class="btn ghost" onclick="setScene('tt-task-edit')">Edit</button>
+                </div>
+              </div>
+              <div class="tt-task-row">
+                <span class="tdot" style="background: var(--primary);"></span>
+                <div>
+                  <div class="tname">WT-T39 — Visual prototype for TimeTracker sub-views</div>
+                </div>
+                <span class="tkey">task #826</span>
+                <span class="tdur">45m</span>
+                <span class="tstatus doing">doing</span>
+                <div class="actions">
+                  <button class="btn ghost" onclick="setScene('tt-task-edit')">Edit</button>
+                </div>
+              </div>
+              <div class="tt-task-row">
+                <span class="tdot" style="background: var(--text-disabled);"></span>
+                <div>
+                  <div class="tname">WT-T40 — Implement Projects / Worklogs / Reports UI</div>
+                </div>
+                <span class="tkey">task #827</span>
+                <span class="tdur">—</span>
+                <span class="tstatus todo">todo</span>
+                <div class="actions">
+                  <button class="btn ghost" onclick="setScene('tt-task-edit')">Edit</button>
+                </div>
+              </div>
+              <div class="tt-task-row">
+                <span class="tdot" style="background: var(--text-disabled);"></span>
+                <div>
+                  <div class="tname">WT-T41 — Jira sync worker + mapping config</div>
+                </div>
+                <span class="tkey">task #828</span>
+                <span class="tdur">—</span>
+                <span class="tstatus todo">todo</span>
+                <div class="actions">
+                  <button class="btn ghost" onclick="setScene('tt-task-edit')">Edit</button>
+                </div>
+              </div>
+              <div class="tt-add-task" onclick="setScene('tt-task-edit')">+ Add task to this epic</div>
+            </div>
+          </div>
+
+          <div class="tt-epic">
+            <div class="tt-epic-header">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+              <div>
+                <div class="ename">Phase 5 — PTY management + terminal UI</div>
+                <div class="esub">5 of 5 tasks done · 3h 10m logged</div>
+              </div>
+              <span class="estat">3h 10m</span>
+              <span class="ekey">epic #33</span>
+              <span class="estatus done">done</span>
+              <div class="actions">
+                <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-task-edit');">+ Task</button>
+                <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-epic-edit');">Edit</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="tt-epic">
+            <div class="tt-epic-header">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+              <div>
+                <div class="ename">Phase 4 — Hook listener + helper binary</div>
+                <div class="esub">4 of 4 tasks done · 2h 0m logged</div>
+              </div>
+              <span class="estat">2h 0m</span>
+              <span class="ekey">epic #32</span>
+              <span class="estatus done">done</span>
+              <div class="actions">
+                <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-task-edit');">+ Task</button>
+                <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-epic-edit');">Edit</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="tt-epic">
+            <div class="tt-epic-header">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+              <div>
+                <div class="ename">Phase 3 — State machine + notification rules</div>
+                <div class="esub">3 of 3 tasks done · 1h 30m logged</div>
+              </div>
+              <span class="estat">1h 30m</span>
+              <span class="ekey">epic #31</span>
+              <span class="estatus done">done</span>
+              <div class="actions">
+                <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-task-edit');">+ Task</button>
+                <button class="btn ghost" onclick="event.stopPropagation(); setScene('tt-epic-edit');">Edit</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px; color: var(--text-secondary); font-size: 12px; text-align: center;">
+            6 more epics collapsed · <span class="add-link">show all</span>
+          </div>
+        </div>
+
+        <!-- Worklogs sub-view (project-scoped) -->
+        <div class="tt-sub" data-tt-detail-sub="worklogs">
+          <div class="tt-toolbar">
+            <select class="tt-select"><option>All epics</option><option>Phase 12 (active)</option><option>Phase 6</option><option>Phase 5</option></select>
+            <select class="tt-select"><option>This week</option><option>Today</option><option>This month</option><option>All time</option></select>
+            <select class="tt-select"><option>Source: any</option><option>manual</option><option>watchtower-auto</option></select>
+            <input class="tt-search" placeholder="Search comment…" />
+            <span class="grow"></span>
+            <button class="btn primary" onclick="setScene('tt-worklog-edit')">+ Log work</button>
+          </div>
+
+          <div class="tt-day">
+            <div class="tt-day-label">
+              <span><strong>Today</strong> · 2026-05-24 · <span style="color: var(--text-primary);">2h 0m</span></span>
+              <span>2 entries</span>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #7aa7ff;"></span>
+              <div class="wcomment">ModuleRail sidebar — collapsible toggle + labels + WatchtowerLogo header</div>
+              <span class="wkey">WT-T38</span>
+              <span class="wduration">1h 30m</span>
+              <span class="wtime">11:15 → 12:45</span>
+              <span class="wsource auto">watchtower</span>
+              <div class="actions"><button class="btn ghost" onclick="setScene('tt-worklog-edit')">Edit</button></div>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #7aa7ff;"></span>
+              <div class="wcomment">Visual prototype for TimeTracker sub-views</div>
+              <span class="wkey live">WT-T39</span>
+              <span class="wduration">30m</span>
+              <span class="wtime">15:30 → live</span>
+              <span class="wsource auto">watchtower</span>
+              <div class="actions"><button class="btn ghost" onclick="setScene('tt-worklog-edit')">Edit</button></div>
+            </div>
+          </div>
+
+          <div class="tt-day">
+            <div class="tt-day-label">
+              <span><strong>Yesterday</strong> · 2026-05-23 · <span style="color: var(--text-primary);">30m</span></span>
+              <span>1 entry</span>
+            </div>
+            <div class="tt-worklog-row">
+              <span class="wcolor" style="background: #7aa7ff;"></span>
+              <div class="wcomment">Phase 11 build — packaged .app smoke test + dmg verify</div>
+              <span class="wkey">WT-T37</span>
+              <span class="wduration">30m</span>
+              <span class="wtime">16:00 → 16:30</span>
+              <span class="wsource auto">watchtower</span>
+              <div class="actions"><button class="btn ghost" onclick="setScene('tt-worklog-edit')">Edit</button></div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px; color: var(--text-secondary); font-size: 12px; text-align: center;">
+            34 earlier entries · <span class="add-link">load more</span>
+          </div>
+        </div>
+
+        <!-- Contracts sub-view -->
+        <div class="tt-sub" data-tt-detail-sub="contracts">
+          <div class="tt-toolbar">
+            <select class="tt-select"><option>All</option><option>Active</option><option>Ended</option><option>Future</option></select>
+            <select class="tt-select"><option>Sort: newest first</option><option>Effective from ↑</option><option>Effective from ↓</option></select>
+            <span class="grow"></span>
+            <span class="meta">2 contracts · 1 active · 94.3 MD used total</span>
+            <button class="btn primary" onclick="setScene('tt-contract-edit')">+ Add contract</button>
+          </div>
+
+          <div class="tt-report-card" style="margin-bottom: 16px;">
+            <div class="card-title">Active contract · summary</div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 6px;">
+              <div>
+                <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Rate</div>
+                <div style="font-size: 18px; color: var(--text-primary); font-variant-numeric: tabular-nums; margin-top: 4px;">1 600 <span style="font-size: 12px; color: var(--text-secondary);">CZK / hour</span></div>
+              </div>
+              <div>
+                <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Hours / day</div>
+                <div style="font-size: 18px; color: var(--text-primary); font-variant-numeric: tabular-nums; margin-top: 4px;">8.0</div>
+              </div>
+              <div>
+                <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">MD used</div>
+                <div style="font-size: 18px; color: var(--text-primary); font-variant-numeric: tabular-nums; margin-top: 4px;">1.8 <span style="font-size: 12px; color: var(--text-secondary);">/ unlimited</span></div>
+              </div>
+              <div>
+                <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Projected</div>
+                <div style="font-size: 18px; color: var(--text-primary); font-variant-numeric: tabular-nums; margin-top: 4px;">~ 2 880 <span style="font-size: 12px; color: var(--text-secondary);">CZK billed</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="contract-card active">
+            <div>
+              <div class="c-dates">
+                2026-05-22 → ongoing
+                <span class="active-chip">active</span>
+              </div>
+              <div class="c-rate">1 600 CZK / hour · 8 h/day</div>
+              <div class="c-meta">MD limit <code>—</code> · 14h 25m logged · 1.8 MD used · no end date</div>
+            </div>
+            <div class="c-actions">
+              <button class="btn ghost" onclick="setScene('tt-contract-edit')">Edit</button>
+              <button class="btn ghost" style="color: var(--error);">Delete</button>
+            </div>
+          </div>
+
+          <div class="contract-card">
+            <div>
+              <div class="c-dates">
+                2025-09-01 → 2026-05-21
+                <span class="ended-chip">ended</span>
+              </div>
+              <div class="c-rate">1 400 CZK / hour · 8 h/day</div>
+              <div class="c-meta">MD limit <code>120</code> · 92.5 MD used · auto-closed when next contract started</div>
+            </div>
+            <div class="c-actions">
+              <button class="btn ghost" onclick="setScene('tt-contract-edit')">Edit</button>
+              <button class="btn ghost" style="color: var(--error);">Delete</button>
+            </div>
+          </div>
+
+          <div class="desc" style="margin-top: 12px; padding: 12px 14px; background: var(--bg-paper); border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px;">
+            <strong style="color: var(--text-primary);">How contracts work</strong><br>
+            A contract sets the hourly or daily rate, working hours per day, and an optional MD cap. The newest <strong>active</strong> contract (today between <em>effective from</em> and <em>end date</em>) is used for invoice projections and the dashboard. Contracts cannot overlap in time on the same project.
+          </div>
+        </div>
+      </div>
+      <!-- ═══ /DETAIL MODE ═══ -->
+
+      </div>
+
       <!-- Status bar -->
       <div class="statusbar">
         <span class="item">4 instances</span>
@@ -890,7 +3304,7 @@
       </div>
       <div class="modal-body">
         <div class="input-row">
-          <input class="input" value="~/Projects/PPS/technology" />
+          <input class="input" id="modalNewPath" value="~/Projects/PPS/technology" />
           <button class="btn">Browse…</button>
         </div>
         <div class="recent-list">
@@ -949,6 +3363,438 @@
     </div>
   </div>
 
+  <!-- ── Launch-project choice modal (has running instance) ── -->
+  <div class="overlay" id="modalLaunchChoose" style="display: none">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Open project in Instances</h2>
+        <div class="sub"><strong id="chooseProjectName">PPS Capacity Planning</strong> already has 1 running instance.</div>
+      </div>
+      <div class="modal-body">
+        <div class="choice-card" onclick="setScene('terminal')">
+          <div class="ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          </div>
+          <div class="info">
+            <div class="ctitle">Open existing instance</div>
+            <div class="csub">
+              <span class="dot working" id="chooseRunningDot"></span>
+              <span id="chooseRunningTab">capacity-planning</span>
+              <span style="color: var(--text-disabled);">·</span>
+              <span id="chooseRunningState">working</span>
+              <span style="color: var(--text-disabled);">·</span>
+              <span id="chooseRunningWhen">4 s ago</span>
+              <span id="chooseRunningKeyWrap"><span style="color: var(--text-disabled);">·</span> <code id="chooseRunningKey">FIE1933-18887</code></span>
+            </div>
+          </div>
+          <span class="arrow">›</span>
+        </div>
+        <div class="choice-card" onclick="setScene('tt-launch-new-from-choice')">
+          <div class="ico" style="color: var(--text-primary);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          </div>
+          <div class="info">
+            <div class="ctitle">Create new instance</div>
+            <div class="csub">Spawn a fresh <code>claude --session-id &lt;uuid&gt;</code> in <code id="chooseProjectPath">~/Projects/PPS/capacity-planning</code></div>
+          </div>
+          <span class="arrow">›</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="setScene('tt-projects')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TimeTracker drawers (slide from the right) ── -->
+
+  <!-- Project create/edit drawer -->
+  <div class="drawer-backdrop" id="drawerProjectBackdrop" onclick="closeDrawers()">
+    <div class="drawer" onclick="event.stopPropagation();">
+      <div class="drawer-header">
+        <h2>Edit project · Watchtower</h2>
+        <div class="sub">Changes apply to TimeTracker DB at <code style="font-family: var(--terminal-font); font-size: 11px;">~/Library/Application Support/timetracker/data.db</code></div>
+        <span class="close" onclick="closeDrawers()">×</span>
+      </div>
+      <div class="drawer-body">
+        <div class="form-row">
+          <label>Name</label>
+          <input class="field" value="Watchtower" />
+        </div>
+
+        <div class="form-row">
+          <div class="check-row">
+            <input type="checkbox" id="chkDefault" checked />
+            <label for="chkDefault">Default project</label>
+          </div>
+          <div class="desc">New worklogs and quick-add actions pre-select this project. Only one project can be default.</div>
+        </div>
+
+        <div class="form-row">
+          <label>Color</label>
+          <div class="swatches">
+            <span class="swatch selected" style="background: #7aa7ff;"></span>
+            <span class="swatch" style="background: #f0a868;"></span>
+            <span class="swatch" style="background: #66bb6a;"></span>
+            <span class="swatch" style="background: #ef5350;"></span>
+            <span class="swatch" style="background: #ce93d8;"></span>
+            <span class="swatch" style="background: #4fc3f7;"></span>
+            <span class="swatch" style="background: #ffb74d;"></span>
+            <span class="swatch" style="background: #9e9e9e;"></span>
+          </div>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>Kind</label>
+            <select id="selProjectKind">
+              <option selected>Work</option>
+              <option>Personal</option>
+            </select>
+            <div class="desc">Work projects are billable and require at least one active contract.</div>
+          </div>
+          <div class="form-row">
+            <label>Status</label>
+            <select>
+              <option selected>Active</option>
+              <option>Archived</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>Location on disk</label>
+          <div class="path-row">
+            <input class="field" value="~/Projects/Watchtower" />
+            <button class="btn">Browse…</button>
+          </div>
+          <div class="desc">Used to scope auto-captured worklogs from Claude Code instances and to open the project in VS Code from the detail page.</div>
+        </div>
+
+        <div class="form-row">
+          <label>Jira key mapping</label>
+          <div class="desc">Worklogs with matching keys sync to jira.skoda.vwgroup.com. Globs use shell-style wildcards.</div>
+          <div class="glob-list" style="margin-top: 6px;">
+            <div class="glob-row">
+              <input class="field" value="WT-*" />
+              <button class="x-btn">×</button>
+            </div>
+          </div>
+          <span class="add-link">+ Add mapping</span>
+        </div>
+
+        <div class="form-row">
+          <label>Description</label>
+          <textarea>macOS platform for the Claude Code ecosystem. First module: instance watcher; future: TimeTracker, Settings, Memory inspector, Scheduler, Cost.</textarea>
+        </div>
+
+        <div class="desc" style="margin-top: 4px;">
+          Contracts (rate, working hours, MD limit) are managed on the project detail page's <strong>Contracts</strong> tab.
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn ghost danger-side" style="color: var(--error);">Delete project…</button>
+        <button class="btn" onclick="closeDrawers()">Cancel</button>
+        <button class="btn primary" onclick="closeDrawers()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Epic create/edit drawer -->
+  <div class="drawer-backdrop" id="drawerEpicBackdrop" onclick="closeDrawers()">
+    <div class="drawer" onclick="event.stopPropagation();">
+      <div class="drawer-header">
+        <h2>Edit epic · Phase 12 — TimeTracker module</h2>
+        <div class="sub">Project: <strong>Watchtower</strong></div>
+        <span class="close" onclick="closeDrawers()">×</span>
+      </div>
+      <div class="drawer-body">
+        <div class="form-row">
+          <label>Name</label>
+          <input class="field" value="Phase 12 — TimeTracker module (post-MVP)" />
+        </div>
+
+        <div class="form-row">
+          <label>Description</label>
+          <textarea>Add TimeTracker as the second module in the rail. Projects list, worklogs, reports, project detail with epics/tasks/worklogs editors, Jira sync.</textarea>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>Status</label>
+            <select>
+              <option>Planned</option>
+              <option selected>Active</option>
+              <option>Done</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Display order</label>
+            <input class="field" value="12" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>Jira Epic Link <span style="color: var(--text-disabled); font-weight: 400;">(optional)</span></label>
+          <input class="field" placeholder="e.g. WT-100" style="font-family: var(--terminal-font);" />
+          <div class="desc">If set, tasks under this epic default to this Epic Link when synced.</div>
+        </div>
+
+        <div class="form-row">
+          <label>GitHub issue <span style="color: var(--text-disabled); font-weight: 400;">(optional)</span></label>
+          <input class="field" placeholder="https://github.com/JanProkorat/Watchtower/issues/12" />
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn ghost danger-side" style="color: var(--error);">Delete epic…</button>
+        <button class="btn" onclick="closeDrawers()">Cancel</button>
+        <button class="btn primary" onclick="closeDrawers()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task create/edit drawer -->
+  <div class="drawer-backdrop" id="drawerTaskBackdrop" onclick="closeDrawers()">
+    <div class="drawer" onclick="event.stopPropagation();">
+      <div class="drawer-header">
+        <h2>Edit task · WT-T39</h2>
+        <div class="sub">Project: <strong>Watchtower</strong> · Epic: <strong>Phase 12 — TimeTracker module</strong></div>
+        <span class="close" onclick="closeDrawers()">×</span>
+      </div>
+      <div class="drawer-body">
+        <div class="form-row">
+          <label>Name</label>
+          <input class="field" value="WT-T39 — Visual prototype for TimeTracker sub-views" />
+        </div>
+
+        <div class="form-row">
+          <label>Epic</label>
+          <select>
+            <option selected>Phase 12 — TimeTracker module (active)</option>
+            <option>Phase 6 — Spawn polish + rail + dashboard</option>
+            <option>Phase 5 — PTY management + terminal UI</option>
+            <option>Phase 4 — Hook listener + helper binary</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label>Description</label>
+          <textarea>Add Projects / Worklogs / Reports sub-views + project detail page to prototype.html. Drawer pattern for create/edit. Match existing scene-picker convention.</textarea>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>Status</label>
+            <select>
+              <option>To do</option>
+              <option selected>Doing</option>
+              <option>Done</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Estimate (hours)</label>
+            <input class="field" value="1.0" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>Jira key <span style="color: var(--text-disabled); font-weight: 400;">(optional)</span></label>
+          <input class="field" placeholder="e.g. WT-T39 or FIE1933-19001" style="font-family: var(--terminal-font);" />
+          <div class="desc">If matching a project mapping (<code style="font-family: var(--terminal-font); font-size: 11px;">WT-*</code>), worklogs against this task sync to Jira automatically.</div>
+        </div>
+
+        <div class="form-row">
+          <label>Source ID <span style="color: var(--text-disabled); font-weight: 400;">(internal)</span></label>
+          <input class="field" value="826" disabled style="font-family: var(--terminal-font); font-size: 12px;" />
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn ghost danger-side" style="color: var(--error);">Delete task…</button>
+        <button class="btn" onclick="closeDrawers()">Cancel</button>
+        <button class="btn primary" onclick="closeDrawers()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Worklog create/edit drawer -->
+  <div class="drawer-backdrop" id="drawerWorklogBackdrop" onclick="closeDrawers()">
+    <div class="drawer" onclick="event.stopPropagation();">
+      <div class="drawer-header">
+        <h2>Edit worklog</h2>
+        <div class="sub"><span class="source-badge">watchtower-auto</span> &nbsp;captured by the orchestrator on 2026-05-24 at 11:15</div>
+        <span class="close" onclick="closeDrawers()">×</span>
+      </div>
+      <div class="drawer-body">
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>Project</label>
+            <select>
+              <option selected>Watchtower</option>
+              <option>PPS Capacity Planning</option>
+              <option>PPS Technology</option>
+              <option>PPS Manufactory</option>
+              <option>TimeTracker (dogfood)</option>
+              <option>Personal</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Task</label>
+            <select>
+              <option selected>WT-T38 — ModuleRail sidebar</option>
+              <option>WT-T39 — Visual prototype for TimeTracker sub-views</option>
+              <option>WT-T37 — Build & ship MVP</option>
+              <option style="color: var(--text-disabled);">— no task —</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>Comment</label>
+          <textarea>ModuleRail sidebar — collapsible toggle + labels + WatchtowerLogo header</textarea>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>Date</label>
+            <input class="field" type="date" value="2026-05-24" />
+          </div>
+          <div class="form-row">
+            <label>Duration</label>
+            <input class="field" value="1h 30m" />
+          </div>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>Started at</label>
+            <input class="field" value="11:15" />
+          </div>
+          <div class="form-row">
+            <label>Ended at</label>
+            <input class="field" value="12:45" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>Jira key</label>
+          <input class="field" placeholder="WT-T38" value="WT-T38" style="font-family: var(--terminal-font);" />
+          <div class="desc">Resolved from task → project mapping. Override to log against a different ticket.</div>
+        </div>
+
+        <div class="form-row">
+          <div class="check-row">
+            <input type="checkbox" id="chkJiraSync" checked />
+            <label for="chkJiraSync">Sync to Jira</label>
+          </div>
+          <div class="desc">Posts to <code style="font-family: var(--terminal-font); font-size: 11px;">/rest/api/2/issue/WT-T38/worklog</code> on next sync run.</div>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>Source</label>
+            <input class="field" value="watchtower-auto" disabled />
+          </div>
+          <div class="form-row">
+            <label>External ID</label>
+            <input class="field" value="9ee88b6" disabled style="font-family: var(--terminal-font); font-size: 12px;" />
+          </div>
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn ghost danger-side" style="color: var(--error);">Delete worklog…</button>
+        <button class="btn" onclick="closeDrawers()">Cancel</button>
+        <button class="btn primary" onclick="closeDrawers()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contract create/edit drawer -->
+  <div class="drawer-backdrop" id="drawerContractBackdrop" onclick="closeDrawers()">
+    <div class="drawer" onclick="event.stopPropagation();">
+      <div class="drawer-header">
+        <h2>Edit contract</h2>
+        <div class="sub">Project: <strong>Watchtower</strong> · effective period <strong>2026-05-22 → ongoing</strong></div>
+        <span class="close" onclick="closeDrawers()">×</span>
+      </div>
+      <div class="drawer-body">
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>Effective from</label>
+            <input class="field" type="date" value="2026-05-22" />
+          </div>
+          <div class="form-row">
+            <label>End date <span style="color: var(--text-disabled); font-weight: 400;">(optional)</span></label>
+            <input class="field" type="date" placeholder="leave empty for ongoing" />
+            <div class="desc">Leave empty for an open-ended contract. Adding a newer contract auto-closes the previous one.</div>
+          </div>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>Rate type</label>
+            <select id="selRateType">
+              <option selected>Hourly</option>
+              <option>Daily (MD)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Currency</label>
+            <select>
+              <option selected>CZK</option>
+              <option>EUR</option>
+              <option>USD</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>Rate amount</label>
+            <input class="field" value="1600" style="font-variant-numeric: tabular-nums;" />
+            <div class="desc" id="rateUnitHint">CZK per hour worked.</div>
+          </div>
+          <div class="form-row">
+            <label>Hours per day</label>
+            <input class="field" value="8.0" style="font-variant-numeric: tabular-nums;" />
+            <div class="desc">Used to convert logged hours into man-days (MDs) for reporting and MD limit tracking.</div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>MD limit <span style="color: var(--text-disabled); font-weight: 400;">(optional)</span></label>
+          <input class="field" placeholder="e.g. 120" style="font-variant-numeric: tabular-nums;" />
+          <div class="desc">Total man-days budgeted for this contract period. Dashboard warns when usage exceeds 80% / 100%.</div>
+        </div>
+
+        <div class="form-section" style="margin-top: 18px; padding-top: 14px;">
+          <div class="form-section-header">
+            <h3>Current usage</h3>
+            <span class="hint">read-only · computed from worklogs</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 12px;">
+            <div>
+              <div style="color: var(--text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Hours logged</div>
+              <div style="color: var(--text-primary); font-variant-numeric: tabular-nums; font-size: 15px; margin-top: 4px;">14h 25m</div>
+            </div>
+            <div>
+              <div style="color: var(--text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">MD used</div>
+              <div style="color: var(--text-primary); font-variant-numeric: tabular-nums; font-size: 15px; margin-top: 4px;">1.8</div>
+            </div>
+            <div>
+              <div style="color: var(--text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Projected total</div>
+              <div style="color: var(--text-primary); font-variant-numeric: tabular-nums; font-size: 15px; margin-top: 4px;">~ 2 880 CZK</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn ghost danger-side" style="color: var(--error);">Delete contract…</button>
+        <button class="btn" onclick="closeDrawers()">Cancel</button>
+        <button class="btn primary" onclick="closeDrawers()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Tray menu (anchored to the title bar) ── -->
   <div class="tray-popup" id="trayPopup">
     <div class="arrow"></div>
@@ -975,6 +3821,8 @@
       show('dashboardView', false);
       show('resumeFailedView', false);
       show('settingsView', false);
+      show('ttView', false);
+      show('tabs', true, 'flex');
       hideOverlays();
       setRail('railInstances');
       setActiveTab('capacity-planning');
@@ -984,6 +3832,8 @@
       show('dashboardView', true);
       show('resumeFailedView', false);
       show('settingsView', false);
+      show('ttView', false);
+      show('tabs', true, 'flex');
       hideOverlays();
       setRail('railInstances');
       setActiveTab('dashboard');
@@ -1000,6 +3850,7 @@
       show('terminalView', false);
       show('dashboardView', false);
       show('settingsView', false);
+      show('ttView', false);
       show('resumeFailedView', true, 'flex');
       hideOverlays();
       setRail('railInstances');
@@ -1010,8 +3861,36 @@
       show('dashboardView', false);
       show('resumeFailedView', false);
       show('settingsView', true, 'block');
+      show('ttView', false);
+      show('tabs', true, 'flex');
       hideOverlays();
       setRail('railSettings');
+    },
+    'tt-projects': () => showTimeTracker('list', 'projects'),
+    'tt-worklogs': () => showTimeTracker('list', 'worklogs'),
+    'tt-grid':     () => showTimeTracker('list', 'grid'),
+    'tt-timeoff':  () => showTimeTracker('list', 'timeoff'),
+    'tt-reports':  () => showTimeTracker('list', 'reports'),
+    'tt-detail': () => showTimeTracker('detail', 'epics'),
+    'tt-detail-worklogs': () => showTimeTracker('detail', 'worklogs'),
+    'tt-detail-contracts': () => showTimeTracker('detail', 'contracts'),
+    'tt-project-edit':  () => { showTimeTracker('list', 'projects'); openDrawer('Project'); },
+    'tt-epic-edit':     () => { showTimeTracker('detail', 'epics');     openDrawer('Epic'); },
+    'tt-task-edit':     () => { showTimeTracker('detail', 'epics');     openDrawer('Task'); },
+    'tt-worklog-edit':  () => { showTimeTracker('detail', 'worklogs');  openDrawer('Worklog'); },
+    'tt-contract-edit': () => { showTimeTracker('detail', 'contracts'); openDrawer('Contract'); },
+    'tt-launch-new': () => {
+      showTimeTracker('list', 'projects');
+      document.getElementById('modalNew').style.display = 'flex';
+    },
+    'tt-launch-new-from-choice': () => {
+      // Coming from the choice modal: keep TT module visible, open the new-instance modal
+      showTimeTracker('list', 'projects');
+      document.getElementById('modalNew').style.display = 'flex';
+    },
+    'tt-launch-choose': () => {
+      showTimeTracker('list', 'projects');
+      document.getElementById('modalLaunchChoose').style.display = 'flex';
     },
     tray: () => {
       scenes.terminal();
@@ -1029,12 +3908,83 @@
     el.style.display = on ? (displayValue || (el.tagName === 'PRE' ? 'block' : (el.classList.contains('settings-pane') ? 'block' : (el.classList.contains('resume-failed') ? 'flex' : 'block')))) : 'none';
   }
 
+  function showTimeTracker(mode, sub) {
+    show('terminalView', false);
+    show('dashboardView', false);
+    show('resumeFailedView', false);
+    show('settingsView', false);
+    show('ttView', true, 'block');
+    show('tabs', false);
+    hideOverlays();
+    setRail('railTimeTracker');
+
+    const isList = mode === 'list';
+    document.getElementById('ttListMode').style.display = isList ? 'block' : 'none';
+    document.getElementById('ttDetailMode').style.display = isList ? 'none' : 'block';
+
+    const scope = isList ? '#ttListMode' : '#ttDetailMode';
+    const attr  = isList ? 'ttSub' : 'ttDetailSub';
+    document.querySelectorAll(scope + ' > .tt-tabs .tt-tab').forEach((t) => {
+      t.classList.toggle('active', t.dataset[attr] === sub);
+    });
+    document.querySelectorAll(scope + ' > .tt-sub').forEach((s) => {
+      s.classList.toggle('active', s.dataset[attr] === sub);
+    });
+  }
+
   function hideOverlays() {
     document.getElementById('modalNew').style.display = 'none';
     document.getElementById('modalWizard').style.display = 'none';
+    document.getElementById('modalLaunchChoose').style.display = 'none';
     document.getElementById('trayPopup').classList.remove('show');
     document.getElementById('crashBanner').classList.remove('show');
+    closeDrawers();
   }
+
+  function openDrawer(name) {
+    const el = document.getElementById('drawer' + name + 'Backdrop');
+    if (el) el.classList.add('show');
+  }
+
+  function closeDrawers() {
+    document.querySelectorAll('.drawer-backdrop').forEach((d) => d.classList.remove('show'));
+  }
+  window.openDrawer = openDrawer;
+  window.closeDrawers = closeDrawers;
+
+  // ── Launch a project: bridge from TimeTracker → Instances ──
+  function launchProjectNew(name, path) {
+    document.getElementById('modalNewPath').value = path;
+    setScene('tt-launch-new');
+  }
+  function launchProjectChoose(name, path, tab, state, jiraKey, when) {
+    document.getElementById('chooseProjectName').textContent = name;
+    document.getElementById('chooseProjectPath').textContent = path;
+    document.getElementById('chooseRunningTab').textContent = tab;
+    document.getElementById('chooseRunningState').textContent = state;
+    document.getElementById('chooseRunningWhen').textContent = when;
+    // Swap the state-dot color based on state
+    const dot = document.getElementById('chooseRunningDot');
+    dot.className = 'dot ' + ({
+      'working': 'working',
+      'waiting permission': 'waiting-permission',
+      'waiting input': 'waiting-input',
+      'idle': 'idle-notify',
+    }[state] || 'working');
+    // Hide the Jira key fragment when null
+    const keyWrap = document.getElementById('chooseRunningKeyWrap');
+    if (jiraKey) {
+      keyWrap.style.display = '';
+      document.getElementById('chooseRunningKey').textContent = jiraKey;
+    } else {
+      keyWrap.style.display = 'none';
+    }
+    // Pre-fill the path for the eventual "Create new" branch
+    document.getElementById('modalNewPath').value = path;
+    setScene('tt-launch-choose');
+  }
+  window.launchProjectNew = launchProjectNew;
+  window.launchProjectChoose = launchProjectChoose;
 
   function setRail(activeId) {
     document.querySelectorAll('.rail-btn').forEach((b) => b.classList.remove('active'));
@@ -1068,6 +4018,463 @@
   });
 
   document.getElementById('tabAdd').addEventListener('click', () => setScene('new'));
+
+  // TimeTracker list-mode tab switching
+  document.querySelectorAll('#ttListMode > .tt-tabs .tt-tab').forEach((t) => {
+    t.addEventListener('click', () => setScene('tt-' + t.dataset.ttSub));
+  });
+
+  // TimeTracker detail-mode tab switching
+  document.querySelectorAll('#ttDetailMode > .tt-tabs .tt-tab').forEach((t) => {
+    t.addEventListener('click', () => {
+      const sub = t.dataset.ttDetailSub;
+      if (sub === 'epics') setScene('tt-detail');
+      else if (sub === 'worklogs') setScene('tt-detail-worklogs');
+      else if (sub === 'contracts') setScene('tt-detail-contracts');
+    });
+  });
+
+  // Epic expand/collapse on header click
+  document.querySelectorAll('#ttDetailMode .tt-epic-header').forEach((h) => {
+    h.addEventListener('click', (e) => {
+      if (e.target.closest('.actions')) return;
+      h.parentElement.classList.toggle('expanded');
+    });
+  });
+
+  // Esc closes any open drawer
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDrawers();
+  });
+
+  // Swatch click → mark selected
+  document.querySelectorAll('.swatches').forEach((group) => {
+    group.addEventListener('click', (e) => {
+      const sw = e.target.closest('.swatch');
+      if (!sw) return;
+      group.querySelectorAll('.swatch').forEach((s) => s.classList.remove('selected'));
+      sw.classList.add('selected');
+    });
+  });
+
+  // Rail click — TimeTracker rail icon → Projects sub-view (default landing)
+  document.getElementById('railTimeTracker').addEventListener('click', () => setScene('tt-projects'));
+
+  // ── Task grid: build the per-task ⇄ per-day matrix ──
+  const taskGridData = {
+    year: 2026,
+    month: 4, // 0-indexed (4 = May)
+    monthLabel: 'May 2026',
+    daysInMonth: 31,
+    todayDay: 24,
+    holidays: { 1: 'Labor Day', 8: 'Liberation Day' },
+    tasks: [
+      { status: 'done',  color: '#7aa7ff', key: 'WT-T37',         logged: 1.0,  est: 1.0, byDay: {12: 0.5, 15: 0.5},                                            billable: false },
+      { status: 'done',  color: '#7aa7ff', key: 'WT-T38',         logged: 1.5,  est: 1.5, byDay: {24: 1.5},                                                     billable: false },
+      { status: 'doing', color: '#7aa7ff', key: 'WT-T39',         logged: 0.75, est: 1.0, byDay: {24: 0.75},                                                    billable: false },
+      { status: 'doing', color: '#f0a868', key: 'FIE1933-18887',  logged: 8.0,  est: 6.0, byDay: {4: 2.0, 6: 1.5, 18: 1.5, 19: 1.0, 22: 2.0},                   billable: true },
+      { status: 'doing', color: '#f0a868', key: 'FIE1933-19001',  logged: 4.5,  est: 5.0, byDay: {13: 2.25, 19: 1.5, 22: 0.75},                                 billable: true },
+      { status: 'done',  color: '#f0a868', key: 'KP-512',         logged: 2.0,  est: 2.5, byDay: {11: 1.0, 14: 1.0},                                            billable: true },
+      { status: 'doing', color: '#66bb6a', key: 'TEH-2841',       logged: 6.5,  est: 8.0, byDay: {14: 1.5, 19: 1.5, 20: 1.75, 21: 1.0, 23: 0.75},               billable: true },
+      { status: 'todo',  color: '#66bb6a', key: 'TEH-2904',       logged: 0,    est: 4.0, byDay: {},                                                            billable: true },
+      { status: 'done',  color: '#ef5350', key: 'VYR-1102',       logged: 4.25, est: 4.0, byDay: {11: 2.0, 12: 1.25, 18: 1.0},                                  billable: true },
+      { status: 'todo',  color: '#ef5350', key: 'VYR-1198',       logged: 0,    est: 6.0, byDay: {},                                                            billable: true },
+      { status: 'done',  color: '#ce93d8', key: 'STR-301',        logged: 1.5,  est: 2.0, byDay: {22: 1.5},                                                     billable: true },
+    ],
+    rateCZK: 1600,
+  };
+
+  function fmtHours(h) {
+    if (h === 0) return '';
+    if (h === Math.floor(h)) return String(h);
+    // Show one or two decimals as needed.
+    return Number.isInteger(h * 4) ? h.toFixed(2).replace(/\.?0+$/, '') : String(h);
+  }
+  function statusIconSvg(s) {
+    if (s === 'done')
+      return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>';
+    if (s === 'doing')
+      return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 3 a9 9 0 0 1 0 18 Z" fill="currentColor"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg>';
+  }
+  function loggedClass(logged, est) {
+    if (est <= 0) return '';
+    if (logged > est) return 'over';
+    if (logged >= est * 0.8) return 'risk';
+    return '';
+  }
+
+  function renderTaskGrid() {
+    const data = taskGridData;
+    const dayShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const days = [];
+    for (let d = 1; d <= data.daysInMonth; d++) {
+      const dow = new Date(data.year, data.month, d).getDay();
+      const isWeekend = dow === 0 || dow === 6;
+      const isHoliday = Object.prototype.hasOwnProperty.call(data.holidays, d);
+      days.push({
+        d, dow,
+        isWeekend, isHoliday,
+        isNonWorking: isWeekend || isHoliday,
+        isToday: d === data.todayDay,
+        label: dayShort[dow],
+        holidayName: data.holidays[d] || '',
+      });
+    }
+
+    // Header row
+    let head = '<tr>';
+    head += '<th class="col-key">Key</th>';
+    head += '<th class="col-logged">Logged</th>';
+    for (const day of days) {
+      const cls = ['col-day'];
+      if (day.isNonWorking) cls.push('weekend');
+      if (day.isToday) cls.push('today');
+      const title = day.holidayName ? ' title="' + day.holidayName + '"' : '';
+      head += '<th class="' + cls.join(' ') + '"' + title + '>'
+            + '<div class="dnum">' + day.d + '</div>'
+            + '<div class="dow">' + day.label + '</div>'
+            + '</th>';
+    }
+    head += '</tr>';
+    document.querySelector('#gridTable thead').innerHTML = head;
+
+    // Body rows + daily totals (all + billable subset)
+    const dailyTotals = {};
+    const billableDailyTotals = {};
+    let grandTotal = 0;
+    let billableGrand = 0;
+    let body = '';
+    for (const t of data.tasks) {
+      body += '<tr>';
+      body += '<td class="col-key"><div class="grid-row-key">'
+            + '<span class="status-icon ' + t.status + '">' + statusIconSvg(t.status) + '</span>'
+            + '<span class="pdot" style="background: ' + t.color + ';"></span>'
+            + '<button class="task-key" onclick="setScene(\'tt-task-edit\')">' + t.key + '</button>'
+            + '</div></td>';
+      const lc = loggedClass(t.logged, t.est);
+      const loggedInner = t.est > 0
+        ? fmtHours(t.logged) + ' <span class="est">/ ' + fmtHours(t.est) + '</span>'
+        : (t.logged > 0 ? fmtHours(t.logged) : '<span class="est">—</span>');
+      body += '<td class="col-logged ' + lc + '" title="Estimate ' + t.est + 'h">' + loggedInner + '</td>';
+
+      for (const day of days) {
+        const v = t.byDay[day.d] || 0;
+        const cls = ['col-day'];
+        if (day.isNonWorking) cls.push('weekend');
+        if (day.isToday) cls.push('today');
+        if (v === 0) cls.push('cell-empty');
+        body += '<td class="' + cls.join(' ') + '" onclick="setScene(\'tt-worklog-edit\')">' + fmtHours(v) + '</td>';
+        dailyTotals[day.d] = (dailyTotals[day.d] || 0) + v;
+        if (t.billable) {
+          billableDailyTotals[day.d] = (billableDailyTotals[day.d] || 0) + v;
+        }
+      }
+      grandTotal += t.logged;
+      if (t.billable) billableGrand += t.logged;
+      body += '</tr>';
+    }
+
+    // Totals row (sticky above earnings row)
+    const workdays = days.filter((d) => !d.isNonWorking).length;
+    const capacityHours = workdays * 8;
+    body += '<tr class="totals">';
+    body += '<td class="col-key">Total hours · ' + workdays + ' workdays</td>';
+    body += '<td class="col-logged">' + fmtHours(grandTotal) + ' <span class="est">/ ' + capacityHours + '</span></td>';
+    for (const day of days) {
+      const v = dailyTotals[day.d] || 0;
+      const cls = ['col-day'];
+      if (day.isNonWorking) cls.push('weekend');
+      if (day.isToday) cls.push('today');
+      if (v === 0) cls.push('cell-empty');
+      body += '<td class="' + cls.join(' ') + '">' + fmtHours(v) + '</td>';
+    }
+    body += '</tr>';
+
+    // Earnings row — one per currency (CZK only for this prototype)
+    const earnedTotal = Math.round(billableGrand * data.rateCZK);
+    const predictedTotal = Math.round(capacityHours * data.rateCZK);
+    body += '<tr class="earnings">';
+    body += '<td class="col-key">Earned (CZK)</td>';
+    body += '<td class="col-logged">'
+          + earnedTotal.toLocaleString('cs-CZ')
+          + ' <span class="est">/ ' + predictedTotal.toLocaleString('cs-CZ') + '</span>'
+          + '</td>';
+    for (const day of days) {
+      const billableHours = billableDailyTotals[day.d] || 0;
+      const earned = Math.round(billableHours * data.rateCZK);
+      const cls = ['col-day'];
+      if (day.isNonWorking) cls.push('weekend');
+      if (day.isToday) cls.push('today');
+      if (earned === 0) cls.push('cell-empty');
+      body += '<td class="' + cls.join(' ') + '"'
+            + (earned > 0 ? ' title="' + earned.toLocaleString('cs-CZ') + ' CZK"' : '')
+            + '>'
+            + (earned > 0 ? earned.toLocaleString('cs-CZ') : '')
+            + '</td>';
+    }
+    body += '</tr>';
+
+    document.querySelector('#gridTable tbody').innerHTML = body;
+  }
+
+  renderTaskGrid();
+
+  // ── Time off: 3-month calendar + paged upcoming list ──
+  const timeOffData = {
+    todayStr: '2026-05-24',
+    windowStart: { year: 2026, month: 3 }, // April 2026 (month is 0-indexed)
+    monthsVisible: 3,
+    daysOff: [
+      // User-managed entries — past and future. Past ones are filtered out of
+      // the upcoming list but still tint the calendar cells.
+      { date: '2026-04-09', kind: 'vacation', note: null },
+      { date: '2026-04-10', kind: 'vacation', note: null },
+      { date: '2026-05-15', kind: 'sick',     note: 'Flu' },
+      { date: '2026-05-19', kind: 'other',    note: 'Doctor appointment' },
+      { date: '2026-05-27', kind: 'vacation', note: 'Long weekend' },
+      { date: '2026-05-28', kind: 'vacation', note: 'Long weekend' },
+      { date: '2026-05-29', kind: 'vacation', note: 'Long weekend' },
+      { date: '2026-06-15', kind: 'vacation', note: 'Summer leave' },
+      { date: '2026-06-16', kind: 'vacation', note: 'Summer leave' },
+      { date: '2026-06-17', kind: 'vacation', note: 'Summer leave' },
+      { date: '2026-06-18', kind: 'vacation', note: 'Summer leave' },
+      { date: '2026-06-19', kind: 'vacation', note: 'Summer leave' },
+      { date: '2026-07-13', kind: 'vacation', note: null },
+      { date: '2026-07-14', kind: 'vacation', note: null },
+      { date: '2026-08-03', kind: 'vacation', note: 'Family vacation' },
+      { date: '2026-08-04', kind: 'vacation', note: 'Family vacation' },
+      { date: '2026-08-05', kind: 'vacation', note: 'Family vacation' },
+      { date: '2026-08-06', kind: 'vacation', note: 'Family vacation' },
+      { date: '2026-08-07', kind: 'vacation', note: 'Family vacation' },
+      { date: '2026-10-15', kind: 'other',    note: 'Dentist' },
+    ],
+    // Czech public holidays for 2026
+    holidays: [
+      { date: '2026-01-01', name: 'New Year / Restoration Day' },
+      { date: '2026-04-03', name: 'Good Friday' },
+      { date: '2026-04-06', name: 'Easter Monday' },
+      { date: '2026-05-01', name: 'Labor Day' },
+      { date: '2026-05-08', name: 'Liberation Day' },
+      { date: '2026-07-05', name: 'Cyril & Methodius Day' },
+      { date: '2026-07-06', name: 'Jan Hus Day' },
+      { date: '2026-09-28', name: 'St. Wenceslas Day' },
+      { date: '2026-10-28', name: 'Statehood Day' },
+      { date: '2026-11-17', name: 'Freedom & Democracy Day' },
+      { date: '2026-12-24', name: 'Christmas Eve' },
+      { date: '2026-12-25', name: 'Christmas Day' },
+      { date: '2026-12-26', name: '2nd Christmas Day' },
+    ],
+  };
+
+  let upcomingPage = 0;
+  let upcomingPageSize = 5;
+
+  const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONTH_LONG  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DOW_SHORT   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  function ymd(date) {
+    return date.getFullYear() + '-'
+         + String(date.getMonth() + 1).padStart(2, '0') + '-'
+         + String(date.getDate()).padStart(2, '0');
+  }
+  function kindLabel(k) {
+    return { vacation: 'Vacation', sick: 'Sick', other: 'Other', holiday: 'Public holiday' }[k] || k;
+  }
+
+  function renderTimeOffCalendars() {
+    const data = timeOffData;
+    const byDate = new Map(data.daysOff.map((d) => [d.date, d]));
+    const holidayByDate = new Map(data.holidays.map((h) => [h.date, h]));
+
+    const container = document.getElementById('timeoffCalendars');
+    let html = '';
+
+    for (let i = 0; i < data.monthsVisible; i++) {
+      const monthIdx = data.windowStart.month + i;
+      const year = data.windowStart.year + Math.floor(monthIdx / 12);
+      const month = ((monthIdx % 12) + 12) % 12;
+
+      const firstOfMonth = new Date(year, month, 1);
+      const startDow = firstOfMonth.getDay();      // 0=Sun..6=Sat
+      const startOffset = (startDow + 6) % 7;      // 0=Mon
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+
+      html += '<div class="month-block">';
+      html += '<div class="month-title">' + MONTH_LONG[month] + ' ' + year + '</div>';
+      html += '<div class="month-dow">';
+      for (const d of ['Mo','Tu','We','Th','Fr','Sa','Su']) html += '<span>' + d + '</span>';
+      html += '</div>';
+      html += '<div class="month-cells">';
+
+      for (let c = 0; c < totalCells; c++) {
+        const cellDate = new Date(year, month, 1 - startOffset + c);
+        const cellYmd  = ymd(cellDate);
+        const inMonth  = cellDate.getMonth() === month;
+        const dow      = cellDate.getDay();
+        const isWeekend = dow === 0 || dow === 6;
+        const isToday  = cellYmd === data.todayStr;
+        const dayOff   = byDate.get(cellYmd);
+        const holiday  = holidayByDate.get(cellYmd);
+        const isHolidayOnly = !dayOff && !!holiday;
+
+        const cls = ['day-cell'];
+        if (!inMonth) cls.push('outside');
+        if (isWeekend) cls.push('weekend');
+        if (isToday) cls.push('today');
+        if (dayOff) cls.push('kind-' + dayOff.kind);
+        else if (holiday) cls.push('holiday-only');
+
+        const tooltip = dayOff
+          ? kindLabel(dayOff.kind) + (dayOff.note ? ' — ' + dayOff.note : '')
+          : holiday
+            ? holiday.name
+            : (isWeekend ? 'Weekend' : '');
+
+        html += '<div class="' + cls.join(' ') + '"'
+              + (tooltip ? ' title="' + tooltip + '"' : '') + '>'
+              + cellDate.getDate() + '</div>';
+      }
+
+      html += '</div></div>';
+    }
+
+    container.innerHTML = html;
+
+    // Window label
+    const startMonth = data.windowStart.month;
+    const startYear  = data.windowStart.year;
+    const endIdx = startMonth + data.monthsVisible - 1;
+    const endYear  = startYear + Math.floor(endIdx / 12);
+    const endMonth = ((endIdx % 12) + 12) % 12;
+    document.getElementById('timeoffWindowLabel').textContent =
+      MONTH_SHORT[startMonth] + ' ' + startYear + ' – ' + MONTH_SHORT[endMonth] + ' ' + endYear;
+  }
+
+  function renderUpcoming() {
+    const data = timeOffData;
+    const items = [];
+
+    // Holidays first (auto, removable=false)
+    for (const h of data.holidays) {
+      if (h.date < data.todayStr) continue;
+      items.push({ date: h.date, kind: 'holiday', label: 'Public holiday', note: h.name, removable: false });
+    }
+    // User entries override holiday on same date (user intent wins)
+    for (const d of data.daysOff) {
+      if (d.date < data.todayStr) continue;
+      const existingIdx = items.findIndex((it) => it.date === d.date);
+      const item = { date: d.date, kind: d.kind, label: kindLabel(d.kind), note: d.note, removable: true };
+      if (existingIdx >= 0) items.splice(existingIdx, 1, item);
+      else items.push(item);
+    }
+    items.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Kind totals
+    const totals = { vacation: 0, sick: 0, other: 0, holiday: 0 };
+    for (const it of items) totals[it.kind]++;
+
+    // Chips
+    const chipDefs = [
+      { k: 'vacation', label: 'vacation' },
+      { k: 'sick',     label: 'sick' },
+      { k: 'other',    label: 'other' },
+      { k: 'holiday',  label: 'public holiday' },
+    ];
+    let chipHtml = '';
+    for (const c of chipDefs) {
+      const active = totals[c.k] > 0;
+      chipHtml += '<span class="kind-chip ' + (active ? 'active ' : 'inactive ') + c.k + '">'
+                + totals[c.k] + ' ' + c.label
+                + '</span>';
+    }
+    document.getElementById('upcomingChips').innerHTML = chipHtml;
+
+    // Paging
+    const totalPages = Math.max(1, Math.ceil(items.length / upcomingPageSize));
+    if (upcomingPage >= totalPages) upcomingPage = totalPages - 1;
+    if (upcomingPage < 0) upcomingPage = 0;
+    const start = upcomingPage * upcomingPageSize;
+    const end   = Math.min(start + upcomingPageSize, items.length);
+    const slice = items.slice(start, end);
+
+    // List rendering
+    const list = document.getElementById('upcomingList');
+    if (slice.length === 0) {
+      list.innerHTML = '<div class="upcoming-empty">No upcoming days off planned.</div>';
+    } else {
+      let html = '';
+      for (const it of slice) {
+        const [y, m, d] = it.date.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        const dateStr = DOW_SHORT[dt.getDay()] + ', ' + d + ' ' + MONTH_SHORT[m - 1] + ' ' + y;
+        html += '<div class="upcoming-item">';
+        html += '<svg class="uc-ico ' + it.kind + '" viewBox="0 0 24 24" fill="currentColor">'
+              + '<path d="M12.95 4.62l4.95 4.95-1.42 1.41-3.54-3.54c-2.4 1.27-3.94 3.04-4.74 5.62l1.69 1.69-1.41 1.41L4.62 12.5l1.41-1.41 1.66 1.66c.81-2.07 2.46-4.05 4.85-5.42L8.83 3.62l1.42-1.41 4.95 4.95-1.25-1.54zM4 20h16v2H4v-2z"/>'
+              + '</svg>';
+        html += '<div>'
+              +   '<div class="uc-date">' + dateStr + '</div>'
+              +   '<div class="uc-meta">' + it.label + (it.note ? ' — ' + it.note : '') + '</div>'
+              + '</div>';
+        html += it.removable
+          ? '<button class="btn ghost">Remove</button>'
+          : '<span class="uc-auto">auto</span>';
+        html += '</div>';
+      }
+      list.innerHTML = html;
+    }
+
+    // Paging bar
+    document.getElementById('upcomingPageInfo').textContent =
+      items.length === 0
+        ? 'No entries'
+        : 'Showing ' + (start + 1) + '–' + end + ' of ' + items.length;
+    document.getElementById('upcomingPrev').disabled = upcomingPage === 0;
+    document.getElementById('upcomingNext').disabled = end >= items.length;
+  }
+
+  function renderTimeOff() {
+    renderTimeOffCalendars();
+    renderUpcoming();
+  }
+
+  // Paging handlers + month navigation
+  document.getElementById('upcomingPrev').addEventListener('click', () => {
+    upcomingPage = Math.max(0, upcomingPage - 1);
+    renderUpcoming();
+  });
+  document.getElementById('upcomingNext').addEventListener('click', () => {
+    upcomingPage = upcomingPage + 1;
+    renderUpcoming();
+  });
+  document.getElementById('upcomingPageSize').addEventListener('change', (e) => {
+    upcomingPageSize = Number(e.target.value) || 5;
+    upcomingPage = 0;
+    renderUpcoming();
+  });
+
+  // 3-month window navigation
+  document.querySelectorAll('#ttListMode .calendars-header .icon-btn').forEach((btn, idx) => {
+    btn.addEventListener('click', () => {
+      const delta = idx === 0 ? -1 : 1; // first icon-btn = prev, second = next
+      let m = timeOffData.windowStart.month + delta;
+      let y = timeOffData.windowStart.year;
+      if (m < 0) { m += 12; y -= 1; }
+      if (m > 11) { m -= 12; y += 1; }
+      timeOffData.windowStart = { year: y, month: m };
+      renderTimeOffCalendars();
+    });
+  });
+  document.querySelector('#ttListMode .calendars-header .today-btn').addEventListener('click', () => {
+    // Focus on May 2026; window starts at April (focus - 1)
+    timeOffData.windowStart = { year: 2026, month: 3 };
+    renderTimeOffCalendars();
+  });
+
+  renderTimeOff();
+
   window.setScene = setScene;
 </script>
 
