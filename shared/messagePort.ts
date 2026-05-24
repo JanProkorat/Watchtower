@@ -52,7 +52,8 @@ export type OrchRequest =
   | { id: string; kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } }
   | { id: string; kind: 'instances:findByCwd'; payload: { cwd: string } }
   | { id: string; kind: 'claudeSettings:read'; payload: { scope: 'global' | 'project'; projectPath?: string } }
-  | { id: string; kind: 'claudeSettings:write'; payload: { scope: 'global' | 'project'; projectPath?: string; content: string } };
+  | { id: string; kind: 'claudeSettings:write'; payload: { scope: 'global' | 'project'; projectPath?: string; content: string } }
+  | { id: string; kind: 'skills:list'; payload: Record<string, never> };
 
 export interface OrchRunningInstance {
   id: string;
@@ -414,7 +415,8 @@ export type OrchResponse =
   | { kind: 'reports:rateChanges'; payload: { rateChanges: OrchRateChangeMarker[] } }
   | { kind: 'instances:findByCwd'; payload: { instances: OrchRunningInstance[] } }
   | { kind: 'claudeSettings:read'; payload: { path: string; exists: boolean; content: string } }
-  | { kind: 'claudeSettings:write'; payload: { ok: boolean; backupPath?: string; error?: string } };
+  | { kind: 'claudeSettings:write'; payload: { ok: boolean; backupPath?: string; error?: string } }
+  | { kind: 'skills:list'; payload: { skills: Array<{ name: string; path: string; source: string; description: string; body: string }> } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

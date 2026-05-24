@@ -43,6 +43,7 @@ import {
   uninstallHooks,
 } from './hookInstaller.js';
 import { readSettings, writeSettings } from './services/claudeSettings.js';
+import { listSkills } from './services/claudeSkills.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
 
@@ -608,6 +609,10 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
 
     case 'claudeSettings:write': {
       return writeSettings(req.payload.scope, req.payload.projectPath, req.payload.content);
+    }
+
+    case 'skills:list': {
+      return { skills: listSkills() };
     }
   }
 }
