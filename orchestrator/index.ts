@@ -542,6 +542,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           req.payload.from,
           req.payload.to,
           req.payload.granularity,
+          req.payload.projectId,
         ),
       };
 
@@ -550,25 +551,35 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
         byProject: new ReportsService(handle!.db).byProject(
           req.payload.from,
           req.payload.to,
+          req.payload.projectId,
         ),
       };
 
     case 'reports:earnings':
-      return new ReportsService(handle!.db).earnings(req.payload.from, req.payload.to);
+      return new ReportsService(handle!.db).earnings(
+        req.payload.from,
+        req.payload.to,
+        req.payload.projectId,
+      );
 
     case 'reports:heatmap':
       return {
-        heatmap: new ReportsService(handle!.db).heatmap(req.payload.from, req.payload.to),
+        heatmap: new ReportsService(handle!.db).heatmap(
+          req.payload.from,
+          req.payload.to,
+          req.payload.projectId,
+        ),
       };
 
     case 'reports:contracts':
-      return { contracts: new ReportsService(handle!.db).contracts() };
+      return { contracts: new ReportsService(handle!.db).contracts(req.payload.projectId) };
 
     case 'reports:rateChanges':
       return {
         rateChanges: new ReportsService(handle!.db).rateChanges(
           req.payload.from,
           req.payload.to,
+          req.payload.projectId,
         ),
       };
   }

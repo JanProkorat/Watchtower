@@ -46,12 +46,12 @@ export type IpcRequest =
   | { kind: 'daysOff:upsert'; payload: DayOffInputPayload }
   | { kind: 'daysOff:delete'; payload: { date: string } }
   | { kind: 'holidays:list'; payload: { year: number } }
-  | { kind: 'reports:trend'; payload: { from: string; to: string; granularity: 'day' | 'week' | 'month' } }
-  | { kind: 'reports:byProject'; payload: { from: string; to: string } }
-  | { kind: 'reports:earnings'; payload: { from: string; to: string } }
-  | { kind: 'reports:heatmap'; payload: { from: string; to: string } }
-  | { kind: 'reports:contracts'; payload: Record<string, never> }
-  | { kind: 'reports:rateChanges'; payload: { from: string; to: string } };
+  | { kind: 'reports:trend'; payload: { from: string; to: string; granularity: 'day' | 'week' | 'month'; projectId?: number } }
+  | { kind: 'reports:byProject'; payload: { from: string; to: string; projectId?: number } }
+  | { kind: 'reports:earnings'; payload: { from: string; to: string; projectId?: number } }
+  | { kind: 'reports:heatmap'; payload: { from: string; to: string; projectId?: number } }
+  | { kind: 'reports:contracts'; payload: { projectId?: number } }
+  | { kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } };
 
 export interface TrendDatumPayload {
   bucket: string;

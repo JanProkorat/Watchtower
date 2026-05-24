@@ -44,12 +44,12 @@ export type OrchRequest =
   | { id: string; kind: 'daysOff:upsert'; payload: OrchDayOffInput }
   | { id: string; kind: 'daysOff:delete'; payload: { date: string } }
   | { id: string; kind: 'holidays:list'; payload: { year: number } }
-  | { id: string; kind: 'reports:trend'; payload: { from: string; to: string; granularity: 'day' | 'week' | 'month' } }
-  | { id: string; kind: 'reports:byProject'; payload: { from: string; to: string } }
-  | { id: string; kind: 'reports:earnings'; payload: { from: string; to: string } }
-  | { id: string; kind: 'reports:heatmap'; payload: { from: string; to: string } }
-  | { id: string; kind: 'reports:contracts'; payload: Record<string, never> }
-  | { id: string; kind: 'reports:rateChanges'; payload: { from: string; to: string } };
+  | { id: string; kind: 'reports:trend'; payload: { from: string; to: string; granularity: 'day' | 'week' | 'month'; projectId?: number } }
+  | { id: string; kind: 'reports:byProject'; payload: { from: string; to: string; projectId?: number } }
+  | { id: string; kind: 'reports:earnings'; payload: { from: string; to: string; projectId?: number } }
+  | { id: string; kind: 'reports:heatmap'; payload: { from: string; to: string; projectId?: number } }
+  | { id: string; kind: 'reports:contracts'; payload: { projectId?: number } }
+  | { id: string; kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } };
 
 export interface OrchTrendDatum {
   bucket: string;
