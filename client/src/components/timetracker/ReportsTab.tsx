@@ -8,12 +8,14 @@ import {
   Grid,
   Paper,
   Stack,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs, { type Dayjs } from 'dayjs';
 import { useReports, type Granularity } from '../../state/useReports.js';
+import { CZ_DATE_FORMAT } from '../../util/format.js';
 import ChartCard from './charts/ChartCard.js';
 import TrendChart, {
   type RateChangeMarker,
@@ -187,23 +189,19 @@ export function ReportsTab() {
           spacing={2}
           alignItems={{ xs: 'stretch', md: 'center' }}
         >
-          <TextField
+          <DatePicker
             label="From"
-            type="date"
-            size="small"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            sx={{ minWidth: 160 }}
+            value={dayjs(from)}
+            onChange={(v: Dayjs | null) => v && setFrom(v.format('YYYY-MM-DD'))}
+            format={CZ_DATE_FORMAT}
+            slotProps={{ textField: { size: 'small', sx: { minWidth: 170 } } }}
           />
-          <TextField
+          <DatePicker
             label="To"
-            type="date"
-            size="small"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            sx={{ minWidth: 160 }}
+            value={dayjs(to)}
+            onChange={(v: Dayjs | null) => v && setTo(v.format('YYYY-MM-DD'))}
+            format={CZ_DATE_FORMAT}
+            slotProps={{ textField: { size: 'small', sx: { minWidth: 170 } } }}
           />
           <ButtonGroup variant="outlined" size="small">
             {presets.map((p) => (
