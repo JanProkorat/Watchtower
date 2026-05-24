@@ -58,15 +58,34 @@ describe('TaskGridService', () => {
     expect(res.dailyTotalsReported).toEqual({});
     expect(res.earningsByCurrency).toEqual([]);
     expect(res.daysInMonth).toBe(31);
-    // May 2026 = 21 weekdays × 8h × 60min = 10080.
-    expect(res.monthCapacityMinutes).toBe(10080);
+    // May 2026: 21 Mon-Fri days minus Labour Day (May 1) and Liberation Day
+    // (May 8) — both fall on Friday — = 19 workdays × 8h × 60min = 9120.
+    expect(res.monthCapacityMinutes).toBe(9120);
   });
 
-  it('computes monthCapacityMinutes from Mon-Fri workdays × 8h', () => {
-    // Feb 2026: 20 weekdays. 20 × 8 × 60 = 9600.
+  it('computes monthCapacityMinutes from workdays × 8h (minus public holidays)', () => {
+    // Feb 2026: 20 weekdays, no Czech holidays. 20 × 8 × 60 = 9600.
     expect(s.service.get(2026, 2).monthCapacityMinutes).toBe(9600);
-    // Aug 2026: 21 weekdays. 21 × 8 × 60 = 10080.
+    // Aug 2026: 21 weekdays, no Czech holidays. 21 × 8 × 60 = 10080.
     expect(s.service.get(2026, 8).monthCapacityMinutes).toBe(10080);
+    // May 2026: 21 weekdays - 2 holidays (May 1, May 8) = 19 workdays.
+    expect(s.service.get(2026, 5).monthCapacityMinutes).toBe(9120);
+  });
+
+  it('returns the Czech public holidays that fall inside the displayed month', () => {
+    const may = s.service.get(2026, 5);
+    expect(may.publicHolidays).toEqual([
+      { date: '2026-05-01', name: 'Labour Day' },
+      { date: '2026-05-08', name: 'Liberation Day' },
+    ]);
+    // April 2026 carries Good Friday and Easter Monday (Easter Sunday = Apr 5).
+    const apr = s.service.get(2026, 4);
+    expect(apr.publicHolidays.map((h) => h.date)).toEqual([
+      '2026-04-03',
+      '2026-04-06',
+    ]);
+    // February has none.
+    expect(s.service.get(2026, 2).publicHolidays).toEqual([]);
   });
 
   it('uses reported_minutes when set, falling back to minutes', () => {
