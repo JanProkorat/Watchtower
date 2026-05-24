@@ -51,6 +51,7 @@ Watchtower won because it fits the MVP function *literally* (you watch from a to
 | First runnable build | `release/Watchtower-0.0.1-arm64.dmg` |
 | First daily-use build | drop in /Applications, right-click → Open (unsigned) |
 | TimeTracker module absorption | **All 11 phases done** (#12–#22). Schema, IPC, full UI (Projects, Worklogs, Task grid, Time off, Reports, Contracts), launch bridge, light/dark theme, polish. |
+| Settings / Hooks / Skills / Agents module | **All 7 phases done** (#23–#29 in spec; GH issues #35–#41). Module shell, settings.json editor, hooks viewer/editor, skills + agents browsers, MCP server manager, polish + docs. |
 
 ---
 
@@ -91,6 +92,20 @@ The second module in the rail. Schema and feature-set ported verbatim from the s
 | Phase 20 — Reports | [#20](https://github.com/JanProkorat/Watchtower/issues/20) | recharts panels with project filter + presets. |
 | Phase 21 — Launch project → Instances bridge | [#21](https://github.com/JanProkorat/Watchtower/issues/21) | Open/VS Code buttons, instance choice modal. |
 | Phase 22 — Polish & cleanup | [#22](https://github.com/JanProkorat/Watchtower/issues/22) | Migration wire-up, toast surface, skeletons, docs. |
+
+### Settings / Hooks / Skills / Agents module (phase ↔ issue number)
+
+The third module in the rail. A full GUI for `~/.claude/` and per-project `.claude/`. Replaces the previous narrow Watchtower-only `SettingsPanel`.
+
+| Phase | Issue | Scope |
+|---|---|---|
+| Phase 23 — Module shell & navigation | [#35](https://github.com/JanProkorat/Watchtower/issues/35) | 6-tab strip (General · settings.json · Hooks · Skills · Agents · MCP), hash routing. |
+| Phase 24 — ~/.claude/settings.json editor | [#36](https://github.com/JanProkorat/Watchtower/issues/36) | Read/write with backup, scope toggle, structured form for boolean keys, raw JSON editor with validation. |
+| Phase 25 — Hooks viewer + editor | [#37](https://github.com/JanProkorat/Watchtower/issues/37) | Per-event accordions, Watchtower-managed detection, template library (sound, Slack webhook, file-write audit). |
+| Phase 26 — Skills browser | [#38](https://github.com/JanProkorat/Watchtower/issues/38) | User + plugin skill discovery, frontmatter parser, split list + SKILL.md preview. |
+| Phase 27 — Agents browser | [#39](https://github.com/JanProkorat/Watchtower/issues/39) | User + plugin agent discovery, model + tools chips, frontmatter summary + prompt body. View-only. |
+| Phase 28 — MCP servers | [#40](https://github.com/JanProkorat/Watchtower/issues/40) | List/add/edit/remove with stdio + http transports, KEY=value form, 5 built-in presets. |
+| Phase 29 — Polish & docs | [#41](https://github.com/JanProkorat/Watchtower/issues/41) | Empty states, skeletons, toast wiring audit, PROTOTYPE/CLAUDE/README updates. |
 
 ### TimeTracker (project 4, non-billable)
 
@@ -232,6 +247,19 @@ Append-only record of key calls. Each entry: date, decision, rationale, alternat
 | 19 | **TT-derived purple/cyan palette over the original Watchtower blue/orange** | Light + dark pair already existed in TT, polished. User asked for the TT look during Phase 22 polish. | Keep the dark-only Watchtower palette. |
 | 20 | **Toast surface for fire-and-forget IPC failures** | Read paths surface inline Alerts; mutation paths (archive, delete, snooze, VS Code launch) had no obvious home, so a global Snackbar context covers them. | Per-component inline error state for every mutation. |
 
+### 2026-05-24 — Settings module
+
+| # | Decision | Rationale | Alternatives |
+|---|---|---|---|
+| 21 | **Replace narrow SettingsPanel with a tabbed Settings *module*** | The original `SettingsPanel` only exposed 4 Watchtower-specific knobs (quiet timer, default cwd, hook install/uninstall, test notif). A real GUI for `~/.claude/` is far more useful and is the most-likely-daily-touch module per the original roadmap. | Keep both — `SettingsPanel` as-is, add a separate "Claude config" module. (Rejected — splitting "settings" across two rail items confuses navigation.) |
+| 22 | **Read/write `~/.claude/settings.json` directly with backup-before-write** | settings.json is small, single-user, edited rarely. A full atomic-write protocol is overkill; copy-to-`.bak.<ts>` + rewrite is recoverable, simple, and accumulates rollback points the user can prune at leisure. | Read-only "view" tab with copy-to-clipboard. Mandatory file-locking. |
+| 23 | **Single source of truth = the raw JSON draft; form fields parse-mutate-stringify** | Keeping a separate parsed object as state, then re-stringifying on save, would lose comments + formatting choices the user might have hand-edited. Round-tripping through `JSON.parse` does too, but at least keeps everything in lockstep — and `JSON.stringify(obj, null, 2)` matches Claude Code's own output style. | Diff-based merge layer that preserves the on-disk source verbatim and only patches the changed keys. (Worth doing if users start hand-editing settings.json + losing formatting; not yet justified.) |
+| 24 | **Watchtower-managed hook entries are detected by command-substring + marked read-only in Hooks tab** | The user can install / uninstall Watchtower's hook from the General tab; trying to edit those entries in the Hooks tab risks breaking the notification pipeline. Detection is fragile (string match on `watchtower-hook.mjs`) but cheap and obvious. | Tag entries via a dedicated frontmatter-like field in the settings JSON. (Would require Claude Code's hook schema to support it.) |
+| 25 | **No editing in the Agents tab (view-only first cut)** | Agents have frontmatter + markdown body; editing risks malformed frontmatter that breaks Claude Code's parser. Most users tweak them with a text editor anyway; the value of an in-app editor is mostly the *discovery* of what's installed, not edit-in-place. | In-app Monaco editor for the .md body + a structured frontmatter form. |
+| 26 | **MCP servers: skip connection test in the first cut** | Spawning the configured command from the renderer to verify the JSON-RPC handshake is *risky* — could hang on a misconfigured command, leak processes if the parent quits, or trigger a host-permission prompt for some servers. Visual confirmation (the server appears in the list and Claude Code loads it on restart) is enough for now. | Async connection test with a 5 s timeout + kill. |
+| 27 | **Skills + Agents: monospace `<pre>` for the preview pane instead of a markdown renderer** | Adding `react-markdown` (and its many transitive deps) just for a preview pane bloats the bundle ~150 KB. The bodies are mostly headers + bullets and read fine as plain text. Easy to upgrade later. | Install `react-markdown` + `remark-gfm`. |
+| 28 | **Frontmatter parser duplicated across `claudeSkills` + `claudeAgents`** | Two ~30-line copies are cheaper than a one-shared-file refactor + interface contract this early in the module's life. Both files import zero local code; either can move to a shared util in the next cleanup pass once a third caller appears. | Factor into `orchestrator/services/frontmatter.ts` from day one. |
+
 ---
 
 ## Open questions / risks
@@ -276,6 +304,7 @@ Append entries as the project advances. Format: `YYYY-MM-DD — short summary`. 
 - **2026-05-22** — **Phase 7 + 9 complete** (issues #1 and #7 closed). WT-T22 through WT-T26 + WT-T31 through WT-T33: QuietTimers + Notifier wire the state machine's outputs into actual macOS notifications; FirstRunWizard installs hooks into `~/.claude/settings.json` with a diff preview + backup; tray icon with badge count + instance list + snooze submenu; SettingsPanel exposes quiet timer ms, default cwd, hook reinstall/uninstall, test notification. **Watchtower now actually watches:** claude → hook → orchestrator → state machine → notifier → macOS Notification + tray badge → click brings tab into focus. 4h 5m logged for the combined milestone.
 - **2026-05-22** — **Phase 8 + 10 + 11 complete** (issues #8, #3, #4 closed) — **MVP shipped.** WT-T28 (Cmd+Q confirm dialog), WT-T34 (orchestrator auto-restart 3×/60 s + crash banner), WT-T37 (`npm run dist:mac` produces an unsigned `.dmg` + `.app`). T35 / T36 deferred (rare edge cases). Smoke-tested the packaged `.app` — runs from `release/mac-arm64/Watchtower.app`, orchestrator forks out of `app.asar`, native modules load, previous-session row resumes via fast-fail-to-fresh path. 1h 10m logged. **All 37 plan-tasks done; all 11 GitHub issues closed; ~15h total time logged in TimeTracker.**
 - **2026-05-24** — **TimeTracker module shipped** (issues #12–#22 closed). 11 phases, one branch + PR per phase. Final state: Projects CRUD with folder picker + per-project rate history (Contracts tab), Epics & Tasks tree, Worklogs CRUD with dual duration (tracked + reported), 31-day Task grid with weekend/holiday shading + per-day capacity, 3-month Time off calendar with Czech public holidays (Anonymous Gregorian Easter + 11 fixed dates), Reports tab (recharts: trend, project donut, earnings summary, contracts cards, heatmap) with project filter + period presets. Launch bridge from Projects → Instances ("Open" → choice modal when instances live, pre-filled New-instance modal when none) and a project-detail "Open in VS Code" button. Light/dark theme pair ported from TT (purple primary, cyan secondary), sun/moon toggle in the module-rail header. Phase 22 polish: orchestrator-bootstrap-driven TT absorption (idempotent, source renamed to `.migrated-<ts>.bak`), global toast surface for fire-and-forget mutation failures (archive, delete, snooze, VS Code launch), MUI Skeletons in DetailMode + Reports charts, build log + decision log updates here, new `README.md` + `CLAUDE.md`. **219 vitest tests, renderer build clean.** 3 projects / 35 epics / 782 tasks / 2593 worklogs / 18 days off absorbed from the standalone app at first orchestrator start.
+- **2026-05-24** — **Settings / Hooks / Skills / Agents module shipped** (issues #35–#41 closed, phases #23–#29 in the plan). 7 phases, one branch + PR per phase. Final state: tabbed module (General · settings.json · Hooks · Skills · Agents · MCP) replacing the previous narrow Watchtower-only `SettingsPanel` (now hosted inside the General tab unchanged). New orchestrator services `claudeSettings`, `claudeSkills`, `claudeAgents` walk `~/.claude/` + plugin install paths (read from `~/.claude/plugins/installed_plugins.json`). `settings.json` editor with global / project scope toggle, backup-before-write (`.bak.<ts>`), structured toggle form for known boolean keys + raw JSON editor with `JSON.parse` validation. Hooks tab with per-event accordions, Watchtower-managed detection (lock icon, disabled remove), template library (sound, Slack webhook, file-write audit). Skills + Agents browsers with source filter chips, search, split list + preview pane (monospace `<pre>` body — markdown renderer deferred). MCP servers with stdio + http transports, 5 built-in presets (Filesystem, Git, GitHub, Memory, Slack), KEY=value form for args/env/headers. Also bundled in this module: two packaging fixes from the first .app publish (vite `base: './'` for renderer asset paths under `file://`, and tray-icon SVG → PNG via `sips` to preserve alpha — `qlmanage` was baking in a white background that killed the template-image mask). **233 vitest tests, renderer + orchestrator builds clean.**
 
 ---
 
