@@ -1,5 +1,6 @@
 import type { SqliteLike } from './migrations.js';
 import { ProjectRatesRepo, type ProjectRateRow } from './repositories/projectRates.js';
+import { countWorkdays } from './workdays.js';
 
 export interface ContractStatus {
   rateId: number;
@@ -33,10 +34,10 @@ export interface ContractStatus {
 
 /**
  * Computes the live status of a project's *active* contract — or any
- * specific rate when an `asOf` date is supplied — from worklogs + a simple
- * Mon-Fri workday counter. Phase 19 will replace the workday counter with
- * one that also subtracts public holidays and days_off; that swap is
- * isolated to `countWorkdays()` below.
+ * specific rate when an `asOf` date is supplied — from worklogs + the shared
+ * workday counter (Mon-Fri minus Czech public holidays). Phase 19 will
+ * extend the helper to also subtract days_off; this module is unaffected by
+ * that change because the contract math just consumes the count.
  */
 export class ContractStatusService {
   private rates: ProjectRatesRepo;
@@ -148,31 +149,3 @@ function minDate(a: string, b: string): string {
   return a <= b ? a : b;
 }
 
-/**
- * Counts Monday-through-Friday days in [from, to] inclusive. Phase 19 will
- * extend this to also subtract Czech public holidays and days_off; the
- * signature stays stable so the swap is mechanical.
- */
-function countWorkdays(from: string, to: string): number {
-  if (from > to) return 0;
-  const [fy, fm, fd] = from.split('-').map(Number);
-  const [ty, tm, td] = to.split('-').map(Number);
-  if (
-    fy === undefined ||
-    fm === undefined ||
-    fd === undefined ||
-    ty === undefined ||
-    tm === undefined ||
-    td === undefined
-  ) {
-    return 0;
-  }
-  const start = new Date(fy, fm - 1, fd);
-  const end = new Date(ty, tm - 1, td);
-  let count = 0;
-  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) count++;
-  }
-  return count;
-}

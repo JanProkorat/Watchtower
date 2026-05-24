@@ -1,4 +1,5 @@
 import type { SqliteLike } from './migrations.js';
+import { countWorkdays, holidaysInRange, type PublicHoliday } from './workdays.js';
 
 export interface TaskGridTask {
   taskId: number;
@@ -42,11 +43,13 @@ export interface TaskGridResponse {
   /** Earnings always use reported minutes — that's what gets billed. */
   earningsByCurrency: TaskGridEarningsRow[];
   /**
-   * Expected working capacity for the month — Mon-Fri workdays × 8h. Phase
-   * 19 will subtract Czech public holidays + days_off; the helper signature
-   * is stable.
+   * Expected working capacity for the month — Mon-Fri workdays minus Czech
+   * public holidays that fell on weekdays, × 8h. Future: subtract days_off
+   * once Phase 19 wires the user-marked time-off table in.
    */
   monthCapacityMinutes: number;
+  /** Czech public holidays that fall inside the displayed month. */
+  publicHolidays: PublicHoliday[];
 }
 
 interface TaskMetaRow {
@@ -101,21 +104,6 @@ function monthBounds(year: number, month: number): { from: string; to: string; d
   };
 }
 
-/**
- * Mon-Fri count for the month. Phase 19 will subtract Czech public holidays
- * + days_off here; until then the contract status helper and the task grid
- * use the same simplified definition so capacity numbers stay consistent
- * across the module.
- */
-function countMonWedFriWorkdays(year: number, month: number): number {
-  const daysInMonth = new Date(year, month, 0).getDate();
-  let count = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dow = new Date(year, month - 1, d).getDay();
-    if (dow !== 0 && dow !== 6) count++;
-  }
-  return count;
-}
 
 /**
  * Builds the per-task ⇄ per-day matrix for a single month.
@@ -129,7 +117,8 @@ export class TaskGridService {
 
   get(year: number, month: number, projectId?: number): TaskGridResponse {
     const { from, to, daysInMonth } = monthBounds(year, month);
-    const monthCapacityMinutes = countMonWedFriWorkdays(year, month) * 8 * 60;
+    const monthCapacityMinutes = countWorkdays(from, to) * 8 * 60;
+    const publicHolidays = holidaysInRange(from, to);
 
     // 1. Fetch worklogs in the period scoped to the optional project.
     //    Both tracked + reported come back so the client can flip between
@@ -160,6 +149,7 @@ export class TaskGridService {
         dailyTotalsReported: {},
         earningsByCurrency: [],
         monthCapacityMinutes,
+        publicHolidays,
       };
     }
 
@@ -264,6 +254,7 @@ export class TaskGridService {
       dailyTotalsReported,
       earningsByCurrency,
       monthCapacityMinutes,
+      publicHolidays,
     };
   }
 

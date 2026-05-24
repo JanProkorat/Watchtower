@@ -183,32 +183,41 @@ export function TaskGridView({ projectId }: Props) {
     setMonth(today.getMonth() + 1);
   };
 
-  // Day metadata for the column headers + tinting.
+  // Day metadata for the column headers + tinting. Holidays come from the
+  // server response so the client doesn't need its own Easter algorithm.
   const days = useMemo(() => {
     const daysInMonth = grid.data?.daysInMonth ?? new Date(year, month, 0).getDate();
     const todayYmd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const holidayByYmd = new Map(
+      (grid.data?.publicHolidays ?? []).map((h) => [h.date, h.name] as const),
+    );
     const result: Array<{
       day: number;
       ymd: string;
       dow: number;
       isWeekend: boolean;
       isToday: boolean;
+      isHoliday: boolean;
+      holidayName: string | null;
     }> = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const dt = new Date(year, month - 1, d);
       const dow = dt.getDay();
       const ymd = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const holidayName = holidayByYmd.get(ymd) ?? null;
       result.push({
         day: d,
         ymd,
         dow,
         isWeekend: dow === 0 || dow === 6,
         isToday: ymd === todayYmd,
+        isHoliday: holidayName != null,
+        holidayName,
       });
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, grid.data?.daysInMonth]);
+  }, [year, month, grid.data?.daysInMonth, grid.data?.publicHolidays]);
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -408,7 +417,15 @@ function Grid({
   onCellClick,
 }: {
   data: import('../../../../shared/ipcContract.js').TaskGridResponsePayload;
-  days: Array<{ day: number; ymd: string; dow: number; isWeekend: boolean; isToday: boolean }>;
+  days: Array<{
+    day: number;
+    ymd: string;
+    dow: number;
+    isWeekend: boolean;
+    isToday: boolean;
+    isHoliday: boolean;
+    holidayName: string | null;
+  }>;
   displayMode: 'tracked' | 'reported';
   hideDone: boolean;
   onTaskKeyClick(task: TaskGridTaskPayload): void;
@@ -501,14 +518,16 @@ function Grid({
               Logged
             </th>
             {days.map((d) => {
+              const isNonWorking = d.isWeekend || d.isHoliday;
               const cls = d.isToday
                 ? { background: todayBg, color: todayText }
-                : d.isWeekend
+                : isNonWorking
                   ? { background: weekendBg }
                   : {};
               return (
                 <th
                   key={d.day}
+                  title={d.holidayName ?? undefined}
                   style={{
                     minWidth: DAY_COL_WIDTH,
                     width: DAY_COL_WIDTH,
@@ -593,7 +612,11 @@ function Grid({
             </td>
             {days.map((d) => {
               const v = visibleDailyTotals[d.day] ?? 0;
-              const cellBg = d.isToday ? todaySolidBg : d.isWeekend ? weekendSolidBg : totalSolidBg;
+              const cellBg = d.isToday
+                ? todaySolidBg
+                : d.isWeekend || d.isHoliday
+                  ? weekendSolidBg
+                  : totalSolidBg;
               return (
                 <td
                   key={d.day}
@@ -651,7 +674,11 @@ function Grid({
                 </td>
                 {days.map((d) => {
                   const v = row.perDay[d.day] ?? 0;
-                  const cellBg = d.isToday ? todaySolidBg : d.isWeekend ? weekendSolidBg : earningsSolidBg;
+                  const cellBg = d.isToday
+                    ? todaySolidBg
+                    : d.isWeekend || d.isHoliday
+                      ? weekendSolidBg
+                      : earningsSolidBg;
                   return (
                     <td
                       key={d.day}
@@ -694,7 +721,15 @@ function TaskRow({
   onCellClick,
 }: {
   task: TaskGridTaskPayload;
-  days: Array<{ day: number; ymd: string; dow: number; isWeekend: boolean; isToday: boolean }>;
+  days: Array<{
+    day: number;
+    ymd: string;
+    dow: number;
+    isWeekend: boolean;
+    isToday: boolean;
+    isHoliday: boolean;
+    holidayName: string | null;
+  }>;
   displayMode: 'tracked' | 'reported';
   weekendBg: string;
   todayBg: string;
@@ -815,7 +850,7 @@ function TaskRow({
       </td>
       {days.map((d) => {
         const v = perDay[d.day] ?? 0;
-        const baseBg = d.isToday ? todayBg : d.isWeekend ? weekendBg : 'transparent';
+        const baseBg = d.isToday ? todayBg : d.isWeekend || d.isHoliday ? weekendBg : 'transparent';
         return (
           <td
             key={d.day}
@@ -837,7 +872,13 @@ function TaskRow({
             onMouseLeave={(e) => {
               e.currentTarget.style.background = baseBg as string;
             }}
-            title={v > 0 ? `${fmtHoursTrim(v)} h on ${d.ymd}` : `Log work on ${d.ymd}`}
+            title={
+              v > 0
+                ? `${fmtHoursTrim(v)} h on ${d.ymd}${d.holidayName ? ` (${d.holidayName})` : ''}`
+                : d.holidayName
+                  ? `${d.holidayName} · click to log work anyway`
+                  : `Log work on ${d.ymd}`
+            }
           >
             {v > 0 ? fmtHoursTrim(v) : ''}
           </td>
