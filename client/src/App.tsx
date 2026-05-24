@@ -28,7 +28,7 @@ import { NewInstanceModal } from './components/NewInstanceModal.js';
 import { ModuleRail, type ModuleId } from './components/ModuleRail.js';
 import { DashboardTab } from './components/DashboardTab.js';
 import { FirstRunWizard } from './components/FirstRunWizard.js';
-import { SettingsPanel } from './components/SettingsPanel.js';
+import { ModuleSettings } from './components/settings/ModuleSettings.js';
 import { ModuleTimeTracker } from './components/timetracker/ModuleTimeTracker.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
@@ -240,7 +240,7 @@ export function App() {
         />
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {activeModule === 'settings' ? (
-          <SettingsPanel />
+          <ModuleSettings active />
         ) : activeModule === 'timetracker' ? (
           <ModuleTimeTracker
             active

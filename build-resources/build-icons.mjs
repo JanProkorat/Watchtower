@@ -66,7 +66,15 @@ rmSync(iconset, { recursive: true, force: true });
 console.log(`✓ wrote ${path.relative(process.cwd(), icns)}`);
 
 // ─── tray-template.png ──────────────────────────────────────────────────────
+// qlmanage adds a white background when rendering SVGs, which kills the
+// alpha channel macOS needs for a tray template image (everything ends up
+// rendered as a solid foreground square). sips converts SVG → PNG
+// natively and preserves transparency.
 const traySvg = path.join(__dirname, 'tray-template.svg');
-renderSvg(traySvg, path.join(__dirname, 'tray-template.png'), 18);
-renderSvg(traySvg, path.join(__dirname, 'tray-template@2x.png'), 36);
+const trayTmp = path.join(__dirname, 'tray-template-source.png');
+sh(`sips -s format png ${JSON.stringify(traySvg)} --out ${JSON.stringify(trayTmp)} >/dev/null 2>&1`);
+// macOS menu-bar standard is 22pt @1x / 44px @2x.
+sh(`sips -z 22 22 ${JSON.stringify(trayTmp)} --out ${JSON.stringify(path.join(__dirname, 'tray-template.png'))} >/dev/null 2>&1`);
+sh(`sips -z 44 44 ${JSON.stringify(trayTmp)} --out ${JSON.stringify(path.join(__dirname, 'tray-template@2x.png'))} >/dev/null 2>&1`);
+rmSync(trayTmp, { force: true });
 console.log(`✓ wrote tray-template.png + @2x`);
