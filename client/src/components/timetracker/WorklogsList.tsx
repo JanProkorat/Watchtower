@@ -293,11 +293,16 @@ function WorklogRow({
 }) {
   const sourceLabel =
     worklog.source && SOURCE_LABELS[worklog.source] ? SOURCE_LABELS[worklog.source] : worklog.source;
+  // Surface reported_minutes only when it's explicitly different from the
+  // tracked value. NULL or equal-to-tracked stays implicit to keep the row
+  // compact for the common case.
+  const reportedDiffers =
+    worklog.reportedMinutes != null && worklog.reportedMinutes !== worklog.minutes;
   return (
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: '12px 110px minmax(0, 1fr) 70px 90px auto',
+        gridTemplateColumns: '12px 110px minmax(0, 1fr) 100px 90px auto',
         gap: 1.5,
         alignItems: 'center',
         px: 1.25,
@@ -333,12 +338,46 @@ function WorklogRow({
           </Typography>
         )}
       </Box>
-      <Typography
-        variant="body2"
-        sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}
-      >
-        {fmtMinutes(worklog.minutes)}
-      </Typography>
+      <Box sx={{ textAlign: 'right' }}>
+        <Typography
+          variant="body2"
+          sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}
+          title={
+            reportedDiffers
+              ? `Tracked ${fmtMinutes(worklog.minutes)} · Reported ${fmtMinutes(worklog.reportedMinutes!)}`
+              : undefined
+          }
+        >
+          {fmtMinutes(worklog.minutes)}
+          {reportedDiffers && (
+            <Box
+              component="span"
+              sx={{
+                color: 'text.secondary',
+                fontWeight: 400,
+                ml: 0.5,
+              }}
+            >
+              / {fmtMinutes(worklog.reportedMinutes!)}
+            </Box>
+          )}
+        </Typography>
+        {reportedDiffers && (
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              color: 'text.disabled',
+              fontSize: 9,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              mt: -0.25,
+            }}
+          >
+            tracked / reported
+          </Typography>
+        )}
+      </Box>
       {sourceLabel ? (
         <Chip
           label={sourceLabel}

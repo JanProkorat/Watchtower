@@ -34,7 +34,14 @@ interface Draft {
   taskId: number | null;
   description: string;
   workDate: string;
+  /** Tracked time — the `worklogs.minutes` column. Required. */
   hours: string;
+  /**
+   * Optional reported time — `worklogs.reported_minutes`. Empty means "same
+   * as tracked" and is persisted as NULL so the legacy fallback semantics
+   * stay intact (NULL reported_minutes ↔ minutes in TimeTracker's reports).
+   */
+  reportedHours: string;
 }
 
 function todayStr(): string {
@@ -55,16 +62,23 @@ function emptyDraft(projectId: number | null = null): Draft {
     description: '',
     workDate: todayStr(),
     hours: '',
+    reportedHours: '',
   };
 }
 
 function draftOf(w: WorklogViewPayload): Draft {
+  // Reported hours only show in the input when explicitly different from
+  // tracked — null reportedMinutes (or equal to minutes) leaves the field
+  // empty, signalling "same as tracked" to the user.
+  const reportedDifferent =
+    w.reportedMinutes != null && w.reportedMinutes !== w.minutes;
   return {
     projectId: w.projectId,
     taskId: w.taskId,
     description: w.description ?? '',
     workDate: w.workDate,
     hours: (w.minutes / 60).toString(),
+    reportedHours: reportedDifferent ? (w.reportedMinutes! / 60).toString() : '',
   };
 }
 
@@ -117,8 +131,22 @@ export function WorklogDrawer({
     draft.hours.trim() && Number.isFinite(hoursNum) && hoursNum > 0
       ? Math.round(hoursNum * 60)
       : 0;
+  // Reported minutes are stored as NULL when "same as tracked" so the legacy
+  // semantics from TimeTracker survive (NULL reported ↔ minutes in reports).
+  const reportedHoursNum = Number(draft.reportedHours);
+  const reportedHoursValid =
+    !draft.reportedHours.trim() ||
+    (Number.isFinite(reportedHoursNum) && reportedHoursNum > 0);
+  const reportedMinutes =
+    draft.reportedHours.trim() && Number.isFinite(reportedHoursNum) && reportedHoursNum > 0
+      ? Math.round(reportedHoursNum * 60)
+      : null;
   const canSubmit =
-    draft.taskId != null && minutes > 0 && draft.workDate.length === 10 && !submitting;
+    draft.taskId != null &&
+    minutes > 0 &&
+    draft.workDate.length === 10 &&
+    reportedHoursValid &&
+    !submitting;
 
   const submit = async () => {
     if (!canSubmit || draft.taskId == null) return;
@@ -130,6 +158,10 @@ export function WorklogDrawer({
         description: draft.description.trim() ? draft.description.trim() : null,
         workDate: draft.workDate,
         minutes,
+        // Only persist a distinct reported value when the user actually
+        // typed something different. Equal-to-tracked round-trips as NULL.
+        reportedMinutes:
+          reportedMinutes != null && reportedMinutes !== minutes ? reportedMinutes : null,
       });
       onClose();
     } catch (err) {
@@ -254,19 +286,20 @@ export function WorklogDrawer({
             fullWidth
           />
 
+          <TextField
+            label="Date"
+            type="date"
+            size="small"
+            value={draft.workDate}
+            onChange={(e) => setDraft({ ...draft, workDate: e.target.value })}
+            required
+            InputLabelProps={{ shrink: true }}
+            sx={{ alignSelf: 'flex-start', minWidth: 180 }}
+          />
+
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
-              label="Date"
-              type="date"
-              size="small"
-              value={draft.workDate}
-              onChange={(e) => setDraft({ ...draft, workDate: e.target.value })}
-              required
-              sx={{ flex: 1 }}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Duration (hours)"
+              label="Tracked (hours)"
               type="number"
               size="small"
               value={draft.hours}
@@ -274,12 +307,31 @@ export function WorklogDrawer({
               inputProps={{ min: 0, step: 0.25 }}
               required
               sx={{ flex: 1 }}
+              helperText="The actual time you spent on this task."
+            />
+            <TextField
+              label="Reported (hours)"
+              type="number"
+              size="small"
+              value={draft.reportedHours}
+              onChange={(e) => setDraft({ ...draft, reportedHours: e.target.value })}
+              inputProps={{ min: 0, step: 0.25 }}
+              sx={{ flex: 1 }}
+              placeholder="same as tracked"
+              helperText={
+                reportedMinutes != null && reportedMinutes !== minutes
+                  ? `Billed value (differs from tracked).`
+                  : 'Defaults to tracked when empty.'
+              }
             />
           </Box>
 
           {minutes > 0 && (
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              = {minutes} minute{minutes === 1 ? '' : 's'}
+              Tracked = {minutes} min
+              {reportedMinutes != null && reportedMinutes !== minutes
+                ? ` · Reported = ${reportedMinutes} min`
+                : ''}
             </Typography>
           )}
 
