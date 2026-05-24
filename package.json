@@ -99,7 +99,6 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "build-resources/icon.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "identity": null,
