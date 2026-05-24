@@ -6,6 +6,9 @@ import TimerIcon from '@mui/icons-material/Timer';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import type { ThemeMode } from '../theme.js';
 
 export type ModuleId = 'dashboard' | 'instances' | 'timetracker' | 'settings';
 
@@ -24,7 +27,7 @@ const ITEMS: RailItem[] = [
 ];
 
 const COLLAPSED_WIDTH = 52;
-const EXPANDED_WIDTH = 200;
+const EXPANDED_WIDTH = 232;
 const STORAGE_KEY = 'watchtower.moduleRail.expanded';
 
 function WatchtowerLogo({ size = 28 }: { size?: number }) {
@@ -46,9 +49,11 @@ function WatchtowerLogo({ size = 28 }: { size?: number }) {
 interface Props {
   active: ModuleId;
   onSelect(id: ModuleId): void;
+  mode: ThemeMode;
+  onToggleMode(): void;
 }
 
-export function ModuleRail({ active, onSelect }: Props) {
+export function ModuleRail({ active, onSelect, mode, onToggleMode }: Props) {
   const [expanded, setExpanded] = useState<boolean>(() => {
     try {
       const v = localStorage.getItem(STORAGE_KEY);
@@ -101,19 +106,40 @@ export function ModuleRail({ active, onSelect }: Props) {
           <WatchtowerLogo size={28} />
         </Box>
         {expanded && (
-          <Typography
-            sx={{
-              fontSize: 15,
-              fontWeight: 600,
-              letterSpacing: 0.2,
-              color: 'text.primary',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            Watchtower
-          </Typography>
+          <>
+            <Typography
+              sx={{
+                fontSize: 15,
+                fontWeight: 600,
+                letterSpacing: 0.2,
+                color: 'text.primary',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                flex: 1,
+              }}
+            >
+              Watchtower
+            </Typography>
+            <Tooltip
+              title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              placement="right"
+            >
+              <IconButton
+                size="small"
+                onClick={onToggleMode}
+                aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  color: 'text.secondary',
+                  ':hover': { color: 'text.primary', backgroundColor: 'action.hover' },
+                }}
+              >
+                {mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+          </>
         )}
       </Box>
 
@@ -185,6 +211,29 @@ export function ModuleRail({ active, onSelect }: Props) {
       })}
 
       <Box sx={{ flex: 1 }} />
+
+      {!expanded && (
+        <Tooltip
+          title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          placement="right"
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5 }}>
+            <IconButton
+              size="small"
+              onClick={onToggleMode}
+              aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              sx={{
+                width: 32,
+                height: 32,
+                color: 'text.secondary',
+                ':hover': { color: 'text.primary', backgroundColor: 'action.hover' },
+              }}
+            >
+              {mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+            </IconButton>
+          </Box>
+        </Tooltip>
+      )}
 
       <Tooltip title={expanded ? 'Collapse sidebar' : 'Expand sidebar'} placement="right">
         <Box sx={{ display: 'flex', justifyContent: expanded ? 'flex-end' : 'center' }}>

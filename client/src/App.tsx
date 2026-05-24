@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -17,7 +17,8 @@ import {
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import 'dayjs/locale/cs';
-import { watchtowerTheme } from './theme.js';
+import { darkTheme, lightTheme } from './theme.js';
+import { useThemeMode } from './state/useThemeMode.js';
 import { useInstances } from './state/useInstances.js';
 import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
 import { Terminal } from './components/Terminal.js';
@@ -99,6 +100,8 @@ function LoadingScreen() {
 }
 
 export function App() {
+  const { mode, toggle: toggleThemeMode } = useThemeMode();
+  const theme = useMemo(() => (mode === 'dark' ? darkTheme : lightTheme), [mode]);
   const { instances, activeId, loaded, setActive, spawn, remove, reorder } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
@@ -187,7 +190,7 @@ export function App() {
 
   if (!loaded) {
     return (
-      <ThemeProvider theme={watchtowerTheme}>
+      <ThemeProvider theme={theme}>
         <CssBaseline />
         <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="cs">
           <LoadingScreen />
@@ -197,7 +200,7 @@ export function App() {
   }
 
   return (
-    <ThemeProvider theme={watchtowerTheme}>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="cs">
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -227,7 +230,12 @@ export function App() {
         </Box>
       )}
       <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <ModuleRail active={activeModule} onSelect={setActiveModule} />
+        <ModuleRail
+          active={activeModule}
+          onSelect={setActiveModule}
+          mode={mode}
+          onToggleMode={toggleThemeMode}
+        />
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {activeModule === 'settings' ? (
           <SettingsPanel />
