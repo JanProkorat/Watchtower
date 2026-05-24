@@ -53,7 +53,9 @@ export type IpcRequest =
   | { kind: 'reports:contracts'; payload: { projectId?: number } }
   | { kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } }
   | { kind: 'instances:findByCwd'; payload: { cwd: string } }
-  | { kind: 'openInVSCode'; payload: { path: string } };
+  | { kind: 'openInVSCode'; payload: { path: string } }
+  | { kind: 'claudeSettings:read'; payload: { scope: 'global' | 'project'; projectPath?: string } }
+  | { kind: 'claudeSettings:write'; payload: { scope: 'global' | 'project'; projectPath?: string; content: string } };
 
 export interface RunningInstancePayload {
   id: string;
@@ -411,7 +413,18 @@ export type IpcResponse =
   | { kind: 'reports:contracts'; payload: { contracts: ContractReportRowPayload[] } }
   | { kind: 'reports:rateChanges'; payload: { rateChanges: RateChangeMarkerPayload[] } }
   | { kind: 'instances:findByCwd'; payload: { instances: RunningInstancePayload[] } }
-  | { kind: 'openInVSCode'; payload: { ok: boolean; error?: string } };
+  | { kind: 'openInVSCode'; payload: { ok: boolean; error?: string } }
+  | { kind: 'claudeSettings:read'; payload: ClaudeSettingsReadPayload }
+  | { kind: 'claudeSettings:write'; payload: { ok: boolean; backupPath?: string; error?: string } };
+
+export interface ClaudeSettingsReadPayload {
+  /** Absolute path that was read (or attempted). */
+  path: string;
+  /** True iff the file existed on disk. */
+  exists: boolean;
+  /** Raw file content as a string. Empty string when the file did not exist. */
+  content: string;
+}
 
 export type IpcPush =
   | { kind: 'hello'; payload: { version: string } }
