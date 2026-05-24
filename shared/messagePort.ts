@@ -37,7 +37,39 @@ export type OrchRequest =
   | { id: string; kind: 'contracts:listForProject'; payload: { projectId: number } }
   | { id: string; kind: 'contracts:create'; payload: OrchContractInput }
   | { id: string; kind: 'contracts:update'; payload: { id: number; input: Partial<OrchContractInput> } }
-  | { id: string; kind: 'contracts:delete'; payload: { id: number } };
+  | { id: string; kind: 'contracts:delete'; payload: { id: number } }
+  | { id: string; kind: 'taskGrid:get'; payload: { year: number; month: number; projectId?: number } };
+
+export interface OrchTaskGridTask {
+  taskId: number;
+  taskNumber: string;
+  taskTitle: string;
+  status: 'open' | 'in_progress' | 'done';
+  estimatedMinutes: number | null;
+  totalMinutes: number;
+  epicId: number;
+  epicName: string;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  isBillable: boolean;
+  perDay: Record<number, number>;
+}
+
+export interface OrchTaskGridEarningsRow {
+  currency: string;
+  perDay: Record<number, number>;
+  totalAmount: number;
+}
+
+export interface OrchTaskGridResponse {
+  year: number;
+  month: number;
+  daysInMonth: number;
+  tasks: OrchTaskGridTask[];
+  dailyTotals: Record<number, number>;
+  earningsByCurrency: OrchTaskGridEarningsRow[];
+}
 
 export interface OrchContractInput {
   projectId: number;
@@ -248,7 +280,8 @@ export type OrchResponse =
   | { kind: 'contracts:listForProject'; payload: { contracts: OrchContractView[] } }
   | { kind: 'contracts:create'; payload: { contract: OrchContractView } | OrchOverlapError }
   | { kind: 'contracts:update'; payload: { contract: OrchContractView } | OrchOverlapError }
-  | { kind: 'contracts:delete'; payload: { ok: true } };
+  | { kind: 'contracts:delete'; payload: { ok: true } }
+  | { kind: 'taskGrid:get'; payload: OrchTaskGridResponse };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
