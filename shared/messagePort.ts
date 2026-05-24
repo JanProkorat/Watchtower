@@ -49,7 +49,16 @@ export type OrchRequest =
   | { id: string; kind: 'reports:earnings'; payload: { from: string; to: string; projectId?: number } }
   | { id: string; kind: 'reports:heatmap'; payload: { from: string; to: string; projectId?: number } }
   | { id: string; kind: 'reports:contracts'; payload: { projectId?: number } }
-  | { id: string; kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } };
+  | { id: string; kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } }
+  | { id: string; kind: 'instances:findByCwd'; payload: { cwd: string } };
+
+export interface OrchRunningInstance {
+  id: string;
+  cwd: string;
+  status: string;
+  lastActivityAt: number;
+  jiraKeyHint: string | null;
+}
 
 export interface OrchTrendDatum {
   bucket: string;
@@ -400,7 +409,8 @@ export type OrchResponse =
   | { kind: 'reports:earnings'; payload: OrchEarningsResponse }
   | { kind: 'reports:heatmap'; payload: { heatmap: OrchHeatmapDatum[] } }
   | { kind: 'reports:contracts'; payload: { contracts: OrchContractReportRow[] } }
-  | { kind: 'reports:rateChanges'; payload: { rateChanges: OrchRateChangeMarker[] } };
+  | { kind: 'reports:rateChanges'; payload: { rateChanges: OrchRateChangeMarker[] } }
+  | { kind: 'instances:findByCwd'; payload: { instances: OrchRunningInstance[] } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

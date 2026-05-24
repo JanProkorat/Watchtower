@@ -1,4 +1,7 @@
-import { ipcMain, dialog } from 'electron';
+import { ipcMain, dialog, shell } from 'electron';
+import { exec } from 'node:child_process';
+import { homedir } from 'node:os';
+import path from 'node:path';
 import type { IpcRequest, IpcResponse } from '../shared/ipcContract.js';
 import { getMainWindow, createMainWindow } from './window.js';
 import { getOrchestrator } from './orchestratorHost.js';
@@ -7,6 +10,7 @@ import { fireMacNotification, fireTestNotification } from './notifications.js';
 const ELECTRON_ONLY_KINDS = new Set<IpcRequest['kind']>([
   'chooseDirectory',
   'sendTestNotification',
+  'openInVSCode',
 ]);
 
 export function registerIpc(): void {
@@ -57,6 +61,26 @@ export function registerIpc(): void {
       if (kind === 'sendTestNotification') {
         fireTestNotification();
         return { ok: true };
+      }
+
+      if (kind === 'openInVSCode') {
+        const { path: rawPath } = payload as { path: string };
+        const expanded = rawPath.startsWith('~/')
+          ? path.join(homedir(), rawPath.slice(2))
+          : rawPath === '~'
+            ? homedir()
+            : rawPath;
+        // Try `code <path>` first (the canonical VS Code CLI); fall back to
+        // `shell.openPath` which opens the folder in Finder so the user at
+        // least gets *something* if `code` isn't on PATH.
+        return await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          exec(`code ${JSON.stringify(expanded)}`, async (err) => {
+            if (!err) return resolve({ ok: true });
+            const fallback = await shell.openPath(expanded);
+            if (fallback === '') return resolve({ ok: true });
+            resolve({ ok: false, error: `code: ${err.message}; openPath: ${fallback}` });
+          });
+        });
       }
 
       if (ELECTRON_ONLY_KINDS.has(kind)) {

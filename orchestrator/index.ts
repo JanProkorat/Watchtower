@@ -582,6 +582,24 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           req.payload.projectId,
         ),
       };
+
+    case 'instances:findByCwd': {
+      const expanded = req.payload.cwd.startsWith('~/')
+        ? path.join(homedir(), req.payload.cwd.slice(2))
+        : req.payload.cwd === '~'
+          ? homedir()
+          : req.payload.cwd;
+      const rows = repo().liveByCwd(expanded);
+      return {
+        instances: rows.map((r) => ({
+          id: r.id,
+          cwd: r.cwd,
+          status: r.status,
+          lastActivityAt: r.lastActivityAt,
+          jiraKeyHint: r.jiraKeyHint,
+        })),
+      };
+    }
   }
 }
 

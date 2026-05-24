@@ -14,6 +14,8 @@ interface Props {
   tab: DetailTab;
   onTabChange(tab: DetailTab): void;
   onBack(): void;
+  onActivateInstance(id: string): void;
+  onOpenNewInstanceForCwd(cwd: string): void;
 }
 
 const TAB_LABELS: Record<DetailTab, string> = {
@@ -22,7 +24,14 @@ const TAB_LABELS: Record<DetailTab, string> = {
   contracts: 'Contracts',
 };
 
-export function DetailMode({ projectId, tab, onTabChange, onBack }: Props) {
+export function DetailMode({
+  projectId,
+  tab,
+  onTabChange,
+  onBack,
+  onActivateInstance,
+  onOpenNewInstanceForCwd,
+}: Props) {
   const state = useProject(projectId);
   const [editOpen, setEditOpen] = useState(false);
 
@@ -68,6 +77,8 @@ export function DetailMode({ projectId, tab, onTabChange, onBack }: Props) {
             project={state.project}
             onEdit={() => setEditOpen(true)}
             onArchive={() => void state.archive(!state.project!.archived)}
+            onActivateInstance={onActivateInstance}
+            onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
           />
 
           <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>

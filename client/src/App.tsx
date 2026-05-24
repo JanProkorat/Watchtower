@@ -103,8 +103,21 @@ export function App() {
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  /** Set by the TimeTracker launch bridge to pre-fill the New-instance modal. */
+  const [pendingNewCwd, setPendingNewCwd] = useState<string | undefined>(undefined);
   const [activeModule, setActiveModule] = useState<ModuleId>('instances');
   const [wizardOpen, setWizardOpen] = useState(false);
+
+  // Bridge handlers exposed to the TimeTracker module.
+  const switchToInstance = (id: string) => {
+    setActiveModule('instances');
+    setActive(id);
+  };
+  const switchToNewInstanceForCwd = (cwd: string) => {
+    setActiveModule('instances');
+    setPendingNewCwd(cwd);
+    setNewOpen(true);
+  };
 
   // Show the first-run wizard until the user explicitly finishes or skips it.
   useEffect(() => {
@@ -219,7 +232,11 @@ export function App() {
         {activeModule === 'settings' ? (
           <SettingsPanel />
         ) : activeModule === 'timetracker' ? (
-          <ModuleTimeTracker active />
+          <ModuleTimeTracker
+            active
+            onActivateInstance={switchToInstance}
+            onOpenNewInstanceForCwd={switchToNewInstanceForCwd}
+          />
         ) : (
           <>
         <TabStrip
@@ -278,8 +295,14 @@ export function App() {
       </Box>
       <NewInstanceModal
         open={newOpen}
-        defaultCwd="~/Projects"
-        onClose={() => setNewOpen(false)}
+        // Pre-fill only when an outside caller set pendingNewCwd (e.g. the
+        // TimeTracker launch bridge). The plain `+ New instance` button leaves
+        // it unset so the recent-list / empty default still applies.
+        defaultCwd={pendingNewCwd}
+        onClose={() => {
+          setNewOpen(false);
+          setPendingNewCwd(undefined);
+        }}
         onSpawn={(cwd) => void doSpawn(cwd)}
       />
       <FirstRunWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />

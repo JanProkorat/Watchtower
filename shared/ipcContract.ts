@@ -51,7 +51,17 @@ export type IpcRequest =
   | { kind: 'reports:earnings'; payload: { from: string; to: string; projectId?: number } }
   | { kind: 'reports:heatmap'; payload: { from: string; to: string; projectId?: number } }
   | { kind: 'reports:contracts'; payload: { projectId?: number } }
-  | { kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } };
+  | { kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } }
+  | { kind: 'instances:findByCwd'; payload: { cwd: string } }
+  | { kind: 'openInVSCode'; payload: { path: string } };
+
+export interface RunningInstancePayload {
+  id: string;
+  cwd: string;
+  status: string;
+  lastActivityAt: number;
+  jiraKeyHint: string | null;
+}
 
 export interface TrendDatumPayload {
   bucket: string;
@@ -399,7 +409,9 @@ export type IpcResponse =
   | { kind: 'reports:earnings'; payload: EarningsResponsePayload }
   | { kind: 'reports:heatmap'; payload: { heatmap: HeatmapDatumPayload[] } }
   | { kind: 'reports:contracts'; payload: { contracts: ContractReportRowPayload[] } }
-  | { kind: 'reports:rateChanges'; payload: { rateChanges: RateChangeMarkerPayload[] } };
+  | { kind: 'reports:rateChanges'; payload: { rateChanges: RateChangeMarkerPayload[] } }
+  | { kind: 'instances:findByCwd'; payload: { instances: RunningInstancePayload[] } }
+  | { kind: 'openInVSCode'; payload: { ok: boolean; error?: string } };
 
 export type IpcPush =
   | { kind: 'hello'; payload: { version: string } }

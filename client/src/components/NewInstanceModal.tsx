@@ -52,7 +52,10 @@ export function NewInstanceModal({ open, defaultCwd, onClose, onSpawn }: Props) 
     if (!open) return;
     const list = readRecent();
     setRecent(list);
-    setCwd(list[0] ?? defaultCwd ?? '');
+    // Explicit defaultCwd from the caller wins (e.g. the TimeTracker launch
+    // bridge pre-filling the project's folder). Otherwise the most recent
+    // cwd, otherwise empty.
+    setCwd(defaultCwd ?? list[0] ?? '');
   }, [open, defaultCwd]);
 
   const browse = async () => {
