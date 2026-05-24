@@ -44,6 +44,7 @@ import {
 } from './hookInstaller.js';
 import { readSettings, writeSettings } from './services/claudeSettings.js';
 import { listSkills } from './services/claudeSkills.js';
+import { listAgents } from './services/claudeAgents.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
 
@@ -613,6 +614,10 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
 
     case 'skills:list': {
       return { skills: listSkills() };
+    }
+
+    case 'agents:list': {
+      return { agents: listAgents() };
     }
   }
 }
