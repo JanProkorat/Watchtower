@@ -8,13 +8,14 @@ default behaviour where they conflict.
 
 A macOS Electron app with three cooperating processes:
 
-- **Renderer** (`client/src/`) — React + MUI v5 + xterm.js. Two modules:
-  Instances (Phase 1–11) and TimeTracker (Phase 12–22).
+- **Renderer** (`client/src/`) — React + MUI v5 + xterm.js. Three modules:
+  Instances (Phase 1–11), TimeTracker (Phase 12–22), Settings (Phase 23–29).
 - **Electron main** (`electron/`) — windowing, tray, macOS notifications,
   bridge to the orchestrator. Thin.
 - **Orchestrator** (`orchestrator/`) — Node `utilityProcess` child. Owns
   the pty sessions, the localhost HTTP listener that hook events POST to,
-  the SQLite store, and the per-instance state machine.
+  the SQLite store, the per-instance state machine, and read/write
+  helpers for `~/.claude/` config files (`orchestrator/services/`).
 
 Plus a bundled `watchtower-hook` helper (`helper/`) installed into
 `~/.claude/settings.json`.
@@ -55,6 +56,23 @@ version: v5.
 PROTOTYPE.md decision #13). Don't rename `project_rates` → `contracts`
 or drop `is_billable` until the absorption has run on enough dogfood data.
 
+## ~/.claude/ filesystem layout (Settings module reads this)
+
+| Path | Purpose |
+|---|---|
+| `~/.claude/settings.json` | Global Claude Code config. Keys: `permissions`, `hooks`, `mcpServers`, `enabledPlugins`, `extraKnownMarketplaces`, `statusLine`, `skipAutoPermissionPrompt`, `alwaysThinking`, `telemetry`, `autoApprove`. |
+| `~/.claude/settings.local.json` | Local-machine overrides. Not currently edited by Watchtower — touch with the raw editor if needed. |
+| `<cwd>/.claude/settings.json` | Per-project override (Settings module's "Project" scope). Created on first write to a project that doesn't have one. |
+| `~/.claude/skills/<name>/SKILL.md` | User-installed skill. Frontmatter (`---name`, `---description`) + markdown body. |
+| `~/.claude/agents/<name>.md` | User-installed agent. Frontmatter (`---name`, `---description`, `---model`, `---tools`) + prompt body. |
+| `~/.claude/plugins/installed_plugins.json` | Index of installed plugins. Each entry has an `installPath` — skills/agents live at `<installPath>/skills/` and `<installPath>/agents/`. |
+| `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` | Plugin install root. Walked by `claudeSkills.listSkills()` + `claudeAgents.listAgents()`. |
+
+**Backup convention** for any file Watchtower writes: copy the existing
+file to `<path>.bak.<YYYYMMDD-HHMMSS>` before overwriting. Backups
+accumulate, never deleted, so manual rollback is always possible (same
+pattern as the TT absorption migration).
+
 ## IPC namespaces
 
 Two transports:
@@ -70,9 +88,21 @@ file picker, `openInVSCode`, `triggerNewInstance`, etc. — see
 `ELECTRON_ONLY_KINDS` in that file.
 
 Naming convention is `<noun>:<verb>`, e.g. `projects:list`,
-`worklogs:create`, `instances:findByCwd`. Pushes (orchestrator → renderer
-events, no response) live in `IpcPush`: `ptyData`, `stateChanged`,
-`orchestratorCrashed`, `activateInstance`, etc.
+`worklogs:create`, `instances:findByCwd`, `claudeSettings:read`,
+`skills:list`. Pushes (orchestrator → renderer events, no response)
+live in `IpcPush`: `ptyData`, `stateChanged`, `orchestratorCrashed`,
+`activateInstance`, etc.
+
+Settings module's read/write surface is:
+- `claudeSettings:read` / `claudeSettings:write` — `~/.claude/settings.json`
+  (or per-project) with the backup convention above.
+- `skills:list` — walks user + plugin skill dirs, parses SKILL.md
+  frontmatter (`orchestrator/services/claudeSkills.ts`).
+- `agents:list` — walks user + plugin agent dirs, parses the .md
+  frontmatter (`orchestrator/services/claudeAgents.ts`).
+- Hooks + MCP servers are edited via the `claudeSettings:write` IPC —
+  the renderer mutates the parsed `hooks` / `mcpServers` key in the
+  draft, then saves the whole file.
 
 When adding a new kind:
 

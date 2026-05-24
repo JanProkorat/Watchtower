@@ -4,9 +4,15 @@
 > Claude Code instance and notifies the moment one needs input.
 
 Multi-tab embedded terminals, hook-driven state tracking, native
-notifications, tray badge, quit-with-suspend and start-with-resume. Plus a
-bundled TimeTracker module — projects, worklogs, contracts, task grid,
-Czech-locale time off, reports.
+notifications, tray badge, quit-with-suspend and start-with-resume. Plus
+two bundled modules:
+
+- **TimeTracker** — projects, worklogs, contracts, task grid,
+  Czech-locale time off, reports.
+- **Settings / Hooks / Skills / Agents / MCP** — full GUI for
+  `~/.claude/settings.json` and per-project `.claude/settings.json`,
+  hook editor with templates, browsable user + plugin skills + agents,
+  MCP server manager.
 
 ## Quick start
 
@@ -102,16 +108,47 @@ proven itself in daily use, drag `/Applications/TimeTracker.app` to the
 Trash manually. The Watchtower DB has been the source of truth since
 the first successful migration.
 
+## Configuring Claude Code
+
+The Settings module gives you a GUI for the files Claude Code reads:
+
+- **General tab** — Watchtower-specific knobs (quiet timer, default cwd,
+  hook reinstall, test notification).
+- **settings.json tab** — read/write `~/.claude/settings.json` (global)
+  or `<project>/.claude/settings.json` (project-scoped). Structured
+  form for known boolean keys + raw JSON editor with live validation.
+- **Hooks tab** — per-event accordions (SessionStart, UserPromptSubmit,
+  PreToolUse, PostToolUse, Notification, Stop, SessionEnd). Add hooks
+  from templates (play sound, Slack webhook, audit file writes) or
+  hand-roll. Watchtower's own hook entries are marked read-only with
+  a lock icon — manage them from the General tab.
+- **Skills tab** — browse user skills (`~/.claude/skills/`) and
+  plugin-provided skills (`~/.claude/plugins/cache/.../skills/`).
+  Search, filter by source, preview each `SKILL.md`.
+- **Agents tab** — same shape as Skills, for `~/.claude/agents/` +
+  plugin agent dirs. Shows model + tools chips. View-only.
+- **MCP tab** — list/add/edit/remove servers from the `mcpServers`
+  key. stdio + http transports. Five presets (Filesystem, Git,
+  GitHub, Memory, Slack).
+
+**Backup convention:** any file Watchtower writes is first copied to
+`<path>.bak.<YYYYMMDD-HHMMSS>`. Backups accumulate, never deleted, so
+manual rollback is always possible.
+
 ## Repository layout
 
 ```
-client/         renderer (React + MUI + xterm)
-electron/       main process (windowing, tray, IPC bridge)
-orchestrator/   Node utilityProcess child (pty, hooks, SQLite, state machine)
-helper/         bundled watchtower-hook (esbuild-built CLI for ~/.claude/settings.json)
-shared/         tagged-union IPC contracts shared by all three
-tests/          vitest specs (orchestrator + renderer)
-docs/           design spec, implementation plans, working notes
+client/                       renderer (React + MUI + xterm)
+  src/components/timetracker/   TimeTracker module
+  src/components/settings/      Settings module (5 tabs)
+electron/                     main process (windowing, tray, IPC bridge)
+orchestrator/                 Node utilityProcess child
+  services/                     read/write helpers for ~/.claude/*
+  db/                           SQLite schema + repos + migrations
+helper/                       bundled watchtower-hook (esbuild CLI)
+shared/                       tagged-union IPC contracts
+tests/                        vitest specs (orchestrator + renderer)
+docs/                         design spec, implementation plans
 ```
 
 ## License
