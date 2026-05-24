@@ -71,6 +71,8 @@ export interface TaskGridResponsePayload {
   tasks: TaskGridTaskPayload[];
   dailyTotals: Record<number, number>;
   earningsByCurrency: TaskGridEarningsRowPayload[];
+  /** Mon-Fri workdays × 8h, used as the capacity divisor in the total row. */
+  monthCapacityMinutes: number;
 }
 
 export interface ContractInputPayload {

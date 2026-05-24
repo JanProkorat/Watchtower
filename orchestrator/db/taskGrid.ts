@@ -33,6 +33,12 @@ export interface TaskGridResponse {
   /** day-of-month → grand-total minutes across all tasks shown. */
   dailyTotals: Record<number, number>;
   earningsByCurrency: TaskGridEarningsRow[];
+  /**
+   * Expected working capacity for the month — Mon-Fri workdays × 8h. Phase
+   * 19 will subtract Czech public holidays + days_off; the helper signature
+   * is stable.
+   */
+  monthCapacityMinutes: number;
 }
 
 interface TaskMetaRow {
@@ -53,6 +59,11 @@ interface WorklogPeriodRow {
   task_id: number;
   project_id: number;
   work_date: string;
+  /**
+   * Already COALESCE'd in SQL — reported_minutes when set, otherwise the
+   * tracked minutes. This is what gets shown in the grid and used for
+   * earnings, because reported time is what the user bills.
+   */
   minutes: number;
 }
 
@@ -81,6 +92,22 @@ function monthBounds(year: number, month: number): { from: string; to: string; d
 }
 
 /**
+ * Mon-Fri count for the month. Phase 19 will subtract Czech public holidays
+ * + days_off here; until then the contract status helper and the task grid
+ * use the same simplified definition so capacity numbers stay consistent
+ * across the module.
+ */
+function countMonWedFriWorkdays(year: number, month: number): number {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  let count = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month - 1, d).getDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  return count;
+}
+
+/**
  * Builds the per-task ⇄ per-day matrix for a single month.
  *
  * Only tasks that have at least one worklog inside the month are returned —
@@ -92,11 +119,16 @@ export class TaskGridService {
 
   get(year: number, month: number, projectId?: number): TaskGridResponse {
     const { from, to, daysInMonth } = monthBounds(year, month);
+    const monthCapacityMinutes = countMonWedFriWorkdays(year, month) * 8 * 60;
 
     // 1. Fetch worklogs in the period scoped to the optional project.
+    //    COALESCE collapses tracked vs reported so the rest of the pipeline
+    //    treats the visible value as one number — reported_minutes wins when
+    //    it's set, otherwise the tracked minutes do.
     const worklogParams: unknown[] = [from, to];
     let worklogSql =
-      `SELECT w.task_id, p.id AS project_id, w.work_date, w.minutes
+      `SELECT w.task_id, p.id AS project_id, w.work_date,
+              COALESCE(w.reported_minutes, w.minutes) AS minutes
          FROM worklogs w
          JOIN tasks t ON t.id = w.task_id
          JOIN epics e ON e.id = t.epic_id
@@ -116,6 +148,7 @@ export class TaskGridService {
         tasks: [],
         dailyTotals: {},
         earningsByCurrency: [],
+        monthCapacityMinutes,
       };
     }
 
@@ -196,6 +229,7 @@ export class TaskGridService {
       tasks: orderedTasks,
       dailyTotals,
       earningsByCurrency,
+      monthCapacityMinutes,
     };
   }
 

@@ -518,8 +518,15 @@ function Grid({
                 borderTop: `2px solid ${divider}`,
                 fontVariantNumeric: 'tabular-nums',
               }}
+              title={`Capacity = ${fmtHoursTrim(data.monthCapacityMinutes)} h (Mon-Fri × 8h; Czech holidays land in Phase 19)`}
             >
               {fmtHoursTrim(sumOf(data.dailyTotals))}
+              <Box
+                component="span"
+                sx={{ color: 'text.secondary', fontWeight: 400, ml: 0.5 }}
+              >
+                / {fmtHoursTrim(data.monthCapacityMinutes)}
+              </Box>
             </td>
             {days.map((d) => {
               const v = data.dailyTotals[d.day] ?? 0;

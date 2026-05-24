@@ -69,6 +69,7 @@ export interface OrchTaskGridResponse {
   tasks: OrchTaskGridTask[];
   dailyTotals: Record<number, number>;
   earningsByCurrency: OrchTaskGridEarningsRow[];
+  monthCapacityMinutes: number;
 }
 
 export interface OrchContractInput {
