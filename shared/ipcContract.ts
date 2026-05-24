@@ -56,7 +56,8 @@ export type IpcRequest =
   | { kind: 'openInVSCode'; payload: { path: string } }
   | { kind: 'claudeSettings:read'; payload: { scope: 'global' | 'project'; projectPath?: string } }
   | { kind: 'claudeSettings:write'; payload: { scope: 'global' | 'project'; projectPath?: string; content: string } }
-  | { kind: 'skills:list'; payload: Record<string, never> };
+  | { kind: 'skills:list'; payload: Record<string, never> }
+  | { kind: 'agents:list'; payload: Record<string, never> };
 
 export interface RunningInstancePayload {
   id: string;
@@ -417,7 +418,18 @@ export type IpcResponse =
   | { kind: 'openInVSCode'; payload: { ok: boolean; error?: string } }
   | { kind: 'claudeSettings:read'; payload: ClaudeSettingsReadPayload }
   | { kind: 'claudeSettings:write'; payload: { ok: boolean; backupPath?: string; error?: string } }
-  | { kind: 'skills:list'; payload: { skills: SkillRowPayload[] } };
+  | { kind: 'skills:list'; payload: { skills: SkillRowPayload[] } }
+  | { kind: 'agents:list'; payload: { agents: AgentRowPayload[] } };
+
+export interface AgentRowPayload {
+  name: string;
+  path: string;
+  source: string;
+  description: string;
+  model: string;
+  tools: string;
+  body: string;
+}
 
 export interface SkillRowPayload {
   name: string;
