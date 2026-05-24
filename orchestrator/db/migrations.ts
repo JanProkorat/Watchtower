@@ -45,6 +45,22 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       db.exec(sql);
     },
   },
+  {
+    version: 4,
+    up: (db) => {
+      // Watchtower-specific extensions to the verbatim TT projects schema —
+      // these columns don't exist in TimeTracker but the Watchtower module
+      // surfaces them in the project drawer:
+      //   - folder_path: local working directory (powers the Instances bridge
+      //     in Phase 21 and the "Open in VS Code" action)
+      //   - jira_globs: JSON array of shell-style globs (e.g. ["FIE1933-*"])
+      //     for Jira-key resolution on worklog sync
+      //   - description: long-form note shown in the drawer
+      db.exec(`ALTER TABLE projects ADD COLUMN folder_path TEXT`);
+      db.exec(`ALTER TABLE projects ADD COLUMN jira_globs TEXT`);
+      db.exec(`ALTER TABLE projects ADD COLUMN description TEXT`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

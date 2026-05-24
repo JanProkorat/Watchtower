@@ -1,12 +1,13 @@
-import { Box, Button, Tab, Tabs } from '@mui/material';
+import { Box, Tab, Tabs } from '@mui/material';
 import { LIST_TABS, type ListTab } from '../../util/timetrackerUrl.js';
 import { EmptyTabState } from './EmptyTabState.js';
+import { ProjectsList } from './ProjectsList.js';
 
 interface Props {
   tab: ListTab;
   onTabChange(tab: ListTab): void;
-  /** Mock affordance for Phase 13 — Phase 14 replaces the Projects tab body with a real list. */
-  onOpenMockProject(): void;
+  /** Project row → open detail mode for that project. */
+  onOpenProject(projectId: number): void;
 }
 
 const TAB_LABELS: Record<ListTab, string> = {
@@ -17,7 +18,7 @@ const TAB_LABELS: Record<ListTab, string> = {
   reports: 'Reports',
 };
 
-export function ListMode({ tab, onTabChange, onOpenMockProject }: Props) {
+export function ListMode({ tab, onTabChange, onOpenProject }: Props) {
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
@@ -39,17 +40,7 @@ export function ListMode({ tab, onTabChange, onOpenMockProject }: Props) {
       </Box>
 
       <Box sx={{ flex: 1, display: 'flex', overflow: 'auto', minHeight: 0 }}>
-        {tab === 'projects' && (
-          <EmptyTabState
-            title="No projects yet"
-            hint="Create your first project to start tracking time. The Projects list, search, and create/edit drawer ship in Phase 14."
-            action={
-              <Button variant="contained" size="small" onClick={onOpenMockProject}>
-                Open mock project (#1)
-              </Button>
-            }
-          />
-        )}
+        {tab === 'projects' && <ProjectsList onOpenProject={onOpenProject} />}
         {tab === 'worklogs' && (
           <EmptyTabState
             title="No worklogs"

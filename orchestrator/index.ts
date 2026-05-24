@@ -10,6 +10,12 @@ import { InstancesRepo } from './db/repositories/instances.js';
 import { HookEventsRepo } from './db/repositories/hookEvents.js';
 import { NotificationsRepo } from './db/repositories/notifications.js';
 import { SettingsRepo } from './db/repositories/settings.js';
+import {
+  ProjectsRepo,
+  type ProjectInput,
+  type ProjectListFilter,
+  type ProjectRow,
+} from './db/repositories/projects.js';
 import { transition } from './stateMachine.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
@@ -56,6 +62,17 @@ function resolveHelperPath(): string {
 
 function repo(): InstancesRepo {
   return new InstancesRepo(handle!.db);
+}
+
+function projectsRepo(): ProjectsRepo {
+  return new ProjectsRepo(handle!.db);
+}
+
+function projectViewOf(row: ProjectRow): ProjectRow {
+  // The repo row already matches the wire shape; this is a no-op identity that
+  // exists so we can refactor the wire format separately from the repo without
+  // touching every call site. (Phase 22 may rename `kind`/`is_billable`.)
+  return row;
 }
 
 function statusOf(id: string): InstanceStatus {
@@ -278,6 +295,38 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
     case 'focusChanged':
       notifier?.setFocused(req.payload.instanceId);
       return { ok: true };
+
+    case 'projects:list': {
+      const filter = req.payload as ProjectListFilter;
+      const rows = projectsRepo().list(filter);
+      return { projects: rows.map(projectViewOf) };
+    }
+
+    case 'projects:get': {
+      const row = projectsRepo().get(req.payload.id);
+      return { project: row ? projectViewOf(row) : null };
+    }
+
+    case 'projects:create': {
+      const input = req.payload as ProjectInput;
+      const row = projectsRepo().create(input);
+      return { project: projectViewOf(row) };
+    }
+
+    case 'projects:update': {
+      const row = projectsRepo().update(req.payload.id, req.payload.input as Partial<ProjectInput>);
+      return { project: projectViewOf(row) };
+    }
+
+    case 'projects:archive': {
+      projectsRepo().archive(req.payload.id, req.payload.archived);
+      return { ok: true };
+    }
+
+    case 'projects:delete': {
+      projectsRepo().delete(req.payload.id);
+      return { ok: true };
+    }
   }
 }
 
