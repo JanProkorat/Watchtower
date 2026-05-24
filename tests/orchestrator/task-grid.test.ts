@@ -57,6 +57,34 @@ describe('TaskGridService', () => {
     expect(res.dailyTotals).toEqual({});
     expect(res.earningsByCurrency).toEqual([]);
     expect(res.daysInMonth).toBe(31);
+    // May 2026 = 21 weekdays × 8h × 60min = 10080.
+    expect(res.monthCapacityMinutes).toBe(10080);
+  });
+
+  it('computes monthCapacityMinutes from Mon-Fri workdays × 8h', () => {
+    // Feb 2026: 20 weekdays. 20 × 8 × 60 = 9600.
+    expect(s.service.get(2026, 2).monthCapacityMinutes).toBe(9600);
+    // Aug 2026: 21 weekdays. 21 × 8 × 60 = 10080.
+    expect(s.service.get(2026, 8).monthCapacityMinutes).toBe(10080);
+  });
+
+  it('uses reported_minutes when set, falling back to minutes', () => {
+    const project = s.projectsRepo.create({ name: 'P', kind: 'work' });
+    const epic = s.epicsRepo.create({ projectId: project.id, name: 'E' });
+    const task = s.tasksRepo.create({ epicId: epic.id, number: 'T', title: 'T' });
+    // Tracked 120 min, reported 90 min — grid should show 90.
+    s.worklogsRepo.create({
+      taskId: task.id,
+      workDate: '2026-05-04',
+      minutes: 120,
+      reportedMinutes: 90,
+    });
+    // Reported NULL (default) — grid should show the tracked 60.
+    s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-05', minutes: 60 });
+    const res = s.service.get(2026, 5);
+    expect(res.tasks[0]?.perDay).toEqual({ 4: 90, 5: 60 });
+    expect(res.tasks[0]?.totalMinutes).toBe(150);
+    expect(res.dailyTotals).toEqual({ 4: 90, 5: 60 });
   });
 
   it('includes daysInMonth correctly for short / long / leap months', () => {
