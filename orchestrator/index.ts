@@ -42,6 +42,7 @@ import {
   ensureHooksInstalled,
   uninstallHooks,
 } from './hookInstaller.js';
+import { readSettings, writeSettings } from './services/claudeSettings.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
 
@@ -599,6 +600,14 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           jiraKeyHint: r.jiraKeyHint,
         })),
       };
+    }
+
+    case 'claudeSettings:read': {
+      return readSettings(req.payload.scope, req.payload.projectPath);
+    }
+
+    case 'claudeSettings:write': {
+      return writeSettings(req.payload.scope, req.payload.projectPath, req.payload.content);
     }
   }
 }
