@@ -21,7 +21,61 @@ export type IpcRequest =
   | { kind: 'projects:create'; payload: ProjectInputPayload }
   | { kind: 'projects:update'; payload: { id: number; input: Partial<ProjectInputPayload> } }
   | { kind: 'projects:archive'; payload: { id: number; archived: boolean } }
-  | { kind: 'projects:delete'; payload: { id: number } };
+  | { kind: 'projects:delete'; payload: { id: number } }
+  | { kind: 'epics:list'; payload: { projectId: number } }
+  | { kind: 'epics:create'; payload: EpicInputPayload }
+  | { kind: 'epics:update'; payload: { id: number; input: Partial<EpicInputPayload> } }
+  | { kind: 'epics:reorder'; payload: { projectId: number; orderedIds: number[] } }
+  | { kind: 'epics:delete'; payload: { id: number } }
+  | { kind: 'tasks:listForEpic'; payload: { epicId: number } }
+  | { kind: 'tasks:listForProject'; payload: { projectId: number } }
+  | { kind: 'tasks:create'; payload: TaskInputPayload }
+  | { kind: 'tasks:update'; payload: { id: number; input: Partial<TaskInputPayload> } }
+  | { kind: 'tasks:delete'; payload: { id: number } };
+
+export interface EpicInputPayload {
+  projectId: number;
+  name: string;
+  description?: string | null;
+  status?: 'planned' | 'active' | 'done';
+  jiraEpicKey?: string | null;
+  githubIssueUrl?: string | null;
+}
+
+export interface EpicViewPayload {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string | null;
+  status: 'planned' | 'active' | 'done';
+  displayOrder: number;
+  jiraEpicKey: string | null;
+  githubIssueUrl: string | null;
+  createdAt: string;
+  taskCount: number;
+  totalMinutes: number;
+}
+
+export interface TaskInputPayload {
+  epicId: number;
+  number: string;
+  title: string;
+  description?: string | null;
+  status?: 'open' | 'in_progress' | 'done';
+  estimatedMinutes?: number | null;
+}
+
+export interface TaskViewPayload {
+  id: number;
+  epicId: number;
+  number: string;
+  title: string;
+  description: string | null;
+  status: 'open' | 'in_progress' | 'done';
+  estimatedMinutes: number | null;
+  createdAt: string;
+  totalMinutes: number;
+}
 
 export interface ProjectListFilterPayload {
   archived?: boolean;
@@ -91,7 +145,17 @@ export type IpcResponse =
   | { kind: 'projects:create'; payload: { project: ProjectViewPayload } }
   | { kind: 'projects:update'; payload: { project: ProjectViewPayload } }
   | { kind: 'projects:archive'; payload: { ok: true } }
-  | { kind: 'projects:delete'; payload: { ok: true } };
+  | { kind: 'projects:delete'; payload: { ok: true } }
+  | { kind: 'epics:list'; payload: { epics: EpicViewPayload[] } }
+  | { kind: 'epics:create'; payload: { epic: EpicViewPayload } }
+  | { kind: 'epics:update'; payload: { epic: EpicViewPayload } }
+  | { kind: 'epics:reorder'; payload: { ok: true } }
+  | { kind: 'epics:delete'; payload: { ok: true } }
+  | { kind: 'tasks:listForEpic'; payload: { tasks: TaskViewPayload[] } }
+  | { kind: 'tasks:listForProject'; payload: { tasks: TaskViewPayload[] } }
+  | { kind: 'tasks:create'; payload: { task: TaskViewPayload } }
+  | { kind: 'tasks:update'; payload: { task: TaskViewPayload } }
+  | { kind: 'tasks:delete'; payload: { ok: true } };
 
 export type IpcPush =
   | { kind: 'hello'; payload: { version: string } }

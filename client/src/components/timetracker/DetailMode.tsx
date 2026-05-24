@@ -1,7 +1,12 @@
-import { Box, Button, Tab, Tabs, Typography } from '@mui/material';
+import { useState } from 'react';
+import { Alert, Box, Button, CircularProgress, Tab, Tabs } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { DETAIL_TABS, type DetailTab } from '../../util/timetrackerUrl.js';
+import { useProject } from '../../state/useProject.js';
 import { EmptyTabState } from './EmptyTabState.js';
+import { ProjectDetailHeader } from './ProjectDetailHeader.js';
+import { ProjectDrawer } from './ProjectDrawer.js';
+import { EpicsTreeView } from './EpicsTreeView.js';
 
 interface Props {
   projectId: number;
@@ -17,15 +22,18 @@ const TAB_LABELS: Record<DetailTab, string> = {
 };
 
 export function DetailMode({ projectId, tab, onTabChange, onBack }: Props) {
+  const state = useProject(projectId);
+  const [editOpen, setEditOpen] = useState(false);
+
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 2,
+          gap: 1,
           px: 2,
-          py: 1.5,
+          py: 1,
           borderBottom: 1,
           borderColor: 'divider',
         }}
@@ -39,54 +47,72 @@ export function DetailMode({ projectId, tab, onTabChange, onBack }: Props) {
         >
           Back to projects
         </Button>
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-            Project #{projectId}
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Header (color · name · meta · stats · Edit/Archive) ships in Phase 15.
-          </Typography>
+      </Box>
+
+      {state.loading && !state.project && (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+          <CircularProgress size={20} />
         </Box>
-      </Box>
+      )}
 
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
-        <Tabs
-          value={tab}
-          onChange={(_, next: DetailTab) => onTabChange(next)}
-          variant="standard"
-          sx={{ minHeight: 44 }}
-        >
-          {DETAIL_TABS.map((id) => (
-            <Tab
-              key={id}
-              value={id}
-              label={TAB_LABELS[id]}
-              sx={{ textTransform: 'none', fontSize: 13, minHeight: 44, fontWeight: 500 }}
-            />
-          ))}
-        </Tabs>
-      </Box>
+      {state.error && (
+        <Alert severity="error" sx={{ m: 2 }}>
+          {state.error}
+        </Alert>
+      )}
 
-      <Box sx={{ flex: 1, display: 'flex', overflow: 'auto', minHeight: 0 }}>
-        {tab === 'epics' && (
-          <EmptyTabState
-            title="Epics & Tasks (Phase 15)"
-            hint="Expandable epics tree with per-epic Add Task. Epic and Task create/edit drawers land in the same phase."
+      {state.project && (
+        <>
+          <ProjectDetailHeader
+            project={state.project}
+            onEdit={() => setEditOpen(true)}
+            onArchive={() => void state.archive(!state.project!.archived)}
           />
-        )}
-        {tab === 'worklogs' && (
-          <EmptyTabState
-            title="Worklogs (Phase 16)"
-            hint="Project-scoped worklog list, grouped by day, with epic + period + source filters."
+
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
+            <Tabs
+              value={tab}
+              onChange={(_, next: DetailTab) => onTabChange(next)}
+              variant="standard"
+              sx={{ minHeight: 44 }}
+            >
+              {DETAIL_TABS.map((id) => (
+                <Tab
+                  key={id}
+                  value={id}
+                  label={TAB_LABELS[id]}
+                  sx={{ textTransform: 'none', fontSize: 13, minHeight: 44, fontWeight: 500 }}
+                />
+              ))}
+            </Tabs>
+          </Box>
+
+          <Box sx={{ flex: 1, display: 'flex', overflow: 'auto', minHeight: 0 }}>
+            {tab === 'epics' && <EpicsTreeView projectId={projectId} />}
+            {tab === 'worklogs' && (
+              <EmptyTabState
+                title="Worklogs (Phase 16)"
+                hint="Project-scoped worklog list, grouped by day, with epic + period + source filters."
+              />
+            )}
+            {tab === 'contracts' && (
+              <EmptyTabState
+                title="Contracts (Phase 17)"
+                hint="Active-contract summary card + rate-period cards with create/edit drawer. Overlap validation enforced server-side."
+              />
+            )}
+          </Box>
+
+          <ProjectDrawer
+            open={editOpen}
+            project={state.project}
+            onClose={() => setEditOpen(false)}
+            onSubmit={async (input) => {
+              await state.update(input);
+            }}
           />
-        )}
-        {tab === 'contracts' && (
-          <EmptyTabState
-            title="Contracts (Phase 17)"
-            hint="Active-contract summary card + rate-period cards with create/edit drawer. Overlap validation enforced server-side."
-          />
-        )}
-      </Box>
+        </>
+      )}
     </Box>
   );
 }

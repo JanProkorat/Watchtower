@@ -227,9 +227,11 @@ describe('migrations · v4 adds folder_path / jira_globs / description', () => {
     expect(names).toContain('description');
   });
 
-  it('bumps schema version to 4', () => {
+  it('bumps schema version to at least 4', () => {
+    // Phase 15 (migration v5) extends the schema further; this assertion
+    // just guards against v4 being skipped.
     const db = freshDb();
     const row = db.prepare(`SELECT MAX(version) v FROM schema_version`).get() as { v: number };
-    expect(row.v).toBe(4);
+    expect(row.v).toBeGreaterThanOrEqual(4);
   });
 });
