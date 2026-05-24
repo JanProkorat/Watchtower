@@ -24,6 +24,17 @@ interface Props {
   worklog: WorklogViewPayload | null;
   /** Pre-fill the project select (e.g. when opening from the detail page). */
   initialProjectId?: number | null;
+  /**
+   * Pre-fill the task select in create mode (e.g. when opening from a task
+   * grid cell). Ignored when `worklog` is non-null — the editing flow uses
+   * the worklog's own task_id.
+   */
+  initialTaskId?: number | null;
+  /**
+   * Pre-fill the work-date in create mode (e.g. when opening from a task
+   * grid cell). Falls back to today when unset.
+   */
+  initialWorkDate?: string | null;
   onClose(): void;
   onSubmit(input: WorklogInputPayload): Promise<void>;
   onDelete?(): Promise<void>;
@@ -55,12 +66,16 @@ function todayStr(): string {
   );
 }
 
-function emptyDraft(projectId: number | null = null): Draft {
+function emptyDraft(
+  projectId: number | null = null,
+  taskId: number | null = null,
+  workDate: string | null = null,
+): Draft {
   return {
     projectId,
-    taskId: null,
+    taskId,
     description: '',
-    workDate: todayStr(),
+    workDate: workDate ?? todayStr(),
     hours: '',
     reportedHours: '',
   };
@@ -92,11 +107,15 @@ export function WorklogDrawer({
   open,
   worklog,
   initialProjectId,
+  initialTaskId,
+  initialWorkDate,
   onClose,
   onSubmit,
   onDelete,
 }: Props) {
-  const [draft, setDraft] = useState<Draft>(() => emptyDraft(initialProjectId ?? null));
+  const [draft, setDraft] = useState<Draft>(() =>
+    emptyDraft(initialProjectId ?? null, initialTaskId ?? null, initialWorkDate ?? null),
+  );
   const [projects, setProjects] = useState<ProjectViewPayload[]>([]);
   const [tasks, setTasks] = useState<TaskViewPayload[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -106,12 +125,16 @@ export function WorklogDrawer({
     if (!open) return;
     setError(null);
     setSubmitting(false);
-    setDraft(worklog ? draftOf(worklog) : emptyDraft(initialProjectId ?? null));
+    setDraft(
+      worklog
+        ? draftOf(worklog)
+        : emptyDraft(initialProjectId ?? null, initialTaskId ?? null, initialWorkDate ?? null),
+    );
     void window.watchtower
       .invoke('projects:list', { archived: false })
       .then((r) => setProjects(r.projects))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
-  }, [open, worklog, initialProjectId]);
+  }, [open, worklog, initialProjectId, initialTaskId, initialWorkDate]);
 
   // Fetch tasks every time the selected project changes.
   useEffect(() => {
