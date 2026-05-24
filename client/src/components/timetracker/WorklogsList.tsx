@@ -19,6 +19,7 @@ import {
   type PeriodPreset,
   type SourceFilter,
 } from '../../state/useWorklogs.js';
+import { useToast, toastMessage } from '../../state/useToast.js';
 import { WorklogDrawer } from './WorklogDrawer.js';
 import type { ProjectViewPayload, WorklogViewPayload } from '../../../../shared/ipcContract.js';
 
@@ -73,6 +74,7 @@ const SOURCE_LABELS: Record<string, string> = {
 
 export function WorklogsList({ projectId }: Props) {
   const state = useWorklogs({ projectId: projectId ?? null });
+  const { showError } = useToast();
   const [projects, setProjects] = useState<ProjectViewPayload[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<WorklogViewPayload | null>(null);
@@ -250,7 +252,9 @@ export function WorklogsList({ projectId }: Props) {
                     setEditing(w);
                     setDrawerOpen(true);
                   }}
-                  onDelete={() => void state.remove(w.id)}
+                  onDelete={() => {
+                    state.remove(w.id).catch((err) => showError(toastMessage(err)));
+                  }}
                 />
               ))}
             </Stack>

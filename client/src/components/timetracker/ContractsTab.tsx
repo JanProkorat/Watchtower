@@ -13,6 +13,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useContracts } from '../../state/useContracts.js';
+import { useToast, toastMessage } from '../../state/useToast.js';
 import { ContractDrawer } from './ContractDrawer.js';
 import type { ContractViewPayload } from '../../../../shared/ipcContract.js';
 
@@ -37,6 +38,7 @@ function formatRate(c: ContractViewPayload): string {
 
 export function ContractsTab({ projectId }: Props) {
   const state = useContracts(projectId);
+  const { showError } = useToast();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<ContractViewPayload | null>(null);
 
@@ -96,7 +98,9 @@ export function ContractsTab({ projectId }: Props) {
             <ContractCard
               contract={active}
               onEdit={() => openEdit(active)}
-              onDelete={() => void state.remove(active.id)}
+              onDelete={() => {
+                state.remove(active.id).catch((err) => showError(toastMessage(err)));
+              }}
             />
           )}
           {others.map((c) => (
@@ -104,7 +108,9 @@ export function ContractsTab({ projectId }: Props) {
               key={c.id}
               contract={c}
               onEdit={() => openEdit(c)}
-              onDelete={() => void state.remove(c.id)}
+              onDelete={() => {
+                state.remove(c.id).catch((err) => showError(toastMessage(err)));
+              }}
             />
           ))}
         </Stack>

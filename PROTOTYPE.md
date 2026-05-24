@@ -50,6 +50,7 @@ Watchtower won because it fits the MVP function *literally* (you watch from a to
 | MVP implementation | **All 11 phases done.** ~15h logged. |
 | First runnable build | `release/Watchtower-0.0.1-arm64.dmg` |
 | First daily-use build | drop in /Applications, right-click → Open (unsigned) |
+| TimeTracker module absorption | **All 11 phases done** (#12–#22). Schema, IPC, full UI (Projects, Worklogs, Task grid, Time off, Reports, Contracts), launch bridge, light/dark theme, polish. |
 
 ---
 
@@ -72,6 +73,24 @@ Watchtower won because it fits the MVP function *literally* (you watch from a to
 | Phase 11 — Build & ship | [#4](https://github.com/JanProkorat/Watchtower/issues/4) |
 
 (GitHub assigned the numbers in parallel-creation order — the phase number remains the canonical ordering.)
+
+### TimeTracker module (phase ↔ issue number)
+
+The second module in the rail. Schema and feature-set ported verbatim from the standalone TimeTracker app, which is being deprecated.
+
+| Phase | Issue | Scope |
+|---|---|---|
+| Phase 12 — Schema & migration | [#12](https://github.com/JanProkorat/Watchtower/issues/12) | v3 migration: TT tables verbatim. |
+| Phase 13 — Module shell & navigation | [#13](https://github.com/JanProkorat/Watchtower/issues/13) | Rail item, list/detail modes, URL-hash view state. |
+| Phase 14 — Projects CRUD | [#14](https://github.com/JanProkorat/Watchtower/issues/14) | List + drawer + folder picker + defaults. |
+| Phase 15 — Project detail · Epics & Tasks | [#15](https://github.com/JanProkorat/Watchtower/issues/15) | Tree view, nested drawers, search + paging. |
+| Phase 16 — Worklogs CRUD | [#16](https://github.com/JanProkorat/Watchtower/issues/16) | List + drawer, dual duration (tracked + reported). |
+| Phase 17 — Contracts / project_rates | [#17](https://github.com/JanProkorat/Watchtower/issues/17) | Per-project rate history with overlap detection. |
+| Phase 18 — Task grid | [#18](https://github.com/JanProkorat/Watchtower/issues/18) | 31-day sticky grid, capacity, weekend/holiday shading. |
+| Phase 19 — Time off + Czech holidays | [#19](https://github.com/JanProkorat/Watchtower/issues/19) | 3-month calendar, Anonymous Gregorian Easter algorithm. |
+| Phase 20 — Reports | [#20](https://github.com/JanProkorat/Watchtower/issues/20) | recharts panels with project filter + presets. |
+| Phase 21 — Launch project → Instances bridge | [#21](https://github.com/JanProkorat/Watchtower/issues/21) | Open/VS Code buttons, instance choice modal. |
+| Phase 22 — Polish & cleanup | [#22](https://github.com/JanProkorat/Watchtower/issues/22) | Migration wire-up, toast surface, skeletons, docs. |
 
 ### TimeTracker (project 4, non-billable)
 
@@ -199,6 +218,20 @@ Append-only record of key calls. Each entry: date, decision, rationale, alternat
 | 10 | **Name = Watchtower** | Fits the MVP function literally + the platform metaphor mythically. Scales to many modules. | Atelier (refined / craft); Bastion (fortified); Sanctum (mystical); Forge (overused). |
 | 11 | **Repo location: `/Users/jan/Projects/Watchtower`, separate GitHub repo** | Clean separation from TimeTracker; independent versioning, CI, release cadence. | Subfolder of TimeTracker (rejected). |
 
+### 2026-05-24 — TimeTracker absorption
+
+| # | Decision | Rationale | Alternatives |
+|---|---|---|---|
+| 12 | **Absorb TimeTracker as a second module instead of integrating** | TT is solo-user, schema-stable, and the integration surface (auto-log on Jira key) is small. Owning the data avoids cross-app sync. | Keep TT separate + integrate over IPC. |
+| 13 | **Schema port is verbatim first, refactor in a follow-up** | Blending the absorption migration with a schema refactor doubles the risk surface. Verbatim keeps the migration dumb and reversible-feeling. | Rename `project_rates`→`contracts`, drop `is_billable` up front. |
+| 14 | **Migration runs at orchestrator bootstrap, not behind a button** | Idempotent + marker-guarded. Less UI surface, no chance of the user forgetting to click. Source file is renamed to `.migrated-<ts>.bak`, never deleted. | Settings button + manual trigger. |
+| 15 | **Keep TimeTracker.app installed post-migration** | Dogfooding safety net for the first week. The `.bak` is a manual-rollback path; the live `.app` is a verification path. | Auto-uninstall on first successful migration. |
+| 16 | **Recharts for Reports panels** | Same dep TT used; charts ported with minimal rewiring. `useChartColors` reads from MUI theme so they adapt to light/dark. | Visx; rebuild with d3-primitives. |
+| 17 | **Czech locale + holidays baked in (not a settings choice)** | Single-user app. `dayjs/locale/cs`, `D. M. YYYY`, NBSP thousand separators, Anonymous Gregorian Easter + 11 fixed dates per Act 245/2000 Sb. | i18n surface; pull holidays from a service. |
+| 18 | **Launch bridge over a custom URL scheme** | Lower friction than a `watchtower://` protocol handler; works inside the app without OS roundtrip. Cross-module callbacks lifted to App.tsx. | `vscode://`-style protocol; embedded route. |
+| 19 | **TT-derived purple/cyan palette over the original Watchtower blue/orange** | Light + dark pair already existed in TT, polished. User asked for the TT look during Phase 22 polish. | Keep the dark-only Watchtower palette. |
+| 20 | **Toast surface for fire-and-forget IPC failures** | Read paths surface inline Alerts; mutation paths (archive, delete, snooze, VS Code launch) had no obvious home, so a global Snackbar context covers them. | Per-component inline error state for every mutation. |
+
 ---
 
 ## Open questions / risks
@@ -242,6 +275,7 @@ Append entries as the project advances. Format: `YYYY-MM-DD — short summary`. 
 - **2026-05-22** — **Phase 6 complete** (issue #6 closed). WT-T19 through WT-T21 landed: NewInstanceModal (cwd input + Browse + recent-list), ModuleRail (left activity bar; Instances active, others stubbed), DashboardTab (grouped instance rows with chips + relative timestamps + Open/Kill/Remove actions). 67 vitest tests passing. 1h 15m logged. Plus a clutch of pragmatic interim fixes in this session: ABI / preload-CJS shenanigans, DnD reordering with `display_order` column + v2 migration, last-active-tab persistence, per-instance dot palette, resume-on-restart with fast-fail fallback to fresh spawn, 10s spinner safety net, terminal error boundary.
 - **2026-05-22** — **Phase 7 + 9 complete** (issues #1 and #7 closed). WT-T22 through WT-T26 + WT-T31 through WT-T33: QuietTimers + Notifier wire the state machine's outputs into actual macOS notifications; FirstRunWizard installs hooks into `~/.claude/settings.json` with a diff preview + backup; tray icon with badge count + instance list + snooze submenu; SettingsPanel exposes quiet timer ms, default cwd, hook reinstall/uninstall, test notification. **Watchtower now actually watches:** claude → hook → orchestrator → state machine → notifier → macOS Notification + tray badge → click brings tab into focus. 4h 5m logged for the combined milestone.
 - **2026-05-22** — **Phase 8 + 10 + 11 complete** (issues #8, #3, #4 closed) — **MVP shipped.** WT-T28 (Cmd+Q confirm dialog), WT-T34 (orchestrator auto-restart 3×/60 s + crash banner), WT-T37 (`npm run dist:mac` produces an unsigned `.dmg` + `.app`). T35 / T36 deferred (rare edge cases). Smoke-tested the packaged `.app` — runs from `release/mac-arm64/Watchtower.app`, orchestrator forks out of `app.asar`, native modules load, previous-session row resumes via fast-fail-to-fresh path. 1h 10m logged. **All 37 plan-tasks done; all 11 GitHub issues closed; ~15h total time logged in TimeTracker.**
+- **2026-05-24** — **TimeTracker module shipped** (issues #12–#22 closed). 11 phases, one branch + PR per phase. Final state: Projects CRUD with folder picker + per-project rate history (Contracts tab), Epics & Tasks tree, Worklogs CRUD with dual duration (tracked + reported), 31-day Task grid with weekend/holiday shading + per-day capacity, 3-month Time off calendar with Czech public holidays (Anonymous Gregorian Easter + 11 fixed dates), Reports tab (recharts: trend, project donut, earnings summary, contracts cards, heatmap) with project filter + period presets. Launch bridge from Projects → Instances ("Open" → choice modal when instances live, pre-filled New-instance modal when none) and a project-detail "Open in VS Code" button. Light/dark theme pair ported from TT (purple primary, cyan secondary), sun/moon toggle in the module-rail header. Phase 22 polish: orchestrator-bootstrap-driven TT absorption (idempotent, source renamed to `.migrated-<ts>.bak`), global toast surface for fire-and-forget mutation failures (archive, delete, snooze, VS Code launch), MUI Skeletons in DetailMode + Reports charts, build log + decision log updates here, new `README.md` + `CLAUDE.md`. **219 vitest tests, renderer build clean.** 3 projects / 35 epics / 782 tasks / 2593 worklogs / 18 days off absorbed from the standalone app at first orchestrator start.
 
 ---
 

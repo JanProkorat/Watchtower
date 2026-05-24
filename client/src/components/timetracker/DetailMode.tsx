@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Tab, Tabs } from '@mui/material';
+import { Alert, Box, Button, Skeleton, Stack, Tab, Tabs } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { DETAIL_TABS, type DetailTab } from '../../util/timetrackerUrl.js';
 import { useProject } from '../../state/useProject.js';
+import { useToast, toastMessage } from '../../state/useToast.js';
 import { ProjectDetailHeader } from './ProjectDetailHeader.js';
 import { ProjectDrawer } from './ProjectDrawer.js';
 import { EpicsTreeView } from './EpicsTreeView.js';
@@ -33,6 +34,7 @@ export function DetailMode({
   onOpenNewInstanceForCwd,
 }: Props) {
   const state = useProject(projectId);
+  const { showError } = useToast();
   const [editOpen, setEditOpen] = useState(false);
 
   return (
@@ -60,9 +62,12 @@ export function DetailMode({
       </Box>
 
       {state.loading && !state.project && (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-          <CircularProgress size={20} />
-        </Box>
+        <Stack spacing={1.5} sx={{ p: 2 }}>
+          <Skeleton variant="rounded" height={64} />
+          <Skeleton variant="rounded" height={44} />
+          <Skeleton variant="rounded" height={120} />
+          <Skeleton variant="rounded" height={120} />
+        </Stack>
       )}
 
       {state.error && (
@@ -76,7 +81,9 @@ export function DetailMode({
           <ProjectDetailHeader
             project={state.project}
             onEdit={() => setEditOpen(true)}
-            onArchive={() => void state.archive(!state.project!.archived)}
+            onArchive={() => {
+              state.archive(!state.project!.archived).catch((err) => showError(toastMessage(err)));
+            }}
             onActivateInstance={onActivateInstance}
             onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
           />

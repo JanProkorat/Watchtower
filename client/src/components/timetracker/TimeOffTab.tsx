@@ -18,6 +18,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import BeachAccessIcon from '@mui/icons-material/BeachAccess';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useDaysOff } from '../../state/useDaysOff.js';
+import { useToast, toastMessage } from '../../state/useToast.js';
 import { ThreeMonthCalendar } from './ThreeMonthCalendar.js';
 import type {
   DayOffViewPayload,
@@ -66,6 +67,7 @@ export function TimeOffTab() {
   const [focusMonth, setFocusMonth] = useState(today.getMonth() + 1); // 1-based, this is the *centre* month
   const [marking, setMarking] = useState<MarkingKind>('vacation');
   const [pageSize, setPageSize] = useState(5);
+  const { showError } = useToast();
   const [page, setPage] = useState(0);
 
   const state = useDaysOff(focusYear);
@@ -96,15 +98,16 @@ export function TimeOffTab() {
     // plain click on a holiday-only cell is a no-op. The ThreeMonthCalendar
     // already filters this for clickability, but defending here too.
     const existing = state.byDate.get(date);
+    const onErr = (err: unknown) => showError(toastMessage(err));
     if (existing) {
       // Same kind → clear; different kind → switch.
       if (existing.kind === marking) {
-        void state.remove(date);
+        state.remove(date).catch(onErr);
       } else {
-        void state.upsert({ date, kind: marking });
+        state.upsert({ date, kind: marking }).catch(onErr);
       }
     } else {
-      void state.upsert({ date, kind: marking });
+      state.upsert({ date, kind: marking }).catch(onErr);
     }
   };
 
@@ -296,7 +299,9 @@ export function TimeOffTab() {
                 <UpcomingRow
                   key={item.date}
                   item={item}
-                  onRemove={() => void state.remove(item.date)}
+                  onRemove={() => {
+                    state.remove(item.date).catch((err) => showError(toastMessage(err)));
+                  }}
                 />
               ))}
             </Stack>
