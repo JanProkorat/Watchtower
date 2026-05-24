@@ -11,10 +11,13 @@ import {
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs, { type Dayjs } from 'dayjs';
 import type {
   ContractInputPayload,
   ContractViewPayload,
 } from '../../../../shared/ipcContract.js';
+import { CZ_DATE_FORMAT } from '../../util/format.js';
 
 interface OverlapInfo {
   conflictingId: number;
@@ -184,26 +187,32 @@ export function ContractDrawer({ open, contract, projectId, onClose, onSubmit, o
           {error && <Alert severity="error">{error}</Alert>}
 
           <Stack direction="row" spacing={2}>
-            <TextField
+            <DatePicker
               label="Effective from"
-              type="date"
-              size="small"
-              value={draft.effectiveFrom}
-              onChange={(e) => setDraft({ ...draft, effectiveFrom: e.target.value })}
-              required
-              sx={{ flex: 1 }}
-              InputLabelProps={{ shrink: true }}
+              value={dayjs(draft.effectiveFrom)}
+              onChange={(v: Dayjs | null) =>
+                v && setDraft({ ...draft, effectiveFrom: v.format('YYYY-MM-DD') })
+              }
+              format={CZ_DATE_FORMAT}
+              slotProps={{
+                textField: { size: 'small', required: true, sx: { flex: 1 } },
+              }}
             />
-            <TextField
+            <DatePicker
               label="End date"
-              type="date"
-              size="small"
-              value={draft.endDate}
-              onChange={(e) => setDraft({ ...draft, endDate: e.target.value })}
-              placeholder="ongoing"
-              sx={{ flex: 1 }}
-              InputLabelProps={{ shrink: true }}
-              helperText="Leave empty for open-ended"
+              value={draft.endDate ? dayjs(draft.endDate) : null}
+              onChange={(v: Dayjs | null) =>
+                setDraft({ ...draft, endDate: v ? v.format('YYYY-MM-DD') : '' })
+              }
+              format={CZ_DATE_FORMAT}
+              slotProps={{
+                textField: {
+                  size: 'small',
+                  sx: { flex: 1 },
+                  helperText: 'Leave empty for open-ended',
+                },
+                field: { clearable: true },
+              }}
             />
           </Stack>
 

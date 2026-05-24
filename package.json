@@ -31,6 +31,7 @@
     "@fastify/cors": "^9.0.1",
     "@mui/icons-material": "^5.16.7",
     "@mui/material": "^5.16.7",
+    "@mui/x-date-pickers": "^7.29.4",
     "@react-buddy/ide-toolbox": "^2.5.0",
     "@react-buddy/palette-mui": "^5.0.1",
     "@xterm/addon-fit": "^0.10.0",

@@ -10,7 +10,10 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs, { type Dayjs } from 'dayjs';
 import CloseIcon from '@mui/icons-material/Close';
+import { CZ_DATE_FORMAT } from '../../util/format.js';
 import type {
   ProjectViewPayload,
   TaskViewPayload,
@@ -309,15 +312,16 @@ export function WorklogDrawer({
             fullWidth
           />
 
-          <TextField
+          <DatePicker
             label="Date"
-            type="date"
-            size="small"
-            value={draft.workDate}
-            onChange={(e) => setDraft({ ...draft, workDate: e.target.value })}
-            required
-            InputLabelProps={{ shrink: true }}
-            sx={{ alignSelf: 'flex-start', minWidth: 180 }}
+            value={dayjs(draft.workDate)}
+            onChange={(v: Dayjs | null) =>
+              v && setDraft({ ...draft, workDate: v.format('YYYY-MM-DD') })
+            }
+            format={CZ_DATE_FORMAT}
+            slotProps={{
+              textField: { size: 'small', required: true, sx: { alignSelf: 'flex-start', minWidth: 200 } },
+            }}
           />
 
           <Box sx={{ display: 'flex', gap: 2 }}>

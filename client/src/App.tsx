@@ -14,6 +14,9 @@ import {
   ThemeProvider,
   Typography,
 } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import 'dayjs/locale/cs';
 import { watchtowerTheme } from './theme.js';
 import { useInstances } from './state/useInstances.js';
 import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
@@ -173,7 +176,9 @@ export function App() {
     return (
       <ThemeProvider theme={watchtowerTheme}>
         <CssBaseline />
-        <LoadingScreen />
+        <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="cs">
+          <LoadingScreen />
+        </LocalizationProvider>
       </ThemeProvider>
     );
   }
@@ -181,6 +186,7 @@ export function App() {
   return (
     <ThemeProvider theme={watchtowerTheme}>
       <CssBaseline />
+      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="cs">
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {orchDown && (
         <Box
@@ -322,6 +328,7 @@ export function App() {
           spawn failed: {spawnError}
         </Alert>
       </Snackbar>
+      </LocalizationProvider>
     </ThemeProvider>
   );
 }
