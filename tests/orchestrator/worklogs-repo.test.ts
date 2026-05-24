@@ -178,6 +178,33 @@ describe('WorklogsRepo', () => {
       expect(after?.taskId).toBe(otherTask);
       expect(after?.epicName).toBe('E2');
     });
+
+    it('round-trips reported_minutes independently of minutes', () => {
+      const w = worklogs.create({
+        taskId,
+        workDate: '2026-05-24',
+        minutes: 120, // tracked 2h
+        reportedMinutes: 90, // reported (billed) 1h 30m
+      });
+      expect(w.minutes).toBe(120);
+      expect(w.reportedMinutes).toBe(90);
+      // Update reportedMinutes only — tracked stays at 120.
+      worklogs.update(w.id, { reportedMinutes: 60 });
+      const after = worklogs.get(w.id);
+      expect(after?.minutes).toBe(120);
+      expect(after?.reportedMinutes).toBe(60);
+    });
+
+    it('persists reported_minutes as NULL when explicitly cleared', () => {
+      const w = worklogs.create({
+        taskId,
+        workDate: '2026-05-24',
+        minutes: 60,
+        reportedMinutes: 45,
+      });
+      worklogs.update(w.id, { reportedMinutes: null });
+      expect(worklogs.get(w.id)?.reportedMinutes).toBeNull();
+    });
   });
 
   describe('delete', () => {
