@@ -7,6 +7,7 @@ import { EmptyTabState } from './EmptyTabState.js';
 import { ProjectDetailHeader } from './ProjectDetailHeader.js';
 import { ProjectDrawer } from './ProjectDrawer.js';
 import { EpicsTreeView } from './EpicsTreeView.js';
+import { WorklogsList } from './WorklogsList.js';
 
 interface Props {
   projectId: number;
@@ -89,12 +90,7 @@ export function DetailMode({ projectId, tab, onTabChange, onBack }: Props) {
 
           <Box sx={{ flex: 1, display: 'flex', overflow: 'auto', minHeight: 0 }}>
             {tab === 'epics' && <EpicsTreeView projectId={projectId} />}
-            {tab === 'worklogs' && (
-              <EmptyTabState
-                title="Worklogs (Phase 16)"
-                hint="Project-scoped worklog list, grouped by day, with epic + period + source filters."
-              />
-            )}
+            {tab === 'worklogs' && <WorklogsList projectId={projectId} />}
             {tab === 'contracts' && (
               <EmptyTabState
                 title="Contracts (Phase 17)"

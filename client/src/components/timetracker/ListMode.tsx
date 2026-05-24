@@ -2,6 +2,7 @@ import { Box, Tab, Tabs } from '@mui/material';
 import { LIST_TABS, type ListTab } from '../../util/timetrackerUrl.js';
 import { EmptyTabState } from './EmptyTabState.js';
 import { ProjectsList } from './ProjectsList.js';
+import { WorklogsList } from './WorklogsList.js';
 
 interface Props {
   tab: ListTab;
@@ -41,12 +42,7 @@ export function ListMode({ tab, onTabChange, onOpenProject }: Props) {
 
       <Box sx={{ flex: 1, display: 'flex', overflow: 'auto', minHeight: 0 }}>
         {tab === 'projects' && <ProjectsList onOpenProject={onOpenProject} />}
-        {tab === 'worklogs' && (
-          <EmptyTabState
-            title="No worklogs"
-            hint="The flat, day-grouped worklog list with filters ships in Phase 16. Manual entries land first; the watchtower-auto ingest path from the MVP keeps working through the migration."
-          />
-        )}
+        {tab === 'worklogs' && <WorklogsList />}
         {tab === 'grid' && (
           <EmptyTabState
             title="Task grid (Phase 18)"

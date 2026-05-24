@@ -18,6 +18,11 @@ import {
 } from './db/repositories/projects.js';
 import { EpicsRepo, type EpicInput } from './db/repositories/epics.js';
 import { TasksRepo, type TaskInput } from './db/repositories/tasks.js';
+import {
+  WorklogsRepo,
+  type WorklogInput,
+  type WorklogListFilter,
+} from './db/repositories/worklogs.js';
 import { transition } from './stateMachine.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
@@ -76,6 +81,10 @@ function epicsRepo(): EpicsRepo {
 
 function tasksRepo(): TasksRepo {
   return new TasksRepo(handle!.db);
+}
+
+function worklogsRepo(): WorklogsRepo {
+  return new WorklogsRepo(handle!.db);
 }
 
 function projectViewOf(row: ProjectRow): ProjectRow {
@@ -369,6 +378,24 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
 
     case 'tasks:delete':
       tasksRepo().delete(req.payload.id);
+      return { ok: true };
+
+    case 'worklogs:list':
+      return { worklogs: worklogsRepo().list(req.payload as WorklogListFilter) };
+
+    case 'worklogs:create':
+      return { worklog: worklogsRepo().create(req.payload as WorklogInput) };
+
+    case 'worklogs:update':
+      return {
+        worklog: worklogsRepo().update(
+          req.payload.id,
+          req.payload.input as Partial<WorklogInput>,
+        ),
+      };
+
+    case 'worklogs:delete':
+      worklogsRepo().delete(req.payload.id);
       return { ok: true };
   }
 }
