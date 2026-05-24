@@ -4,10 +4,10 @@ import {
   Box,
   Button,
   ButtonGroup,
-  CircularProgress,
   Grid,
   MenuItem,
   Paper,
+  Skeleton,
   Stack,
   TextField,
   ToggleButton,
@@ -350,11 +350,7 @@ export function ReportsTab() {
 }
 
 function Loading() {
-  return (
-    <Stack alignItems="center" justifyContent="center" sx={{ height: '100%' }}>
-      <CircularProgress size={22} />
-    </Stack>
-  );
+  return <Skeleton variant="rounded" sx={{ height: '100%', width: '100%' }} animation="wave" />;
 }
 
 // Touch unused-warning workaround for the Typography import — kept on

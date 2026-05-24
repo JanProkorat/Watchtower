@@ -18,6 +18,7 @@ import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import { useProjects } from '../../state/useProjects.js';
 import { useInstanceLauncher } from '../../state/useInstanceLauncher.js';
+import { useToast, toastMessage } from '../../state/useToast.js';
 import { ProjectDrawer } from './ProjectDrawer.js';
 import { InstancesLaunchModal } from './InstancesLaunchModal.js';
 import type { ProjectViewPayload } from '../../../../shared/ipcContract.js';
@@ -43,6 +44,7 @@ export function ProjectsList({
   onOpenNewInstanceForCwd,
 }: Props) {
   const state = useProjects();
+  const { showError } = useToast();
   const launcher = useInstanceLauncher({
     onActivateInstance,
     onSpawnNew: onOpenNewInstanceForCwd,
@@ -131,7 +133,9 @@ export function ProjectsList({
                 project={p}
                 onOpen={() => onOpenProject(p.id)}
                 onEdit={() => openEdit(p)}
-                onArchive={() => void state.archive(p.id, !p.archived)}
+                onArchive={() => {
+                  state.archive(p.id, !p.archived).catch((err) => showError(toastMessage(err)));
+                }}
                 onLaunch={
                   p.folderPath ? () => void launcher.launch(p.name, p.folderPath!) : null
                 }

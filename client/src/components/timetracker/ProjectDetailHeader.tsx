@@ -5,6 +5,7 @@ import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import CodeIcon from '@mui/icons-material/Code';
 import { useInstanceLauncher } from '../../state/useInstanceLauncher.js';
+import { useToast, toastMessage } from '../../state/useToast.js';
 import { InstancesLaunchModal } from './InstancesLaunchModal.js';
 import type { ProjectViewPayload } from '../../../../shared/ipcContract.js';
 
@@ -36,13 +37,21 @@ export function ProjectDetailHeader({
     onActivateInstance,
     onSpawnNew: onOpenNewInstanceForCwd,
   });
+  const { showError } = useToast();
 
   const launchInstances = project.folderPath
     ? () => void launcher.launch(project.name, project.folderPath!)
     : null;
 
   const openInVSCode = project.folderPath
-    ? () => void window.watchtower.invoke('openInVSCode', { path: project.folderPath! })
+    ? () => {
+        window.watchtower
+          .invoke('openInVSCode', { path: project.folderPath! })
+          .then((r) => {
+            if (!r.ok) showError(r.error ?? 'Could not open in VS Code');
+          })
+          .catch((err) => showError(toastMessage(err)));
+      }
     : null;
 
   return (

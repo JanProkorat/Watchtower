@@ -19,6 +19,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import 'dayjs/locale/cs';
 import { darkTheme, lightTheme } from './theme.js';
 import { useThemeMode } from './state/useThemeMode.js';
+import { ToastProvider } from './state/useToast.js';
 import { useInstances } from './state/useInstances.js';
 import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
 import { Terminal } from './components/Terminal.js';
@@ -203,6 +204,7 @@ export function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="cs">
+      <ToastProvider>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {orchDown && (
         <Box
@@ -359,6 +361,7 @@ export function App() {
           spawn failed: {spawnError}
         </Alert>
       </Snackbar>
+      </ToastProvider>
       </LocalizationProvider>
     </ThemeProvider>
   );
