@@ -4,8 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Watchtower</title>
+    <style>
+      /* Pre-React splash colours. Once MUI CssBaseline mounts it owns the
+         body background; these CSS vars are only used by the inline splash
+         div below until then. */
+      :root { --wt-splash-bg: #0a0b0f; --wt-splash-fg: #9aa3b2; --wt-splash-spinner: #2e333d; --wt-splash-accent: #7c5cff; }
+      html[data-theme='light'] { --wt-splash-bg: #f7f8fa; --wt-splash-fg: #5b6370; --wt-splash-spinner: #d9dde3; --wt-splash-accent: #6e54e0; }
+      body { background: var(--wt-splash-bg); }
+    </style>
+    <script>
+      // Read saved theme so the pre-React paint matches what App.tsx will render.
+      // Falls back to dark when nothing is stored.
+      (function () {
+        try {
+          var v = localStorage.getItem('watchtower:theme-mode');
+          document.documentElement.setAttribute('data-theme', v === 'light' ? 'light' : 'dark');
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
   </head>
-  <body style="margin:0;background:#0e0f12;">
+  <body style="margin:0;">
     <div id="root">
       <!-- Pre-React splash. createRoot.render() replaces this with the App tree
            the moment main.tsx finishes loading. Inline so it paints on first
@@ -19,8 +39,8 @@
           align-items: center;
           justify-content: center;
           gap: 14px;
-          background: #0e0f12;
-          color: #9aa1ab;
+          background: var(--wt-splash-bg);
+          color: var(--wt-splash-fg);
           font-family: Inter, system-ui, -apple-system, sans-serif;
           font-size: 13px;
         "
@@ -29,8 +49,8 @@
           style="
             width: 22px;
             height: 22px;
-            border: 2px solid #2e333d;
-            border-top-color: #7aa7ff;
+            border: 2px solid var(--wt-splash-spinner);
+            border-top-color: var(--wt-splash-accent);
             border-radius: 50%;
             animation: __wt_spin 0.8s linear infinite;
           "

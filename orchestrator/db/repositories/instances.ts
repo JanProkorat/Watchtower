@@ -89,6 +89,25 @@ export class InstancesRepo {
       .all(...LIVE_STATUSES) as DbInstanceRow[]).map(toRow);
   }
 
+  /**
+   * Returns every live instance whose `cwd` equals the given path (after the
+   * caller normalises `~`). Used by the TimeTracker → Instances launch
+   * bridge to decide between "open existing" and "spawn new".
+   */
+  liveByCwd(cwd: string): InstanceRow[] {
+    const placeholders = LIVE_STATUSES.map(() => '?').join(',');
+    return (
+      this.db
+        .prepare(
+          `SELECT * FROM instances
+            WHERE status IN (${placeholders})
+              AND cwd = ?
+            ORDER BY spawned_at`,
+        )
+        .all(...LIVE_STATUSES, cwd) as DbInstanceRow[]
+    ).map(toRow);
+  }
+
   updateStatus(id: string, status: InstanceStatus, now: number): void {
     this.db
       .prepare(`UPDATE instances SET status = ?, last_activity_at = ? WHERE id = ?`)

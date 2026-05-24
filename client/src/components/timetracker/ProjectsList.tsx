@@ -15,12 +15,17 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
+import TerminalIcon from '@mui/icons-material/Terminal';
 import { useProjects } from '../../state/useProjects.js';
+import { useInstanceLauncher } from '../../state/useInstanceLauncher.js';
 import { ProjectDrawer } from './ProjectDrawer.js';
+import { InstancesLaunchModal } from './InstancesLaunchModal.js';
 import type { ProjectViewPayload } from '../../../../shared/ipcContract.js';
 
 interface Props {
   onOpenProject(projectId: number): void;
+  onActivateInstance(id: string): void;
+  onOpenNewInstanceForCwd(cwd: string): void;
 }
 
 function formatTotal(minutes: number): string {
@@ -32,8 +37,16 @@ function formatTotal(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
-export function ProjectsList({ onOpenProject }: Props) {
+export function ProjectsList({
+  onOpenProject,
+  onActivateInstance,
+  onOpenNewInstanceForCwd,
+}: Props) {
   const state = useProjects();
+  const launcher = useInstanceLauncher({
+    onActivateInstance,
+    onSpawnNew: onOpenNewInstanceForCwd,
+  });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectViewPayload | null>(null);
 
@@ -119,6 +132,9 @@ export function ProjectsList({ onOpenProject }: Props) {
                 onOpen={() => onOpenProject(p.id)}
                 onEdit={() => openEdit(p)}
                 onArchive={() => void state.archive(p.id, !p.archived)}
+                onLaunch={
+                  p.folderPath ? () => void launcher.launch(p.name, p.folderPath!) : null
+                }
               />
             ))}
           </Stack>
@@ -137,6 +153,15 @@ export function ProjectsList({ onOpenProject }: Props) {
           }
         }}
       />
+      <InstancesLaunchModal
+        open={launcher.pending !== null}
+        projectName={launcher.pending?.projectName ?? ''}
+        cwd={launcher.pending?.cwd ?? ''}
+        runningInstances={launcher.pending?.runningInstances ?? []}
+        onClose={launcher.dismiss}
+        onActivateInstance={onActivateInstance}
+        onSpawnNew={onOpenNewInstanceForCwd}
+      />
     </Box>
   );
 }
@@ -146,11 +171,14 @@ function ProjectRow({
   onOpen,
   onEdit,
   onArchive,
+  onLaunch,
 }: {
   project: ProjectViewPayload;
   onOpen(): void;
   onEdit(): void;
   onArchive(): void;
+  /** Null when the project has no folder_path — the Open button is hidden. */
+  onLaunch: (() => void) | null;
 }) {
   return (
     <Box
@@ -203,6 +231,21 @@ function ProjectRow({
         {project.epicCount} {project.epicCount === 1 ? 'epic' : 'epics'}
       </Typography>
       <Stack direction="row" spacing={0.5} onClick={(e) => e.stopPropagation()}>
+        {onLaunch ? (
+          <Tooltip title="Open in Instances">
+            <IconButton size="small" onClick={onLaunch}>
+              <TerminalIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <Tooltip title="No folder configured — set 'Location on disk' to enable">
+            <span>
+              <IconButton size="small" disabled>
+                <TerminalIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
         <Tooltip title="Edit">
           <IconButton size="small" onClick={onEdit}>
             <EditIcon fontSize="small" />

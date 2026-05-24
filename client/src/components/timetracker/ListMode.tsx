@@ -12,6 +12,8 @@ interface Props {
   onTabChange(tab: ListTab): void;
   /** Project row → open detail mode for that project. */
   onOpenProject(projectId: number): void;
+  onActivateInstance(id: string): void;
+  onOpenNewInstanceForCwd(cwd: string): void;
 }
 
 const TAB_LABELS: Record<ListTab, string> = {
@@ -22,7 +24,13 @@ const TAB_LABELS: Record<ListTab, string> = {
   reports: 'Reports',
 };
 
-export function ListMode({ tab, onTabChange, onOpenProject }: Props) {
+export function ListMode({
+  tab,
+  onTabChange,
+  onOpenProject,
+  onActivateInstance,
+  onOpenNewInstanceForCwd,
+}: Props) {
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
@@ -44,7 +52,13 @@ export function ListMode({ tab, onTabChange, onOpenProject }: Props) {
       </Box>
 
       <Box sx={{ flex: 1, display: 'flex', overflow: 'auto', minHeight: 0 }}>
-        {tab === 'projects' && <ProjectsList onOpenProject={onOpenProject} />}
+        {tab === 'projects' && (
+          <ProjectsList
+            onOpenProject={onOpenProject}
+            onActivateInstance={onActivateInstance}
+            onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
+          />
+        )}
         {tab === 'worklogs' && <WorklogsList />}
         {tab === 'grid' && <TaskGridView />}
         {tab === 'timeoff' && <TimeOffTab />}

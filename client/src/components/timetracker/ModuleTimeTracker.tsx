@@ -5,6 +5,10 @@ import { DetailMode } from './DetailMode.js';
 interface Props {
   /** True while the TimeTracker rail icon is the active module. */
   active: boolean;
+  /** Switch to Instances and focus the given instance. */
+  onActivateInstance(id: string): void;
+  /** Switch to Instances and open the New-instance modal pre-filled. */
+  onOpenNewInstanceForCwd(cwd: string): void;
 }
 
 /**
@@ -16,7 +20,7 @@ interface Props {
  * the real Projects list, Worklogs view, Task grid, Time off calendar, and
  * Reports panels respectively.
  */
-export function ModuleTimeTracker({ active }: Props) {
+export function ModuleTimeTracker({ active, onActivateInstance, onOpenNewInstanceForCwd }: Props) {
   const { view, setListTab, openProject, closeProject, setDetailTab } = useTimeTrackerView(active);
 
   if (view.mode === 'detail') {
@@ -26,6 +30,8 @@ export function ModuleTimeTracker({ active }: Props) {
         tab={view.tab}
         onTabChange={setDetailTab}
         onBack={closeProject}
+        onActivateInstance={onActivateInstance}
+        onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
       />
     );
   }
@@ -35,6 +41,8 @@ export function ModuleTimeTracker({ active }: Props) {
       tab={view.tab}
       onTabChange={setListTab}
       onOpenProject={(id) => openProject(id, 'epics')}
+      onActivateInstance={onActivateInstance}
+      onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
     />
   );
 }

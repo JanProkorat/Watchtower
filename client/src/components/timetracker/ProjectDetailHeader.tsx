@@ -2,12 +2,18 @@ import { Box, Button, Chip, IconButton, Stack, Tooltip, Typography } from '@mui/
 import EditIcon from '@mui/icons-material/Edit';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
+import TerminalIcon from '@mui/icons-material/Terminal';
+import CodeIcon from '@mui/icons-material/Code';
+import { useInstanceLauncher } from '../../state/useInstanceLauncher.js';
+import { InstancesLaunchModal } from './InstancesLaunchModal.js';
 import type { ProjectViewPayload } from '../../../../shared/ipcContract.js';
 
 interface Props {
   project: ProjectViewPayload;
   onEdit(): void;
   onArchive(): void;
+  onActivateInstance(id: string): void;
+  onOpenNewInstanceForCwd(cwd: string): void;
 }
 
 function formatHours(minutes: number): string {
@@ -19,7 +25,26 @@ function formatHours(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
-export function ProjectDetailHeader({ project, onEdit, onArchive }: Props) {
+export function ProjectDetailHeader({
+  project,
+  onEdit,
+  onArchive,
+  onActivateInstance,
+  onOpenNewInstanceForCwd,
+}: Props) {
+  const launcher = useInstanceLauncher({
+    onActivateInstance,
+    onSpawnNew: onOpenNewInstanceForCwd,
+  });
+
+  const launchInstances = project.folderPath
+    ? () => void launcher.launch(project.name, project.folderPath!)
+    : null;
+
+  const openInVSCode = project.folderPath
+    ? () => void window.watchtower.invoke('openInVSCode', { path: project.folderPath! })
+    : null;
+
   return (
     <Box
       sx={{
@@ -94,6 +119,44 @@ export function ProjectDetailHeader({ project, onEdit, onArchive }: Props) {
       </Stack>
 
       <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+        <Tooltip
+          title={
+            launchInstances
+              ? 'Open in Instances'
+              : 'No folder configured — set Location on disk in the project drawer'
+          }
+        >
+          <span>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<TerminalIcon fontSize="small" />}
+              onClick={launchInstances ?? undefined}
+              disabled={launchInstances === null}
+            >
+              Instances
+            </Button>
+          </span>
+        </Tooltip>
+        <Tooltip
+          title={
+            openInVSCode
+              ? 'Open folder in VS Code (falls back to Finder)'
+              : 'No folder configured'
+          }
+        >
+          <span>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<CodeIcon fontSize="small" />}
+              onClick={openInVSCode ?? undefined}
+              disabled={openInVSCode === null}
+            >
+              VS Code
+            </Button>
+          </span>
+        </Tooltip>
         <Button
           size="small"
           variant="outlined"
@@ -112,6 +175,16 @@ export function ProjectDetailHeader({ project, onEdit, onArchive }: Props) {
           </IconButton>
         </Tooltip>
       </Stack>
+
+      <InstancesLaunchModal
+        open={launcher.pending !== null}
+        projectName={launcher.pending?.projectName ?? ''}
+        cwd={launcher.pending?.cwd ?? ''}
+        runningInstances={launcher.pending?.runningInstances ?? []}
+        onClose={launcher.dismiss}
+        onActivateInstance={onActivateInstance}
+        onSpawnNew={onOpenNewInstanceForCwd}
+      />
     </Box>
   );
 }

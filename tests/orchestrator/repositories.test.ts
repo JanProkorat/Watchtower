@@ -52,6 +52,19 @@ describe('repositories', () => {
     expect(repo.listLive().map((r) => r.id)).toEqual(['1']);
   });
 
+  it('InstancesRepo.liveByCwd narrows to live rows with matching cwd', () => {
+    const repo = new InstancesRepo(sqlite);
+    repo.insert(makeRow({ id: '1', cwd: '/a', status: 'working' }));
+    repo.insert(makeRow({ id: '2', cwd: '/a', status: 'waiting-permission' }));
+    repo.insert(makeRow({ id: '3', cwd: '/b', status: 'working' }));
+    // Finished rows are excluded.
+    repo.insert(makeRow({ id: '4', cwd: '/a', status: 'finished', exitCode: 0, terminationReason: 'session-end' }));
+
+    expect(repo.liveByCwd('/a').map((r) => r.id).sort()).toEqual(['1', '2']);
+    expect(repo.liveByCwd('/b').map((r) => r.id)).toEqual(['3']);
+    expect(repo.liveByCwd('/nowhere')).toEqual([]);
+  });
+
   it('InstancesRepo.reorder rewrites display_order so listAll honors the new order', () => {
     const repo = new InstancesRepo(sqlite);
     repo.insert(makeRow({ id: 'a', cwd: '/a' }));
