@@ -35,7 +35,45 @@ export type IpcRequest =
   | { kind: 'worklogs:list'; payload: WorklogListFilterPayload }
   | { kind: 'worklogs:create'; payload: WorklogInputPayload }
   | { kind: 'worklogs:update'; payload: { id: number; input: Partial<WorklogInputPayload> } }
-  | { kind: 'worklogs:delete'; payload: { id: number } };
+  | { kind: 'worklogs:delete'; payload: { id: number } }
+  | { kind: 'contracts:listForProject'; payload: { projectId: number } }
+  | { kind: 'contracts:create'; payload: ContractInputPayload }
+  | { kind: 'contracts:update'; payload: { id: number; input: Partial<ContractInputPayload> } }
+  | { kind: 'contracts:delete'; payload: { id: number } };
+
+export interface ContractInputPayload {
+  projectId: number;
+  effectiveFrom: string;
+  rateType: 'hourly' | 'daily';
+  rateAmount: number;
+  currency: string;
+  hoursPerDay?: number;
+  endDate?: string | null;
+  mdLimit?: number | null;
+}
+
+export interface ContractViewPayload {
+  id: number;
+  projectId: number;
+  effectiveFrom: string;
+  endDate: string | null;
+  rateType: 'hourly' | 'daily';
+  rateAmount: number;
+  currency: string;
+  hoursPerDay: number;
+  mdLimit: number | null;
+  createdAt: string;
+  // Computed status fields (joined / derived):
+  minutesLogged: number;
+  mdsUsed: number;
+  mdsRemaining: number | null;
+  elapsedWorkdays: number;
+  totalWorkdays: number | null;
+  workdaysRemaining: number | null;
+  projectedTotalMds: number | null;
+  isActive: boolean;
+  isCompleted: boolean;
+}
 
 export interface WorklogListFilterPayload {
   projectId?: number;
@@ -204,7 +242,11 @@ export type IpcResponse =
   | { kind: 'worklogs:list'; payload: { worklogs: WorklogViewPayload[] } }
   | { kind: 'worklogs:create'; payload: { worklog: WorklogViewPayload } }
   | { kind: 'worklogs:update'; payload: { worklog: WorklogViewPayload } }
-  | { kind: 'worklogs:delete'; payload: { ok: true } };
+  | { kind: 'worklogs:delete'; payload: { ok: true } }
+  | { kind: 'contracts:listForProject'; payload: { contracts: ContractViewPayload[] } }
+  | { kind: 'contracts:create'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null } }
+  | { kind: 'contracts:update'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null } }
+  | { kind: 'contracts:delete'; payload: { ok: true } };
 
 export type IpcPush =
   | { kind: 'hello'; payload: { version: string } }

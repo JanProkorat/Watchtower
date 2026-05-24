@@ -3,11 +3,11 @@ import { Alert, Box, Button, CircularProgress, Tab, Tabs } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { DETAIL_TABS, type DetailTab } from '../../util/timetrackerUrl.js';
 import { useProject } from '../../state/useProject.js';
-import { EmptyTabState } from './EmptyTabState.js';
 import { ProjectDetailHeader } from './ProjectDetailHeader.js';
 import { ProjectDrawer } from './ProjectDrawer.js';
 import { EpicsTreeView } from './EpicsTreeView.js';
 import { WorklogsList } from './WorklogsList.js';
+import { ContractsTab } from './ContractsTab.js';
 
 interface Props {
   projectId: number;
@@ -91,12 +91,7 @@ export function DetailMode({ projectId, tab, onTabChange, onBack }: Props) {
           <Box sx={{ flex: 1, display: 'flex', overflow: 'auto', minHeight: 0 }}>
             {tab === 'epics' && <EpicsTreeView projectId={projectId} />}
             {tab === 'worklogs' && <WorklogsList projectId={projectId} />}
-            {tab === 'contracts' && (
-              <EmptyTabState
-                title="Contracts (Phase 17)"
-                hint="Active-contract summary card + rate-period cards with create/edit drawer. Overlap validation enforced server-side."
-              />
-            )}
+            {tab === 'contracts' && <ContractsTab projectId={projectId} />}
           </Box>
 
           <ProjectDrawer

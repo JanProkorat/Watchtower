@@ -23,6 +23,13 @@ import {
   type WorklogInput,
   type WorklogListFilter,
 } from './db/repositories/worklogs.js';
+import {
+  ProjectRatesRepo,
+  RateOverlapError,
+  type ProjectRateInput,
+  type ProjectRateRow,
+} from './db/repositories/projectRates.js';
+import { ContractStatusService } from './db/contractStatus.js';
 import { transition } from './stateMachine.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
@@ -85,6 +92,59 @@ function tasksRepo(): TasksRepo {
 
 function worklogsRepo(): WorklogsRepo {
   return new WorklogsRepo(handle!.db);
+}
+
+function projectRatesRepo(): ProjectRatesRepo {
+  return new ProjectRatesRepo(handle!.db);
+}
+
+function contractStatusService(): ContractStatusService {
+  return new ContractStatusService(handle!.db);
+}
+
+function contractViewOf(rate: ProjectRateRow): {
+  id: number;
+  projectId: number;
+  effectiveFrom: string;
+  endDate: string | null;
+  rateType: 'hourly' | 'daily';
+  rateAmount: number;
+  currency: string;
+  hoursPerDay: number;
+  mdLimit: number | null;
+  createdAt: string;
+  minutesLogged: number;
+  mdsUsed: number;
+  mdsRemaining: number | null;
+  elapsedWorkdays: number;
+  totalWorkdays: number | null;
+  workdaysRemaining: number | null;
+  projectedTotalMds: number | null;
+  isActive: boolean;
+  isCompleted: boolean;
+} {
+  const status = contractStatusService().forRate(rate);
+  return {
+    id: rate.id,
+    projectId: rate.projectId,
+    effectiveFrom: rate.effectiveFrom,
+    endDate: rate.endDate,
+    rateType: rate.rateType,
+    rateAmount: rate.rateAmount,
+    currency: rate.currency,
+    hoursPerDay: rate.hoursPerDay,
+    mdLimit: rate.mdLimit,
+    createdAt: rate.createdAt,
+    minutesLogged: status.minutesLogged,
+    mdsUsed: status.mdsUsed,
+    mdsRemaining: status.mdsRemaining,
+    elapsedWorkdays: status.elapsedWorkdays,
+    totalWorkdays: status.totalWorkdays,
+    workdaysRemaining: status.workdaysRemaining,
+    projectedTotalMds: status.projectedTotalMds,
+    isActive: status.isActive,
+    isCompleted: status.isCompleted,
+  };
 }
 
 function projectViewOf(row: ProjectRow): ProjectRow {
@@ -396,6 +456,52 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
 
     case 'worklogs:delete':
       worklogsRepo().delete(req.payload.id);
+      return { ok: true };
+
+    case 'contracts:listForProject': {
+      const rows = projectRatesRepo().listForProject(req.payload.projectId);
+      return { contracts: rows.map(contractViewOf) };
+    }
+
+    case 'contracts:create': {
+      try {
+        const row = projectRatesRepo().create(req.payload as ProjectRateInput);
+        return { contract: contractViewOf(row) };
+      } catch (err) {
+        if (err instanceof RateOverlapError) {
+          return {
+            error: 'overlap' as const,
+            conflictingId: err.conflictingId,
+            conflictingFrom: err.conflictingFrom,
+            conflictingTo: err.conflictingTo,
+          };
+        }
+        throw err;
+      }
+    }
+
+    case 'contracts:update': {
+      try {
+        const row = projectRatesRepo().update(
+          req.payload.id,
+          req.payload.input as Partial<ProjectRateInput>,
+        );
+        return { contract: contractViewOf(row) };
+      } catch (err) {
+        if (err instanceof RateOverlapError) {
+          return {
+            error: 'overlap' as const,
+            conflictingId: err.conflictingId,
+            conflictingFrom: err.conflictingFrom,
+            conflictingTo: err.conflictingTo,
+          };
+        }
+        throw err;
+      }
+    }
+
+    case 'contracts:delete':
+      projectRatesRepo().delete(req.payload.id);
       return { ok: true };
   }
 }
