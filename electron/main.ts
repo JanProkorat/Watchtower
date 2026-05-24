@@ -1,6 +1,9 @@
-import { app, dialog } from 'electron';
+import { app, dialog, nativeImage } from 'electron';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createMainWindow, getMainWindow } from './window.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { registerIpc, pushToRenderer } from './ipc.js';
 import { startOrchestrator, getOrchestrator, onOrchestratorCrash } from './orchestratorHost.js';
 import {
@@ -21,6 +24,15 @@ const LIVE_STATUSES = new Set([
 let quitting = false;
 
 app.setName('Watchtower');
+
+// In dev (unpackaged) macOS shows Electron's default Dock icon. Packaged
+// builds get the icon from electron-builder via Info.plist. Point the Dock
+// at our .icns explicitly when unpackaged so dev matches the shipped look.
+if (process.platform === 'darwin' && !app.isPackaged && app.dock) {
+  const icnsPath = path.resolve(__dirname, '../../build-resources/icon.icns');
+  const img = nativeImage.createFromPath(icnsPath);
+  if (!img.isEmpty()) app.dock.setIcon(img);
+}
 
 app.whenReady().then(() => {
   const orch = startOrchestrator();
