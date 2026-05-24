@@ -6,15 +6,20 @@ export interface TaskGridTask {
   taskTitle: string;
   status: 'open' | 'in_progress' | 'done';
   estimatedMinutes: number | null;
-  totalMinutes: number;
+  /** Sum of `worklogs.minutes` (actual time) for the task in the month. */
+  totalTracked: number;
+  /** Sum of COALESCE(reported_minutes, minutes) (billed time) for the task. */
+  totalReported: number;
   epicId: number;
   epicName: string;
   projectId: number;
   projectName: string;
   projectColor: string;
   isBillable: boolean;
-  /** day-of-month (1..31) → minutes logged on that day. */
-  perDay: Record<number, number>;
+  /** day-of-month → tracked minutes (raw `worklogs.minutes`). */
+  perDayTracked: Record<number, number>;
+  /** day-of-month → reported minutes (COALESCE(reported_minutes, minutes)). */
+  perDayReported: Record<number, number>;
 }
 
 export interface TaskGridEarningsRow {
@@ -30,8 +35,11 @@ export interface TaskGridResponse {
   month: number;
   daysInMonth: number;
   tasks: TaskGridTask[];
-  /** day-of-month → grand-total minutes across all tasks shown. */
-  dailyTotals: Record<number, number>;
+  /** day-of-month → grand-total tracked minutes across all tasks shown. */
+  dailyTotalsTracked: Record<number, number>;
+  /** day-of-month → grand-total reported minutes across all tasks shown. */
+  dailyTotalsReported: Record<number, number>;
+  /** Earnings always use reported minutes — that's what gets billed. */
   earningsByCurrency: TaskGridEarningsRow[];
   /**
    * Expected working capacity for the month — Mon-Fri workdays × 8h. Phase
@@ -59,12 +67,14 @@ interface WorklogPeriodRow {
   task_id: number;
   project_id: number;
   work_date: string;
+  /** Raw `worklogs.minutes` — the actually tracked time. */
+  tracked_minutes: number;
   /**
-   * Already COALESCE'd in SQL — reported_minutes when set, otherwise the
-   * tracked minutes. This is what gets shown in the grid and used for
-   * earnings, because reported time is what the user bills.
+   * COALESCE(reported_minutes, minutes) — reported value when set, otherwise
+   * the tracked fallback. Used as the displayed/billed quantity throughout
+   * the module by default.
    */
-  minutes: number;
+  reported_minutes: number;
 }
 
 interface RateRow {
@@ -122,13 +132,13 @@ export class TaskGridService {
     const monthCapacityMinutes = countMonWedFriWorkdays(year, month) * 8 * 60;
 
     // 1. Fetch worklogs in the period scoped to the optional project.
-    //    COALESCE collapses tracked vs reported so the rest of the pipeline
-    //    treats the visible value as one number — reported_minutes wins when
-    //    it's set, otherwise the tracked minutes do.
+    //    Both tracked + reported come back so the client can flip between
+    //    them without re-fetching. Earnings always use reported (billing).
     const worklogParams: unknown[] = [from, to];
     let worklogSql =
       `SELECT w.task_id, p.id AS project_id, w.work_date,
-              COALESCE(w.reported_minutes, w.minutes) AS minutes
+              w.minutes AS tracked_minutes,
+              COALESCE(w.reported_minutes, w.minutes) AS reported_minutes
          FROM worklogs w
          JOIN tasks t ON t.id = w.task_id
          JOIN epics e ON e.id = t.epic_id
@@ -146,7 +156,8 @@ export class TaskGridService {
         month,
         daysInMonth,
         tasks: [],
-        dailyTotals: {},
+        dailyTotalsTracked: {},
+        dailyTotalsReported: {},
         earningsByCurrency: [],
         monthCapacityMinutes,
       };
@@ -170,21 +181,36 @@ export class TaskGridService {
       TaskMetaRow & { epic_display_order: number | null }
     >;
 
-    // 3. Build per-task per-day map + per-task total.
-    const perTask = new Map<number, { perDay: Record<number, number>; total: number }>();
+    // 3. Build per-task per-day maps (tracked + reported) and per-task totals.
+    interface TaskBucket {
+      perDayTracked: Record<number, number>;
+      perDayReported: Record<number, number>;
+      totalTracked: number;
+      totalReported: number;
+    }
+    const perTask = new Map<number, TaskBucket>();
     for (const w of worklogs) {
       const day = Number(w.work_date.slice(8, 10));
-      const bucket = perTask.get(w.task_id) ?? { perDay: {}, total: 0 };
-      bucket.perDay[day] = (bucket.perDay[day] ?? 0) + w.minutes;
-      bucket.total += w.minutes;
+      const bucket = perTask.get(w.task_id) ?? {
+        perDayTracked: {},
+        perDayReported: {},
+        totalTracked: 0,
+        totalReported: 0,
+      };
+      bucket.perDayTracked[day] = (bucket.perDayTracked[day] ?? 0) + w.tracked_minutes;
+      bucket.perDayReported[day] = (bucket.perDayReported[day] ?? 0) + w.reported_minutes;
+      bucket.totalTracked += w.tracked_minutes;
+      bucket.totalReported += w.reported_minutes;
       perTask.set(w.task_id, bucket);
     }
 
-    // 4. Build the per-day grand totals across visible tasks.
-    const dailyTotals: Record<number, number> = {};
+    // 4. Build the per-day grand totals (both flavours) across visible tasks.
+    const dailyTotalsTracked: Record<number, number> = {};
+    const dailyTotalsReported: Record<number, number> = {};
     for (const w of worklogs) {
       const day = Number(w.work_date.slice(8, 10));
-      dailyTotals[day] = (dailyTotals[day] ?? 0) + w.minutes;
+      dailyTotalsTracked[day] = (dailyTotalsTracked[day] ?? 0) + w.tracked_minutes;
+      dailyTotalsReported[day] = (dailyTotalsReported[day] ?? 0) + w.reported_minutes;
     }
 
     // 5. Build the task list in stable order (project name, epic display_order, task id).
@@ -198,21 +224,28 @@ export class TaskGridService {
         return a.task_id - b.task_id;
       })
       .map((t) => {
-        const bucket = perTask.get(t.task_id) ?? { perDay: {}, total: 0 };
+        const bucket = perTask.get(t.task_id) ?? {
+          perDayTracked: {},
+          perDayReported: {},
+          totalTracked: 0,
+          totalReported: 0,
+        };
         return {
           taskId: t.task_id,
           taskNumber: t.task_number,
           taskTitle: t.task_title,
           status: t.status,
           estimatedMinutes: t.estimated_minutes,
-          totalMinutes: bucket.total,
+          totalTracked: bucket.totalTracked,
+          totalReported: bucket.totalReported,
           epicId: t.epic_id,
           epicName: t.epic_name,
           projectId: t.project_id,
           projectName: t.project_name,
           projectColor: t.project_color,
           isBillable: t.project_kind === 'work',
-          perDay: bucket.perDay,
+          perDayTracked: bucket.perDayTracked,
+          perDayReported: bucket.perDayReported,
         };
       });
 
@@ -227,7 +260,8 @@ export class TaskGridService {
       month,
       daysInMonth,
       tasks: orderedTasks,
-      dailyTotals,
+      dailyTotalsTracked,
+      dailyTotalsReported,
       earningsByCurrency,
       monthCapacityMinutes,
     };
@@ -278,14 +312,16 @@ export class TaskGridService {
       return null;
     }
 
-    // Currency → day → rounded amount, plus total.
+    // Currency → day → rounded amount, plus total. Earnings always use
+    // reported_minutes (the billed value) regardless of the client's
+    // display toggle.
     const byCurrency = new Map<string, { perDay: Record<number, number>; total: number }>();
     for (const w of worklogs) {
       if (!billableByProject.get(w.project_id)) continue;
       const rate = findRateForDate(w.project_id, w.work_date);
       if (!rate) continue;
 
-      const hours = w.minutes / 60;
+      const hours = w.reported_minutes / 60;
       const amount =
         rate.rate_type === 'hourly'
           ? hours * rate.rate_amount

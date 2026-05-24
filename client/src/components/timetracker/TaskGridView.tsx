@@ -3,10 +3,14 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
+  FormControlLabel,
   IconButton,
   MenuItem,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -65,6 +69,14 @@ export function TaskGridView({ projectId }: Props) {
   const [month, setMonth] = useState(today.getMonth() + 1); // 1-based
   const [projectFilter, setProjectFilter] = useState<number | null>(projectId ?? null);
   const [projects, setProjects] = useState<ProjectViewPayload[]>([]);
+  /**
+   * Which value the grid displays in every cell + total. Reported is the
+   * billing default (what gets sent to invoices); Tracked shows the actual
+   * time spent. Earnings always use reported regardless of this toggle —
+   * the billing value is the source of truth there.
+   */
+  const [displayMode, setDisplayMode] = useState<'tracked' | 'reported'>('reported');
+  const [hideDone, setHideDone] = useState(false);
   const grid = useTaskGrid(
     year,
     month,
@@ -250,6 +262,35 @@ export function TaskGridView({ projectId }: Props) {
           </TextField>
         )}
 
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={displayMode}
+          onChange={(_, next: 'tracked' | 'reported' | null) => {
+            if (next) setDisplayMode(next);
+          }}
+          aria-label="Display mode"
+        >
+          <ToggleButton value="tracked" sx={{ textTransform: 'none', px: 1.5 }}>
+            Tracked
+          </ToggleButton>
+          <ToggleButton value="reported" sx={{ textTransform: 'none', px: 1.5 }}>
+            Reported
+          </ToggleButton>
+        </ToggleButtonGroup>
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              size="small"
+              checked={hideDone}
+              onChange={(e) => setHideDone(e.target.checked)}
+            />
+          }
+          label="Hide done tasks"
+          sx={{ '& .MuiFormControlLabel-label': { fontSize: 13 } }}
+        />
+
         <Box sx={{ flex: 1 }} />
 
         <Button
@@ -291,6 +332,8 @@ export function TaskGridView({ projectId }: Props) {
           <Grid
             data={grid.data}
             days={days}
+            displayMode={displayMode}
+            hideDone={hideDone}
             onTaskKeyClick={openTaskDrawer}
             onCellClick={openWorklogDrawerForCell}
           />
@@ -359,11 +402,15 @@ export function TaskGridView({ projectId }: Props) {
 function Grid({
   data,
   days,
+  displayMode,
+  hideDone,
   onTaskKeyClick,
   onCellClick,
 }: {
   data: import('../../../../shared/ipcContract.js').TaskGridResponsePayload;
   days: Array<{ day: number; ymd: string; dow: number; isWeekend: boolean; isToday: boolean }>;
+  displayMode: 'tracked' | 'reported';
+  hideDone: boolean;
   onTaskKeyClick(task: TaskGridTaskPayload): void;
   onCellClick(taskId: number, day: number): void;
 }) {
@@ -388,6 +435,21 @@ function Grid({
   // task rows → total row → earnings rows. The earnings rows pin from the very
   // bottom and the total row sits above the stack.
   const earningsHeight = data.earningsByCurrency.length * TOTAL_ROW_HEIGHT;
+
+  // Apply the hide-done filter client-side so the toggle is instant. When done
+  // tasks are hidden, the daily totals also need to subtract their per-day
+  // contributions; the server's `dailyTotals*` payloads include every task
+  // returned in `data.tasks`.
+  const visibleTasks = hideDone ? data.tasks.filter((t) => t.status !== 'done') : data.tasks;
+  const daysTotalsField =
+    displayMode === 'tracked' ? 'dailyTotalsTracked' : 'dailyTotalsReported';
+  const visibleDailyTotals: Record<number, number> = hideDone
+    ? visibleTasks.reduce<Record<number, number>>((acc, t) => {
+        const map = displayMode === 'tracked' ? t.perDayTracked : t.perDayReported;
+        for (const [d, m] of Object.entries(map)) acc[Number(d)] = (acc[Number(d)] ?? 0) + m;
+        return acc;
+      }, {})
+    : data[daysTotalsField];
 
   return (
     <Box sx={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
@@ -474,11 +536,12 @@ function Grid({
           </tr>
         </thead>
         <tbody>
-          {data.tasks.map((task) => (
+          {visibleTasks.map((task) => (
             <TaskRow
               key={task.taskId}
               task={task}
               days={days}
+              displayMode={displayMode}
               weekendBg={weekendBg}
               todayBg={todayBg}
               hoverCellBg={hoverCellBg}
@@ -520,7 +583,7 @@ function Grid({
               }}
               title={`Capacity = ${fmtHoursTrim(data.monthCapacityMinutes)} h (Mon-Fri × 8h; Czech holidays land in Phase 19)`}
             >
-              {fmtHoursTrim(sumOf(data.dailyTotals))}
+              {fmtHoursTrim(sumOf(visibleDailyTotals))}
               <Box
                 component="span"
                 sx={{ color: 'text.secondary', fontWeight: 400, ml: 0.5 }}
@@ -529,7 +592,7 @@ function Grid({
               </Box>
             </td>
             {days.map((d) => {
-              const v = data.dailyTotals[d.day] ?? 0;
+              const v = visibleDailyTotals[d.day] ?? 0;
               const cellBg = d.isToday ? todaySolidBg : d.isWeekend ? weekendSolidBg : totalSolidBg;
               return (
                 <td
@@ -621,6 +684,7 @@ function Grid({
 function TaskRow({
   task,
   days,
+  displayMode,
   weekendBg,
   todayBg,
   hoverCellBg,
@@ -631,6 +695,7 @@ function TaskRow({
 }: {
   task: TaskGridTaskPayload;
   days: Array<{ day: number; ymd: string; dow: number; isWeekend: boolean; isToday: boolean }>;
+  displayMode: 'tracked' | 'reported';
   weekendBg: string;
   todayBg: string;
   hoverCellBg: string;
@@ -639,6 +704,8 @@ function TaskRow({
   onKeyClick(): void;
   onCellClick(taskId: number, day: number): void;
 }) {
+  const perDay = displayMode === 'tracked' ? task.perDayTracked : task.perDayReported;
+  const totalMinutes = displayMode === 'tracked' ? task.totalTracked : task.totalReported;
   const paper = theme.palette.background.paper;
   const StatusIcon =
     task.status === 'done'
@@ -656,12 +723,12 @@ function TaskRow({
   const overEstimate =
     task.estimatedMinutes != null &&
     task.estimatedMinutes > 0 &&
-    task.totalMinutes > task.estimatedMinutes;
+    totalMinutes > task.estimatedMinutes;
   const riskEstimate =
     !overEstimate &&
     task.estimatedMinutes != null &&
     task.estimatedMinutes > 0 &&
-    task.totalMinutes >= task.estimatedMinutes * 0.8;
+    totalMinutes >= task.estimatedMinutes * 0.8;
   const loggedColor = overEstimate
     ? theme.palette.error.main
     : riskEstimate
@@ -734,7 +801,7 @@ function TaskRow({
       >
         {task.estimatedMinutes != null && task.estimatedMinutes > 0 ? (
           <>
-            {fmtHoursTrim(task.totalMinutes)}
+            {fmtHoursTrim(totalMinutes)}
             <Box
               component="span"
               sx={{ color: 'text.secondary', fontWeight: 400, ml: 0.5 }}
@@ -743,11 +810,11 @@ function TaskRow({
             </Box>
           </>
         ) : (
-          fmtHoursTrim(task.totalMinutes)
+          fmtHoursTrim(totalMinutes)
         )}
       </td>
       {days.map((d) => {
-        const v = task.perDay[d.day] ?? 0;
+        const v = perDay[d.day] ?? 0;
         const baseBg = d.isToday ? todayBg : d.isWeekend ? weekendBg : 'transparent';
         return (
           <td
