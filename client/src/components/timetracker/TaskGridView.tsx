@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -71,12 +71,20 @@ export function TaskGridView({ projectId }: Props) {
     projectId ?? projectFilter ?? undefined,
   );
 
-  // Load the project filter options once on mount (only relevant in list-mode usage).
+  // Load projects once on mount (only in list mode). On the first load, snap
+  // the filter to the project marked is_default = 1 so the grid lands on the
+  // user's working project instead of the costlier "All projects" scan.
+  const initialProjectSelectionDoneRef = useRef(false);
   useEffect(() => {
     if (projectId !== undefined) return;
-    void window.watchtower
-      .invoke('projects:list', { archived: false })
-      .then((r) => setProjects(r.projects));
+    void window.watchtower.invoke('projects:list', { archived: false }).then((r) => {
+      setProjects(r.projects);
+      if (!initialProjectSelectionDoneRef.current) {
+        initialProjectSelectionDoneRef.current = true;
+        const def = r.projects.find((p) => p.isDefault);
+        if (def) setProjectFilter(def.id);
+      }
+    });
   }, [projectId]);
 
   // Task + worklog drawers — opened on cell / key click.
@@ -87,10 +95,17 @@ export function TaskGridView({ projectId }: Props) {
 
   const [worklogDrawerOpen, setWorklogDrawerOpen] = useState(false);
   const [worklogDrawerProjectId, setWorklogDrawerProjectId] = useState<number | null>(null);
-  const [worklogDrawerInitialTask, setWorklogDrawerInitialTask] = useState<{
-    id: number;
-    workDate: string;
-  } | null>(null);
+  const [worklogDrawerTaskId, setWorklogDrawerTaskId] = useState<number | null>(null);
+  const [worklogDrawerWorkDate, setWorklogDrawerWorkDate] = useState<string | null>(null);
+  /**
+   * When the cell-click flow finds an existing worklog (or worklogs) for
+   * that task/date, we open the drawer in edit mode on the first match.
+   * Multiple worklogs on the same cell get a "+ N more" hint in the
+   * description fallback so the user knows the rest live in the list view.
+   */
+  const [worklogDrawerEditing, setWorklogDrawerEditing] = useState<WorklogViewPayload | null>(
+    null,
+  );
 
   const openTaskDrawer = async (gridTask: TaskGridTaskPayload) => {
     // Fetch the full task row + the project's epics so the drawer has its
@@ -112,14 +127,37 @@ export function TaskGridView({ projectId }: Props) {
     }
   };
 
-  const openWorklogDrawerForCell = (taskId: number, day: number) => {
+  const openWorklogDrawerForCell = async (taskId: number, day: number) => {
     const ymd = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     // Find the project for this task (from the grid payload).
     const gridTask = grid.data?.tasks.find((t) => t.taskId === taskId);
     if (!gridTask) return;
-    setWorklogDrawerProjectId(gridTask.projectId);
-    setWorklogDrawerInitialTask({ id: taskId, workDate: ymd });
-    setWorklogDrawerOpen(true);
+
+    // Look up any worklog(s) already on this cell so the drawer opens in
+    // edit mode (with real values) when there's an existing one. The grid's
+    // perDay aggregates can hide multiple worklogs per cell; we surface the
+    // first match here and rely on the per-row list view for the rest.
+    try {
+      const res = await window.watchtower.invoke('worklogs:list', {
+        taskId,
+        from: ymd,
+        to: ymd,
+      });
+      const existing = res.worklogs[0] ?? null;
+      setWorklogDrawerEditing(existing);
+      setWorklogDrawerProjectId(gridTask.projectId);
+      setWorklogDrawerTaskId(existing ? null : taskId);
+      setWorklogDrawerWorkDate(existing ? null : ymd);
+      setWorklogDrawerOpen(true);
+    } catch {
+      // Network-ish blip: still open in create mode so the user can log
+      // work even if the lookup failed.
+      setWorklogDrawerEditing(null);
+      setWorklogDrawerProjectId(gridTask.projectId);
+      setWorklogDrawerTaskId(taskId);
+      setWorklogDrawerWorkDate(ymd);
+      setWorklogDrawerOpen(true);
+    }
   };
 
   const stepMonth = (delta: number) => {
@@ -219,8 +257,10 @@ export function TaskGridView({ projectId }: Props) {
           variant="outlined"
           startIcon={<AccessTimeIcon fontSize="small" />}
           onClick={() => {
-            setWorklogDrawerProjectId(projectId ?? null);
-            setWorklogDrawerInitialTask(null);
+            setWorklogDrawerEditing(null);
+            setWorklogDrawerProjectId(projectId ?? projectFilter ?? null);
+            setWorklogDrawerTaskId(null);
+            setWorklogDrawerWorkDate(null);
             setWorklogDrawerOpen(true);
           }}
         >
@@ -283,50 +323,35 @@ export function TaskGridView({ projectId }: Props) {
 
       <WorklogDrawer
         open={worklogDrawerOpen}
-        worklog={initialWorklogFromCell(worklogDrawerInitialTask)}
+        worklog={worklogDrawerEditing}
         initialProjectId={worklogDrawerProjectId}
+        initialTaskId={worklogDrawerTaskId}
+        initialWorkDate={worklogDrawerWorkDate}
         onClose={() => setWorklogDrawerOpen(false)}
         onSubmit={async (input) => {
-          // The cell-click flow pre-fills date + task but doesn't preload the
-          // existing worklog (cells aggregate many). Always create new from
-          // this entry point.
-          await window.watchtower.invoke('worklogs:create', input);
+          if (worklogDrawerEditing) {
+            await window.watchtower.invoke('worklogs:update', {
+              id: worklogDrawerEditing.id,
+              input,
+            });
+          } else {
+            await window.watchtower.invoke('worklogs:create', input);
+          }
           await grid.refresh();
         }}
+        onDelete={
+          worklogDrawerEditing
+            ? async () => {
+                await window.watchtower.invoke('worklogs:delete', {
+                  id: worklogDrawerEditing.id,
+                });
+                await grid.refresh();
+              }
+            : undefined
+        }
       />
     </Box>
   );
-}
-
-/**
- * Synthesises just enough of a WorklogViewPayload to seed the drawer's form
- * from a clicked cell — task pre-selected, work_date pre-filled, no minutes.
- * The drawer doesn't render anything from the joined fields when minutes is 0
- * so the placeholder values are safe.
- */
-function initialWorklogFromCell(
-  cell: { id: number; workDate: string } | null,
-): WorklogViewPayload | null {
-  if (!cell) return null;
-  return {
-    id: -1, // not a real row — the drawer creates a new one on submit
-    taskId: cell.id,
-    description: null,
-    workDate: cell.workDate,
-    minutes: 0,
-    reportedMinutes: null,
-    source: null,
-    externalId: null,
-    jiraUploaded: false,
-    createdAt: '',
-    taskNumber: '',
-    taskTitle: '',
-    epicId: 0,
-    epicName: '',
-    projectId: 0,
-    projectName: '',
-    projectColor: '',
-  };
 }
 
 // ─── Grid table (rendered as raw <table> + sticky cells) ────────────────────
