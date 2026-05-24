@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!--
+    Watchtower tray template — same three-hex triangle as the app icon,
+    but as a black alpha mask on transparent background. macOS retints
+    this for the menu-bar appearance (white on dark menu bars, dark grey
+    on light). No fill colour distinction at this size; the three hexes
+    are visually distinct purely by position.
+  -->
+  <polygon points="32,9 41,14 41,25 32,30 23,25 23,14" fill="#000"/>
+  <polygon points="20,31 29,36 29,47 20,52 11,47 11,36" fill="#000"/>
+  <polygon points="44,31 53,36 53,47 44,52 35,47 35,36" fill="#000"/>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    Watchtower app icon — V2 palette (Teal · Emerald · Cobalt) on the 4b
+    three-hex triangle shape. Flat fills; depth comes from the colour
+    progression alone. 1024×1024 source, 22.4 % corner radius matches
+    macOS Big Sur+ app-icon mask.
+  -->
+  <rect width="1024" height="1024" rx="229" fill="#15171c"/>
+
+  <!-- Top hex — teal -->
+  <polygon points="512,152 664,240 664,416 512,504 360,416 360,240" fill="#4dd0e1"/>
+
+  <!-- Bottom-left hex — emerald -->
+  <polygon points="320,496 472,584 472,760 320,848 168,760 168,584" fill="#1abc9c"/>
+
+  <!-- Bottom-right hex — cobalt -->
+  <polygon points="704,496 856,584 856,760 704,848 552,760 552,584" fill="#2980b9"/>
+</svg>
