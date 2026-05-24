@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -6,6 +6,7 @@ import {
   Chip,
   IconButton,
   Stack,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -13,6 +14,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import AdjustIcon from '@mui/icons-material/Adjust';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -23,6 +25,8 @@ import type {
 import { useEpicsAndTasks } from '../../state/useEpicsAndTasks.js';
 import { EpicDrawer } from './EpicDrawer.js';
 import { TaskDrawer } from './TaskDrawer.js';
+
+const PAGE_SIZE = 20;
 
 interface Props {
   projectId: number;
@@ -61,11 +65,48 @@ const STATUS_COLOR: Record<
 export function EpicsTreeView({ projectId }: Props) {
   const state = useEpicsAndTasks(projectId);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [search, setSearch] = useState<string>('');
+  // Per-epic pagination — reset to page 0 when the search filter changes so
+  // the user never lands on an out-of-range page.
+  const [pageByEpic, setPageByEpic] = useState<Map<number, number>>(new Map());
   const [epicDrawerOpen, setEpicDrawerOpen] = useState(false);
   const [editingEpic, setEditingEpic] = useState<EpicViewPayload | null>(null);
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskViewPayload | null>(null);
   const [taskDrawerDefaultEpic, setTaskDrawerDefaultEpic] = useState<number | null>(null);
+
+  // Pre-compute the filtered task list per epic so the row count + paging
+  // controls don't re-filter on every render.
+  const filteredTasksByEpic = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const result = new Map<number, TaskViewPayload[]>();
+    for (const [epicId, tasks] of state.tasksByEpic) {
+      const filtered = q
+        ? tasks.filter(
+            (t) =>
+              t.title.toLowerCase().includes(q) ||
+              t.number.toLowerCase().includes(q),
+          )
+        : tasks;
+      result.set(epicId, filtered);
+    }
+    return result;
+  }, [state.tasksByEpic, search]);
+
+  // When the search query changes, snap every epic's page back to 0 to keep
+  // the visible window in sync with the new (smaller) result set.
+  const setSearchAndResetPages = (next: string) => {
+    setSearch(next);
+    setPageByEpic(new Map());
+  };
+
+  const setEpicPage = (epicId: number, page: number) => {
+    setPageByEpic((prev) => {
+      const next = new Map(prev);
+      next.set(epicId, page);
+      return next;
+    });
+  };
 
   const toggleExpand = (id: number) => {
     setExpanded((prev) => {
@@ -102,12 +143,24 @@ export function EpicsTreeView({ projectId }: Props) {
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <Stack
         direction="row"
-        spacing={1}
+        spacing={1.5}
         alignItems="center"
         sx={{ px: 2, py: 1.25, borderBottom: 1, borderColor: 'divider' }}
       >
+        <TextField
+          size="small"
+          placeholder="Search tasks (title or number)…"
+          value={search}
+          onChange={(e) => setSearchAndResetPages(e.target.value)}
+          sx={{ minWidth: 260 }}
+        />
         <Typography variant="caption" sx={{ color: 'text.secondary', flex: 1 }}>
           {state.epics.length} {state.epics.length === 1 ? 'epic' : 'epics'}
+          {search.trim() && totalFilteredTaskCount(filteredTasksByEpic) > 0
+            ? ` · ${totalFilteredTaskCount(filteredTasksByEpic)} matching ${
+                totalFilteredTaskCount(filteredTasksByEpic) === 1 ? 'task' : 'tasks'
+              }`
+            : ''}
         </Typography>
         <Button
           variant="contained"
@@ -147,7 +200,11 @@ export function EpicsTreeView({ projectId }: Props) {
             <EpicCard
               key={epic.id}
               epic={epic}
-              tasks={state.tasksByEpic.get(epic.id) ?? []}
+              tasks={filteredTasksByEpic.get(epic.id) ?? []}
+              totalUnfiltered={state.tasksByEpic.get(epic.id)?.length ?? 0}
+              searchActive={search.trim().length > 0}
+              page={pageByEpic.get(epic.id) ?? 0}
+              onPageChange={(p) => setEpicPage(epic.id, p)}
               expanded={expanded.has(epic.id)}
               onToggle={() => toggleExpand(epic.id)}
               onEdit={() => openEditEpic(epic)}
@@ -208,6 +265,10 @@ export function EpicsTreeView({ projectId }: Props) {
 function EpicCard({
   epic,
   tasks,
+  totalUnfiltered,
+  searchActive,
+  page,
+  onPageChange,
   expanded,
   onToggle,
   onEdit,
@@ -216,12 +277,25 @@ function EpicCard({
 }: {
   epic: EpicViewPayload;
   tasks: TaskViewPayload[];
+  /** All tasks in this epic before search narrowing — used in the header counter. */
+  totalUnfiltered: number;
+  /** True when a non-empty search query is filtering the list. */
+  searchActive: boolean;
+  page: number;
+  onPageChange(page: number): void;
   expanded: boolean;
   onToggle(): void;
   onEdit(): void;
   onAddTask(): void;
   onEditTask(task: TaskViewPayload): void;
 }) {
+  const totalPages = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
+  const safePage = Math.min(Math.max(0, page), totalPages - 1);
+  const sliceStart = safePage * PAGE_SIZE;
+  const sliceEnd = Math.min(sliceStart + PAGE_SIZE, tasks.length);
+  const visibleTasks = tasks.slice(sliceStart, sliceEnd);
+  const showPaging = tasks.length > PAGE_SIZE;
+
   return (
     <Box
       sx={{
@@ -255,7 +329,9 @@ function EpicCard({
             {epic.name}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
+            {searchActive && tasks.length !== totalUnfiltered
+              ? `${tasks.length} of ${totalUnfiltered} ${totalUnfiltered === 1 ? 'task' : 'tasks'} match`
+              : `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`}
             {epic.totalMinutes > 0 ? ` · ${fmtMinutes(epic.totalMinutes)} logged` : ''}
           </Typography>
         </Box>
@@ -305,21 +381,65 @@ function EpicCard({
         <Box sx={{ borderTop: 1, borderColor: 'divider', backgroundColor: 'action.hover' }}>
           {tasks.length === 0 ? (
             <Box sx={{ py: 1.5, textAlign: 'center' }}>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<AddIcon fontSize="small" />}
-                onClick={onAddTask}
-              >
-                Add task to this epic
-              </Button>
+              {searchActive && totalUnfiltered > 0 ? (
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  No tasks in this epic match your search.
+                </Typography>
+              ) : (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<AddIcon fontSize="small" />}
+                  onClick={onAddTask}
+                >
+                  Add task to this epic
+                </Button>
+              )}
             </Box>
           ) : (
-            <Stack divider={<Box sx={{ height: 1, backgroundColor: 'divider' }} />}>
-              {tasks.map((task) => (
-                <TaskRow key={task.id} task={task} onEdit={() => onEditTask(task)} />
-              ))}
-              <Box sx={{ py: 1, textAlign: 'center' }}>
+            <>
+              <Stack divider={<Box sx={{ height: 1, backgroundColor: 'divider' }} />}>
+                {visibleTasks.map((task) => (
+                  <TaskRow key={task.id} task={task} onEdit={() => onEditTask(task)} />
+                ))}
+              </Stack>
+              {showPaging && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 1,
+                    py: 0.75,
+                    borderTop: 1,
+                    borderColor: 'divider',
+                  }}
+                >
+                  <IconButton
+                    size="small"
+                    disabled={safePage === 0}
+                    onClick={() => onPageChange(safePage - 1)}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeftIcon fontSize="small" />
+                  </IconButton>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {sliceStart + 1}–{sliceEnd} of {tasks.length}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    disabled={safePage >= totalPages - 1}
+                    onClick={() => onPageChange(safePage + 1)}
+                    aria-label="Next page"
+                  >
+                    <ChevronRightIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              )}
+              <Box sx={{ py: 1, textAlign: 'center', borderTop: 1, borderColor: 'divider' }}>
                 <Button
                   size="small"
                   variant="text"
@@ -329,12 +449,20 @@ function EpicCard({
                   Add task
                 </Button>
               </Box>
-            </Stack>
+            </>
           )}
         </Box>
       )}
     </Box>
   );
+}
+
+function totalFilteredTaskCount(
+  filteredTasksByEpic: Map<number, TaskViewPayload[]>,
+): number {
+  let count = 0;
+  for (const tasks of filteredTasksByEpic.values()) count += tasks.length;
+  return count;
 }
 
 function TaskRow({ task, onEdit }: { task: TaskViewPayload; onEdit(): void }) {
