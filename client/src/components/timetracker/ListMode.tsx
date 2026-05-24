@@ -5,6 +5,7 @@ import { ProjectsList } from './ProjectsList.js';
 import { WorklogsList } from './WorklogsList.js';
 import { TaskGridView } from './TaskGridView.js';
 import { TimeOffTab } from './TimeOffTab.js';
+import { ReportsTab } from './ReportsTab.js';
 
 interface Props {
   tab: ListTab;
@@ -47,12 +48,7 @@ export function ListMode({ tab, onTabChange, onOpenProject }: Props) {
         {tab === 'worklogs' && <WorklogsList />}
         {tab === 'grid' && <TaskGridView />}
         {tab === 'timeoff' && <TimeOffTab />}
-        {tab === 'reports' && (
-          <EmptyTabState
-            title="Reports (Phase 20)"
-            hint="Sticky filter bar, trend chart, project donut + earnings, active contracts, activity heatmap."
-          />
-        )}
+        {tab === 'reports' && <ReportsTab />}
       </Box>
     </Box>
   );

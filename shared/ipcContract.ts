@@ -45,7 +45,86 @@ export type IpcRequest =
   | { kind: 'daysOff:listInRange'; payload: { from: string; to: string } }
   | { kind: 'daysOff:upsert'; payload: DayOffInputPayload }
   | { kind: 'daysOff:delete'; payload: { date: string } }
-  | { kind: 'holidays:list'; payload: { year: number } };
+  | { kind: 'holidays:list'; payload: { year: number } }
+  | { kind: 'reports:trend'; payload: { from: string; to: string; granularity: 'day' | 'week' | 'month' } }
+  | { kind: 'reports:byProject'; payload: { from: string; to: string } }
+  | { kind: 'reports:earnings'; payload: { from: string; to: string } }
+  | { kind: 'reports:heatmap'; payload: { from: string; to: string } }
+  | { kind: 'reports:contracts'; payload: Record<string, never> }
+  | { kind: 'reports:rateChanges'; payload: { from: string; to: string } };
+
+export interface TrendDatumPayload {
+  bucket: string;
+  minutes: number;
+  earnedByCurrency: Record<string, number>;
+}
+
+export interface ByProjectDatumPayload {
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  isBillable: number;
+  currency: string | null;
+  minutes: number;
+  earnedAmount: number | null;
+}
+
+export interface EarningsByProjectPayload {
+  project_id: number;
+  project_name: string;
+  project_color: string;
+  currency: string | null;
+  minutes: number;
+  earned_amount: number | null;
+}
+
+export interface EarningsResponsePayload {
+  billableMinutes: number;
+  unbillableMinutes: number;
+  timeOffMinutes: number;
+  totalEarned: Record<string, number>;
+  avgEffectiveHourlyRate: Record<string, number>;
+  byProject: EarningsByProjectPayload[];
+}
+
+export interface HeatmapDatumPayload {
+  date: string;
+  minutes: number;
+}
+
+export interface ContractReportRowPayload {
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  archived: number;
+  contract: {
+    rateId: number;
+    projectId: number;
+    effectiveFrom: string;
+    endDate: string | null;
+    hoursPerDay: number;
+    mdLimit: number | null;
+    minutesLogged: number;
+    mdsUsed: number;
+    mdsRemaining: number | null;
+    elapsedWorkdays: number;
+    totalWorkdays: number | null;
+    workdaysRemaining: number | null;
+    projectedTotalMds: number | null;
+    isActive: boolean;
+    isCompleted: boolean;
+  };
+}
+
+export interface RateChangeMarkerPayload {
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  effectiveFrom: string;
+  rateType: 'hourly' | 'daily';
+  rateAmount: number;
+  currency: string;
+}
 
 export interface DayOffInputPayload {
   date: string;
@@ -314,7 +393,13 @@ export type IpcResponse =
   | { kind: 'daysOff:listInRange'; payload: { daysOff: DayOffViewPayload[] } }
   | { kind: 'daysOff:upsert'; payload: { dayOff: DayOffViewPayload } }
   | { kind: 'daysOff:delete'; payload: { ok: true } }
-  | { kind: 'holidays:list'; payload: { holidays: PublicHolidayPayload[] } };
+  | { kind: 'holidays:list'; payload: { holidays: PublicHolidayPayload[] } }
+  | { kind: 'reports:trend'; payload: { trend: TrendDatumPayload[] } }
+  | { kind: 'reports:byProject'; payload: { byProject: ByProjectDatumPayload[] } }
+  | { kind: 'reports:earnings'; payload: EarningsResponsePayload }
+  | { kind: 'reports:heatmap'; payload: { heatmap: HeatmapDatumPayload[] } }
+  | { kind: 'reports:contracts'; payload: { contracts: ContractReportRowPayload[] } }
+  | { kind: 'reports:rateChanges'; payload: { rateChanges: RateChangeMarkerPayload[] } };
 
 export type IpcPush =
   | { kind: 'hello'; payload: { version: string } }

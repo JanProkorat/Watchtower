@@ -43,7 +43,86 @@ export type OrchRequest =
   | { id: string; kind: 'daysOff:listInRange'; payload: { from: string; to: string } }
   | { id: string; kind: 'daysOff:upsert'; payload: OrchDayOffInput }
   | { id: string; kind: 'daysOff:delete'; payload: { date: string } }
-  | { id: string; kind: 'holidays:list'; payload: { year: number } };
+  | { id: string; kind: 'holidays:list'; payload: { year: number } }
+  | { id: string; kind: 'reports:trend'; payload: { from: string; to: string; granularity: 'day' | 'week' | 'month' } }
+  | { id: string; kind: 'reports:byProject'; payload: { from: string; to: string } }
+  | { id: string; kind: 'reports:earnings'; payload: { from: string; to: string } }
+  | { id: string; kind: 'reports:heatmap'; payload: { from: string; to: string } }
+  | { id: string; kind: 'reports:contracts'; payload: Record<string, never> }
+  | { id: string; kind: 'reports:rateChanges'; payload: { from: string; to: string } };
+
+export interface OrchTrendDatum {
+  bucket: string;
+  minutes: number;
+  earnedByCurrency: Record<string, number>;
+}
+
+export interface OrchByProjectDatum {
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  isBillable: number;
+  currency: string | null;
+  minutes: number;
+  earnedAmount: number | null;
+}
+
+export interface OrchEarningsByProject {
+  project_id: number;
+  project_name: string;
+  project_color: string;
+  currency: string | null;
+  minutes: number;
+  earned_amount: number | null;
+}
+
+export interface OrchEarningsResponse {
+  billableMinutes: number;
+  unbillableMinutes: number;
+  timeOffMinutes: number;
+  totalEarned: Record<string, number>;
+  avgEffectiveHourlyRate: Record<string, number>;
+  byProject: OrchEarningsByProject[];
+}
+
+export interface OrchHeatmapDatum {
+  date: string;
+  minutes: number;
+}
+
+export interface OrchContractReportRow {
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  archived: number;
+  contract: {
+    rateId: number;
+    projectId: number;
+    effectiveFrom: string;
+    endDate: string | null;
+    hoursPerDay: number;
+    mdLimit: number | null;
+    minutesLogged: number;
+    mdsUsed: number;
+    mdsRemaining: number | null;
+    elapsedWorkdays: number;
+    totalWorkdays: number | null;
+    workdaysRemaining: number | null;
+    projectedTotalMds: number | null;
+    isActive: boolean;
+    isCompleted: boolean;
+  };
+}
+
+export interface OrchRateChangeMarker {
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  effectiveFrom: string;
+  rateType: 'hourly' | 'daily';
+  rateAmount: number;
+  currency: string;
+}
 
 export interface OrchDayOffInput {
   date: string;
@@ -315,7 +394,13 @@ export type OrchResponse =
   | { kind: 'daysOff:listInRange'; payload: { daysOff: OrchDayOffView[] } }
   | { kind: 'daysOff:upsert'; payload: { dayOff: OrchDayOffView } }
   | { kind: 'daysOff:delete'; payload: { ok: true } }
-  | { kind: 'holidays:list'; payload: { holidays: OrchPublicHoliday[] } };
+  | { kind: 'holidays:list'; payload: { holidays: OrchPublicHoliday[] } }
+  | { kind: 'reports:trend'; payload: { trend: OrchTrendDatum[] } }
+  | { kind: 'reports:byProject'; payload: { byProject: OrchByProjectDatum[] } }
+  | { kind: 'reports:earnings'; payload: OrchEarningsResponse }
+  | { kind: 'reports:heatmap'; payload: { heatmap: OrchHeatmapDatum[] } }
+  | { kind: 'reports:contracts'; payload: { contracts: OrchContractReportRow[] } }
+  | { kind: 'reports:rateChanges'; payload: { rateChanges: OrchRateChangeMarker[] } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

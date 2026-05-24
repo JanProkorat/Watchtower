@@ -33,6 +33,7 @@ import { ContractStatusService } from './db/contractStatus.js';
 import { TaskGridService } from './db/taskGrid.js';
 import { DaysOffRepo, type DayOffInput } from './db/repositories/daysOff.js';
 import { czechHolidays } from './db/workdays.js';
+import { ReportsService } from './db/reports.js';
 import { transition } from './stateMachine.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
@@ -534,6 +535,42 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       holidays.sort((a, b) => a.date.localeCompare(b.date));
       return { holidays };
     }
+
+    case 'reports:trend':
+      return {
+        trend: new ReportsService(handle!.db).trend(
+          req.payload.from,
+          req.payload.to,
+          req.payload.granularity,
+        ),
+      };
+
+    case 'reports:byProject':
+      return {
+        byProject: new ReportsService(handle!.db).byProject(
+          req.payload.from,
+          req.payload.to,
+        ),
+      };
+
+    case 'reports:earnings':
+      return new ReportsService(handle!.db).earnings(req.payload.from, req.payload.to);
+
+    case 'reports:heatmap':
+      return {
+        heatmap: new ReportsService(handle!.db).heatmap(req.payload.from, req.payload.to),
+      };
+
+    case 'reports:contracts':
+      return { contracts: new ReportsService(handle!.db).contracts() };
+
+    case 'reports:rateChanges':
+      return {
+        rateChanges: new ReportsService(handle!.db).rateChanges(
+          req.payload.from,
+          req.payload.to,
+        ),
+      };
   }
 }
 
