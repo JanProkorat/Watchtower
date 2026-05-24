@@ -329,11 +329,12 @@ describe('migrations · v3 adds TimeTracker tables', () => {
     db.close();
   });
 
-  it('reports schema version 3 after running migrations', () => {
+  it('reports the latest schema version after running migrations', () => {
     const db = new DatabaseSync(dbPath);
     runMigrations(db as unknown as SqliteLike);
     const row = db.prepare(`SELECT MAX(version) v FROM schema_version`).get() as { v: number };
-    expect(row.v).toBe(3);
+    // v3 adds the TT tables; subsequent migrations (v4+) extend them.
+    expect(row.v).toBeGreaterThanOrEqual(3);
     db.close();
   });
 });

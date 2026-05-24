@@ -34,7 +34,7 @@ export function ModuleTimeTracker({ active }: Props) {
     <ListMode
       tab={view.tab}
       onTabChange={setListTab}
-      onOpenMockProject={() => openProject(1, 'epics')}
+      onOpenProject={(id) => openProject(id, 'epics')}
     />
   );
 }

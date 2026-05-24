@@ -13,7 +13,44 @@ export type OrchRequest =
   | { id: string; kind: 'installHooks'; payload: Record<string, never> }
   | { id: string; kind: 'uninstallHooks'; payload: Record<string, never> }
   | { id: string; kind: 'snooze'; payload: { instanceId: string | '*'; untilMs: number } }
-  | { id: string; kind: 'focusChanged'; payload: { instanceId: string | null } };
+  | { id: string; kind: 'focusChanged'; payload: { instanceId: string | null } }
+  | { id: string; kind: 'projects:list'; payload: OrchProjectListFilter }
+  | { id: string; kind: 'projects:get'; payload: { id: number } }
+  | { id: string; kind: 'projects:create'; payload: OrchProjectInput }
+  | { id: string; kind: 'projects:update'; payload: { id: number; input: Partial<OrchProjectInput> } }
+  | { id: string; kind: 'projects:archive'; payload: { id: number; archived: boolean } }
+  | { id: string; kind: 'projects:delete'; payload: { id: number } };
+
+export interface OrchProjectListFilter {
+  archived?: boolean;
+  kind?: 'work' | 'time_off';
+  search?: string;
+}
+
+export interface OrchProjectInput {
+  name: string;
+  color?: string;
+  kind?: 'work' | 'time_off';
+  isDefault?: boolean;
+  folderPath?: string | null;
+  jiraGlobs?: string[];
+  description?: string | null;
+}
+
+export interface OrchProjectView {
+  id: number;
+  name: string;
+  color: string;
+  archived: boolean;
+  kind: 'work' | 'time_off';
+  isDefault: boolean;
+  folderPath: string | null;
+  jiraGlobs: string[];
+  description: string | null;
+  createdAt: string;
+  epicCount: number;
+  totalMinutes: number;
+}
 
 export type OrchResponse =
   | { kind: 'ping'; payload: { now: number; orch: number } }
@@ -44,7 +81,13 @@ export type OrchResponse =
   | { kind: 'installHooks'; payload: { changed: boolean; backedUp: string | null } }
   | { kind: 'uninstallHooks'; payload: { changed: boolean } }
   | { kind: 'snooze'; payload: { ok: true } }
-  | { kind: 'focusChanged'; payload: { ok: true } };
+  | { kind: 'focusChanged'; payload: { ok: true } }
+  | { kind: 'projects:list'; payload: { projects: OrchProjectView[] } }
+  | { kind: 'projects:get'; payload: { project: OrchProjectView | null } }
+  | { kind: 'projects:create'; payload: { project: OrchProjectView } }
+  | { kind: 'projects:update'; payload: { project: OrchProjectView } }
+  | { kind: 'projects:archive'; payload: { ok: true } }
+  | { kind: 'projects:delete'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
