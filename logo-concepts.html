@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Watchtower — Logo: pick a variant</title>
+<style>
+  :root {
+    --bg: #06070a;
+    --panel: #15171c;
+    --border: #2e333d;
+    --text: #e5e7eb;
+    --muted: #9aa1ab;
+    --primary: #7aa7ff;
+    --secondary: #f0a868;
+    --success: #66bb6a;
+    --error: #ef5350;
+    --neutral: #9aa1ab;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle at 25% 0%, #1a1d24 0%, #06070a 60%);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    padding: 40px 24px 64px;
+  }
+  h1 { margin: 0 0 8px; font-weight: 600; }
+  .lead { color: var(--muted); margin-bottom: 32px; font-size: 14px; max-width: 720px; line-height: 1.55; }
+  .concepts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(420px, 1fr));
+    gap: 28px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 18px; }
+  .card .tagline { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+  .sizes {
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+    padding: 20px;
+    background: #06070a;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .size {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .size-label { font-size: 11px; color: var(--muted); letter-spacing: 1.1px; text-transform: uppercase; }
+  .tray-row {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: #f5f5f7;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1d1d1f;
+    font-size: 13px;
+  }
+  .tray-row.dark { background: #15171c; color: var(--text); }
+  .tray-row .tray-icon-wrap {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+  }
+  .tray-row .tray-icon-wrap svg { color: #000; }
+  .tray-row.dark .tray-icon-wrap svg { color: #fff; }
+  .note { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 12px; }
+  .label-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: rgba(122,167,255,0.15);
+    color: var(--primary);
+    font-size: 11px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<h1>Watchtower — pick a variant</h1>
+<p class="lead">
+  Two directions × two variants each. Refined a touch (gradients on layers, soft glow on the active hex,
+  subtle shadow under the stack). Each shown at 256 / 96 / 48 px plus tray template.
+</p>
+
+<div class="concepts">
+
+  <!-- ─────────────────────────────────────── 3a. Layered platform — tonal blue ─────────────────────────────────────── -->
+  <div class="card">
+    <h2>3a. Layered platform — tonal blue<span class="label-tag">most refined</span></h2>
+    <div class="tagline">Three slabs in a single hue family, narrowing upward. Calm, premium. Amber "active" dot at the peak is optional.</div>
+    <div class="sizes">
+      <div class="size">
+        <svg width="160" height="160" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g3a-l1" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#5a86d8"/><stop offset="100%" stop-color="#3d6cbf"/>
+            </linearGradient>
+            <linearGradient id="g3a-l2" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#7da6e8"/><stop offset="100%" stop-color="#5e8cd6"/>
+            </linearGradient>
+            <linearGradient id="g3a-l3" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#a8c4f4"/><stop offset="100%" stop-color="#8ab2ee"/>
+            </linearGradient>
+            <filter id="g3a-shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+              <feOffset dx="0" dy="3" result="off"/>
+              <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+              <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <g filter="url(#g3a-shadow)">
+            <rect x="32" y="164" width="192" height="40" rx="10" fill="url(#g3a-l1)"/>
+            <rect x="52" y="116" width="152" height="40" rx="10" fill="url(#g3a-l2)"/>
+            <rect x="72" y="68" width="112" height="40" rx="10" fill="url(#g3a-l3)"/>
+          </g>
+          <circle cx="184" cy="50" r="11" fill="#f0a868"/>
+          <circle cx="184" cy="50" r="6" fill="#ffd9a8"/>
+        </svg>
+        <span class="size-label">256</span>
+      </div>
+      <div class="size">
+        <svg width="96" height="96" viewBox="0 0 256 256">
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <rect x="32" y="164" width="192" height="40" rx="10" fill="#3d6cbf"/>
+          <rect x="52" y="116" width="152" height="40" rx="10" fill="#6892e4"/>
+          <rect x="72" y="68" width="112" height="40" rx="10" fill="#9bbcff"/>
+          <circle cx="184" cy="50" r="11" fill="#f0a868"/>
+        </svg>
+        <span class="size-label">96</span>
+      </div>
+      <div class="size">
+        <svg width="48" height="48" viewBox="0 0 256 256">
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <rect x="32" y="164" width="192" height="40" rx="10" fill="#3d6cbf"/>
+          <rect x="52" y="116" width="152" height="40" rx="10" fill="#6892e4"/>
+          <rect x="72" y="68" width="112" height="40" rx="10" fill="#9bbcff"/>
+          <circle cx="184" cy="50" r="11" fill="#f0a868"/>
+        </svg>
+        <span class="size-label">48</span>
+      </div>
+    </div>
+    <div class="tray-row">
+      <span class="tray-icon-wrap">
+        <svg viewBox="0 0 256 256" fill="currentColor">
+          <rect x="32" y="164" width="192" height="32" rx="8"/>
+          <rect x="56" y="116" width="144" height="32" rx="8"/>
+          <rect x="80" y="68" width="96" height="32" rx="8"/>
+        </svg>
+      </span>
+      <span>Watchtower</span>
+      <span style="margin-left:auto;color:#6e6e73;font-size:11px">light menu bar</span>
+    </div>
+    <div class="tray-row dark">
+      <span class="tray-icon-wrap">
+        <svg viewBox="0 0 256 256" fill="currentColor">
+          <rect x="32" y="164" width="192" height="32" rx="8"/>
+          <rect x="56" y="116" width="144" height="32" rx="8"/>
+          <rect x="80" y="68" width="96" height="32" rx="8"/>
+        </svg>
+      </span>
+      <span>Watchtower</span>
+      <span style="margin-left:auto;color:#666;font-size:11px">dark menu bar</span>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────────── 3b. Layered platform — module colors ─────────────────────────────────────── -->
+  <div class="card">
+    <h2>3b. Layered platform — module colors</h2>
+    <div class="tagline">Same stacked shape, but each layer is a different module hue (Instances blue, TimeTracker amber, Settings grey). More personality; reads as "different things stacked under one roof."</div>
+    <div class="sizes">
+      <div class="size">
+        <svg width="160" height="160" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g3b-l1" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#9aa1ab"/><stop offset="100%" stop-color="#6e757e"/>
+            </linearGradient>
+            <linearGradient id="g3b-l2" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#f0a868"/><stop offset="100%" stop-color="#cf8a4d"/>
+            </linearGradient>
+            <linearGradient id="g3b-l3" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#7aa7ff"/><stop offset="100%" stop-color="#5586dc"/>
+            </linearGradient>
+            <filter id="g3b-shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+              <feOffset dx="0" dy="3" result="off"/>
+              <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+              <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <g filter="url(#g3b-shadow)">
+            <rect x="32" y="164" width="192" height="40" rx="10" fill="url(#g3b-l1)"/>
+            <rect x="52" y="116" width="152" height="40" rx="10" fill="url(#g3b-l2)"/>
+            <rect x="72" y="68" width="112" height="40" rx="10" fill="url(#g3b-l3)"/>
+          </g>
+        </svg>
+        <span class="size-label">256</span>
+      </div>
+      <div class="size">
+        <svg width="96" height="96" viewBox="0 0 256 256">
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <rect x="32" y="164" width="192" height="40" rx="10" fill="#6e757e"/>
+          <rect x="52" y="116" width="152" height="40" rx="10" fill="#cf8a4d"/>
+          <rect x="72" y="68" width="112" height="40" rx="10" fill="#5586dc"/>
+        </svg>
+        <span class="size-label">96</span>
+      </div>
+      <div class="size">
+        <svg width="48" height="48" viewBox="0 0 256 256">
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <rect x="32" y="164" width="192" height="40" rx="10" fill="#6e757e"/>
+          <rect x="52" y="116" width="152" height="40" rx="10" fill="#cf8a4d"/>
+          <rect x="72" y="68" width="112" height="40" rx="10" fill="#5586dc"/>
+        </svg>
+        <span class="size-label">48</span>
+      </div>
+    </div>
+    <div class="tray-row">
+      <span class="tray-icon-wrap">
+        <svg viewBox="0 0 256 256" fill="currentColor">
+          <rect x="32" y="164" width="192" height="32" rx="8"/>
+          <rect x="56" y="116" width="144" height="32" rx="8"/>
+          <rect x="80" y="68" width="96" height="32" rx="8"/>
+        </svg>
+      </span>
+      <span>Watchtower</span>
+      <span style="margin-left:auto;color:#6e6e73;font-size:11px">light menu bar</span>
+    </div>
+    <div class="tray-row dark">
+      <span class="tray-icon-wrap">
+        <svg viewBox="0 0 256 256" fill="currentColor">
+          <rect x="32" y="164" width="192" height="32" rx="8"/>
+          <rect x="56" y="116" width="144" height="32" rx="8"/>
+          <rect x="80" y="68" width="96" height="32" rx="8"/>
+        </svg>
+      </span>
+      <span>Watchtower</span>
+      <span style="margin-left:auto;color:#666;font-size:11px">dark menu bar</span>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────────── 4a. Hex cluster — 7 cells with amber active ─────────────────────────────────────── -->
+  <div class="card">
+    <h2>4a. Hex cluster — 7 cells</h2>
+    <div class="tagline">Center hex + 6 surrounding. One cell glows amber as the "active module." Soft halo around it.</div>
+    <div class="sizes">
+      <div class="size">
+        <svg width="160" height="160" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="g4a-halo" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#f0a868" stop-opacity="0.6"/>
+              <stop offset="100%" stop-color="#f0a868" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <!-- halo behind the amber cell (top-left) -->
+          <circle cx="76" cy="98" r="42" fill="url(#g4a-halo)"/>
+          <!-- 6 outer cells (cooler blue) -->
+          <polygon points="128,38 154,53 154,83 128,98 102,83 102,53" fill="#3d6cbf"/>
+          <polygon points="180,68 206,83 206,113 180,128 154,113 154,83" fill="#3d6cbf"/>
+          <polygon points="180,128 206,143 206,173 180,188 154,173 154,143" fill="#3d6cbf"/>
+          <polygon points="128,158 154,173 154,203 128,218 102,203 102,173" fill="#3d6cbf"/>
+          <polygon points="76,128 102,143 102,173 76,188 50,173 50,143" fill="#3d6cbf"/>
+          <!-- center (brighter primary blue) -->
+          <polygon points="128,98 154,113 154,143 128,158 102,143 102,113" fill="#7aa7ff"/>
+          <!-- active cell -->
+          <polygon points="76,68 102,83 102,113 76,128 50,113 50,83" fill="#f0a868"/>
+        </svg>
+        <span class="size-label">256</span>
+      </div>
+      <div class="size">
+        <svg width="96" height="96" viewBox="0 0 256 256">
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <polygon points="128,38 154,53 154,83 128,98 102,83 102,53" fill="#3d6cbf"/>
+          <polygon points="180,68 206,83 206,113 180,128 154,113 154,83" fill="#3d6cbf"/>
+          <polygon points="180,128 206,143 206,173 180,188 154,173 154,143" fill="#3d6cbf"/>
+          <polygon points="128,158 154,173 154,203 128,218 102,203 102,173" fill="#3d6cbf"/>
+          <polygon points="76,128 102,143 102,173 76,188 50,173 50,143" fill="#3d6cbf"/>
+          <polygon points="128,98 154,113 154,143 128,158 102,143 102,113" fill="#7aa7ff"/>
+          <polygon points="76,68 102,83 102,113 76,128 50,113 50,83" fill="#f0a868"/>
+        </svg>
+        <span class="size-label">96</span>
+      </div>
+      <div class="size">
+        <svg width="48" height="48" viewBox="0 0 256 256">
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <polygon points="128,38 154,53 154,83 128,98 102,83 102,53" fill="#3d6cbf"/>
+          <polygon points="180,68 206,83 206,113 180,128 154,113 154,83" fill="#3d6cbf"/>
+          <polygon points="180,128 206,143 206,173 180,188 154,173 154,143" fill="#3d6cbf"/>
+          <polygon points="128,158 154,173 154,203 128,218 102,203 102,173" fill="#3d6cbf"/>
+          <polygon points="76,128 102,143 102,173 76,188 50,173 50,143" fill="#3d6cbf"/>
+          <polygon points="128,98 154,113 154,143 128,158 102,143 102,113" fill="#7aa7ff"/>
+          <polygon points="76,68 102,83 102,113 76,128 50,113 50,83" fill="#f0a868"/>
+        </svg>
+        <span class="size-label">48</span>
+      </div>
+    </div>
+    <div class="tray-row">
+      <span class="tray-icon-wrap">
+        <svg viewBox="0 0 256 256" fill="currentColor">
+          <polygon points="128,38 154,53 154,83 128,98 102,83 102,53"/>
+          <polygon points="180,68 206,83 206,113 180,128 154,113 154,83"/>
+          <polygon points="180,128 206,143 206,173 180,188 154,173 154,143"/>
+          <polygon points="128,158 154,173 154,203 128,218 102,203 102,173"/>
+          <polygon points="76,128 102,143 102,173 76,188 50,173 50,143"/>
+          <polygon points="128,98 154,113 154,143 128,158 102,143 102,113"/>
+          <polygon points="76,68 102,83 102,113 76,128 50,113 50,83"/>
+        </svg>
+      </span>
+      <span>Watchtower</span>
+      <span style="margin-left:auto;color:#6e6e73;font-size:11px">light menu bar</span>
+    </div>
+    <div class="tray-row dark">
+      <span class="tray-icon-wrap">
+        <svg viewBox="0 0 256 256" fill="currentColor">
+          <polygon points="128,38 154,53 154,83 128,98 102,83 102,53"/>
+          <polygon points="180,68 206,83 206,113 180,128 154,113 154,83"/>
+          <polygon points="180,128 206,143 206,173 180,188 154,173 154,143"/>
+          <polygon points="128,158 154,173 154,203 128,218 102,203 102,173"/>
+          <polygon points="76,128 102,143 102,173 76,188 50,173 50,143"/>
+          <polygon points="128,98 154,113 154,143 128,158 102,143 102,113"/>
+          <polygon points="76,68 102,83 102,113 76,128 50,113 50,83"/>
+        </svg>
+      </span>
+      <span>Watchtower</span>
+      <span style="margin-left:auto;color:#666;font-size:11px">dark menu bar</span>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────────── 4b. Hex cluster — 3 cells, compact ─────────────────────────────────────── -->
+  <div class="card">
+    <h2>4b. Hex cluster — 3 cells, compact</h2>
+    <div class="tagline">Minimal version: three hexes in a tight triangle, each a different module color. Reads more as a logo / mark than a tile pattern.</div>
+    <div class="sizes">
+      <div class="size">
+        <svg width="160" height="160" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <!-- Three hexes in a triangle: top, bottom-left, bottom-right. Hex size R=44 -->
+          <!-- top -->
+          <polygon points="128,38 166,60 166,104 128,126 90,104 90,60" fill="#7aa7ff"/>
+          <!-- bottom-left -->
+          <polygon points="80,124 118,146 118,190 80,212 42,190 42,146" fill="#f0a868"/>
+          <!-- bottom-right -->
+          <polygon points="176,124 214,146 214,190 176,212 138,190 138,146" fill="#9aa1ab"/>
+        </svg>
+        <span class="size-label">256</span>
+      </div>
+      <div class="size">
+        <svg width="96" height="96" viewBox="0 0 256 256">
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <polygon points="128,38 166,60 166,104 128,126 90,104 90,60" fill="#7aa7ff"/>
+          <polygon points="80,124 118,146 118,190 80,212 42,190 42,146" fill="#f0a868"/>
+          <polygon points="176,124 214,146 214,190 176,212 138,190 138,146" fill="#9aa1ab"/>
+        </svg>
+        <span class="size-label">96</span>
+      </div>
+      <div class="size">
+        <svg width="48" height="48" viewBox="0 0 256 256">
+          <rect width="256" height="256" rx="56" fill="#15171c"/>
+          <polygon points="128,38 166,60 166,104 128,126 90,104 90,60" fill="#7aa7ff"/>
+          <polygon points="80,124 118,146 118,190 80,212 42,190 42,146" fill="#f0a868"/>
+          <polygon points="176,124 214,146 214,190 176,212 138,190 138,146" fill="#9aa1ab"/>
+        </svg>
+        <span class="size-label">48</span>
+      </div>
+    </div>
+    <div class="tray-row">
+      <span class="tray-icon-wrap">
+        <svg viewBox="0 0 256 256" fill="currentColor">
+          <polygon points="128,38 166,60 166,104 128,126 90,104 90,60"/>
+          <polygon points="80,124 118,146 118,190 80,212 42,190 42,146"/>
+          <polygon points="176,124 214,146 214,190 176,212 138,190 138,146"/>
+        </svg>
+      </span>
+      <span>Watchtower</span>
+      <span style="margin-left:auto;color:#6e6e73;font-size:11px">light menu bar</span>
+    </div>
+    <div class="tray-row dark">
+      <span class="tray-icon-wrap">
+        <svg viewBox="0 0 256 256" fill="currentColor">
+          <polygon points="128,38 166,60 166,104 128,126 90,104 90,60"/>
+          <polygon points="80,124 118,146 118,190 80,212 42,190 42,146"/>
+          <polygon points="176,124 214,146 214,190 176,212 138,190 138,146"/>
+        </svg>
+      </span>
+      <span>Watchtower</span>
+      <span style="margin-left:auto;color:#666;font-size:11px">dark menu bar</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

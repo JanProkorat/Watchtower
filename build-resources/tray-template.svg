@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!--
+    Three hexes in a tight triangle, all black on transparent.
+    macOS treats template images as alpha masks and tints them for the menu bar
+    appearance (white on dark, dark grey on light). 64×64 source renders cleanly
+    at the 32×32 (@2x) and 16×16 (@1x) macOS tray sizes.
+  -->
+  <!-- top hex (R≈10) -->
+  <polygon points="32,4 41,9 41,19 32,24 23,19 23,9" fill="#000"/>
+  <!-- bottom-left hex -->
+  <polygon points="20,28 29,33 29,43 20,48 11,43 11,33" fill="#000"/>
+  <!-- bottom-right hex -->
+  <polygon points="44,28 53,33 53,43 44,48 35,43 35,33" fill="#000"/>
+</svg>
