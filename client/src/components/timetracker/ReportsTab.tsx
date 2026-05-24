@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -6,8 +6,10 @@ import {
   ButtonGroup,
   CircularProgress,
   Grid,
+  MenuItem,
   Paper,
   Stack,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -16,6 +18,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useReports, type Granularity } from '../../state/useReports.js';
 import { CZ_DATE_FORMAT } from '../../util/format.js';
+import type { ProjectViewPayload } from '../../../../shared/ipcContract.js';
 import ChartCard from './charts/ChartCard.js';
 import TrendChart, {
   type RateChangeMarker,
@@ -89,8 +92,25 @@ export function ReportsTab() {
   const [from, setFrom] = useState(daysAgoStr(29));
   const [to, setTo] = useState(todayStr());
   const [granularity, setGranularity] = useState<Granularity>('day');
+  const [projectFilter, setProjectFilter] = useState<number | null>(null);
+  const [projects, setProjects] = useState<ProjectViewPayload[]>([]);
 
-  const state = useReports(from, to, granularity);
+  // Load active projects once + snap the filter to the default project on
+  // first load. Same useRef-guarded pattern as TaskGridView so subsequent
+  // manual changes stick.
+  const initialProjectSelectionDoneRef = useRef(false);
+  useEffect(() => {
+    void window.watchtower.invoke('projects:list', { archived: false }).then((r) => {
+      setProjects(r.projects);
+      if (!initialProjectSelectionDoneRef.current) {
+        initialProjectSelectionDoneRef.current = true;
+        const def = r.projects.find((p) => p.isDefault);
+        if (def) setProjectFilter(def.id);
+      }
+    });
+  }, []);
+
+  const state = useReports(from, to, granularity, projectFilter);
 
   const presets = useMemo(
     () => [
@@ -210,6 +230,24 @@ export function ReportsTab() {
               </Button>
             ))}
           </ButtonGroup>
+          <TextField
+            select
+            size="small"
+            label="Project"
+            value={projectFilter ?? ''}
+            onChange={(e) =>
+              setProjectFilter(e.target.value === '' ? null : Number(e.target.value))
+            }
+            sx={{ minWidth: 180 }}
+          >
+            <MenuItem value="">All projects</MenuItem>
+            {projects.map((p) => (
+              <MenuItem key={p.id} value={p.id}>
+                {p.name}
+                {p.isDefault ? ' (default)' : ''}
+              </MenuItem>
+            ))}
+          </TextField>
           <Box sx={{ flexGrow: 1 }} />
           <ToggleButtonGroup
             size="small"

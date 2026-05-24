@@ -103,6 +103,35 @@ describe('ReportsService', () => {
     });
   });
 
+  describe('project filter', () => {
+    it('narrows every report to a single project when projectId is set', () => {
+      const a = projects.create({ name: 'A', color: '#7aa7ff' });
+      const b = projects.create({ name: 'B', color: '#f0a868' });
+      const ae = epics.create({ projectId: a.id, name: 'EA' });
+      const be = epics.create({ projectId: b.id, name: 'EB' });
+      const at = tasks.create({ epicId: ae.id, number: 'A-1', title: 'a' });
+      const bt = tasks.create({ epicId: be.id, number: 'B-1', title: 'b' });
+      worklogs.create({ taskId: at.id, workDate: '2026-05-05', minutes: 60 });
+      worklogs.create({ taskId: bt.id, workDate: '2026-05-05', minutes: 120 });
+
+      // Without filter: both projects contribute.
+      const all = reports.heatmap('2026-05-01', '2026-05-31');
+      expect(all).toEqual([{ date: '2026-05-05', minutes: 180 }]);
+
+      // With filter on project A: only A's worklogs land in the heatmap.
+      const onlyA = reports.heatmap('2026-05-01', '2026-05-31', a.id);
+      expect(onlyA).toEqual([{ date: '2026-05-05', minutes: 60 }]);
+
+      const trendA = reports.trend('2026-05-01', '2026-05-31', 'day', a.id);
+      expect(trendA).toEqual([
+        { bucket: '2026-05-05', minutes: 60, earnedByCurrency: {} },
+      ]);
+
+      const byProjA = reports.byProject('2026-05-01', '2026-05-31', a.id);
+      expect(byProjA.map((r) => r.projectName)).toEqual(['A']);
+    });
+  });
+
   describe('byProject', () => {
     it('returns one row per project with worklogs in range', () => {
       const a = projects.create({ name: 'A', color: '#7aa7ff' });

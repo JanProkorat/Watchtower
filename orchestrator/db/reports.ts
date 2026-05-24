@@ -81,38 +81,58 @@ const BUCKET_EXPR: Record<Granularity, string> = {
 export class ReportsService {
   constructor(private db: SqliteLike) {}
 
-  trend(from: string, to: string, granularity: Granularity): TrendRow[] {
+  trend(from: string, to: string, granularity: Granularity, projectId?: number): TrendRow[] {
     const bucketExpr = BUCKET_EXPR[granularity];
+    const totalsParams: unknown[] = [from, to];
+    let totalsSql = `SELECT ${bucketExpr} AS bucket,
+                            SUM(${EFFECTIVE_MINUTES}) AS minutes
+                       FROM worklogs w`;
+    if (projectId !== undefined) {
+      totalsSql += `
+                       JOIN tasks t    ON t.id = w.task_id
+                       JOIN epics e    ON e.id = t.epic_id
+                      WHERE w.work_date BETWEEN ? AND ?
+                        AND e.project_id = ?`;
+      totalsParams.push(projectId);
+    } else {
+      totalsSql += `
+                      WHERE w.work_date BETWEEN ? AND ?`;
+    }
+    totalsSql += `
+                      GROUP BY bucket
+                      ORDER BY bucket ASC`;
 
-    const totals = this.db
-      .prepare(
-        `SELECT ${bucketExpr} AS bucket,
-                SUM(${EFFECTIVE_MINUTES}) AS minutes
-           FROM worklogs w
-          WHERE w.work_date BETWEEN ? AND ?
-          GROUP BY bucket
-          ORDER BY bucket ASC`,
-      )
-      .all(from, to) as Array<{ bucket: string; minutes: number }>;
+    const totals = this.db.prepare(totalsSql).all(...totalsParams) as Array<{
+      bucket: string;
+      minutes: number;
+    }>;
 
-    const earnings = this.db
-      .prepare(
-        `WITH ${PROJECT_RATE_PERIODS_CTE}
-         SELECT ${bucketExpr} AS bucket,
-                rp.currency   AS currency,
-                ${SUM_EARNED} AS earned
-           FROM worklogs w
-           JOIN tasks t    ON t.id = w.task_id
-           JOIN epics e    ON e.id = t.epic_id
-           JOIN projects p ON p.id = e.project_id
-           ${RATE_PERIOD_JOIN}
-          WHERE w.work_date BETWEEN ? AND ?
-            AND p.is_billable = 1
-            AND rp.rate_amount IS NOT NULL
-          GROUP BY bucket, rp.currency
-          ORDER BY bucket ASC`,
-      )
-      .all(from, to) as Array<{ bucket: string; currency: string; earned: number }>;
+    const earningsParams: unknown[] = [from, to];
+    let earningsSql = `WITH ${PROJECT_RATE_PERIODS_CTE}
+                       SELECT ${bucketExpr} AS bucket,
+                              rp.currency   AS currency,
+                              ${SUM_EARNED} AS earned
+                         FROM worklogs w
+                         JOIN tasks t    ON t.id = w.task_id
+                         JOIN epics e    ON e.id = t.epic_id
+                         JOIN projects p ON p.id = e.project_id
+                         ${RATE_PERIOD_JOIN}
+                        WHERE w.work_date BETWEEN ? AND ?
+                          AND p.is_billable = 1
+                          AND rp.rate_amount IS NOT NULL`;
+    if (projectId !== undefined) {
+      earningsSql += ' AND p.id = ?';
+      earningsParams.push(projectId);
+    }
+    earningsSql += `
+                        GROUP BY bucket, rp.currency
+                        ORDER BY bucket ASC`;
+
+    const earnings = this.db.prepare(earningsSql).all(...earningsParams) as Array<{
+      bucket: string;
+      currency: string;
+      earned: number;
+    }>;
 
     const earnedByBucket = new Map<string, Record<string, number>>();
     for (const row of earnings) {
@@ -128,7 +148,13 @@ export class ReportsService {
     }));
   }
 
-  byProject(from: string, to: string): ByProjectRow[] {
+  byProject(from: string, to: string, projectId?: number): ByProjectRow[] {
+    const params: unknown[] = [from, to];
+    let whereProject = '';
+    if (projectId !== undefined) {
+      whereProject = ' WHERE p.id = ?';
+      params.push(projectId);
+    }
     const rows = this.db
       .prepare(
         `WITH ${PROJECT_RATE_PERIODS_CTE}
@@ -151,12 +177,12 @@ export class ReportsService {
            LEFT JOIN tasks t    ON t.epic_id    = e.id
            LEFT JOIN worklogs w ON w.task_id    = t.id
                                 AND w.work_date BETWEEN ? AND ?
-           ${RATE_PERIOD_JOIN}
+           ${RATE_PERIOD_JOIN}${whereProject}
           GROUP BY p.id
           HAVING minutes > 0
           ORDER BY minutes DESC`,
       )
-      .all(from, to) as Array<{
+      .all(...params) as Array<{
         project_id: number;
         project_name: string;
         project_color: string;
@@ -177,7 +203,11 @@ export class ReportsService {
     }));
   }
 
-  earnings(from: string, to: string): EarningsResponse {
+  earnings(from: string, to: string, projectId?: number): EarningsResponse {
+    const projectFilter = projectId !== undefined ? ' AND p.id = ?' : '';
+    const totalsParams: unknown[] = [from, to];
+    if (projectId !== undefined) totalsParams.push(projectId);
+
     const totals = this.db
       .prepare(
         `SELECT
@@ -188,14 +218,16 @@ export class ReportsService {
            JOIN tasks t    ON t.id = w.task_id
            JOIN epics e    ON e.id = t.epic_id
            JOIN projects p ON p.id = e.project_id
-          WHERE w.work_date BETWEEN ? AND ?`,
+          WHERE w.work_date BETWEEN ? AND ?${projectFilter}`,
       )
-      .get(from, to) as {
+      .get(...totalsParams) as {
         billable_minutes: number | null;
         unbillable_minutes: number | null;
         time_off_minutes: number | null;
       };
 
+    const earnedParams: unknown[] = [from, to];
+    if (projectId !== undefined) earnedParams.push(projectId);
     const earnedByCurrency = this.db
       .prepare(
         `WITH ${PROJECT_RATE_PERIODS_CTE}
@@ -209,11 +241,13 @@ export class ReportsService {
            ${RATE_PERIOD_JOIN}
           WHERE w.work_date BETWEEN ? AND ?
             AND p.is_billable = 1
-            AND rp.rate_amount IS NOT NULL
+            AND rp.rate_amount IS NOT NULL${projectFilter}
           GROUP BY rp.currency`,
       )
-      .all(from, to) as Array<{ currency: string; earned: number; billable_minutes: number }>;
+      .all(...earnedParams) as Array<{ currency: string; earned: number; billable_minutes: number }>;
 
+    const byProjParams: unknown[] = [from, to];
+    if (projectId !== undefined) byProjParams.push(projectId);
     const byProject = this.db
       .prepare(
         `WITH ${PROJECT_RATE_PERIODS_CTE}
@@ -230,11 +264,11 @@ export class ReportsService {
            ${RATE_PERIOD_JOIN}
           WHERE w.work_date BETWEEN ? AND ?
             AND p.is_billable = 1
-            AND rp.rate_amount IS NOT NULL
+            AND rp.rate_amount IS NOT NULL${projectFilter}
           GROUP BY p.id
           ORDER BY earned_amount DESC`,
       )
-      .all(from, to) as EarningsByProjectRow[];
+      .all(...byProjParams) as EarningsByProjectRow[];
 
     const total_earned: Record<string, number> = {};
     const avg_effective_hourly_rate: Record<string, number> = {};
@@ -255,22 +289,37 @@ export class ReportsService {
     };
   }
 
-  heatmap(from: string, to: string): HeatmapRow[] {
-    return this.db
-      .prepare(
-        `SELECT work_date AS date,
-                SUM(${effectiveMinutes('')}) AS minutes
-           FROM worklogs
-          WHERE work_date BETWEEN ? AND ?
-          GROUP BY work_date
-          ORDER BY work_date ASC`,
-      )
-      .all(from, to) as HeatmapRow[];
+  heatmap(from: string, to: string, projectId?: number): HeatmapRow[] {
+    const params: unknown[] = [from, to];
+    let sql = `SELECT w.work_date AS date,
+                      SUM(${EFFECTIVE_MINUTES}) AS minutes
+                 FROM worklogs w`;
+    if (projectId !== undefined) {
+      sql += `
+                 JOIN tasks t ON t.id = w.task_id
+                 JOIN epics e ON e.id = t.epic_id
+                WHERE w.work_date BETWEEN ? AND ?
+                  AND e.project_id = ?`;
+      params.push(projectId);
+    } else {
+      sql += `
+                WHERE w.work_date BETWEEN ? AND ?`;
+    }
+    sql += `
+                GROUP BY w.work_date
+                ORDER BY w.work_date ASC`;
+    return this.db.prepare(sql).all(...params) as HeatmapRow[];
   }
 
   /** Snapshot of every active contract that has an end_date and/or md_limit. */
-  contracts(): ContractsReportRow[] {
+  contracts(projectId?: number): ContractsReportRow[] {
     const today = todayStr();
+    const params: unknown[] = [today, today];
+    let projectFilter = '';
+    if (projectId !== undefined) {
+      projectFilter = ' AND p.id = ?';
+      params.push(projectId);
+    }
     const rows = this.db
       .prepare(
         `SELECT p.id        AS project_id,
@@ -282,11 +331,11 @@ export class ReportsService {
           WHERE p.kind = 'work'
             AND pr.effective_from <= ?
             AND (pr.end_date IS NULL OR pr.end_date >= ?)
-            AND (pr.end_date IS NOT NULL OR pr.md_limit IS NOT NULL)
+            AND (pr.end_date IS NOT NULL OR pr.md_limit IS NOT NULL)${projectFilter}
           GROUP BY p.id
           ORDER BY p.archived ASC, p.name ASC`,
       )
-      .all(today, today) as Array<{
+      .all(...params) as Array<{
         project_id: number;
         project_name: string;
         project_color: string;
@@ -310,7 +359,13 @@ export class ReportsService {
     return out;
   }
 
-  rateChanges(from: string, to: string): RateChangeRow[] {
+  rateChanges(from: string, to: string, projectId?: number): RateChangeRow[] {
+    const params: unknown[] = [from, to];
+    let projectFilter = '';
+    if (projectId !== undefined) {
+      projectFilter = ' AND o.project_id = ?';
+      params.push(projectId);
+    }
     return (
       this.db
         .prepare(
@@ -335,10 +390,10 @@ export class ReportsService {
              FROM ordered o
              JOIN projects p ON p.id = o.project_id
             WHERE o.rn > 1
-              AND o.effective_from BETWEEN ? AND ?
+              AND o.effective_from BETWEEN ? AND ?${projectFilter}
             ORDER BY o.effective_from ASC`,
         )
-        .all(from, to) as Array<{
+        .all(...params) as Array<{
           project_id: number;
           project_name: string;
           project_color: string;

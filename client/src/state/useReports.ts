@@ -31,6 +31,7 @@ export function useReports(
   from: string,
   to: string,
   granularity: Granularity,
+  projectId?: number | null,
 ): ReportsState {
   const [trend, setTrend] = useState<TrendDatumPayload[]>([]);
   const [byProject, setByProject] = useState<ByProjectDatumPayload[]>([]);
@@ -52,14 +53,27 @@ export function useReports(
         return null;
       }
     };
+    // Only include projectId in the payload when set — keeps the wire shape
+    // minimal and matches the "all projects" semantics on the orchestrator.
+    const pid = projectId ?? undefined;
     const [trendRes, byProjRes, earningsRes, heatmapRes, contractsRes, rateRes] =
       await Promise.all([
-        safe('trend', () => window.watchtower.invoke('reports:trend', { from, to, granularity })),
-        safe('byProject', () => window.watchtower.invoke('reports:byProject', { from, to })),
-        safe('earnings', () => window.watchtower.invoke('reports:earnings', { from, to })),
-        safe('heatmap', () => window.watchtower.invoke('reports:heatmap', { from, to })),
-        safe('contracts', () => window.watchtower.invoke('reports:contracts', {})),
-        safe('rateChanges', () => window.watchtower.invoke('reports:rateChanges', { from, to })),
+        safe('trend', () =>
+          window.watchtower.invoke('reports:trend', { from, to, granularity, projectId: pid }),
+        ),
+        safe('byProject', () =>
+          window.watchtower.invoke('reports:byProject', { from, to, projectId: pid }),
+        ),
+        safe('earnings', () =>
+          window.watchtower.invoke('reports:earnings', { from, to, projectId: pid }),
+        ),
+        safe('heatmap', () =>
+          window.watchtower.invoke('reports:heatmap', { from, to, projectId: pid }),
+        ),
+        safe('contracts', () => window.watchtower.invoke('reports:contracts', { projectId: pid })),
+        safe('rateChanges', () =>
+          window.watchtower.invoke('reports:rateChanges', { from, to, projectId: pid }),
+        ),
       ]);
     if (trendRes) setTrend(trendRes.trend);
     if (byProjRes) setByProject(byProjRes.byProject);
@@ -69,7 +83,7 @@ export function useReports(
     if (rateRes) setRateChanges(rateRes.rateChanges);
     setErrors(errs);
     setLoading(false);
-  }, [from, to, granularity]);
+  }, [from, to, granularity, projectId]);
 
   useEffect(() => {
     void refresh();
