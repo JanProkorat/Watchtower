@@ -48,14 +48,16 @@ export interface TaskGridTaskPayload {
   taskTitle: string;
   status: 'open' | 'in_progress' | 'done';
   estimatedMinutes: number | null;
-  totalMinutes: number;
+  totalTracked: number;
+  totalReported: number;
   epicId: number;
   epicName: string;
   projectId: number;
   projectName: string;
   projectColor: string;
   isBillable: boolean;
-  perDay: Record<number, number>;
+  perDayTracked: Record<number, number>;
+  perDayReported: Record<number, number>;
 }
 
 export interface TaskGridEarningsRowPayload {
@@ -69,7 +71,8 @@ export interface TaskGridResponsePayload {
   month: number;
   daysInMonth: number;
   tasks: TaskGridTaskPayload[];
-  dailyTotals: Record<number, number>;
+  dailyTotalsTracked: Record<number, number>;
+  dailyTotalsReported: Record<number, number>;
   earningsByCurrency: TaskGridEarningsRowPayload[];
   /** Mon-Fri workdays × 8h, used as the capacity divisor in the total row. */
   monthCapacityMinutes: number;

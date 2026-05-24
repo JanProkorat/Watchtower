@@ -46,14 +46,16 @@ export interface OrchTaskGridTask {
   taskTitle: string;
   status: 'open' | 'in_progress' | 'done';
   estimatedMinutes: number | null;
-  totalMinutes: number;
+  totalTracked: number;
+  totalReported: number;
   epicId: number;
   epicName: string;
   projectId: number;
   projectName: string;
   projectColor: string;
   isBillable: boolean;
-  perDay: Record<number, number>;
+  perDayTracked: Record<number, number>;
+  perDayReported: Record<number, number>;
 }
 
 export interface OrchTaskGridEarningsRow {
@@ -67,7 +69,8 @@ export interface OrchTaskGridResponse {
   month: number;
   daysInMonth: number;
   tasks: OrchTaskGridTask[];
-  dailyTotals: Record<number, number>;
+  dailyTotalsTracked: Record<number, number>;
+  dailyTotalsReported: Record<number, number>;
   earningsByCurrency: OrchTaskGridEarningsRow[];
   monthCapacityMinutes: number;
 }

@@ -54,7 +54,8 @@ describe('TaskGridService', () => {
   it('returns an empty response when no worklogs exist in the month', () => {
     const res = s.service.get(2026, 5);
     expect(res.tasks).toEqual([]);
-    expect(res.dailyTotals).toEqual({});
+    expect(res.dailyTotalsTracked).toEqual({});
+    expect(res.dailyTotalsReported).toEqual({});
     expect(res.earningsByCurrency).toEqual([]);
     expect(res.daysInMonth).toBe(31);
     // May 2026 = 21 weekdays × 8h × 60min = 10080.
@@ -82,9 +83,14 @@ describe('TaskGridService', () => {
     // Reported NULL (default) — grid should show the tracked 60.
     s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-05', minutes: 60 });
     const res = s.service.get(2026, 5);
-    expect(res.tasks[0]?.perDay).toEqual({ 4: 90, 5: 60 });
-    expect(res.tasks[0]?.totalMinutes).toBe(150);
-    expect(res.dailyTotals).toEqual({ 4: 90, 5: 60 });
+    // Reported view: 90 (overridden) on day 4, 60 (fallback) on day 5
+    expect(res.tasks[0]?.perDayReported).toEqual({ 4: 90, 5: 60 });
+    expect(res.tasks[0]?.totalReported).toBe(150);
+    expect(res.dailyTotalsReported).toEqual({ 4: 90, 5: 60 });
+    // Tracked view: 120 on day 4, 60 on day 5
+    expect(res.tasks[0]?.perDayTracked).toEqual({ 4: 120, 5: 60 });
+    expect(res.tasks[0]?.totalTracked).toBe(180);
+    expect(res.dailyTotalsTracked).toEqual({ 4: 120, 5: 60 });
   });
 
   it('includes daysInMonth correctly for short / long / leap months', () => {
@@ -104,9 +110,12 @@ describe('TaskGridService', () => {
 
     const res = s.service.get(2026, 5);
     expect(res.tasks.length).toBe(1);
-    expect(res.tasks[0]?.perDay).toEqual({ 4: 90, 12: 45 });
-    expect(res.tasks[0]?.totalMinutes).toBe(135);
-    expect(res.dailyTotals).toEqual({ 4: 90, 12: 45 });
+    expect(res.tasks[0]?.perDayReported).toEqual({ 4: 90, 12: 45 });
+    expect(res.tasks[0]?.totalReported).toBe(135);
+    expect(res.tasks[0]?.perDayTracked).toEqual({ 4: 90, 12: 45 });
+    expect(res.tasks[0]?.totalTracked).toBe(135);
+    expect(res.dailyTotalsReported).toEqual({ 4: 90, 12: 45 });
+    expect(res.dailyTotalsTracked).toEqual({ 4: 90, 12: 45 });
   });
 
   it('excludes worklogs outside the month boundaries', () => {
@@ -119,7 +128,8 @@ describe('TaskGridService', () => {
     s.worklogsRepo.create({ taskId: task.id, workDate: '2026-06-01', minutes: 90 });
 
     const res = s.service.get(2026, 5);
-    expect(res.tasks[0]?.totalMinutes).toBe(75); // 30 + 45 only
+    expect(res.tasks[0]?.totalReported).toBe(75); // 30 + 45 only
+    expect(res.tasks[0]?.totalTracked).toBe(75);
   });
 
   it('projectId filter narrows the grid to one project', () => {
@@ -135,7 +145,8 @@ describe('TaskGridService', () => {
     const res = s.service.get(2026, 5, projectA.id);
     expect(res.tasks.length).toBe(1);
     expect(res.tasks[0]?.projectName).toBe('A');
-    expect(res.dailyTotals).toEqual({ 5: 60 });
+    expect(res.dailyTotalsReported).toEqual({ 5: 60 });
+    expect(res.dailyTotalsTracked).toEqual({ 5: 60 });
   });
 
   it('sorts tasks by project name, epic display_order, then task id', () => {
