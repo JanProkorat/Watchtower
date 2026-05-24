@@ -38,7 +38,30 @@ export type OrchRequest =
   | { id: string; kind: 'contracts:create'; payload: OrchContractInput }
   | { id: string; kind: 'contracts:update'; payload: { id: number; input: Partial<OrchContractInput> } }
   | { id: string; kind: 'contracts:delete'; payload: { id: number } }
-  | { id: string; kind: 'taskGrid:get'; payload: { year: number; month: number; projectId?: number } };
+  | { id: string; kind: 'taskGrid:get'; payload: { year: number; month: number; projectId?: number } }
+  | { id: string; kind: 'daysOff:list'; payload: Record<string, never> }
+  | { id: string; kind: 'daysOff:listInRange'; payload: { from: string; to: string } }
+  | { id: string; kind: 'daysOff:upsert'; payload: OrchDayOffInput }
+  | { id: string; kind: 'daysOff:delete'; payload: { date: string } }
+  | { id: string; kind: 'holidays:list'; payload: { year: number } };
+
+export interface OrchDayOffInput {
+  date: string;
+  kind: 'vacation' | 'sick' | 'other' | 'holiday';
+  note?: string | null;
+}
+
+export interface OrchDayOffView {
+  date: string;
+  kind: 'vacation' | 'sick' | 'other' | 'holiday';
+  note: string | null;
+  createdAt: string;
+}
+
+export interface OrchPublicHoliday {
+  date: string;
+  name: string;
+}
 
 export interface OrchTaskGridTask {
   taskId: number;
@@ -74,6 +97,7 @@ export interface OrchTaskGridResponse {
   earningsByCurrency: OrchTaskGridEarningsRow[];
   monthCapacityMinutes: number;
   publicHolidays: Array<{ date: string; name: string }>;
+  daysOff: OrchDayOffView[];
 }
 
 export interface OrchContractInput {
@@ -286,7 +310,12 @@ export type OrchResponse =
   | { kind: 'contracts:create'; payload: { contract: OrchContractView } | OrchOverlapError }
   | { kind: 'contracts:update'; payload: { contract: OrchContractView } | OrchOverlapError }
   | { kind: 'contracts:delete'; payload: { ok: true } }
-  | { kind: 'taskGrid:get'; payload: OrchTaskGridResponse };
+  | { kind: 'taskGrid:get'; payload: OrchTaskGridResponse }
+  | { kind: 'daysOff:list'; payload: { daysOff: OrchDayOffView[] } }
+  | { kind: 'daysOff:listInRange'; payload: { daysOff: OrchDayOffView[] } }
+  | { kind: 'daysOff:upsert'; payload: { dayOff: OrchDayOffView } }
+  | { kind: 'daysOff:delete'; payload: { ok: true } }
+  | { kind: 'holidays:list'; payload: { holidays: OrchPublicHoliday[] } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

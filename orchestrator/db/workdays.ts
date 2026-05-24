@@ -92,11 +92,20 @@ export function czechHolidays(year: number): Map<string, string> {
 }
 
 /**
- * Mon-Fri count for the period, minus Czech public holidays that fell on a
- * weekday. Returns whole-day workdays — no fractions. Bounds are inclusive
- * and expressed as YYYY-MM-DD strings.
+ * Mon-Fri count for the period, minus Czech public holidays AND any
+ * user-marked days off (vacation, sick, other) that fall on a weekday.
+ * Returns whole-day workdays — no fractions. Bounds are inclusive and
+ * expressed as YYYY-MM-DD strings.
+ *
+ * `extraNonWorking` is the days_off set; pass undefined when the caller
+ * doesn't care about user time off (e.g. early bootstrap before the
+ * days_off table is populated).
  */
-export function countWorkdays(from: string, to: string): number {
+export function countWorkdays(
+  from: string,
+  to: string,
+  extraNonWorking?: ReadonlySet<string>,
+): number {
   if (from > to) return 0;
   const [fy, fm, fd] = from.split('-').map(Number);
   const [ty, tm, td] = to.split('-').map(Number);
@@ -125,6 +134,7 @@ export function countWorkdays(from: string, to: string): number {
     }
     const key = ymd(d.getFullYear(), d.getMonth() + 1, d.getDate());
     if (holidayMap.has(key)) continue;
+    if (extraNonWorking?.has(key)) continue;
     count++;
   }
   return count;

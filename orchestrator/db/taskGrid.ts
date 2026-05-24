@@ -1,5 +1,6 @@
 import type { SqliteLike } from './migrations.js';
 import { countWorkdays, holidaysInRange, type PublicHoliday } from './workdays.js';
+import { DaysOffRepo, type DayOffRow } from './repositories/daysOff.js';
 
 export interface TaskGridTask {
   taskId: number;
@@ -44,12 +45,13 @@ export interface TaskGridResponse {
   earningsByCurrency: TaskGridEarningsRow[];
   /**
    * Expected working capacity for the month — Mon-Fri workdays minus Czech
-   * public holidays that fell on weekdays, × 8h. Future: subtract days_off
-   * once Phase 19 wires the user-marked time-off table in.
+   * public holidays AND user-marked days off that fell on weekdays, × 8h.
    */
   monthCapacityMinutes: number;
   /** Czech public holidays that fall inside the displayed month. */
   publicHolidays: PublicHoliday[];
+  /** User-marked days off that fall inside the displayed month. */
+  daysOff: DayOffRow[];
 }
 
 interface TaskMetaRow {
@@ -117,8 +119,10 @@ export class TaskGridService {
 
   get(year: number, month: number, projectId?: number): TaskGridResponse {
     const { from, to, daysInMonth } = monthBounds(year, month);
-    const monthCapacityMinutes = countWorkdays(from, to) * 8 * 60;
     const publicHolidays = holidaysInRange(from, to);
+    const daysOff = new DaysOffRepo(this.db).listInRange(from, to);
+    const daysOffSet = new Set(daysOff.map((d) => d.date));
+    const monthCapacityMinutes = countWorkdays(from, to, daysOffSet) * 8 * 60;
 
     // 1. Fetch worklogs in the period scoped to the optional project.
     //    Both tracked + reported come back so the client can flip between
@@ -150,6 +154,7 @@ export class TaskGridService {
         earningsByCurrency: [],
         monthCapacityMinutes,
         publicHolidays,
+        daysOff,
       };
     }
 
@@ -255,6 +260,7 @@ export class TaskGridService {
       earningsByCurrency,
       monthCapacityMinutes,
       publicHolidays,
+      daysOff,
     };
   }
 
