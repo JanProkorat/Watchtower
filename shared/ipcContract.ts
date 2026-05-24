@@ -31,7 +31,52 @@ export type IpcRequest =
   | { kind: 'tasks:listForProject'; payload: { projectId: number } }
   | { kind: 'tasks:create'; payload: TaskInputPayload }
   | { kind: 'tasks:update'; payload: { id: number; input: Partial<TaskInputPayload> } }
-  | { kind: 'tasks:delete'; payload: { id: number } };
+  | { kind: 'tasks:delete'; payload: { id: number } }
+  | { kind: 'worklogs:list'; payload: WorklogListFilterPayload }
+  | { kind: 'worklogs:create'; payload: WorklogInputPayload }
+  | { kind: 'worklogs:update'; payload: { id: number; input: Partial<WorklogInputPayload> } }
+  | { kind: 'worklogs:delete'; payload: { id: number } };
+
+export interface WorklogListFilterPayload {
+  projectId?: number;
+  epicId?: number;
+  taskId?: number;
+  from?: string;
+  to?: string;
+  source?: string;
+  search?: string;
+}
+
+export interface WorklogInputPayload {
+  taskId: number;
+  description?: string | null;
+  workDate: string;
+  minutes: number;
+  reportedMinutes?: number | null;
+  source?: string | null;
+  externalId?: string | null;
+  jiraUploaded?: boolean;
+}
+
+export interface WorklogViewPayload {
+  id: number;
+  taskId: number;
+  description: string | null;
+  workDate: string;
+  minutes: number;
+  reportedMinutes: number | null;
+  source: string | null;
+  externalId: string | null;
+  jiraUploaded: boolean;
+  createdAt: string;
+  taskNumber: string;
+  taskTitle: string;
+  epicId: number;
+  epicName: string;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+}
 
 export interface EpicInputPayload {
   projectId: number;
@@ -155,7 +200,11 @@ export type IpcResponse =
   | { kind: 'tasks:listForProject'; payload: { tasks: TaskViewPayload[] } }
   | { kind: 'tasks:create'; payload: { task: TaskViewPayload } }
   | { kind: 'tasks:update'; payload: { task: TaskViewPayload } }
-  | { kind: 'tasks:delete'; payload: { ok: true } };
+  | { kind: 'tasks:delete'; payload: { ok: true } }
+  | { kind: 'worklogs:list'; payload: { worklogs: WorklogViewPayload[] } }
+  | { kind: 'worklogs:create'; payload: { worklog: WorklogViewPayload } }
+  | { kind: 'worklogs:update'; payload: { worklog: WorklogViewPayload } }
+  | { kind: 'worklogs:delete'; payload: { ok: true } };
 
 export type IpcPush =
   | { kind: 'hello'; payload: { version: string } }

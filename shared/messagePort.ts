@@ -29,7 +29,52 @@ export type OrchRequest =
   | { id: string; kind: 'tasks:listForProject'; payload: { projectId: number } }
   | { id: string; kind: 'tasks:create'; payload: OrchTaskInput }
   | { id: string; kind: 'tasks:update'; payload: { id: number; input: Partial<OrchTaskInput> } }
-  | { id: string; kind: 'tasks:delete'; payload: { id: number } };
+  | { id: string; kind: 'tasks:delete'; payload: { id: number } }
+  | { id: string; kind: 'worklogs:list'; payload: OrchWorklogListFilter }
+  | { id: string; kind: 'worklogs:create'; payload: OrchWorklogInput }
+  | { id: string; kind: 'worklogs:update'; payload: { id: number; input: Partial<OrchWorklogInput> } }
+  | { id: string; kind: 'worklogs:delete'; payload: { id: number } };
+
+export interface OrchWorklogListFilter {
+  projectId?: number;
+  epicId?: number;
+  taskId?: number;
+  from?: string;
+  to?: string;
+  source?: string;
+  search?: string;
+}
+
+export interface OrchWorklogInput {
+  taskId: number;
+  description?: string | null;
+  workDate: string;
+  minutes: number;
+  reportedMinutes?: number | null;
+  source?: string | null;
+  externalId?: string | null;
+  jiraUploaded?: boolean;
+}
+
+export interface OrchWorklogView {
+  id: number;
+  taskId: number;
+  description: string | null;
+  workDate: string;
+  minutes: number;
+  reportedMinutes: number | null;
+  source: string | null;
+  externalId: string | null;
+  jiraUploaded: boolean;
+  createdAt: string;
+  taskNumber: string;
+  taskTitle: string;
+  epicId: number;
+  epicName: string;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+}
 
 export interface OrchEpicInput {
   projectId: number;
@@ -151,7 +196,11 @@ export type OrchResponse =
   | { kind: 'tasks:listForProject'; payload: { tasks: OrchTaskView[] } }
   | { kind: 'tasks:create'; payload: { task: OrchTaskView } }
   | { kind: 'tasks:update'; payload: { task: OrchTaskView } }
-  | { kind: 'tasks:delete'; payload: { ok: true } };
+  | { kind: 'tasks:delete'; payload: { ok: true } }
+  | { kind: 'worklogs:list'; payload: { worklogs: OrchWorklogView[] } }
+  | { kind: 'worklogs:create'; payload: { worklog: OrchWorklogView } }
+  | { kind: 'worklogs:update'; payload: { worklog: OrchWorklogView } }
+  | { kind: 'worklogs:delete'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
