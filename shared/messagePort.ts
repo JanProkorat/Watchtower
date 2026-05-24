@@ -19,7 +19,61 @@ export type OrchRequest =
   | { id: string; kind: 'projects:create'; payload: OrchProjectInput }
   | { id: string; kind: 'projects:update'; payload: { id: number; input: Partial<OrchProjectInput> } }
   | { id: string; kind: 'projects:archive'; payload: { id: number; archived: boolean } }
-  | { id: string; kind: 'projects:delete'; payload: { id: number } };
+  | { id: string; kind: 'projects:delete'; payload: { id: number } }
+  | { id: string; kind: 'epics:list'; payload: { projectId: number } }
+  | { id: string; kind: 'epics:create'; payload: OrchEpicInput }
+  | { id: string; kind: 'epics:update'; payload: { id: number; input: Partial<OrchEpicInput> } }
+  | { id: string; kind: 'epics:reorder'; payload: { projectId: number; orderedIds: number[] } }
+  | { id: string; kind: 'epics:delete'; payload: { id: number } }
+  | { id: string; kind: 'tasks:listForEpic'; payload: { epicId: number } }
+  | { id: string; kind: 'tasks:listForProject'; payload: { projectId: number } }
+  | { id: string; kind: 'tasks:create'; payload: OrchTaskInput }
+  | { id: string; kind: 'tasks:update'; payload: { id: number; input: Partial<OrchTaskInput> } }
+  | { id: string; kind: 'tasks:delete'; payload: { id: number } };
+
+export interface OrchEpicInput {
+  projectId: number;
+  name: string;
+  description?: string | null;
+  status?: 'planned' | 'active' | 'done';
+  jiraEpicKey?: string | null;
+  githubIssueUrl?: string | null;
+}
+
+export interface OrchEpicView {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string | null;
+  status: 'planned' | 'active' | 'done';
+  displayOrder: number;
+  jiraEpicKey: string | null;
+  githubIssueUrl: string | null;
+  createdAt: string;
+  taskCount: number;
+  totalMinutes: number;
+}
+
+export interface OrchTaskInput {
+  epicId: number;
+  number: string;
+  title: string;
+  description?: string | null;
+  status?: 'open' | 'in_progress' | 'done';
+  estimatedMinutes?: number | null;
+}
+
+export interface OrchTaskView {
+  id: number;
+  epicId: number;
+  number: string;
+  title: string;
+  description: string | null;
+  status: 'open' | 'in_progress' | 'done';
+  estimatedMinutes: number | null;
+  createdAt: string;
+  totalMinutes: number;
+}
 
 export interface OrchProjectListFilter {
   archived?: boolean;
@@ -87,7 +141,17 @@ export type OrchResponse =
   | { kind: 'projects:create'; payload: { project: OrchProjectView } }
   | { kind: 'projects:update'; payload: { project: OrchProjectView } }
   | { kind: 'projects:archive'; payload: { ok: true } }
-  | { kind: 'projects:delete'; payload: { ok: true } };
+  | { kind: 'projects:delete'; payload: { ok: true } }
+  | { kind: 'epics:list'; payload: { epics: OrchEpicView[] } }
+  | { kind: 'epics:create'; payload: { epic: OrchEpicView } }
+  | { kind: 'epics:update'; payload: { epic: OrchEpicView } }
+  | { kind: 'epics:reorder'; payload: { ok: true } }
+  | { kind: 'epics:delete'; payload: { ok: true } }
+  | { kind: 'tasks:listForEpic'; payload: { tasks: OrchTaskView[] } }
+  | { kind: 'tasks:listForProject'; payload: { tasks: OrchTaskView[] } }
+  | { kind: 'tasks:create'; payload: { task: OrchTaskView } }
+  | { kind: 'tasks:update'; payload: { task: OrchTaskView } }
+  | { kind: 'tasks:delete'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

@@ -40,7 +40,7 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(4);
+    expect(version.v).toBe(5);
   });
 
   it('v2 adds the display_order column with spawned_at as default', () => {

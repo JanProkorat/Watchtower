@@ -16,6 +16,8 @@ import {
   type ProjectListFilter,
   type ProjectRow,
 } from './db/repositories/projects.js';
+import { EpicsRepo, type EpicInput } from './db/repositories/epics.js';
+import { TasksRepo, type TaskInput } from './db/repositories/tasks.js';
 import { transition } from './stateMachine.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
@@ -66,6 +68,14 @@ function repo(): InstancesRepo {
 
 function projectsRepo(): ProjectsRepo {
   return new ProjectsRepo(handle!.db);
+}
+
+function epicsRepo(): EpicsRepo {
+  return new EpicsRepo(handle!.db);
+}
+
+function tasksRepo(): TasksRepo {
+  return new TasksRepo(handle!.db);
 }
 
 function projectViewOf(row: ProjectRow): ProjectRow {
@@ -327,6 +337,39 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       projectsRepo().delete(req.payload.id);
       return { ok: true };
     }
+
+    case 'epics:list':
+      return { epics: epicsRepo().listForProject(req.payload.projectId) };
+
+    case 'epics:create':
+      return { epic: epicsRepo().create(req.payload as EpicInput) };
+
+    case 'epics:update':
+      return { epic: epicsRepo().update(req.payload.id, req.payload.input as Partial<EpicInput>) };
+
+    case 'epics:reorder':
+      epicsRepo().reorder(req.payload.projectId, req.payload.orderedIds);
+      return { ok: true };
+
+    case 'epics:delete':
+      epicsRepo().delete(req.payload.id);
+      return { ok: true };
+
+    case 'tasks:listForEpic':
+      return { tasks: tasksRepo().listForEpic(req.payload.epicId) };
+
+    case 'tasks:listForProject':
+      return { tasks: tasksRepo().listForProject(req.payload.projectId) };
+
+    case 'tasks:create':
+      return { task: tasksRepo().create(req.payload as TaskInput) };
+
+    case 'tasks:update':
+      return { task: tasksRepo().update(req.payload.id, req.payload.input as Partial<TaskInput>) };
+
+    case 'tasks:delete':
+      tasksRepo().delete(req.payload.id);
+      return { ok: true };
   }
 }
 

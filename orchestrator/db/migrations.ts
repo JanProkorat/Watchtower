@@ -61,6 +61,34 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       db.exec(`ALTER TABLE projects ADD COLUMN description TEXT`);
     },
   },
+  {
+    version: 5,
+    up: (db) => {
+      // Phase 15 additions to the TT-verbatim shape — surface fields the
+      // prototype's epic + task drawers need:
+      //   epics.display_order      — manual tree ordering (steps of 1000 like
+      //                              instances; new rows append at the end)
+      //   epics.status             — planned / active / done (drives the
+      //                              prototype's status pill + filtering)
+      //   epics.jira_epic_key      — optional Jira Epic Link (TEH-100 etc.)
+      //   epics.github_issue_url   — optional GitHub issue URL
+      //   tasks.description        — long-form task note shown in the drawer
+      db.exec(`ALTER TABLE epics ADD COLUMN display_order INTEGER`);
+      db.exec(`ALTER TABLE epics ADD COLUMN status TEXT NOT NULL DEFAULT 'planned'
+                 CHECK (status IN ('planned','active','done'))`);
+      db.exec(`ALTER TABLE epics ADD COLUMN jira_epic_key TEXT`);
+      db.exec(`ALTER TABLE epics ADD COLUMN github_issue_url TEXT`);
+      db.exec(`ALTER TABLE tasks ADD COLUMN description TEXT`);
+
+      // Backfill display_order so existing rows keep their historical order
+      // until the user manually reorders. Per-project ordering using
+      // (project_id, id) so the sequence starts fresh in each project.
+      db.exec(`UPDATE epics SET display_order = (id * 1000) WHERE display_order IS NULL`);
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_epics_display_order
+                 ON epics(project_id, display_order)`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {
