@@ -39,7 +39,39 @@ export type IpcRequest =
   | { kind: 'contracts:listForProject'; payload: { projectId: number } }
   | { kind: 'contracts:create'; payload: ContractInputPayload }
   | { kind: 'contracts:update'; payload: { id: number; input: Partial<ContractInputPayload> } }
-  | { kind: 'contracts:delete'; payload: { id: number } };
+  | { kind: 'contracts:delete'; payload: { id: number } }
+  | { kind: 'taskGrid:get'; payload: { year: number; month: number; projectId?: number } };
+
+export interface TaskGridTaskPayload {
+  taskId: number;
+  taskNumber: string;
+  taskTitle: string;
+  status: 'open' | 'in_progress' | 'done';
+  estimatedMinutes: number | null;
+  totalMinutes: number;
+  epicId: number;
+  epicName: string;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  isBillable: boolean;
+  perDay: Record<number, number>;
+}
+
+export interface TaskGridEarningsRowPayload {
+  currency: string;
+  perDay: Record<number, number>;
+  totalAmount: number;
+}
+
+export interface TaskGridResponsePayload {
+  year: number;
+  month: number;
+  daysInMonth: number;
+  tasks: TaskGridTaskPayload[];
+  dailyTotals: Record<number, number>;
+  earningsByCurrency: TaskGridEarningsRowPayload[];
+}
 
 export interface ContractInputPayload {
   projectId: number;
@@ -246,7 +278,8 @@ export type IpcResponse =
   | { kind: 'contracts:listForProject'; payload: { contracts: ContractViewPayload[] } }
   | { kind: 'contracts:create'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null } }
   | { kind: 'contracts:update'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null } }
-  | { kind: 'contracts:delete'; payload: { ok: true } };
+  | { kind: 'contracts:delete'; payload: { ok: true } }
+  | { kind: 'taskGrid:get'; payload: TaskGridResponsePayload };
 
 export type IpcPush =
   | { kind: 'hello'; payload: { version: string } }

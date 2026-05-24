@@ -3,6 +3,7 @@ import { LIST_TABS, type ListTab } from '../../util/timetrackerUrl.js';
 import { EmptyTabState } from './EmptyTabState.js';
 import { ProjectsList } from './ProjectsList.js';
 import { WorklogsList } from './WorklogsList.js';
+import { TaskGridView } from './TaskGridView.js';
 
 interface Props {
   tab: ListTab;
@@ -43,12 +44,7 @@ export function ListMode({ tab, onTabChange, onOpenProject }: Props) {
       <Box sx={{ flex: 1, display: 'flex', overflow: 'auto', minHeight: 0 }}>
         {tab === 'projects' && <ProjectsList onOpenProject={onOpenProject} />}
         {tab === 'worklogs' && <WorklogsList />}
-        {tab === 'grid' && (
-          <EmptyTabState
-            title="Task grid (Phase 18)"
-            hint="A monthly per-task ⇄ per-day matrix with sticky borders and stacked sticky earnings rows."
-          />
-        )}
+        {tab === 'grid' && <TaskGridView />}
         {tab === 'timeoff' && (
           <EmptyTabState
             title="Time off (Phase 19)"

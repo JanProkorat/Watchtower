@@ -30,6 +30,7 @@ import {
   type ProjectRateRow,
 } from './db/repositories/projectRates.js';
 import { ContractStatusService } from './db/contractStatus.js';
+import { TaskGridService } from './db/taskGrid.js';
 import { transition } from './stateMachine.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
@@ -503,6 +504,12 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
     case 'contracts:delete':
       projectRatesRepo().delete(req.payload.id);
       return { ok: true };
+
+    case 'taskGrid:get': {
+      const { year, month, projectId } = req.payload;
+      const service = new TaskGridService(handle!.db);
+      return service.get(year, month, projectId);
+    }
   }
 }
 
