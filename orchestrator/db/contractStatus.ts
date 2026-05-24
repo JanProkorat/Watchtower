@@ -1,6 +1,7 @@
 import type { SqliteLike } from './migrations.js';
 import { ProjectRatesRepo, type ProjectRateRow } from './repositories/projectRates.js';
 import { countWorkdays } from './workdays.js';
+import { DaysOffRepo } from './repositories/daysOff.js';
 
 export interface ContractStatus {
   rateId: number;
@@ -80,11 +81,28 @@ export class ContractStatusService {
     const mdsUsed = round2(minutesLogged / 60 / rate.hoursPerDay);
     const mdsRemaining = rate.mdLimit != null ? round2(rate.mdLimit - mdsUsed) : null;
 
-    const elapsedWorkdays = countWorkdays(rate.effectiveFrom, minDate(today, periodEnd));
-    const totalWorkdays = effectiveTo ? countWorkdays(rate.effectiveFrom, effectiveTo) : null;
+    // Pre-load every days_off row inside the contract's full date span so
+    // each countWorkdays call below can dedupe against the same set without
+    // re-querying the table.
+    const daysOffSpanFrom = rate.effectiveFrom;
+    const daysOffSpanTo = effectiveTo ?? today;
+    const daysOffSet = new Set(
+      new DaysOffRepo(this.db)
+        .listInRange(daysOffSpanFrom, daysOffSpanTo)
+        .map((d) => d.date),
+    );
+
+    const elapsedWorkdays = countWorkdays(
+      rate.effectiveFrom,
+      minDate(today, periodEnd),
+      daysOffSet,
+    );
+    const totalWorkdays = effectiveTo
+      ? countWorkdays(rate.effectiveFrom, effectiveTo, daysOffSet)
+      : null;
     const workdaysRemaining =
       effectiveTo && today <= effectiveTo
-        ? countWorkdays(addDay(today), effectiveTo)
+        ? countWorkdays(addDay(today), effectiveTo, daysOffSet)
         : effectiveTo
           ? 0
           : null;

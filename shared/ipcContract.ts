@@ -40,7 +40,30 @@ export type IpcRequest =
   | { kind: 'contracts:create'; payload: ContractInputPayload }
   | { kind: 'contracts:update'; payload: { id: number; input: Partial<ContractInputPayload> } }
   | { kind: 'contracts:delete'; payload: { id: number } }
-  | { kind: 'taskGrid:get'; payload: { year: number; month: number; projectId?: number } };
+  | { kind: 'taskGrid:get'; payload: { year: number; month: number; projectId?: number } }
+  | { kind: 'daysOff:list'; payload: Record<string, never> }
+  | { kind: 'daysOff:listInRange'; payload: { from: string; to: string } }
+  | { kind: 'daysOff:upsert'; payload: DayOffInputPayload }
+  | { kind: 'daysOff:delete'; payload: { date: string } }
+  | { kind: 'holidays:list'; payload: { year: number } };
+
+export interface DayOffInputPayload {
+  date: string;
+  kind: 'vacation' | 'sick' | 'other' | 'holiday';
+  note?: string | null;
+}
+
+export interface DayOffViewPayload {
+  date: string;
+  kind: 'vacation' | 'sick' | 'other' | 'holiday';
+  note: string | null;
+  createdAt: string;
+}
+
+export interface PublicHolidayPayload {
+  date: string;
+  name: string;
+}
 
 export interface TaskGridTaskPayload {
   taskId: number;
@@ -77,6 +100,7 @@ export interface TaskGridResponsePayload {
   /** (Mon-Fri − Czech public holidays) × 8h, used as the capacity divisor. */
   monthCapacityMinutes: number;
   publicHolidays: Array<{ date: string; name: string }>;
+  daysOff: DayOffViewPayload[];
 }
 
 export interface ContractInputPayload {
@@ -285,7 +309,12 @@ export type IpcResponse =
   | { kind: 'contracts:create'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null } }
   | { kind: 'contracts:update'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null } }
   | { kind: 'contracts:delete'; payload: { ok: true } }
-  | { kind: 'taskGrid:get'; payload: TaskGridResponsePayload };
+  | { kind: 'taskGrid:get'; payload: TaskGridResponsePayload }
+  | { kind: 'daysOff:list'; payload: { daysOff: DayOffViewPayload[] } }
+  | { kind: 'daysOff:listInRange'; payload: { daysOff: DayOffViewPayload[] } }
+  | { kind: 'daysOff:upsert'; payload: { dayOff: DayOffViewPayload } }
+  | { kind: 'daysOff:delete'; payload: { ok: true } }
+  | { kind: 'holidays:list'; payload: { holidays: PublicHolidayPayload[] } };
 
 export type IpcPush =
   | { kind: 'hello'; payload: { version: string } }

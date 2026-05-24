@@ -31,6 +31,8 @@ import {
 } from './db/repositories/projectRates.js';
 import { ContractStatusService } from './db/contractStatus.js';
 import { TaskGridService } from './db/taskGrid.js';
+import { DaysOffRepo, type DayOffInput } from './db/repositories/daysOff.js';
+import { czechHolidays } from './db/workdays.js';
 import { transition } from './stateMachine.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
@@ -509,6 +511,28 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       const { year, month, projectId } = req.payload;
       const service = new TaskGridService(handle!.db);
       return service.get(year, month, projectId);
+    }
+
+    case 'daysOff:list':
+      return { daysOff: new DaysOffRepo(handle!.db).listAll() };
+
+    case 'daysOff:listInRange':
+      return {
+        daysOff: new DaysOffRepo(handle!.db).listInRange(req.payload.from, req.payload.to),
+      };
+
+    case 'daysOff:upsert':
+      return { dayOff: new DaysOffRepo(handle!.db).upsert(req.payload as DayOffInput) };
+
+    case 'daysOff:delete':
+      new DaysOffRepo(handle!.db).delete(req.payload.date);
+      return { ok: true };
+
+    case 'holidays:list': {
+      const map = czechHolidays(req.payload.year);
+      const holidays = Array.from(map, ([date, name]) => ({ date, name }));
+      holidays.sort((a, b) => a.date.localeCompare(b.date));
+      return { holidays };
     }
   }
 }

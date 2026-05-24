@@ -4,6 +4,7 @@ import { EmptyTabState } from './EmptyTabState.js';
 import { ProjectsList } from './ProjectsList.js';
 import { WorklogsList } from './WorklogsList.js';
 import { TaskGridView } from './TaskGridView.js';
+import { TimeOffTab } from './TimeOffTab.js';
 
 interface Props {
   tab: ListTab;
@@ -45,12 +46,7 @@ export function ListMode({ tab, onTabChange, onOpenProject }: Props) {
         {tab === 'projects' && <ProjectsList onOpenProject={onOpenProject} />}
         {tab === 'worklogs' && <WorklogsList />}
         {tab === 'grid' && <TaskGridView />}
-        {tab === 'timeoff' && (
-          <EmptyTabState
-            title="Time off (Phase 19)"
-            hint="3-month calendar plus a paged Upcoming days off list. Includes Czech public holidays (computed)."
-          />
-        )}
+        {tab === 'timeoff' && <TimeOffTab />}
         {tab === 'reports' && (
           <EmptyTabState
             title="Reports (Phase 20)"
