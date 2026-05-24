@@ -31,7 +31,7 @@ describe('bootstrap', () => {
   });
 
   it('opens DB, starts listener, writes sidecar + token', async () => {
-    handle = await bootstrap({ supportDir: dir, portRange: [17500, 17510], dbFactory: nodeSqliteFactory });
+    handle = await bootstrap({ supportDir: dir, portRange: [17500, 17510], dbFactory: nodeSqliteFactory, timetrackerMigration: { skip: true } });
     expect(handle.listener.port).toBeGreaterThanOrEqual(17500);
     expect(existsSync(path.join(dir, 'data.db'))).toBe(true);
     expect(existsSync(path.join(dir, 'listener.json'))).toBe(true);
@@ -47,7 +47,7 @@ describe('bootstrap', () => {
   it('reuses an existing token if hook-token exists', async () => {
     const existing = 'a'.repeat(64);
     writeFileSync(path.join(dir, 'hook-token'), existing, { mode: 0o600 });
-    handle = await bootstrap({ supportDir: dir, portRange: [17500, 17510], dbFactory: nodeSqliteFactory });
+    handle = await bootstrap({ supportDir: dir, portRange: [17500, 17510], dbFactory: nodeSqliteFactory, timetrackerMigration: { skip: true } });
     const sidecar = JSON.parse(readFileSync(path.join(dir, 'listener.json'), 'utf8')) as { token: string };
     expect(sidecar.token).toBe(existing);
   });
@@ -58,6 +58,7 @@ describe('bootstrap', () => {
       supportDir: dir,
       portRange: [17500, 17510],
       dbFactory: nodeSqliteFactory,
+      timetrackerMigration: { skip: true },
       onHookEvent: async (event, _body, instanceId) => {
         seen.push({ event, instanceId });
       },

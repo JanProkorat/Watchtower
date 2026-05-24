@@ -6,6 +6,11 @@ import { startHookListener, type HookListenerHandle } from './hookListener.js';
 import { writeListenerSidecar } from './listenerSidecar.js';
 import { HookEventsRepo } from './db/repositories/hookEvents.js';
 import type { SqliteLike } from './db/migrations.js';
+import {
+  migrateTimetracker,
+  type MigrationStatus,
+  type MigrateOptions,
+} from './db/migrateTimetracker.js';
 
 export interface DbHandle {
   /** Whatever the underlying driver exposes — better-sqlite3 in prod, node:sqlite in tests. */
@@ -19,11 +24,19 @@ export interface BootstrapOptions {
   /** Override for tests — defaults to a real better-sqlite3 opened from supportDir/data.db. */
   dbFactory?: (dbPath: string) => DbHandle;
   onHookEvent?: (event: string, body: unknown, instanceId: string) => Promise<void>;
+  /**
+   * Override TimeTracker migration behaviour. Pass `{ skip: true }` to bypass
+   * entirely (tests do this unless explicitly exercising the migration path).
+   * Pass migrate options to override source path / source opener.
+   */
+  timetrackerMigration?: { skip: true } | MigrateOptions;
 }
 
 export interface BootstrapHandle {
   db: SqliteLike;
   listener: HookListenerHandle;
+  /** Result of the TimeTracker absorption migration attempted on startup. */
+  timetrackerMigration: MigrationStatus | { status: 'skipped' };
   shutdown(): Promise<void>;
 }
 
@@ -49,6 +62,18 @@ function defaultDbFactory(dbPath: string): DbHandle {
 export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle> {
   const dbFactory = opts.dbFactory ?? defaultDbFactory;
   const dbHandle = dbFactory(path.join(opts.supportDir, 'data.db'));
+
+  // One-shot import of legacy TimeTracker data. Idempotent — the function
+  // returns `no-source` when there's nothing to import and `already-migrated`
+  // once the marker is set, so calling it every startup is safe and free.
+  let ttResult: BootstrapHandle['timetrackerMigration'];
+  const ttOpt = opts.timetrackerMigration;
+  if (ttOpt && 'skip' in ttOpt) {
+    ttResult = { status: 'skipped' };
+  } else {
+    ttResult = migrateTimetracker(dbHandle.raw, ttOpt);
+  }
+
   const token = readOrCreateToken(opts.supportDir);
   const hookEvents = new HookEventsRepo(dbHandle.raw);
 
@@ -72,6 +97,7 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
   return {
     db: dbHandle.raw,
     listener,
+    timetrackerMigration: ttResult,
     async shutdown() {
       await listener.stop();
       dbHandle.close();
