@@ -50,6 +50,7 @@ export type OrchRequest =
   | { id: string; kind: 'reports:heatmap'; payload: { from: string; to: string; projectId?: number } }
   | { id: string; kind: 'reports:contracts'; payload: { projectId?: number } }
   | { id: string; kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } }
+  | { id: string; kind: 'dashboard:overview'; payload: import('./ipcContract.js').DashboardOverviewRequestPayload }
   | { id: string; kind: 'instances:findByCwd'; payload: { cwd: string } }
   | { id: string; kind: 'claudeSettings:read'; payload: { scope: 'global' | 'project'; projectPath?: string } }
   | { id: string; kind: 'claudeSettings:write'; payload: { scope: 'global' | 'project'; projectPath?: string; content: string } }

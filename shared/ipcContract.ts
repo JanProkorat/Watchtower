@@ -52,6 +52,7 @@ export type IpcRequest =
   | { kind: 'reports:heatmap'; payload: { from: string; to: string; projectId?: number } }
   | { kind: 'reports:contracts'; payload: { projectId?: number } }
   | { kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } }
+  | { kind: 'dashboard:overview'; payload: DashboardOverviewRequestPayload }
   | { kind: 'instances:findByCwd'; payload: { cwd: string } }
   | { kind: 'openInVSCode'; payload: { path: string } }
   | { kind: 'claudeSettings:read'; payload: { scope: 'global' | 'project'; projectPath?: string } }
@@ -104,6 +105,70 @@ export interface EarningsResponsePayload {
 export interface HeatmapDatumPayload {
   date: string;
   minutes: number;
+}
+
+// ─── Dashboard overview ──────────────────────────────────────────────────
+
+export interface DashboardOverviewRequestPayload {
+  /** Optional project filter; null = all projects. */
+  projectId: number | null;
+  /** Any ISO date inside the target week (YYYY-MM-DD). Server normalises to Monday. */
+  weekAnchor: string;
+  /** ISO YYYY-MM-DD in the user's local tz, sent by renderer so the orchestrator
+   *  doesn't derive "today" from its own clock. */
+  todayDate: string;
+}
+
+export interface DashboardWeekDayPayload {
+  /** YYYY-MM-DD. */
+  date: string;
+  /** Sum of minutes for the day (respects projectId filter). */
+  minutes: number;
+  worklogs: DashboardWeekWorklogPayload[];
+}
+
+export interface DashboardWeekWorklogPayload {
+  id: number;
+  /** e.g. "FIE1933-19084" — may be null for ad-hoc tasks. */
+  taskNumber: string | null;
+  projectName: string;
+  projectColor: string | null;
+  minutes: number;
+  note: string | null;
+}
+
+export interface DashboardHeatmapStatsPayload {
+  currentStreak: number;
+  longestStreak: number;
+  activeDays: number;
+  /** Total minutes / 30 * 7, rounded to nearest minute. */
+  weeklyAvgMinutes: number;
+  busiestDay: { date: string; minutes: number } | null;
+}
+
+export interface DashboardTopProjectPayload {
+  projectId: number;
+  projectName: string;
+  projectColor: string | null;
+  minutes: number;
+}
+
+export interface DashboardOverviewResponse {
+  today: { minutes: number };
+  month: { minutes: number };
+  week: {
+    fromDate: string;
+    toDate: string;
+    totalMinutes: number;
+    days: DashboardWeekDayPayload[];
+  };
+  heatmap30d: {
+    fromDate: string;
+    toDate: string;
+    days: { date: string; minutes: number }[];
+    stats: DashboardHeatmapStatsPayload;
+  };
+  topProjects: DashboardTopProjectPayload[];
 }
 
 export interface ContractReportRowPayload {
@@ -414,6 +479,7 @@ export type IpcResponse =
   | { kind: 'reports:heatmap'; payload: { heatmap: HeatmapDatumPayload[] } }
   | { kind: 'reports:contracts'; payload: { contracts: ContractReportRowPayload[] } }
   | { kind: 'reports:rateChanges'; payload: { rateChanges: RateChangeMarkerPayload[] } }
+  | { kind: 'dashboard:overview'; payload: DashboardOverviewResponse }
   | { kind: 'instances:findByCwd'; payload: { instances: RunningInstancePayload[] } }
   | { kind: 'openInVSCode'; payload: { ok: boolean; error?: string } }
   | { kind: 'claudeSettings:read'; payload: ClaudeSettingsReadPayload }
