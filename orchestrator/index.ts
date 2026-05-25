@@ -34,6 +34,7 @@ import { TaskGridService } from './db/taskGrid.js';
 import { DaysOffRepo, type DayOffInput } from './db/repositories/daysOff.js';
 import { czechHolidays } from './db/workdays.js';
 import { ReportsService } from './db/reports.js';
+import { DashboardOverviewService } from './db/dashboardOverview.js';
 import { transition } from './stateMachine.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
@@ -585,6 +586,9 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           req.payload.projectId,
         ),
       };
+
+    case 'dashboard:overview':
+      return new DashboardOverviewService(handle!.db).run(req.payload);
 
     case 'instances:findByCwd': {
       const expanded = req.payload.cwd.startsWith('~/')
