@@ -55,6 +55,7 @@ export function ModuleDashboard({
   const [today, setToday] = useState<string>(todayIso);
   const [weekAnchor, setWeekAnchor] = useState<string>(today);
   const [projectId, setProjectId] = useState<number | null>(readPersistedProject);
+  const [defaultSeeded, setDefaultSeeded] = useState(false);
   const projectsState = useProjects();
   const { showError } = useToast();
 
@@ -66,6 +67,28 @@ export function ModuleDashboard({
     }, 60_000);
     return () => clearInterval(t);
   }, []);
+
+  // Seed default project on first load if no persisted selection.
+  useEffect(() => {
+    if (defaultSeeded) return;
+    if (projectId != null) {
+      setDefaultSeeded(true);
+      return;
+    }
+    // Only seed if nothing was ever persisted (so we don't override an explicit
+    // "All projects" choice the user made).
+    let persisted: string | null = null;
+    try {
+      persisted = localStorage.getItem(FILTER_KEY);
+    } catch { /* ignore */ }
+    if (persisted !== null) {
+      setDefaultSeeded(true);
+      return;
+    }
+    const def = projectsState.projects.find((p) => p.isDefault);
+    if (def) setProjectId(def.id);
+    setDefaultSeeded(true);
+  }, [defaultSeeded, projectId, projectsState.projects]);
 
   useEffect(() => {
     persistProject(projectId);
