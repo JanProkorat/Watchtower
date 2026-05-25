@@ -12,18 +12,20 @@ import { formatDateLongCz, formatMinutes } from '../../util/format.js';
 import { SprintDayCell } from './SprintDayCell.js';
 
 const HANDLE_HEIGHT = 8;
-const MIN_HEIGHT = 120;
-const MAX_HEIGHT = 600;
+const MIN_HEIGHT = 160;
+const MAX_HEIGHT = 560;
+const DEFAULT_HEIGHT = 220;
+const CELL_WIDTH = 168;
 const STORAGE_KEY = 'watchtower.dashboard.weekCellHeight';
 
 function readPersistedHeight(): number {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    if (!v) return 200;
+    if (!v) return DEFAULT_HEIGHT;
     const n = Number(v);
-    return Number.isFinite(n) && n >= MIN_HEIGHT && n <= MAX_HEIGHT ? n : 200;
+    return Number.isFinite(n) && n >= MIN_HEIGHT && n <= MAX_HEIGHT ? n : DEFAULT_HEIGHT;
   } catch {
-    return 200;
+    return DEFAULT_HEIGHT;
   }
 }
 
@@ -54,10 +56,17 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
   const [cellHeight, setCellHeight] = useState<number>(readPersistedHeight);
   const cellHeightRef = useRef(cellHeight);
   const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+  const todayRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     cellHeightRef.current = cellHeight;
   }, [cellHeight]);
+
+  useEffect(() => {
+    if (todayRef.current) {
+      todayRef.current.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' });
+    }
+  }, []); // only first paint
 
   const onDragStart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -148,11 +157,23 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
         </Box>
       </Popover>
 
-      <Stack direction="row" spacing={1.25} sx={{ width: '100%' }}>
-        {sprint.days.map((d) => (
-          <SprintDayCell key={d.date} day={d} isToday={d.date === todayDate} cellMinHeight={cellHeight} />
-        ))}
-      </Stack>
+      <Box sx={{ overflowX: 'auto', pb: 1 }}>
+        <Stack direction="row" spacing={1.25} sx={{ width: 'max-content' }}>
+          {sprint.days.map((d) => {
+            const isToday = d.date === todayDate;
+            return (
+              <Box key={d.date} ref={isToday ? todayRef : undefined}>
+                <SprintDayCell
+                  day={d}
+                  isToday={isToday}
+                  cellWidth={CELL_WIDTH}
+                  cellHeight={cellHeight}
+                />
+              </Box>
+            );
+          })}
+        </Stack>
+      </Box>
 
       <Box
         onMouseDown={onDragStart}

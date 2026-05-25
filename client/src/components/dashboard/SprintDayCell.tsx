@@ -13,8 +13,10 @@ export interface SprintDayCellProps {
   day: DashboardSprintDayPayload;
   /** True for today's column. */
   isToday: boolean;
-  /** Override the default 200px minimum height. */
-  cellMinHeight?: number;
+  /** Fixed cell width in px. */
+  cellWidth?: number;
+  /** Fixed cell height in px. */
+  cellHeight?: number;
 }
 
 function shortDate(iso: string): string {
@@ -23,13 +25,13 @@ function shortDate(iso: string): string {
   return `${Number(d)}. ${Number(m)}.`;
 }
 
-export function SprintDayCell({ day, isToday, cellMinHeight }: SprintDayCellProps) {
+export function SprintDayCell({ day, isToday, cellWidth = 168, cellHeight = 220 }: SprintDayCellProps) {
   return (
     <Box
       sx={{
-        flex: 1,
-        minWidth: 0,
-        minHeight: cellMinHeight ?? 200,
+        width: cellWidth,
+        flexShrink: 0,
+        height: cellHeight,
         p: 1.25,
         borderRadius: 1.25,
         border: 1,
@@ -40,9 +42,10 @@ export function SprintDayCell({ day, isToday, cellMinHeight }: SprintDayCellProp
         display: 'flex',
         flexDirection: 'column',
         gap: 1,
+        overflow: 'hidden',
       }}
     >
-      <Stack direction="row" justifyContent="space-between" alignItems="baseline">
+      <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ flexShrink: 0 }}>
         <Typography
           sx={{
             fontSize: 10,
@@ -57,15 +60,23 @@ export function SprintDayCell({ day, isToday, cellMinHeight }: SprintDayCellProp
         <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{shortDate(day.date)}</Typography>
       </Stack>
 
-      {day.worklogs.length === 0 ? (
+      {day.tasks.length === 0 ? (
         <Stack flex={1} alignItems="center" justifyContent="center">
           <Typography sx={{ color: 'text.disabled', fontSize: 14 }}>—</Typography>
         </Stack>
       ) : (
-        <Stack spacing={0.75} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          {day.worklogs.map((w) => (
+        <Stack
+          spacing={0.75}
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}
+        >
+          {day.tasks.map((t, i) => (
             <Box
-              key={w.id}
+              key={`${t.taskNumber ?? t.projectName}-${i}`}
               sx={{
                 pl: 1,
                 py: 0.75,
@@ -73,7 +84,7 @@ export function SprintDayCell({ day, isToday, cellMinHeight }: SprintDayCellProp
                 borderRadius: 0.75,
                 backgroundColor: 'background.paper',
                 borderLeft: 3,
-                borderColor: w.projectColor ?? 'primary.main',
+                borderColor: t.projectColor ?? 'primary.main',
               }}
             >
               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0 }}>
@@ -88,25 +99,20 @@ export function SprintDayCell({ day, isToday, cellMinHeight }: SprintDayCellProp
                     textOverflow: 'ellipsis',
                   }}
                 >
-                  {w.taskNumber ?? w.projectName}
+                  {t.taskNumber ?? t.projectName}
+                  {t.worklogCount > 1 && (
+                    <Typography
+                      component="span"
+                      sx={{ ml: 0.5, fontSize: 10, color: 'text.disabled' }}
+                    >
+                      ×{t.worklogCount}
+                    </Typography>
+                  )}
                 </Typography>
                 <Typography sx={{ fontSize: 10.5, color: 'text.secondary' }}>
-                  {formatMinutes(w.minutes)}
+                  {formatMinutes(t.minutes)}
                 </Typography>
               </Stack>
-              {w.note && (
-                <Typography
-                  sx={{
-                    fontSize: 10.5,
-                    color: 'text.disabled',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {w.note}
-                </Typography>
-              )}
             </Box>
           ))}
         </Stack>
