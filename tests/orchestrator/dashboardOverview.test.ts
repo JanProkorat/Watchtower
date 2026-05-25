@@ -173,6 +173,23 @@ describe('DashboardOverviewService', () => {
     expect(res.heatmap30d.stats.activeDays).toBe(4);
   });
 
+  it('currentStreak is 0 when today has no logged minutes, even if yesterday did', () => {
+    const { task } = seedTask('P', '#7aa7ff', 'T-1');
+    // Worked yesterday and the day before — but nothing today.
+    seedWorklog(task.id, '2026-05-24', 60);
+    seedWorklog(task.id, '2026-05-23', 60);
+
+    const res = service.run({
+      projectId: null, weekAnchor: '2026-05-25', todayDate: '2026-05-25',
+    });
+
+    // Spec: "Current streak: count back from today through consecutive
+    // non-zero days; resets at any zero day". Today is a zero day → streak
+    // resets to 0, even though the prior run was length 2.
+    expect(res.heatmap30d.stats.currentStreak).toBe(0);
+    expect(res.heatmap30d.stats.longestStreak).toBe(2);
+  });
+
   it('busiestDay returns the heaviest non-zero day, null when empty', () => {
     const empty = service.run({
       projectId: null, weekAnchor: '2026-05-25', todayDate: '2026-05-25',

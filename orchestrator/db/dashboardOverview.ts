@@ -8,7 +8,8 @@ import type {
 } from '../../shared/ipcContract.js';
 
 interface MinutesRow {
-  minutes: number | null;
+  /** SQL COALESCE(..., 0) guarantees non-null. */
+  minutes: number;
 }
 
 interface MinutesByDateRow {
@@ -61,7 +62,7 @@ export class DashboardOverviewService {
       JOIN projects p ON p.id = e.project_id
       WHERE w.work_date = ?${pc.sql}
     `;
-    const row = (this.db.prepare(sql).get(date, ...pc.params) as MinutesRow | undefined) ?? null;
+    const row = this.db.prepare(sql).get(date, ...pc.params) as MinutesRow | undefined;
     return row?.minutes ?? 0;
   }
 
@@ -76,7 +77,7 @@ export class DashboardOverviewService {
       JOIN projects p ON p.id = e.project_id
       WHERE strftime('%Y-%m', w.work_date) = ?${pc.sql}
     `;
-    const row = (this.db.prepare(sql).get(ym, ...pc.params) as MinutesRow | undefined) ?? null;
+    const row = this.db.prepare(sql).get(ym, ...pc.params) as MinutesRow | undefined;
     return row?.minutes ?? 0;
   }
 
