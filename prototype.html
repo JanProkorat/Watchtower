@@ -1885,6 +1885,474 @@
   .settings-row .desc { font-size: 12px; color: var(--text-secondary); }
   .settings-divider { height: 1px; background: var(--border); margin: 24px 0; }
 
+  /* ═══════════════════════════════════════════════════════════════════════ */
+  /* Dashboard module (new top-level module, default landing)                 */
+  /* ═══════════════════════════════════════════════════════════════════════ */
+  :root {
+    --dash-accent: #b388ff;
+    --dash-accent-soft: rgba(179, 136, 255, 0.14);
+    --dash-accent-strong: rgba(179, 136, 255, 0.34);
+    --dash-today-red: #ef5350;
+    --dash-today-tint: rgba(239, 83, 80, 0.10);
+  }
+
+  .module-dashboard {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+    height: 100%;
+    overflow: auto;
+    padding: 20px 22px 32px;
+    gap: 18px;
+  }
+
+  /* ── Header ── */
+  .md-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background: linear-gradient(180deg, rgba(14,15,18,1) 0%, rgba(14,15,18,0.96) 80%, rgba(14,15,18,0.6) 100%);
+    padding: 4px 0 12px;
+    margin: -4px 0 0;
+  }
+  .md-header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .md-header .md-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .md-projectfilter {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .md-projectfilter > label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: none;
+  }
+  .md-projectfilter > .select {
+    width: 220px;
+    background: var(--bg-paper);
+    border: 1px solid var(--border-strong);
+    border-radius: 24px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .md-projectfilter > .select::after {
+    content: '▾';
+    color: var(--text-secondary);
+    font-size: 10px;
+  }
+  .md-date {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* ── KPI tiles ── */
+  .md-kpis {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+  .md-kpi {
+    background: linear-gradient(135deg, rgba(28,31,38,1) 0%, rgba(20,22,28,1) 80%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 22px;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+  }
+  .md-kpi::after {
+    content: '';
+    position: absolute;
+    width: 180px; height: 180px;
+    right: -60px; top: -60px;
+    background: radial-gradient(circle, var(--dash-accent-soft) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .md-kpi-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .md-kpi-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--dash-accent-soft);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--dash-accent);
+  }
+  .md-kpi-icon svg { width: 16px; height: 16px; }
+  .md-kpi-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 500;
+  }
+  .md-kpi-value {
+    font-size: 36px;
+    font-weight: 600;
+    line-height: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .md-kpi-value .suffix {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  /* ── This-week panel ── */
+  .md-week {
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .md-week-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .md-week-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .md-week-title { font-size: 15px; font-weight: 600; }
+  .md-week-info {
+    color: var(--text-disabled);
+    font-size: 12px;
+    cursor: help;
+  }
+  .md-week-total {
+    background: var(--dash-accent);
+    color: #1a0e36;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 3px 9px;
+  }
+  .md-week-range {
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-top: 2px;
+  }
+  .md-week-nav {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .md-week-nav .nav-btn {
+    width: 28px; height: 28px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-paper-2);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .md-week-nav .nav-btn:hover { color: var(--text-primary); background: var(--bg-elevated); }
+  .md-week-nav .nav-btn svg { width: 14px; height: 14px; }
+
+  .md-week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+  }
+  .md-week-cell {
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-height: 200px;
+    padding: 10px 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .md-week-cell.today {
+    background: var(--dash-today-tint);
+    border-color: var(--dash-today-red);
+  }
+  .md-week-cell .dow {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 600;
+  }
+  .md-week-cell.today .dow { color: var(--dash-today-red); }
+  .md-week-cell .dom { font-size: 13px; font-weight: 600; }
+  .md-week-cell .empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-disabled);
+    font-size: 14px;
+  }
+  .md-week-cell .wl-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+  }
+  .md-week-cell .wl {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    background: var(--bg-paper);
+    border-radius: 6px;
+    padding: 6px 6px 6px 8px;
+    border-left: 3px solid transparent;
+    font-size: 11px;
+  }
+  .md-week-cell .wl .body { flex: 1; min-width: 0; }
+  .md-week-cell .wl .key {
+    font-family: var(--terminal-font);
+    color: var(--text-primary);
+    font-size: 10.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .md-week-cell .wl .min {
+    color: var(--text-secondary);
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    margin-left: 4px;
+  }
+  .md-week-cell .wl .note {
+    color: var(--text-disabled);
+    font-size: 10.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+
+  /* ── Bottom row ── */
+  .md-bottom {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+  }
+  .md-card {
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .md-card-title { font-size: 15px; font-weight: 600; }
+
+  /* heatmap */
+  .md-heat-body {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .md-heatmap {
+    display: grid;
+    grid-template-columns: 18px repeat(6, 1fr);
+    grid-auto-rows: 16px;
+    column-gap: 4px;
+    row-gap: 4px;
+    align-content: start;
+  }
+  .md-heatmap .h-row-label {
+    font-size: 9px;
+    color: var(--text-disabled);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 4px;
+  }
+  .md-heat-cell {
+    border-radius: 3px;
+    background: var(--bg-paper-2);
+    border: 1px solid rgba(255,255,255,0.02);
+  }
+  .md-heat-cell.l1 { background: rgba(179, 136, 255, 0.18); }
+  .md-heat-cell.l2 { background: rgba(179, 136, 255, 0.35); }
+  .md-heat-cell.l3 { background: rgba(179, 136, 255, 0.6); }
+  .md-heat-cell.l4 { background: rgba(179, 136, 255, 0.9); }
+
+  .md-stats {
+    display: grid;
+    grid-template-columns: repeat(5, auto);
+    gap: 24px;
+    margin-top: 4px;
+  }
+  .md-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .md-stat .lbl {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .md-stat .val {
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* top projects */
+  .md-tp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .md-tp-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px;
+  }
+  .md-tp-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .md-tp-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .md-tp-val {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .md-tp-bar {
+    height: 4px;
+    background: var(--bg-paper-2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-left: 18px;
+    margin-right: 2px;
+    margin-top: -4px;
+  }
+  .md-tp-bar > div { height: 100%; border-radius: 2px; }
+
+  /* ── Sessions card (inline, two-column) ── */
+  .md-sessions-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .md-sess-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .md-sess-col-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 600;
+    padding: 0 2px 4px;
+  }
+  .md-sess-col-head .count {
+    background: var(--bg-paper-2);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    font-size: 11px;
+    padding: 2px 8px;
+    font-variant-numeric: tabular-nums;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .md-sess-card {
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .md-sess-card .chip { font-size: 10px; padding: 2px 8px; flex-shrink: 0; min-width: 110px; justify-content: center; }
+  .md-sess-card .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .md-sess-card .cwd {
+    font-family: var(--terminal-font);
+    font-size: 12px;
+    color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .md-sess-card .time {
+    font-size: 11px;
+    color: var(--text-disabled);
+  }
+  .md-sess-card .actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .md-sess-card .actions .btn {
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 6px;
+  }
+  .md-sess-card .actions .icon-btn {
+    width: 26px; height: 26px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-paper);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .md-sess-card .actions .icon-btn:hover { color: var(--error); border-color: var(--error); }
+  .md-sess-card .actions .icon-btn svg { width: 11px; height: 11px; }
+
+  .md-sess-empty {
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    padding: 18px 12px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+  }
+  .md-sess-empty .btn { font-size: 11px; padding: 6px 12px; }
+
 </style>
 </head>
 <body>
@@ -1892,7 +2360,8 @@
 <div class="scene-picker">
   <strong>Watchtower — visual prototype</strong>
   <button data-scene="terminal" data-active="true">Terminal view</button>
-  <button data-scene="dashboard">Dashboard</button>
+  <button data-scene="module-dashboard">Dashboard module</button>
+  <button data-scene="dashboard">Instances · Dashboard tab</button>
   <button data-scene="new">New-instance modal</button>
   <button data-scene="wizard">First-run wizard</button>
   <button data-scene="resume-failed">Resume-failed panel</button>
@@ -1941,7 +2410,7 @@
 
     <!-- ── Module rail ── -->
     <div class="rail">
-      <div class="rail-btn" title="Dashboard">
+      <div class="rail-btn" title="Dashboard" id="railDashboard">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <rect x="3" y="3" width="7" height="9" rx="1.5"/>
           <rect x="14" y="3" width="7" height="5" rx="1.5"/>
@@ -2176,6 +2645,409 @@
             <button class="btn ghost">Open log directory</button>
           </div>
         </div>
+      </div>
+
+      <!-- ═══ Dashboard module (NEW — top-level, default landing) ═══ -->
+      <div class="module-dashboard" id="moduleDashboardView" style="display: none">
+
+          <!-- ── Header ── -->
+          <div class="md-header">
+            <h1>Dashboard</h1>
+            <div class="md-header-right">
+              <div class="md-projectfilter">
+                <label>Project</label>
+                <div class="select">All projects</div>
+              </div>
+              <div class="md-date">pondělí 25. května 2026</div>
+            </div>
+          </div>
+
+          <!-- ── KPI tiles ── -->
+          <div class="md-kpis">
+            <div class="md-kpi">
+              <div class="md-kpi-head">
+                <div class="md-kpi-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/>
+                    <path d="M16 2v4M8 2v4M3 10h18"/>
+                  </svg>
+                </div>
+                <div class="md-kpi-label">Today</div>
+              </div>
+              <div class="md-kpi-value">6,5<span class="suffix">hours</span></div>
+            </div>
+            <div class="md-kpi">
+              <div class="md-kpi-head">
+                <div class="md-kpi-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/>
+                    <path d="M16 2v4M8 2v4M3 10h18"/>
+                  </svg>
+                </div>
+                <div class="md-kpi-label">This week</div>
+              </div>
+              <div class="md-kpi-value">21,0<span class="suffix">hours</span></div>
+            </div>
+            <div class="md-kpi">
+              <div class="md-kpi-head">
+                <div class="md-kpi-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/>
+                    <path d="M16 2v4M8 2v4M3 10h18"/>
+                  </svg>
+                </div>
+                <div class="md-kpi-label">This month</div>
+              </div>
+              <div class="md-kpi-value">142,5<span class="suffix">hours</span></div>
+            </div>
+          </div>
+
+          <!-- ── This-week panel ── -->
+          <div class="md-week">
+            <div class="md-week-head">
+              <div>
+                <div class="md-week-title-row">
+                  <div class="md-week-title">This week</div>
+                  <div class="md-week-info" title="Click a day cell to open that day's worklogs in TimeTracker.">ⓘ</div>
+                  <div class="md-week-total">21h 0m</div>
+                </div>
+                <div class="md-week-range">25. května 2026 — 31. května 2026</div>
+              </div>
+              <div class="md-week-nav">
+                <div class="nav-btn" title="Jump to today">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/>
+                    <path d="M16 2v4M8 2v4M3 10h18"/>
+                    <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+                  </svg>
+                </div>
+                <div class="nav-btn" title="Previous week">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M15 18l-6-6 6-6"/>
+                  </svg>
+                </div>
+                <div class="nav-btn" title="Pick a week">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/>
+                    <path d="M16 2v4M8 2v4M3 10h18"/>
+                  </svg>
+                </div>
+                <div class="nav-btn" title="Next week">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 6l6 6-6 6"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="md-week-grid">
+              <!-- PO (today) -->
+              <div class="md-week-cell today">
+                <div class="dow">PO</div>
+                <div class="dom">25. 5.</div>
+                <div class="wl-list">
+                  <div class="wl" style="border-left-color:#7aa7ff">
+                    <div class="body">
+                      <div class="key">WT-T39<span class="min">· 1h 30m</span></div>
+                      <div class="note">Dashboard wiring</div>
+                    </div>
+                  </div>
+                  <div class="wl" style="border-left-color:#f0a868">
+                    <div class="body">
+                      <div class="key">FIE1933-18887<span class="min">· 2h</span></div>
+                      <div class="note">Capacity-planning rewrite</div>
+                    </div>
+                  </div>
+                  <div class="wl" style="border-left-color:#b388ff">
+                    <div class="body">
+                      <div class="key">TEH-2841<span class="min">· 3h</span></div>
+                      <div class="note">Operation editor</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ÚT -->
+              <div class="md-week-cell">
+                <div class="dow">ÚT</div>
+                <div class="dom">26. 5.</div>
+                <div class="wl-list">
+                  <div class="wl" style="border-left-color:#f0a868">
+                    <div class="body">
+                      <div class="key">FIE1933-19084<span class="min">· 4h</span></div>
+                      <div class="note">Worklog dedup</div>
+                    </div>
+                  </div>
+                  <div class="wl" style="border-left-color:#7aa7ff">
+                    <div class="body">
+                      <div class="key">WT-T40<span class="min">· 30m</span></div>
+                      <div class="note">Code review</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ST -->
+              <div class="md-week-cell">
+                <div class="dow">ST</div>
+                <div class="dom">27. 5.</div>
+                <div class="empty">—</div>
+              </div>
+
+              <!-- ČT -->
+              <div class="md-week-cell">
+                <div class="dow">ČT</div>
+                <div class="dom">28. 5.</div>
+                <div class="wl-list">
+                  <div class="wl" style="border-left-color:#66bb6a">
+                    <div class="body">
+                      <div class="key">KP-512<span class="min">· 6h</span></div>
+                      <div class="note">Manufactory bug-fix</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PÁ -->
+              <div class="md-week-cell">
+                <div class="dow">PÁ</div>
+                <div class="dom">29. 5.</div>
+                <div class="wl-list">
+                  <div class="wl" style="border-left-color:#f0a868">
+                    <div class="body">
+                      <div class="key">FIE1933-18887<span class="min">· 4h</span></div>
+                      <div class="note">Capacity-planning rewrite</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SO -->
+              <div class="md-week-cell">
+                <div class="dow">SO</div>
+                <div class="dom">30. 5.</div>
+                <div class="empty">—</div>
+              </div>
+
+              <!-- NE -->
+              <div class="md-week-cell">
+                <div class="dow">NE</div>
+                <div class="dom">31. 5.</div>
+                <div class="empty">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Sessions card (two columns: Live / Recent) ── -->
+          <div class="md-card">
+            <div class="md-card-title">Sessions</div>
+            <div class="md-sessions-cols">
+              <!-- LIVE column -->
+              <div class="md-sess-col">
+                <div class="md-sess-col-head">
+                  <span>Live</span>
+                  <span class="count">3</span>
+                </div>
+
+                <div class="md-sess-card">
+                  <span class="chip working"><span class="dot working"></span>working</span>
+                  <div class="body">
+                    <div class="cwd">~/Projects/PPS/capacity-planning</div>
+                    <div class="time">streaming · 4 s ago</div>
+                  </div>
+                  <div class="actions">
+                    <button class="btn primary">Open</button>
+                    <div class="icon-btn" title="Kill">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                        <rect x="6" y="6" width="12" height="12" rx="1"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="md-sess-card">
+                  <span class="chip waiting-permission"><span class="dot waiting-permission"></span>waiting perm</span>
+                  <div class="body">
+                    <div class="cwd">~/Projects/PPS/technology</div>
+                    <div class="time">asked 18 s ago</div>
+                  </div>
+                  <div class="actions">
+                    <button class="btn primary">Open</button>
+                    <div class="icon-btn" title="Kill">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                        <rect x="6" y="6" width="12" height="12" rx="1"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="md-sess-card">
+                  <span class="chip idle-notify"><span class="dot idle-notify"></span>idle</span>
+                  <div class="body">
+                    <div class="cwd">~/Projects/TimeTracker</div>
+                    <div class="time">idle 12 m</div>
+                  </div>
+                  <div class="actions">
+                    <button class="btn primary">Open</button>
+                    <div class="icon-btn" title="Kill">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                        <rect x="6" y="6" width="12" height="12" rx="1"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- RECENT column -->
+              <div class="md-sess-col">
+                <div class="md-sess-col-head">
+                  <span>Recent</span>
+                  <span class="count">2</span>
+                </div>
+
+                <div class="md-sess-card">
+                  <span class="chip finished"><span class="dot finished"></span>finished</span>
+                  <div class="body">
+                    <div class="cwd">~/Projects/PPS/machinery</div>
+                    <div class="time">1 h ago</div>
+                  </div>
+                  <div class="actions">
+                    <button class="btn">Open</button>
+                  </div>
+                </div>
+
+                <div class="md-sess-card">
+                  <span class="chip crashed"><span class="dot crashed"></span>crashed</span>
+                  <div class="body">
+                    <div class="cwd">~/Projects/Watchtower (old)</div>
+                    <div class="time">3 h ago</div>
+                  </div>
+                  <div class="actions">
+                    <button class="btn">Open</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Bottom row: heatmap + top projects ── -->
+          <div class="md-bottom">
+            <div class="md-card">
+              <div class="md-card-title">Last 30 days</div>
+              <div class="md-heat-body">
+                <div class="md-heatmap">
+                  <div class="h-row-label">Po</div>
+                  <div class="md-heat-cell l3"></div>
+                  <div class="md-heat-cell l2"></div>
+                  <div class="md-heat-cell l4"></div>
+                  <div class="md-heat-cell l3"></div>
+                  <div class="md-heat-cell l3"></div>
+                  <div class="md-heat-cell l3"></div>
+
+                  <div class="h-row-label">Út</div>
+                  <div class="md-heat-cell l2"></div>
+                  <div class="md-heat-cell l4"></div>
+                  <div class="md-heat-cell l3"></div>
+                  <div class="md-heat-cell l2"></div>
+                  <div class="md-heat-cell l4"></div>
+                  <div class="md-heat-cell"></div>
+
+                  <div class="h-row-label">St</div>
+                  <div class="md-heat-cell l3"></div>
+                  <div class="md-heat-cell l1"></div>
+                  <div class="md-heat-cell l3"></div>
+                  <div class="md-heat-cell l4"></div>
+                  <div class="md-heat-cell"></div>
+                  <div class="md-heat-cell"></div>
+
+                  <div class="h-row-label">Čt</div>
+                  <div class="md-heat-cell l2"></div>
+                  <div class="md-heat-cell l3"></div>
+                  <div class="md-heat-cell l2"></div>
+                  <div class="md-heat-cell l3"></div>
+                  <div class="md-heat-cell l3"></div>
+                  <div class="md-heat-cell"></div>
+
+                  <div class="h-row-label">Pá</div>
+                  <div class="md-heat-cell l1"></div>
+                  <div class="md-heat-cell l2"></div>
+                  <div class="md-heat-cell l3"></div>
+                  <div class="md-heat-cell l2"></div>
+                  <div class="md-heat-cell l2"></div>
+                  <div class="md-heat-cell"></div>
+
+                  <div class="h-row-label">So</div>
+                  <div class="md-heat-cell"></div>
+                  <div class="md-heat-cell"></div>
+                  <div class="md-heat-cell l1"></div>
+                  <div class="md-heat-cell"></div>
+                  <div class="md-heat-cell"></div>
+                  <div class="md-heat-cell"></div>
+
+                  <div class="h-row-label">Ne</div>
+                  <div class="md-heat-cell"></div>
+                  <div class="md-heat-cell"></div>
+                  <div class="md-heat-cell"></div>
+                  <div class="md-heat-cell l1"></div>
+                  <div class="md-heat-cell"></div>
+                  <div class="md-heat-cell"></div>
+                </div>
+              </div>
+              <div class="md-stats">
+                <div class="md-stat"><div class="lbl">Current streak</div><div class="val">4d</div></div>
+                <div class="md-stat"><div class="lbl">Longest streak</div><div class="val">12d</div></div>
+                <div class="md-stat"><div class="lbl">Active days</div><div class="val">18</div></div>
+                <div class="md-stat"><div class="lbl">Weekly avg</div><div class="val">32,4h</div></div>
+                <div class="md-stat"><div class="lbl">Busiest day</div><div class="val">26. 5. (8,2h)</div></div>
+              </div>
+            </div>
+
+            <div class="md-card">
+              <div class="md-card-title">Top projects this month</div>
+              <div class="md-tp-list">
+                <div>
+                  <div class="md-tp-row">
+                    <div class="md-tp-dot" style="background:#f0a868"></div>
+                    <div class="md-tp-name">PPS · Capacity planning</div>
+                    <div class="md-tp-val">48,5h</div>
+                  </div>
+                  <div class="md-tp-bar"><div style="width:100%;background:#f0a868"></div></div>
+                </div>
+                <div>
+                  <div class="md-tp-row">
+                    <div class="md-tp-dot" style="background:#b388ff"></div>
+                    <div class="md-tp-name">PPS · Technology</div>
+                    <div class="md-tp-val">38,0h</div>
+                  </div>
+                  <div class="md-tp-bar"><div style="width:78%;background:#b388ff"></div></div>
+                </div>
+                <div>
+                  <div class="md-tp-row">
+                    <div class="md-tp-dot" style="background:#66bb6a"></div>
+                    <div class="md-tp-name">PPS · Quality control</div>
+                    <div class="md-tp-val">24,0h</div>
+                  </div>
+                  <div class="md-tp-bar"><div style="width:49%;background:#66bb6a"></div></div>
+                </div>
+                <div>
+                  <div class="md-tp-row">
+                    <div class="md-tp-dot" style="background:#7aa7ff"></div>
+                    <div class="md-tp-name">Watchtower</div>
+                    <div class="md-tp-val">22,0h</div>
+                  </div>
+                  <div class="md-tp-bar"><div style="width:45%;background:#7aa7ff"></div></div>
+                </div>
+                <div>
+                  <div class="md-tp-row">
+                    <div class="md-tp-dot" style="background:#ef5350"></div>
+                    <div class="md-tp-name">Internal · Process</div>
+                    <div class="md-tp-val">10,0h</div>
+                  </div>
+                  <div class="md-tp-bar"><div style="width:21%;background:#ef5350"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
       </div>
 
       <!-- TimeTracker module -->
@@ -3822,6 +4694,7 @@
       show('resumeFailedView', false);
       show('settingsView', false);
       show('ttView', false);
+      show('moduleDashboardView', false);
       show('tabs', true, 'flex');
       hideOverlays();
       setRail('railInstances');
@@ -3833,10 +4706,22 @@
       show('resumeFailedView', false);
       show('settingsView', false);
       show('ttView', false);
+      show('moduleDashboardView', false);
       show('tabs', true, 'flex');
       hideOverlays();
       setRail('railInstances');
       setActiveTab('dashboard');
+    },
+    'module-dashboard': () => {
+      show('terminalView', false);
+      show('dashboardView', false);
+      show('resumeFailedView', false);
+      show('settingsView', false);
+      show('ttView', false);
+      show('moduleDashboardView', true, 'flex');
+      show('tabs', false);
+      hideOverlays();
+      setRail('railDashboard');
     },
     new: () => {
       scenes.terminal();
@@ -3851,6 +4736,7 @@
       show('dashboardView', false);
       show('settingsView', false);
       show('ttView', false);
+      show('moduleDashboardView', false);
       show('resumeFailedView', true, 'flex');
       hideOverlays();
       setRail('railInstances');
@@ -3862,6 +4748,7 @@
       show('resumeFailedView', false);
       show('settingsView', true, 'block');
       show('ttView', false);
+      show('moduleDashboardView', false);
       show('tabs', true, 'flex');
       hideOverlays();
       setRail('railSettings');
@@ -3913,6 +4800,7 @@
     show('dashboardView', false);
     show('resumeFailedView', false);
     show('settingsView', false);
+    show('moduleDashboardView', false);
     show('ttView', true, 'block');
     show('tabs', false);
     hideOverlays();
@@ -4059,6 +4947,8 @@
 
   // Rail click — TimeTracker rail icon → Projects sub-view (default landing)
   document.getElementById('railTimeTracker').addEventListener('click', () => setScene('tt-projects'));
+  // Rail click — Dashboard rail icon → Dashboard module (default landing for new module)
+  document.getElementById('railDashboard').addEventListener('click', () => setScene('module-dashboard'));
 
   // ── Task grid: build the per-task ⇄ per-day matrix ──
   const taskGridData = {
