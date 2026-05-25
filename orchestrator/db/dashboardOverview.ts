@@ -1,4 +1,5 @@
 import type { SqliteLike } from './migrations.js';
+import { ReportsService } from './reports.js';
 import type {
   DashboardOverviewRequestPayload,
   DashboardOverviewResponsePayload,
@@ -46,12 +47,21 @@ export class DashboardOverviewService {
 
   run(req: DashboardOverviewRequestPayload): DashboardOverviewResponsePayload {
     const { projectId, sprintAnchor, todayDate } = req;
-    const today = { minutes: this.sumForDate(todayDate, projectId) };
-    const month = { minutes: this.sumForMonth(todayDate, projectId) };
+    const reports = new ReportsService(this.db);
+
+    const todayEarned = reports.earnings(todayDate, todayDate, projectId ?? undefined).totalEarned;
+    const monthFrom = todayDate.slice(0, 7) + '-01';
+    const monthTo = lastDayOfMonth(todayDate);
+    const monthEarned = reports.earnings(monthFrom, monthTo, projectId ?? undefined).totalEarned;
+
     const sprint = this.sprintFor(sprintAnchor, projectId);
+    const sprintEarned = reports.earnings(sprint.fromDate, sprint.toDate, projectId ?? undefined).totalEarned;
+
+    const today = { minutes: this.sumForDate(todayDate, projectId), earned: todayEarned };
+    const month = { minutes: this.sumForMonth(todayDate, projectId), earned: monthEarned };
     const heatmap30d = this.heatmap30d(todayDate, projectId);
     const topProjects = this.topProjects(todayDate, projectId);
-    return { today, month, sprint, heatmap30d, topProjects };
+    return { today, month, sprint: { ...sprint, totalEarned: sprintEarned }, heatmap30d, topProjects };
   }
 
   private sumForDate(date: string, projectId: number | null): number {
@@ -201,6 +211,16 @@ function readIntSetting(db: SqliteLike, key: string, fallback: number): number {
   const v = readStringSetting(db, key, String(fallback));
   const n = Number.parseInt(v, 10);
   return Number.isFinite(n) && n >= 1 && n <= 56 ? n : fallback;
+}
+
+function lastDayOfMonth(date: string): string {
+  // date = YYYY-MM-DD; want the YYYY-MM-{last_day_of_that_month}.
+  const parts = date.split('-').map(Number);
+  const y = parts[0] as number;
+  const m = parts[1] as number;
+  // Day 0 of next month = last day of current month.
+  const d = new Date(Date.UTC(y, m, 0));
+  return d.toISOString().slice(0, 10);
 }
 
 function addDays(date: string, n: number): string {

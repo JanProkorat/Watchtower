@@ -155,8 +155,8 @@ export interface DashboardTopProjectPayload {
 }
 
 export interface DashboardOverviewResponsePayload {
-  today: { minutes: number };
-  month: { minutes: number };
+  today: { minutes: number; earned: Record<string, number> };
+  month: { minutes: number; earned: Record<string, number> };
   sprint: {
     /** ISO YYYY-MM-DD of the first day of the sprint window. */
     fromDate: string;
@@ -166,6 +166,8 @@ export interface DashboardOverviewResponsePayload {
     lengthDays: number;
     /** Sum of minutes across the sprint, respecting projectId filter. */
     totalMinutes: number;
+    /** Sprint-wide earned totals keyed by currency. */
+    totalEarned: Record<string, number>;
     /** Per-day list — exactly `lengthDays` entries. */
     days: DashboardSprintDayPayload[];
   };

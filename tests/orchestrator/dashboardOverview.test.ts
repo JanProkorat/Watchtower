@@ -61,6 +61,9 @@ describe('DashboardOverviewService', () => {
     });
 
     expect(res.today.minutes).toBe(90);
+    expect(res.today.earned).toEqual({});
+    expect(res.month.earned).toEqual({});
+    expect(res.sprint.totalEarned).toEqual({});
   });
 
   it('today.minutes respects projectId filter', () => {
