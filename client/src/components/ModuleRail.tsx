@@ -20,7 +20,7 @@ interface RailItem {
 }
 
 const ITEMS: RailItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <SpaceDashboardIcon fontSize="small" />, enabled: false },
+  { id: 'dashboard', label: 'Dashboard', icon: <SpaceDashboardIcon fontSize="small" />, enabled: true },
   { id: 'instances', label: 'Instances', icon: <TerminalIcon fontSize="small" />, enabled: true },
   { id: 'timetracker', label: 'TimeTracker', icon: <TimerIcon fontSize="small" />, enabled: true },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="small" />, enabled: true },

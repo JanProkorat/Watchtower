@@ -19,6 +19,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import 'dayjs/locale/cs';
 import { darkTheme, lightTheme } from './theme.js';
 import { useThemeMode } from './state/useThemeMode.js';
+import { useActiveModule } from './state/useActiveModule.js';
 import { ToastProvider } from './state/useToast.js';
 import { useInstances } from './state/useInstances.js';
 import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
@@ -109,7 +110,7 @@ export function App() {
   const [newOpen, setNewOpen] = useState(false);
   /** Set by the TimeTracker launch bridge to pre-fill the New-instance modal. */
   const [pendingNewCwd, setPendingNewCwd] = useState<string | undefined>(undefined);
-  const [activeModule, setActiveModule] = useState<ModuleId>('instances');
+  const [activeModule, setActiveModule] = useActiveModule();
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Bridge handlers exposed to the TimeTracker module.
@@ -239,7 +240,11 @@ export function App() {
           onToggleMode={toggleThemeMode}
         />
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {activeModule === 'settings' ? (
+        {activeModule === 'dashboard' ? (
+          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.disabled' }}>
+            <Typography variant="body2">Dashboard module — wiring in progress</Typography>
+          </Box>
+        ) : activeModule === 'settings' ? (
           <ModuleSettings active />
         ) : activeModule === 'timetracker' ? (
           <ModuleTimeTracker
