@@ -415,6 +415,7 @@ export type OrchResponse =
   | { kind: 'reports:heatmap'; payload: { heatmap: OrchHeatmapDatum[] } }
   | { kind: 'reports:contracts'; payload: { contracts: OrchContractReportRow[] } }
   | { kind: 'reports:rateChanges'; payload: { rateChanges: OrchRateChangeMarker[] } }
+  | { kind: 'dashboard:overview'; payload: import('./ipcContract.js').DashboardOverviewResponsePayload }
   | { kind: 'instances:findByCwd'; payload: { instances: OrchRunningInstance[] } }
   | { kind: 'claudeSettings:read'; payload: { path: string; exists: boolean; content: string } }
   | { kind: 'claudeSettings:write'; payload: { ok: boolean; backupPath?: string; error?: string } }

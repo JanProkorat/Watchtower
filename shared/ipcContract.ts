@@ -107,8 +107,6 @@ export interface HeatmapDatumPayload {
   minutes: number;
 }
 
-// ─── Dashboard overview ──────────────────────────────────────────────────
-
 export interface DashboardOverviewRequestPayload {
   /** Optional project filter; null = all projects. */
   projectId: number | null;
@@ -153,7 +151,7 @@ export interface DashboardTopProjectPayload {
   minutes: number;
 }
 
-export interface DashboardOverviewResponse {
+export interface DashboardOverviewResponsePayload {
   today: { minutes: number };
   month: { minutes: number };
   week: {
@@ -479,7 +477,7 @@ export type IpcResponse =
   | { kind: 'reports:heatmap'; payload: { heatmap: HeatmapDatumPayload[] } }
   | { kind: 'reports:contracts'; payload: { contracts: ContractReportRowPayload[] } }
   | { kind: 'reports:rateChanges'; payload: { rateChanges: RateChangeMarkerPayload[] } }
-  | { kind: 'dashboard:overview'; payload: DashboardOverviewResponse }
+  | { kind: 'dashboard:overview'; payload: DashboardOverviewResponsePayload }
   | { kind: 'instances:findByCwd'; payload: { instances: RunningInstancePayload[] } }
   | { kind: 'openInVSCode'; payload: { ok: boolean; error?: string } }
   | { kind: 'claudeSettings:read'; payload: ClaudeSettingsReadPayload }
