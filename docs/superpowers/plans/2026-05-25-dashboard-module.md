@@ -102,7 +102,7 @@ export interface DashboardTopProjectPayload {
   minutes: number;
 }
 
-export interface DashboardOverviewResponse {
+export interface DashboardOverviewResponsePayload {
   today: { minutes: number };
   month: { minutes: number };
   week: {
@@ -135,7 +135,7 @@ Find the existing `reports:rateChanges` line in `IpcRequest` (around line 54) an
 Find the matching `reports:rateChanges` response line and append:
 
 ```ts
-  | { kind: 'dashboard:overview'; payload: DashboardOverviewResponse }
+  | { kind: 'dashboard:overview'; payload: DashboardOverviewResponsePayload }
 ```
 
 - [ ] **Step 1.4: Mirror request into `shared/messagePort.ts`**
@@ -179,18 +179,18 @@ Create `orchestrator/db/dashboardOverview.ts`:
 import type { SqliteLike } from './migrations.js';
 import type {
   DashboardOverviewRequestPayload,
-  DashboardOverviewResponse,
+  DashboardOverviewResponsePayload,
 } from '../../shared/ipcContract.js';
 
 /**
  * Aggregate dashboard data in a single round-trip. Public API mirrors
- * `DashboardOverviewResponse` from the IPC contract — KPIs / week / heatmap /
+ * `DashboardOverviewResponsePayload` from the IPC contract — KPIs / week / heatmap /
  * top projects. All dates on the wire are ISO YYYY-MM-DD.
  */
 export class DashboardOverviewService {
   constructor(private readonly db: SqliteLike) {}
 
-  run(req: DashboardOverviewRequestPayload): DashboardOverviewResponse {
+  run(req: DashboardOverviewRequestPayload): DashboardOverviewResponsePayload {
     throw new Error('not implemented');
   }
 }
@@ -315,7 +315,7 @@ Replace the body of `orchestrator/db/dashboardOverview.ts`:
 import type { SqliteLike } from './migrations.js';
 import type {
   DashboardOverviewRequestPayload,
-  DashboardOverviewResponse,
+  DashboardOverviewResponsePayload,
   DashboardWeekDayPayload,
   DashboardHeatmapStatsPayload,
   DashboardTopProjectPayload,
@@ -359,7 +359,7 @@ function projectClause(projectId: number | null): { sql: string; params: number[
 export class DashboardOverviewService {
   constructor(private readonly db: SqliteLike) {}
 
-  run(req: DashboardOverviewRequestPayload): DashboardOverviewResponse {
+  run(req: DashboardOverviewRequestPayload): DashboardOverviewResponsePayload {
     const { projectId, weekAnchor, todayDate } = req;
 
     const today = { minutes: this.sumForDate(todayDate, projectId) };
@@ -849,11 +849,11 @@ Create `client/src/state/useDashboardOverview.ts`:
 import { useCallback, useEffect, useState } from 'react';
 import type {
   DashboardOverviewRequestPayload,
-  DashboardOverviewResponse,
+  DashboardOverviewResponsePayload,
 } from '../../../shared/ipcContract.js';
 
 export interface DashboardOverviewState {
-  data: DashboardOverviewResponse | null;
+  data: DashboardOverviewResponsePayload | null;
   loading: boolean;
   error: string | null;
   refresh(): Promise<void>;
@@ -869,7 +869,7 @@ export function useDashboardOverview(
   weekAnchor: string,
   todayDate: string,
 ): DashboardOverviewState {
-  const [data, setData] = useState<DashboardOverviewResponse | null>(null);
+  const [data, setData] = useState<DashboardOverviewResponsePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -2215,6 +2215,6 @@ git commit -m "feat(dashboard): wire ModuleDashboard into App + finish module"
 
 - [ ] **Spec coverage** — every bullet in the spec's "In scope" list has a task that implements it (KPIs/week/sessions/heatmap/top-projects/header/project-filter/default-landing/persistence — all covered).
 - [ ] **Placeholder scan** — no `TODO`, `TBD`, "fill in later", or "similar to" references inside steps; every code step has the full code body.
-- [ ] **Type consistency** — `DashboardOverviewResponse` / `DashboardWeekDayPayload` / `DashboardHeatmapStatsPayload` / `DashboardTopProjectPayload` names match between Task 1, Task 2, Task 4, Tasks 12–15.
+- [ ] **Type consistency** — `DashboardOverviewResponsePayload` / `DashboardWeekDayPayload` / `DashboardHeatmapStatsPayload` / `DashboardTopProjectPayload` names match between Task 1, Task 2, Task 4, Tasks 12–15.
 - [ ] **Test count baseline** — `npm test -- --run` total ≥ existing baseline + 15.
 - [ ] **No bypassed hooks** — every `git commit` uses the normal pre-commit hook (pre-commit runs typecheck per project convention; no `--no-verify`).
