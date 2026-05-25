@@ -1,14 +1,7 @@
 import { Box, Button, Chip, Paper, Stack, Typography } from '@mui/material';
 import type { InstanceView } from '../state/useInstances.js';
+import { chipColorFor, isLiveStatus, relativeTime } from '../util/instanceStatus.js';
 
-const LIVE_STATUSES = new Set([
-  'spawning',
-  'working',
-  'waiting-permission',
-  'waiting-input',
-  'idle-notify',
-  'resuming',
-]);
 const ATTENTION_STATUSES = new Set(['waiting-permission', 'idle-notify']);
 const RECENT_STATUSES = new Set(['finished', 'crashed', 'suspended']);
 
@@ -16,37 +9,6 @@ function basename(p: string): string {
   if (!p) return '';
   const parts = p.split('/').filter(Boolean);
   return parts[parts.length - 1] ?? p;
-}
-
-function chipColorFor(
-  status: string,
-): 'default' | 'primary' | 'warning' | 'error' | 'success' | 'info' {
-  switch (status) {
-    case 'waiting-permission':
-    case 'crashed':
-      return 'error';
-    case 'waiting-input':
-      return 'warning';
-    case 'idle-notify':
-      return 'default';
-    case 'working':
-    case 'spawning':
-    case 'resuming':
-      return 'primary';
-    case 'finished':
-      return 'success';
-    default:
-      return 'default';
-  }
-}
-
-function relativeTime(ts: number): string {
-  const delta = Date.now() - ts;
-  if (delta < 5_000) return 'just now';
-  if (delta < 60_000) return `${Math.floor(delta / 1000)} s ago`;
-  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)} m ago`;
-  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)} h ago`;
-  return `${Math.floor(delta / 86_400_000)} d ago`;
 }
 
 interface InstanceRowProps {
@@ -57,7 +19,7 @@ interface InstanceRowProps {
 }
 
 function InstanceRow({ instance, onOpen, onKill, onRemove }: InstanceRowProps) {
-  const live = LIVE_STATUSES.has(instance.status);
+  const live = isLiveStatus(instance.status);
   return (
     <Paper
       sx={{
@@ -154,7 +116,7 @@ interface Props {
 export function DashboardTab({ instances, onOpen, onKill, onRemove, onNew }: Props) {
   const attention = instances.filter((i) => ATTENTION_STATUSES.has(i.status));
   const live = instances.filter(
-    (i) => LIVE_STATUSES.has(i.status) && !ATTENTION_STATUSES.has(i.status),
+    (i) => isLiveStatus(i.status) && !ATTENTION_STATUSES.has(i.status),
   );
   const recent = instances.filter((i) => RECENT_STATUSES.has(i.status));
   const waitingCount = attention.length;

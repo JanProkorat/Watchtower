@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Box, Skeleton, Stack } from '@mui/material';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek.js';
@@ -73,10 +73,8 @@ export function ModuleDashboard({
 
   const overview = useDashboardOverview(projectId, weekAnchor, today);
 
-  const projectList = useMemo(
-    () => projectsState.projects.filter((p) => !p.archived),
-    [projectsState.projects],
-  );
+  // useProjects() defaults to the 'active' filter — server returns only non-archived rows.
+  const projectList = projectsState.projects;
 
   const handleKill = async (id: string) => {
     try {
@@ -104,6 +102,12 @@ export function ModuleDashboard({
         onProjectChange={setProjectId}
         todayDate={today}
       />
+
+      {projectsState.error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Nepodařilo se načíst projekty: {projectsState.error}
+        </Alert>
+      )}
 
       {overview.error && (
         <Alert severity="error" sx={{ mb: 2 }}>
