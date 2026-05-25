@@ -124,12 +124,13 @@ describe('DashboardOverviewService', () => {
     expect(res.sprint.days[0].minutes).toBe(90);
     expect(res.sprint.days[3].minutes).toBe(60);
     expect(res.sprint.days[13].minutes).toBe(30);
-    expect(res.sprint.days[0].tasks[0]).toMatchObject({
+    expect(res.sprint.days[0].worklogs[0]).toMatchObject({
       taskNumber: 'T-1',
+      taskTitle: 'T-1',
       projectName: 'P',
       projectColor: '#7aa7ff',
       minutes: 90,
-      worklogCount: 1,
+      note: 'Day 1 task',
     });
     expect(res.sprint.totalMinutes).toBe(180);
   });
@@ -288,7 +289,7 @@ describe('DashboardOverviewService', () => {
     expect(res.topProjects.map((p) => p.projectName)).toEqual(['Alpha']);
   });
 
-  it('aggregates multiple worklogs for the same task on the same day into one row', () => {
+  it('lists every worklog for the same task on the same day as a separate row (sorted by minutes desc)', () => {
     const { task } = seedTask('P', '#7aa7ff', 'AGG-1');
     seedWorklog(task.id, '2026-05-25', 30, 'morning');
     seedWorklog(task.id, '2026-05-25', 60, 'afternoon');
@@ -300,20 +301,22 @@ describe('DashboardOverviewService', () => {
       todayDate: '2026-05-25',
     });
 
-    // Find the day's tasks — for the default 2026-01-05 / 14d sprint config,
+    // For the default 2026-01-05 / 14d sprint config,
     // 2026-05-25 falls inside one sprint and exactly one day cell will hold this data.
     const day = res.sprint.days.find((d) => d.date === '2026-05-25');
     expect(day).toBeDefined();
-    expect(day!.tasks).toHaveLength(1);
-    expect(day!.tasks[0]).toMatchObject({
+    expect(day!.worklogs).toHaveLength(3);
+    expect(day!.worklogs.map((w) => w.minutes)).toEqual([60, 30, 15]);
+    expect(day!.worklogs.every((w) => w.taskNumber === 'AGG-1')).toBe(true);
+    expect(day!.worklogs[0]).toMatchObject({
       taskNumber: 'AGG-1',
       projectName: 'P',
-      minutes: 30 + 60 + 15,
-      worklogCount: 3,
+      minutes: 60,
+      note: 'afternoon',
     });
   });
 
-  it('renders distinct tasks on the same day as separate rows, sorted by minutes desc', () => {
+  it('renders distinct worklogs on the same day sorted by minutes desc', () => {
     const a = seedTask('P', '#7aa7ff', 'BIG-1');
     const b = seedTask('P', '#7aa7ff', 'SMALL-1');
     seedWorklog(a.task.id, '2026-05-25', 90);
@@ -327,8 +330,8 @@ describe('DashboardOverviewService', () => {
 
     const day = res.sprint.days.find((d) => d.date === '2026-05-25');
     expect(day).toBeDefined();
-    expect(day!.tasks.map((t) => t.taskNumber)).toEqual(['BIG-1', 'SMALL-1']);
-    expect(day!.tasks[0].minutes).toBe(90);
-    expect(day!.tasks[1].minutes).toBe(30);
+    expect(day!.worklogs.map((w) => w.taskNumber)).toEqual(['BIG-1', 'SMALL-1']);
+    expect(day!.worklogs[0].minutes).toBe(90);
+    expect(day!.worklogs[1].minutes).toBe(30);
   });
 });

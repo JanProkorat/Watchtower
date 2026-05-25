@@ -122,18 +122,20 @@ export interface DashboardSprintDayPayload {
   date: string;
   /** Sum of minutes for the day (respects projectId filter). */
   minutes: number;
-  tasks: DashboardSprintTaskPayload[];
+  worklogs: DashboardSprintWorklogPayload[];
 }
 
-export interface DashboardSprintTaskPayload {
+export interface DashboardSprintWorklogPayload {
+  /** Worklog PK — used as React key. */
+  id: number;
   /** Task key like "FIE1933-19084", or null for ad-hoc tasks without a number. */
   taskNumber: string | null;
+  /** Task title, e.g. "Operace odebraná z EK se neposune do...". */
+  taskTitle: string;
   projectName: string;
   projectColor: string | null;
-  /** Sum of minutes for THIS task on THIS day across all its worklogs. */
   minutes: number;
-  /** Worklog count for that task on that day — useful as a "(3)" badge in the UI. */
-  worklogCount: number;
+  note: string | null;
 }
 
 export interface DashboardHeatmapStatsPayload {

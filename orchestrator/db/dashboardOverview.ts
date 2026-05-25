@@ -5,7 +5,7 @@ import type {
   DashboardSprintDayPayload,
   DashboardHeatmapStatsPayload,
   DashboardTopProjectPayload,
-  DashboardSprintTaskPayload,
+  DashboardSprintWorklogPayload,
 } from '../../shared/ipcContract.js';
 
 interface MinutesRow {
@@ -18,13 +18,15 @@ interface MinutesByDateRow {
   minutes: number;
 }
 
-interface SprintTaskJoinedRow {
+interface SprintWorklogJoinedRow {
+  id: number;
   task_number: string | null;
+  task_title: string;
   project_name: string;
   project_color: string | null;
   work_date: string;
   minutes: number;
-  worklog_count: number;
+  description: string | null;
 }
 
 interface TopProjectRow {
@@ -87,36 +89,39 @@ export class DashboardOverviewService {
     const { fromDate, toDate } = sprintWindow(sprintAnchor, startDate, lengthDays);
     const pc = projectClause(projectId);
     const sql = `
-      SELECT t.number AS task_number,
+      SELECT w.id,
+             t.number AS task_number,
+             t.title  AS task_title,
              p.name   AS project_name,
              p.color  AS project_color,
              w.work_date,
-             SUM(w.minutes) AS minutes,
-             COUNT(w.id)    AS worklog_count
+             w.minutes,
+             w.description
       FROM worklogs w
       JOIN tasks   t ON t.id = w.task_id
       JOIN epics   e ON e.id = t.epic_id
       JOIN projects p ON p.id = e.project_id
       WHERE w.work_date BETWEEN ? AND ?${pc.sql}
-      GROUP BY t.id, w.work_date, p.id, p.name, p.color, t.number
-      ORDER BY w.work_date ASC, minutes DESC, t.number ASC
+      ORDER BY w.work_date ASC, w.minutes DESC, w.id ASC
     `;
-    const rows = this.db.prepare(sql).all(fromDate, toDate, ...pc.params) as SprintTaskJoinedRow[];
+    const rows = this.db.prepare(sql).all(fromDate, toDate, ...pc.params) as SprintWorklogJoinedRow[];
 
     const days: DashboardSprintDayPayload[] = [];
     for (let i = 0; i < lengthDays; i++) {
       const date = addDays(fromDate, i);
-      const dayTasks: DashboardSprintTaskPayload[] = rows
+      const dayWls: DashboardSprintWorklogPayload[] = rows
         .filter((r) => r.work_date === date)
         .map((r) => ({
+          id: r.id,
           taskNumber: r.task_number,
+          taskTitle: r.task_title,
           projectName: r.project_name,
           projectColor: r.project_color,
           minutes: r.minutes,
-          worklogCount: r.worklog_count,
+          note: r.description,
         }));
-      const minutes = dayTasks.reduce((acc, t) => acc + t.minutes, 0);
-      days.push({ date, minutes, tasks: dayTasks });
+      const minutes = dayWls.reduce((acc, w) => acc + w.minutes, 0);
+      days.push({ date, minutes, worklogs: dayWls });
     }
     const totalMinutes = days.reduce((acc, d) => acc + d.minutes, 0);
     return { fromDate, toDate, lengthDays, totalMinutes, days };

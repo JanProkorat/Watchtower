@@ -1,39 +1,40 @@
-import { useEffect, useRef, useState } from 'react';
-import { Box, Chip, IconButton, Paper, Popover, Stack, Tooltip, Typography } from '@mui/material';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Box,
+  Chip,
+  IconButton,
+  Paper,
+  Popover,
+  Stack,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import TodayIcon from '@mui/icons-material/Today';
+import DragHandleIcon from '@mui/icons-material/DragHandle';
 import dayjs, { type Dayjs } from 'dayjs';
 import 'dayjs/locale/cs';
 import type { DashboardSprintDayPayload } from '../../../../shared/ipcContract.js';
 import { formatDateLongCz, formatMinutes } from '../../util/format.js';
 import { SprintDayCell } from './SprintDayCell.js';
 
-const HANDLE_HEIGHT = 8;
-const MIN_HEIGHT = 160;
-const MAX_HEIGHT = 560;
-const DEFAULT_HEIGHT = 220;
-const CELL_WIDTH = 168;
-const STORAGE_KEY = 'watchtower.dashboard.weekCellHeight';
+const DAY_HEIGHT_DEFAULT = 330;
+const DAY_HEIGHT_MIN = 160;
+const DAY_HEIGHT_MAX = 900;
+// Old key: 'watchtower.dashboard.weekCellHeight' — silently ignored on first load
+const STORAGE_KEY = 'watchtower.dashboard.sprintCalendar.dayHeight';
 
-function readPersistedHeight(): number {
+function loadDayHeight(): number {
   try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    if (!v) return DEFAULT_HEIGHT;
-    const n = Number(v);
-    return Number.isFinite(n) && n >= MIN_HEIGHT && n <= MAX_HEIGHT ? n : DEFAULT_HEIGHT;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const n = raw != null ? Number(raw) : NaN;
+    if (!Number.isFinite(n)) return DAY_HEIGHT_DEFAULT;
+    return Math.min(DAY_HEIGHT_MAX, Math.max(DAY_HEIGHT_MIN, n));
   } catch {
-    return DEFAULT_HEIGHT;
-  }
-}
-
-function persistHeight(h: number) {
-  try {
-    localStorage.setItem(STORAGE_KEY, String(h));
-  } catch {
-    /* ignore */
+    return DAY_HEIGHT_DEFAULT;
   }
 }
 
@@ -53,14 +54,17 @@ export interface SprintStripProps {
 
 export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripProps) {
   const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null);
-  const [cellHeight, setCellHeight] = useState<number>(readPersistedHeight);
-  const cellHeightRef = useRef(cellHeight);
-  const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+  const [dayHeight, setDayHeight] = useState<number>(loadDayHeight);
+  const dragStateRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const todayRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    cellHeightRef.current = cellHeight;
-  }, [cellHeight]);
+    try {
+      localStorage.setItem(STORAGE_KEY, String(dayHeight));
+    } catch {
+      /* ignore */
+    }
+  }, [dayHeight]);
 
   useEffect(() => {
     if (todayRef.current) {
@@ -68,34 +72,42 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
     }
   }, []); // only first paint
 
-  const onDragStart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    dragRef.current = { startY: e.clientY, startH: cellHeight };
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      dragStateRef.current = { startY: e.clientY, startHeight: dayHeight };
+    },
+    [dayHeight],
+  );
 
-    const onMove = (ev: MouseEvent) => {
-      if (!dragRef.current) return;
-      const delta = ev.clientY - dragRef.current.startY;
-      const next = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, dragRef.current.startH + delta));
-      setCellHeight(next);
-    };
+  const handleResizeMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const state = dragStateRef.current;
+    if (!state) return;
+    const delta = e.clientY - state.startY;
+    const next = Math.min(
+      DAY_HEIGHT_MAX,
+      Math.max(DAY_HEIGHT_MIN, state.startHeight + delta),
+    );
+    setDayHeight(next);
+  }, []);
 
-    const onUp = () => {
-      dragRef.current = null;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      persistHeight(cellHeightRef.current);
-    };
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  };
+  const handleResizeEnd = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStateRef.current) return;
+    dragStateRef.current = null;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* pointer may already be released */
+    }
+  }, []);
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
         <Box>
           <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography sx={{ fontSize: 15, fontWeight: 600 }}>This sprint</Typography>
+            <Typography sx={{ fontSize: 15, fontWeight: 600 }}>Sprint</Typography>
             <Chip
               size="small"
               label={formatMinutes(sprint.totalMinutes)}
@@ -117,7 +129,13 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
           <Tooltip title="Previous sprint">
             <IconButton
               size="small"
-              onClick={() => onAnchorChange(dayjs(sprint.fromDate).subtract(sprint.lengthDays, 'day').format('YYYY-MM-DD'))}
+              onClick={() =>
+                onAnchorChange(
+                  dayjs(sprint.fromDate)
+                    .subtract(sprint.lengthDays, 'day')
+                    .format('YYYY-MM-DD'),
+                )
+              }
             >
               <ChevronLeftIcon fontSize="small" />
             </IconButton>
@@ -130,7 +148,13 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
           <Tooltip title="Next sprint">
             <IconButton
               size="small"
-              onClick={() => onAnchorChange(dayjs(sprint.fromDate).add(sprint.lengthDays, 'day').format('YYYY-MM-DD'))}
+              onClick={() =>
+                onAnchorChange(
+                  dayjs(sprint.fromDate)
+                    .add(sprint.lengthDays, 'day')
+                    .format('YYYY-MM-DD'),
+                )
+              }
             >
               <ChevronRightIcon fontSize="small" />
             </IconButton>
@@ -157,8 +181,8 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
         </Box>
       </Popover>
 
-      <Box sx={{ overflowX: 'auto', pb: 1 }}>
-        <Stack direction="row" spacing={1.25} sx={{ width: 'max-content' }}>
+      <Box sx={{ overflowX: 'auto', pb: 0.5 }}>
+        <Stack direction="row" gap={1} sx={{ width: 'max-content' }}>
           {sprint.days.map((d) => {
             const isToday = d.date === todayDate;
             return (
@@ -166,8 +190,7 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
                 <SprintDayCell
                   day={d}
                   isToday={isToday}
-                  cellWidth={CELL_WIDTH}
-                  cellHeight={cellHeight}
+                  cellHeight={dayHeight}
                 />
               </Box>
             );
@@ -175,22 +198,37 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
         </Stack>
       </Box>
 
-      <Box
-        onMouseDown={onDragStart}
-        sx={{
-          height: HANDLE_HEIGHT,
-          mt: 1,
-          cursor: 'ns-resize',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'text.disabled',
-          borderRadius: 1,
-          '&:hover': { backgroundColor: 'action.hover' },
-        }}
-      >
-        <Box sx={{ width: 36, height: 3, borderRadius: 999, backgroundColor: 'divider' }} />
-      </Box>
+      <Tooltip title="Drag to resize">
+        <Box
+          onPointerDown={handleResizeStart}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeEnd}
+          onPointerCancel={handleResizeEnd}
+          onDoubleClick={() => setDayHeight(DAY_HEIGHT_DEFAULT)}
+          role="separator"
+          sx={{
+            mt: 1,
+            mx: -2,
+            mb: -2,
+            py: 0.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'ns-resize',
+            color: 'text.disabled',
+            borderTop: 1,
+            borderColor: 'divider',
+            touchAction: 'none',
+            userSelect: 'none',
+            '&:hover': {
+              color: 'text.secondary',
+              backgroundColor: 'action.hover',
+            },
+          }}
+        >
+          <DragHandleIcon fontSize="small" />
+        </Box>
+      </Tooltip>
     </Paper>
   );
 }
