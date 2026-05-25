@@ -4,7 +4,7 @@ import { formatHours } from '../../util/format.js';
 
 export interface KpiTilesProps {
   todayMinutes: number;
-  weekMinutes: number;
+  sprintMinutes: number;
   monthMinutes: number;
 }
 
@@ -57,11 +57,11 @@ function Tile({ label, minutes }: TileProps) {
   );
 }
 
-export function KpiTiles({ todayMinutes, weekMinutes, monthMinutes }: KpiTilesProps) {
+export function KpiTiles({ todayMinutes, sprintMinutes, monthMinutes }: KpiTilesProps) {
   return (
     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
       <Tile label="Today" minutes={todayMinutes} />
-      <Tile label="This week" minutes={weekMinutes} />
+      <Tile label="This sprint" minutes={sprintMinutes} />
       <Tile label="This month" minutes={monthMinutes} />
     </Stack>
   );

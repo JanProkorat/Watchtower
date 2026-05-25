@@ -1,13 +1,16 @@
 import { Box, Stack, Typography } from '@mui/material';
-import type { DashboardWeekDayPayload } from '../../../../shared/ipcContract.js';
+import type { DashboardSprintDayPayload } from '../../../../shared/ipcContract.js';
 import { formatMinutes } from '../../util/format.js';
 
-const CZECH_DOW_MON_FIRST = ['PO', 'ÚT', 'ST', 'ČT', 'PÁ', 'SO', 'NE'];
+const CZECH_DOW_BY_JS_DAY = ['NE', 'PO', 'ÚT', 'ST', 'ČT', 'PÁ', 'SO'];
 
-export interface WeekDayCellProps {
-  day: DashboardWeekDayPayload;
-  /** Index 0–6 = Monday..Sunday. */
-  index: number;
+function czechWeekdayOf(iso: string): string {
+  const dow = new Date(iso + 'T00:00:00Z').getUTCDay(); // 0 = Sun
+  return CZECH_DOW_BY_JS_DAY[dow];
+}
+
+export interface SprintDayCellProps {
+  day: DashboardSprintDayPayload;
   /** True for today's column. */
   isToday: boolean;
   /** Override the default 200px minimum height. */
@@ -20,7 +23,7 @@ function shortDate(iso: string): string {
   return `${Number(d)}. ${Number(m)}.`;
 }
 
-export function WeekDayCell({ day, index, isToday, cellMinHeight }: WeekDayCellProps) {
+export function SprintDayCell({ day, isToday, cellMinHeight }: SprintDayCellProps) {
   return (
     <Box
       sx={{
@@ -49,7 +52,7 @@ export function WeekDayCell({ day, index, isToday, cellMinHeight }: WeekDayCellP
             color: isToday ? 'error.main' : 'text.secondary',
           }}
         >
-          {CZECH_DOW_MON_FIRST[index]}
+          {czechWeekdayOf(day.date)}
         </Typography>
         <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{shortDate(day.date)}</Typography>
       </Stack>

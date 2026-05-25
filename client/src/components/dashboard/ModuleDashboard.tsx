@@ -1,19 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Alert, Box, Skeleton, Stack } from '@mui/material';
 import dayjs from 'dayjs';
-import isoWeek from 'dayjs/plugin/isoWeek.js';
 import { useDashboardOverview } from '../../state/useDashboardOverview.js';
 import { useProjects } from '../../state/useProjects.js';
 import { useToast } from '../../state/useToast.js';
 import type { InstanceView } from '../../state/useInstances.js';
 import { DashboardHeader } from './DashboardHeader.js';
 import { KpiTiles } from './KpiTiles.js';
-import { WeekStrip } from './WeekStrip.js';
+import { SprintStrip } from './SprintStrip.js';
 import { SessionsCard } from './SessionsCard.js';
 import { LastThirtyDays } from './LastThirtyDays.js';
 import { TopProjectsCard } from './TopProjectsCard.js';
-
-dayjs.extend(isoWeek);
 
 const FILTER_KEY = 'watchtower.dashboard.projectId';
 
@@ -53,7 +50,7 @@ export function ModuleDashboard({
   onStartNewInstance,
 }: ModuleDashboardProps) {
   const [today, setToday] = useState<string>(todayIso);
-  const [weekAnchor, setWeekAnchor] = useState<string>(today);
+  const [sprintAnchor, setSprintAnchor] = useState<string>(today);
   const [projectId, setProjectId] = useState<number | null>(readPersistedProject);
   const [defaultSeeded, setDefaultSeeded] = useState(false);
   const projectsState = useProjects();
@@ -94,7 +91,7 @@ export function ModuleDashboard({
     persistProject(projectId);
   }, [projectId]);
 
-  const overview = useDashboardOverview(projectId, weekAnchor, today);
+  const overview = useDashboardOverview(projectId, sprintAnchor, today);
 
   // useProjects() defaults to the 'active' filter — server returns only non-archived rows.
   const projectList = projectsState.projects;
@@ -150,13 +147,13 @@ export function ModuleDashboard({
           <>
             <KpiTiles
               todayMinutes={overview.data.today.minutes}
-              weekMinutes={overview.data.week.totalMinutes}
+              sprintMinutes={overview.data.sprint.totalMinutes}
               monthMinutes={overview.data.month.minutes}
             />
-            <WeekStrip
-              week={overview.data.week}
+            <SprintStrip
+              sprint={overview.data.sprint}
               todayDate={today}
-              onAnchorChange={setWeekAnchor}
+              onAnchorChange={setSprintAnchor}
             />
             <SessionsCard
               instances={instances}

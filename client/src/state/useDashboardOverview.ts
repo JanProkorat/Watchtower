@@ -12,13 +12,13 @@ export interface DashboardOverviewState {
 }
 
 /**
- * Single-call dashboard fetcher. Refetches whenever projectId, weekAnchor,
+ * Single-call dashboard fetcher. Refetches whenever projectId, sprintAnchor,
  * or todayDate change. The "today" date is passed in by the caller so the
  * orchestrator doesn't need to know the user's local timezone.
  */
 export function useDashboardOverview(
   projectId: number | null,
-  weekAnchor: string,
+  sprintAnchor: string,
   todayDate: string,
 ): DashboardOverviewState {
   const [data, setData] = useState<DashboardOverviewResponsePayload | null>(null);
@@ -29,7 +29,7 @@ export function useDashboardOverview(
     setLoading(true);
     setError(null);
     try {
-      const payload: DashboardOverviewRequestPayload = { projectId, weekAnchor, todayDate };
+      const payload: DashboardOverviewRequestPayload = { projectId, sprintAnchor, todayDate };
       const res = await window.watchtower.invoke('dashboard:overview', payload);
       setData(res);
     } catch (err) {
@@ -37,7 +37,7 @@ export function useDashboardOverview(
     } finally {
       setLoading(false);
     }
-  }, [projectId, weekAnchor, todayDate]);
+  }, [projectId, sprintAnchor, todayDate]);
 
   useEffect(() => {
     void refresh();

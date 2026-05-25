@@ -6,13 +6,10 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import TodayIcon from '@mui/icons-material/Today';
 import dayjs, { type Dayjs } from 'dayjs';
-import isoWeek from 'dayjs/plugin/isoWeek.js';
 import 'dayjs/locale/cs';
-import type { DashboardWeekDayPayload } from '../../../../shared/ipcContract.js';
+import type { DashboardSprintDayPayload } from '../../../../shared/ipcContract.js';
 import { formatDateLongCz, formatMinutes } from '../../util/format.js';
-import { WeekDayCell } from './WeekDayCell.js';
-
-dayjs.extend(isoWeek);
+import { SprintDayCell } from './SprintDayCell.js';
 
 const HANDLE_HEIGHT = 8;
 const MIN_HEIGHT = 120;
@@ -38,24 +35,21 @@ function persistHeight(h: number) {
   }
 }
 
-export interface WeekStripProps {
-  week: {
+export interface SprintStripProps {
+  sprint: {
     fromDate: string;
     toDate: string;
+    lengthDays: number;
     totalMinutes: number;
-    days: DashboardWeekDayPayload[];
+    days: DashboardSprintDayPayload[];
   };
   /** Today's ISO date (YYYY-MM-DD), used to highlight one column. */
   todayDate: string;
-  /** Caller updates the week anchor; the strip never derives it itself. */
+  /** Caller updates the sprint anchor; the strip never derives it itself. */
   onAnchorChange(nextAnchor: string): void;
 }
 
-function mondayOf(iso: string): string {
-  return dayjs(iso).isoWeekday(1).format('YYYY-MM-DD');
-}
-
-export function WeekStrip({ week, todayDate, onAnchorChange }: WeekStripProps) {
+export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripProps) {
   const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null);
   const [cellHeight, setCellHeight] = useState<number>(readPersistedHeight);
   const cellHeightRef = useRef(cellHeight);
@@ -92,16 +86,16 @@ export function WeekStrip({ week, todayDate, onAnchorChange }: WeekStripProps) {
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
         <Box>
           <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography sx={{ fontSize: 15, fontWeight: 600 }}>This week</Typography>
+            <Typography sx={{ fontSize: 15, fontWeight: 600 }}>This sprint</Typography>
             <Chip
               size="small"
-              label={formatMinutes(week.totalMinutes)}
+              label={formatMinutes(sprint.totalMinutes)}
               sx={{ height: 20, fontSize: 11, fontWeight: 700 }}
               color="primary"
             />
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-            {formatDateLongCz(week.fromDate)} — {formatDateLongCz(week.toDate)}
+            {formatDateLongCz(sprint.fromDate)} — {formatDateLongCz(sprint.toDate)}
           </Typography>
         </Box>
 
@@ -111,23 +105,23 @@ export function WeekStrip({ week, todayDate, onAnchorChange }: WeekStripProps) {
               <TodayIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Previous week">
+          <Tooltip title="Previous sprint">
             <IconButton
               size="small"
-              onClick={() => onAnchorChange(dayjs(week.fromDate).subtract(7, 'day').format('YYYY-MM-DD'))}
+              onClick={() => onAnchorChange(dayjs(sprint.fromDate).subtract(sprint.lengthDays, 'day').format('YYYY-MM-DD'))}
             >
               <ChevronLeftIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Pick a week">
+          <Tooltip title="Pick a date in the sprint">
             <IconButton size="small" onClick={(e) => setPickerAnchor(e.currentTarget)}>
               <CalendarMonthIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Next week">
+          <Tooltip title="Next sprint">
             <IconButton
               size="small"
-              onClick={() => onAnchorChange(dayjs(week.fromDate).add(7, 'day').format('YYYY-MM-DD'))}
+              onClick={() => onAnchorChange(dayjs(sprint.fromDate).add(sprint.lengthDays, 'day').format('YYYY-MM-DD'))}
             >
               <ChevronRightIcon fontSize="small" />
             </IconButton>
@@ -144,10 +138,10 @@ export function WeekStrip({ week, todayDate, onAnchorChange }: WeekStripProps) {
       >
         <Box sx={{ p: 1 }}>
           <DatePicker
-            value={dayjs(week.fromDate)}
+            value={dayjs(sprint.fromDate)}
             onChange={(v: Dayjs | null) => {
               if (!v) return;
-              onAnchorChange(mondayOf(v.format('YYYY-MM-DD')));
+              onAnchorChange(v.format('YYYY-MM-DD'));
               setPickerAnchor(null);
             }}
           />
@@ -155,8 +149,8 @@ export function WeekStrip({ week, todayDate, onAnchorChange }: WeekStripProps) {
       </Popover>
 
       <Stack direction="row" spacing={1.25} sx={{ width: '100%' }}>
-        {week.days.map((d, i) => (
-          <WeekDayCell key={d.date} day={d} index={i} isToday={d.date === todayDate} cellMinHeight={cellHeight} />
+        {sprint.days.map((d) => (
+          <SprintDayCell key={d.date} day={d} isToday={d.date === todayDate} cellMinHeight={cellHeight} />
         ))}
       </Stack>
 
