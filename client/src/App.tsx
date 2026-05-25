@@ -31,6 +31,7 @@ import { DashboardTab } from './components/DashboardTab.js';
 import { FirstRunWizard } from './components/FirstRunWizard.js';
 import { ModuleSettings } from './components/settings/ModuleSettings.js';
 import { ModuleTimeTracker } from './components/timetracker/ModuleTimeTracker.js';
+import { ModuleDashboard } from './components/dashboard/ModuleDashboard.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
 const TERMINAL_STATES = new Set(['finished', 'crashed', 'suspended']);
@@ -104,7 +105,7 @@ function LoadingScreen() {
 export function App() {
   const { mode, toggle: toggleThemeMode } = useThemeMode();
   const theme = useMemo(() => (mode === 'dark' ? darkTheme : lightTheme), [mode]);
-  const { instances, activeId, loaded, setActive, spawn, remove, reorder } = useInstances();
+  const { instances, activeId, loaded, setActive, spawn, kill, remove, reorder } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
@@ -241,9 +242,12 @@ export function App() {
         />
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {activeModule === 'dashboard' ? (
-          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.disabled' }}>
-            <Typography variant="body2">Dashboard module — wiring in progress</Typography>
-          </Box>
+          <ModuleDashboard
+            instances={instances}
+            onActivateInstance={switchToInstance}
+            onKillInstance={(id) => kill(id)}
+            onStartNewInstance={() => setNewOpen(true)}
+          />
         ) : activeModule === 'settings' ? (
           <ModuleSettings active />
         ) : activeModule === 'timetracker' ? (
