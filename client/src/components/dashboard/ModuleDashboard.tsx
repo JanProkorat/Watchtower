@@ -149,6 +149,9 @@ export function ModuleDashboard({
               todayMinutes={overview.data.today.minutes}
               sprintMinutes={overview.data.sprint.totalMinutes}
               monthMinutes={overview.data.month.minutes}
+              todayEarned={overview.data.today.earned}
+              sprintEarned={overview.data.sprint.totalEarned}
+              monthEarned={overview.data.month.earned}
             />
             <SprintStrip
               sprint={overview.data.sprint}

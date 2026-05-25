@@ -1,19 +1,24 @@
 import { Box, Paper, Stack, Typography } from '@mui/material';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import { formatHours } from '../../util/format.js';
+import { formatEarnings, formatHours } from '../../util/format.js';
 
 export interface KpiTilesProps {
   todayMinutes: number;
   sprintMinutes: number;
   monthMinutes: number;
+  todayEarned: Record<string, number>;
+  sprintEarned: Record<string, number>;
+  monthEarned: Record<string, number>;
 }
 
 interface TileProps {
   label: string;
   minutes: number;
+  earned: Record<string, number>;
 }
 
-function Tile({ label, minutes }: TileProps) {
+function Tile({ label, minutes, earned }: TileProps) {
+  const earnedEntries = Object.entries(earned).filter(([, v]) => v > 0);
   return (
     <Paper
       variant="outlined"
@@ -53,16 +58,36 @@ function Tile({ label, minutes }: TileProps) {
         </Typography>
         <Typography variant="body2" color="text.secondary">hours</Typography>
       </Stack>
+      {earnedEntries.length > 0 && (
+        <Stack spacing={0.25} sx={{ mt: 1 }}>
+          {earnedEntries.map(([currency, amount]) => (
+            <Typography
+              key={currency}
+              variant="body2"
+              sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
+            >
+              {formatEarnings(amount, currency)}
+            </Typography>
+          ))}
+        </Stack>
+      )}
     </Paper>
   );
 }
 
-export function KpiTiles({ todayMinutes, sprintMinutes, monthMinutes }: KpiTilesProps) {
+export function KpiTiles({
+  todayMinutes,
+  sprintMinutes,
+  monthMinutes,
+  todayEarned,
+  sprintEarned,
+  monthEarned,
+}: KpiTilesProps) {
   return (
     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-      <Tile label="Today" minutes={todayMinutes} />
-      <Tile label="This sprint" minutes={sprintMinutes} />
-      <Tile label="This month" minutes={monthMinutes} />
+      <Tile label="Today" minutes={todayMinutes} earned={todayEarned} />
+      <Tile label="This sprint" minutes={sprintMinutes} earned={sprintEarned} />
+      <Tile label="This month" minutes={monthMinutes} earned={monthEarned} />
     </Stack>
   );
 }
