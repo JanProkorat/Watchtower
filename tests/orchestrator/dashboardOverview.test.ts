@@ -124,12 +124,12 @@ describe('DashboardOverviewService', () => {
     expect(res.sprint.days[0].minutes).toBe(90);
     expect(res.sprint.days[3].minutes).toBe(60);
     expect(res.sprint.days[13].minutes).toBe(30);
-    expect(res.sprint.days[0].worklogs[0]).toMatchObject({
+    expect(res.sprint.days[0].tasks[0]).toMatchObject({
       taskNumber: 'T-1',
       projectName: 'P',
       projectColor: '#7aa7ff',
       minutes: 90,
-      note: 'Day 1 task',
+      worklogCount: 1,
     });
     expect(res.sprint.totalMinutes).toBe(180);
   });
@@ -286,5 +286,49 @@ describe('DashboardOverviewService', () => {
     });
 
     expect(res.topProjects.map((p) => p.projectName)).toEqual(['Alpha']);
+  });
+
+  it('aggregates multiple worklogs for the same task on the same day into one row', () => {
+    const { task } = seedTask('P', '#7aa7ff', 'AGG-1');
+    seedWorklog(task.id, '2026-05-25', 30, 'morning');
+    seedWorklog(task.id, '2026-05-25', 60, 'afternoon');
+    seedWorklog(task.id, '2026-05-25', 15, 'evening');
+
+    const res = service.run({
+      projectId: null,
+      sprintAnchor: '2026-05-25',
+      todayDate: '2026-05-25',
+    });
+
+    // Find the day's tasks — for the default 2026-01-05 / 14d sprint config,
+    // 2026-05-25 falls inside one sprint and exactly one day cell will hold this data.
+    const day = res.sprint.days.find((d) => d.date === '2026-05-25');
+    expect(day).toBeDefined();
+    expect(day!.tasks).toHaveLength(1);
+    expect(day!.tasks[0]).toMatchObject({
+      taskNumber: 'AGG-1',
+      projectName: 'P',
+      minutes: 30 + 60 + 15,
+      worklogCount: 3,
+    });
+  });
+
+  it('renders distinct tasks on the same day as separate rows, sorted by minutes desc', () => {
+    const a = seedTask('P', '#7aa7ff', 'BIG-1');
+    const b = seedTask('P', '#7aa7ff', 'SMALL-1');
+    seedWorklog(a.task.id, '2026-05-25', 90);
+    seedWorklog(b.task.id, '2026-05-25', 30);
+
+    const res = service.run({
+      projectId: null,
+      sprintAnchor: '2026-05-25',
+      todayDate: '2026-05-25',
+    });
+
+    const day = res.sprint.days.find((d) => d.date === '2026-05-25');
+    expect(day).toBeDefined();
+    expect(day!.tasks.map((t) => t.taskNumber)).toEqual(['BIG-1', 'SMALL-1']);
+    expect(day!.tasks[0].minutes).toBe(90);
+    expect(day!.tasks[1].minutes).toBe(30);
   });
 });

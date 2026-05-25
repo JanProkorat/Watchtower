@@ -5,6 +5,7 @@ import type {
   DashboardSprintDayPayload,
   DashboardHeatmapStatsPayload,
   DashboardTopProjectPayload,
+  DashboardSprintTaskPayload,
 } from '../../shared/ipcContract.js';
 
 interface MinutesRow {
@@ -17,14 +18,13 @@ interface MinutesByDateRow {
   minutes: number;
 }
 
-interface WorklogJoinedRow {
-  id: number;
+interface SprintTaskJoinedRow {
   task_number: string | null;
   project_name: string;
   project_color: string | null;
-  minutes: number;
-  description: string | null;
   work_date: string;
+  minutes: number;
+  worklog_count: number;
 }
 
 interface TopProjectRow {
@@ -87,32 +87,36 @@ export class DashboardOverviewService {
     const { fromDate, toDate } = sprintWindow(sprintAnchor, startDate, lengthDays);
     const pc = projectClause(projectId);
     const sql = `
-      SELECT w.id, t.number AS task_number, p.name AS project_name, p.color AS project_color,
-             w.minutes, w.description, w.work_date
+      SELECT t.number AS task_number,
+             p.name   AS project_name,
+             p.color  AS project_color,
+             w.work_date,
+             SUM(w.minutes) AS minutes,
+             COUNT(w.id)    AS worklog_count
       FROM worklogs w
       JOIN tasks   t ON t.id = w.task_id
       JOIN epics   e ON e.id = t.epic_id
       JOIN projects p ON p.id = e.project_id
       WHERE w.work_date BETWEEN ? AND ?${pc.sql}
-      ORDER BY w.work_date ASC, w.id ASC
+      GROUP BY t.id, w.work_date, p.id, p.name, p.color, t.number
+      ORDER BY w.work_date ASC, minutes DESC, t.number ASC
     `;
-    const rows = this.db.prepare(sql).all(fromDate, toDate, ...pc.params) as WorklogJoinedRow[];
+    const rows = this.db.prepare(sql).all(fromDate, toDate, ...pc.params) as SprintTaskJoinedRow[];
 
     const days: DashboardSprintDayPayload[] = [];
     for (let i = 0; i < lengthDays; i++) {
       const date = addDays(fromDate, i);
-      const dayWls = rows
+      const dayTasks: DashboardSprintTaskPayload[] = rows
         .filter((r) => r.work_date === date)
         .map((r) => ({
-          id: r.id,
           taskNumber: r.task_number,
           projectName: r.project_name,
           projectColor: r.project_color,
           minutes: r.minutes,
-          note: r.description,
+          worklogCount: r.worklog_count,
         }));
-      const minutes = dayWls.reduce((acc, w) => acc + w.minutes, 0);
-      days.push({ date, minutes, worklogs: dayWls });
+      const minutes = dayTasks.reduce((acc, t) => acc + t.minutes, 0);
+      days.push({ date, minutes, tasks: dayTasks });
     }
     const totalMinutes = days.reduce((acc, d) => acc + d.minutes, 0);
     return { fromDate, toDate, lengthDays, totalMinutes, days };
