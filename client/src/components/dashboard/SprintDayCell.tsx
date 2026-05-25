@@ -2,11 +2,11 @@ import { Box, Stack, Typography } from '@mui/material';
 import type { DashboardSprintDayPayload } from '../../../../shared/ipcContract.js';
 import { formatMinutes } from '../../util/format.js';
 
-const CZECH_DOW_BY_JS_DAY = ['NE', 'PO', 'ÚT', 'ST', 'ČT', 'PÁ', 'SO'];
+const CZECH_DOW_BY_JS_DAY = ['NE', 'PO', 'ÚT', 'ST', 'ČT', 'PÁ', 'SO'] as const;
 
 function czechWeekdayOf(iso: string): string {
-  const dow = new Date(iso + 'T00:00:00Z').getUTCDay(); // 0 = Sun
-  return CZECH_DOW_BY_JS_DAY[dow];
+  const dow = new Date(iso + 'T00:00:00Z').getUTCDay(); // 0 = Sun, always 0..6
+  return CZECH_DOW_BY_JS_DAY[dow] ?? '';
 }
 
 export interface SprintDayCellProps {
