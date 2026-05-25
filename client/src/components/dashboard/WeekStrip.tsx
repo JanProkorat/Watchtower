@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Box, Chip, IconButton, Paper, Popover, Stack, Tooltip, Typography } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -13,6 +13,30 @@ import { formatDateLongCz, formatMinutes } from '../../util/format.js';
 import { WeekDayCell } from './WeekDayCell.js';
 
 dayjs.extend(isoWeek);
+
+const HANDLE_HEIGHT = 8;
+const MIN_HEIGHT = 120;
+const MAX_HEIGHT = 600;
+const STORAGE_KEY = 'watchtower.dashboard.weekCellHeight';
+
+function readPersistedHeight(): number {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY);
+    if (!v) return 200;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= MIN_HEIGHT && n <= MAX_HEIGHT ? n : 200;
+  } catch {
+    return 200;
+  }
+}
+
+function persistHeight(h: number) {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(h));
+  } catch {
+    /* ignore */
+  }
+}
 
 export interface WeekStripProps {
   week: {
@@ -33,6 +57,35 @@ function mondayOf(iso: string): string {
 
 export function WeekStrip({ week, todayDate, onAnchorChange }: WeekStripProps) {
   const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null);
+  const [cellHeight, setCellHeight] = useState<number>(readPersistedHeight);
+  const cellHeightRef = useRef(cellHeight);
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+
+  useEffect(() => {
+    cellHeightRef.current = cellHeight;
+  }, [cellHeight]);
+
+  const onDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = { startY: e.clientY, startH: cellHeight };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      const delta = ev.clientY - dragRef.current.startY;
+      const next = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, dragRef.current.startH + delta));
+      setCellHeight(next);
+    };
+
+    const onUp = () => {
+      dragRef.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      persistHeight(cellHeightRef.current);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -103,9 +156,26 @@ export function WeekStrip({ week, todayDate, onAnchorChange }: WeekStripProps) {
 
       <Stack direction="row" spacing={1.25} sx={{ width: '100%' }}>
         {week.days.map((d, i) => (
-          <WeekDayCell key={d.date} day={d} index={i} isToday={d.date === todayDate} />
+          <WeekDayCell key={d.date} day={d} index={i} isToday={d.date === todayDate} cellMinHeight={cellHeight} />
         ))}
       </Stack>
+
+      <Box
+        onMouseDown={onDragStart}
+        sx={{
+          height: HANDLE_HEIGHT,
+          mt: 1,
+          cursor: 'ns-resize',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'text.disabled',
+          borderRadius: 1,
+          '&:hover': { backgroundColor: 'action.hover' },
+        }}
+      >
+        <Box sx={{ width: 36, height: 3, borderRadius: 999, backgroundColor: 'divider' }} />
+      </Box>
     </Paper>
   );
 }

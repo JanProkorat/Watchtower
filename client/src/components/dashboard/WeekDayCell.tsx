@@ -10,6 +10,8 @@ export interface WeekDayCellProps {
   index: number;
   /** True for today's column. */
   isToday: boolean;
+  /** Override the default 200px minimum height. */
+  cellMinHeight?: number;
 }
 
 function shortDate(iso: string): string {
@@ -18,13 +20,13 @@ function shortDate(iso: string): string {
   return `${Number(d)}. ${Number(m)}.`;
 }
 
-export function WeekDayCell({ day, index, isToday }: WeekDayCellProps) {
+export function WeekDayCell({ day, index, isToday, cellMinHeight }: WeekDayCellProps) {
   return (
     <Box
       sx={{
         flex: 1,
         minWidth: 0,
-        minHeight: 200,
+        minHeight: cellMinHeight ?? 200,
         p: 1.25,
         borderRadius: 1.25,
         border: 1,
