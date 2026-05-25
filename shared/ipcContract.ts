@@ -110,22 +110,22 @@ export interface HeatmapDatumPayload {
 export interface DashboardOverviewRequestPayload {
   /** Optional project filter; null = all projects. */
   projectId: number | null;
-  /** Any ISO date inside the target week (YYYY-MM-DD). Server normalises to Monday. */
-  weekAnchor: string;
+  /** Any ISO date inside the target sprint (YYYY-MM-DD). Server computes the sprint window. */
+  sprintAnchor: string;
   /** ISO YYYY-MM-DD in the user's local tz, sent by renderer so the orchestrator
    *  doesn't derive "today" from its own clock. */
   todayDate: string;
 }
 
-export interface DashboardWeekDayPayload {
+export interface DashboardSprintDayPayload {
   /** YYYY-MM-DD. */
   date: string;
   /** Sum of minutes for the day (respects projectId filter). */
   minutes: number;
-  worklogs: DashboardWeekWorklogPayload[];
+  worklogs: DashboardSprintWorklogPayload[];
 }
 
-export interface DashboardWeekWorklogPayload {
+export interface DashboardSprintWorklogPayload {
   id: number;
   /** e.g. "FIE1933-19084" — may be null for ad-hoc tasks. */
   taskNumber: string | null;
@@ -154,11 +154,17 @@ export interface DashboardTopProjectPayload {
 export interface DashboardOverviewResponsePayload {
   today: { minutes: number };
   month: { minutes: number };
-  week: {
+  sprint: {
+    /** ISO YYYY-MM-DD of the first day of the sprint window. */
     fromDate: string;
+    /** ISO YYYY-MM-DD of the last day of the sprint window (inclusive). */
     toDate: string;
+    /** Sprint length in days = days.length. Kept explicit for renderer clarity. */
+    lengthDays: number;
+    /** Sum of minutes across the sprint, respecting projectId filter. */
     totalMinutes: number;
-    days: DashboardWeekDayPayload[];
+    /** Per-day list — exactly `lengthDays` entries. */
+    days: DashboardSprintDayPayload[];
   };
   heatmap30d: {
     fromDate: string;

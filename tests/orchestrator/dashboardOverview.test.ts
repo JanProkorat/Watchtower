@@ -56,7 +56,7 @@ describe('DashboardOverviewService', () => {
 
     const res = service.run({
       projectId: null,
-      weekAnchor: '2026-05-25',
+      sprintAnchor: '2026-05-25',
       todayDate: '2026-05-25',
     });
 
@@ -71,7 +71,7 @@ describe('DashboardOverviewService', () => {
 
     const res = service.run({
       projectId: a.project.id,
-      weekAnchor: '2026-05-25',
+      sprintAnchor: '2026-05-25',
       todayDate: '2026-05-25',
     });
 
@@ -88,56 +88,91 @@ describe('DashboardOverviewService', () => {
 
     const res = service.run({
       projectId: null,
-      weekAnchor: '2026-05-25',
+      sprintAnchor: '2026-05-25',
       todayDate: '2026-05-25',
     });
 
     expect(res.month.minutes).toBe(60 + 120 + 30);
   });
 
-  it('week.days is always length 7 Mon→Sun and totals match', () => {
+  function setSprintConfig(startDate: string, lengthDays: number) {
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('dashboard.sprint.startDate', startDate);
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('dashboard.sprint.lengthDays', String(lengthDays));
+  }
+
+  it('sprint.days is length lengthDays and spans fromDate→toDate inclusive', () => {
+    // Default sprint config: startDate=2026-01-05, lengthDays=14
+    // Sprint containing 2026-05-25: days from 2026-01-05 = 140 days → sprint index 10
+    // fromDate = 2026-01-05 + 10*14 = 2026-01-05 + 140 = 2026-05-25
     const { task } = seedTask('P', '#7aa7ff', 'T-1');
-    seedWorklog(task.id, '2026-05-25', 90, 'Mon task');
+    seedWorklog(task.id, '2026-05-25', 90, 'Day 1 task');
     seedWorklog(task.id, '2026-05-28', 60);
-    seedWorklog(task.id, '2026-05-31', 30);
+    seedWorklog(task.id, '2026-06-07', 30);
 
     const res = service.run({
       projectId: null,
-      weekAnchor: '2026-05-27',
+      sprintAnchor: '2026-05-27',
       todayDate: '2026-05-27',
     });
 
-    expect(res.week.fromDate).toBe('2026-05-25');
-    expect(res.week.toDate).toBe('2026-05-31');
-    expect(res.week.days.map((d) => d.date)).toEqual([
-      '2026-05-25', '2026-05-26', '2026-05-27', '2026-05-28',
-      '2026-05-29', '2026-05-30', '2026-05-31',
-    ]);
-    expect(res.week.days[0].minutes).toBe(90);
-    expect(res.week.days[3].minutes).toBe(60);
-    expect(res.week.days[6].minutes).toBe(30);
-    expect(res.week.days[0].worklogs[0]).toMatchObject({
+    expect(res.sprint.fromDate).toBe('2026-05-25');
+    expect(res.sprint.toDate).toBe('2026-06-07');
+    expect(res.sprint.lengthDays).toBe(14);
+    expect(res.sprint.days).toHaveLength(14);
+    expect(res.sprint.days[0].date).toBe('2026-05-25');
+    expect(res.sprint.days[13].date).toBe('2026-06-07');
+    expect(res.sprint.days[0].minutes).toBe(90);
+    expect(res.sprint.days[3].minutes).toBe(60);
+    expect(res.sprint.days[13].minutes).toBe(30);
+    expect(res.sprint.days[0].worklogs[0]).toMatchObject({
       taskNumber: 'T-1',
       projectName: 'P',
       projectColor: '#7aa7ff',
       minutes: 90,
-      note: 'Mon task',
+      note: 'Day 1 task',
     });
-    expect(res.week.totalMinutes).toBe(180);
+    expect(res.sprint.totalMinutes).toBe(180);
   });
 
-  it('mondayOf snaps Sunday correctly to the preceding Monday', () => {
+  it('sprintFor honours custom sprint length from settings', () => {
+    setSprintConfig('2026-01-05', 7);
     const { task } = seedTask('P', '#7aa7ff', 'T-1');
-    seedWorklog(task.id, '2026-05-25', 10);
+    // With 7-day sprints from 2026-01-05, 2026-05-25 is day 140 (0-indexed)
+    // sprint index = floor(140/7) = 20 → fromDate = 2026-01-05 + 140 = 2026-05-25
+    seedWorklog(task.id, '2026-05-25', 45);
+    seedWorklog(task.id, '2026-05-31', 55);
 
     const res = service.run({
       projectId: null,
-      weekAnchor: '2026-05-31',
-      todayDate: '2026-05-31',
+      sprintAnchor: '2026-05-27',
+      todayDate: '2026-05-27',
     });
 
-    expect(res.week.fromDate).toBe('2026-05-25');
-    expect(res.week.toDate).toBe('2026-05-31');
+    expect(res.sprint.lengthDays).toBe(7);
+    expect(res.sprint.days).toHaveLength(7);
+    expect(res.sprint.fromDate).toBe('2026-05-25');
+    expect(res.sprint.toDate).toBe('2026-05-31');
+    expect(res.sprint.totalMinutes).toBe(100);
+  });
+
+  it('sprintFor honours custom sprint start from settings', () => {
+    // Sprint starts on 2026-05-20, length 14 → first sprint: 2026-05-20..2026-06-02
+    setSprintConfig('2026-05-20', 14);
+    const { task } = seedTask('P', '#7aa7ff', 'T-1');
+    seedWorklog(task.id, '2026-05-20', 60);
+    seedWorklog(task.id, '2026-06-02', 30);
+    seedWorklog(task.id, '2026-06-03', 999); // outside sprint
+
+    const res = service.run({
+      projectId: null,
+      sprintAnchor: '2026-05-25',
+      todayDate: '2026-05-25',
+    });
+
+    expect(res.sprint.fromDate).toBe('2026-05-20');
+    expect(res.sprint.toDate).toBe('2026-06-02');
+    expect(res.sprint.lengthDays).toBe(14);
+    expect(res.sprint.totalMinutes).toBe(90);
   });
 
   it('heatmap30d covers exactly 30 consecutive days ending todayDate', () => {
@@ -147,7 +182,7 @@ describe('DashboardOverviewService', () => {
     seedWorklog(task.id, '2026-04-25', 999);
 
     const res = service.run({
-      projectId: null, weekAnchor: '2026-05-25', todayDate: '2026-05-25',
+      projectId: null, sprintAnchor: '2026-05-25', todayDate: '2026-05-25',
     });
 
     expect(res.heatmap30d.fromDate).toBe('2026-04-26');
@@ -165,7 +200,7 @@ describe('DashboardOverviewService', () => {
     seedWorklog(task.id, '2026-05-21', 30);
 
     const res = service.run({
-      projectId: null, weekAnchor: '2026-05-25', todayDate: '2026-05-25',
+      projectId: null, sprintAnchor: '2026-05-25', todayDate: '2026-05-25',
     });
 
     expect(res.heatmap30d.stats.currentStreak).toBe(3);
@@ -180,7 +215,7 @@ describe('DashboardOverviewService', () => {
     seedWorklog(task.id, '2026-05-23', 60);
 
     const res = service.run({
-      projectId: null, weekAnchor: '2026-05-25', todayDate: '2026-05-25',
+      projectId: null, sprintAnchor: '2026-05-25', todayDate: '2026-05-25',
     });
 
     // Spec: "Current streak: count back from today through consecutive
@@ -192,7 +227,7 @@ describe('DashboardOverviewService', () => {
 
   it('busiestDay returns the heaviest non-zero day, null when empty', () => {
     const empty = service.run({
-      projectId: null, weekAnchor: '2026-05-25', todayDate: '2026-05-25',
+      projectId: null, sprintAnchor: '2026-05-25', todayDate: '2026-05-25',
     });
     expect(empty.heatmap30d.stats.busiestDay).toBeNull();
 
@@ -202,7 +237,7 @@ describe('DashboardOverviewService', () => {
     seedWorklog(task.id, '2026-05-22', 100);
 
     const res = service.run({
-      projectId: null, weekAnchor: '2026-05-25', todayDate: '2026-05-25',
+      projectId: null, sprintAnchor: '2026-05-25', todayDate: '2026-05-25',
     });
     expect(res.heatmap30d.stats.busiestDay).toEqual({ date: '2026-05-25', minutes: 200 });
   });
@@ -213,7 +248,7 @@ describe('DashboardOverviewService', () => {
     seedWorklog(task.id, '2026-05-20', 300);
 
     const res = service.run({
-      projectId: null, weekAnchor: '2026-05-25', todayDate: '2026-05-25',
+      projectId: null, sprintAnchor: '2026-05-25', todayDate: '2026-05-25',
     });
     expect(res.heatmap30d.stats.weeklyAvgMinutes).toBe(Math.round((600 / 30) * 7));
   });
@@ -229,7 +264,7 @@ describe('DashboardOverviewService', () => {
     seedWorklog(c.task.id, '2026-04-15', 999);
 
     const res = service.run({
-      projectId: null, weekAnchor: '2026-05-25', todayDate: '2026-05-25',
+      projectId: null, sprintAnchor: '2026-05-25', todayDate: '2026-05-25',
     });
 
     expect(res.topProjects.map((p) => p.projectName)).toEqual(['Bravo', 'Alpha']);
@@ -247,7 +282,7 @@ describe('DashboardOverviewService', () => {
     seedWorklog(b.task.id, '2026-05-15', 180);
 
     const res = service.run({
-      projectId: a.project.id, weekAnchor: '2026-05-25', todayDate: '2026-05-25',
+      projectId: a.project.id, sprintAnchor: '2026-05-25', todayDate: '2026-05-25',
     });
 
     expect(res.topProjects.map((p) => p.projectName)).toEqual(['Alpha']);
