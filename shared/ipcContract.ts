@@ -596,6 +596,8 @@ export interface BoardCardPayload {
   /** Pre-computed column from the merged Jira→Watchtower mapping. */
   column: BoardColumn;
   estimateSeconds: number | null;
+  /** Total minutes logged locally against this task (sum of worklogs). */
+  loggedMinutes: number;
   component: string | null;
   projectId: number;
   projectName: string;

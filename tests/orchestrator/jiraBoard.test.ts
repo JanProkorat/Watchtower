@@ -261,12 +261,17 @@ describe('JiraBoardService.sync', () => {
     expect(allEpics.map((e) => e.name).sort()).toEqual(['TEH', 'VYR']);
   });
 
-  it('updates an existing task without re-routing its epic', async () => {
+  it('updates an existing task and re-routes it to the area-code epic when no Epic Link is set', async () => {
+    // Existing task lives under a manually-named epic. With no Epic Link
+    // on the Jira issue, routing falls back to area-code: TEH summary tag
+    // → "TEH" epic. Re-routing fixes tasks that previously landed in a
+    // wrong/legacy epic.
     const original = epics.create({ projectId: pps.id, name: 'PreExisting' });
     const t = tasks.create({ epicId: original.id, number: 'FIE1933-1', title: 'old title' });
 
     const svc = new JiraBoardService(db, {
       config: CONFIG,
+      epicLinkFieldId: null,  // disable epic-link routing for this test
       deps: makeFetchDeps({
         cookies: ['session=abc'],
         responses: [
@@ -282,9 +287,95 @@ describe('JiraBoardService.sync', () => {
     expect(r.upserted).toBe(1);
     const updated = tasks.get(t.id)!;
     expect(updated.title).toBe('[TEH] new title');
-    expect(updated.epicId).toBe(original.id);
     expect(updated.jiraStatus).toBe('In Progress');
     expect(updated.status).toBe('in_progress');
+    const newEpic = epics.get(updated.epicId)!;
+    expect(newEpic.name).toBe('TEH');
+  });
+
+  it('routes by Jira Epic Link when set, using the epic\'s summary as the local epic name', async () => {
+    const svc = new JiraBoardService(db, {
+      config: CONFIG,
+      epicLinkFieldId: 'customfield_10006',
+      deps: makeFetchDeps({
+        cookies: ['session=abc'],
+        responses: [
+          {
+            // /rest/api/2/search — the main board query
+            status: 200,
+            body: {
+              issues: [
+                {
+                  key: 'FIE1933-99',
+                  fields: {
+                    summary: '[VYR] foo',
+                    status: { name: 'In Progress' },
+                    timeoriginalestimate: 3600,
+                    labels: [],
+                    components: [],
+                    customfield_10006: 'TEH-456',
+                  },
+                },
+              ],
+            },
+          },
+          {
+            // /rest/api/2/search — the epic summaries batch fetch
+            status: 200,
+            body: {
+              issues: [
+                { key: 'TEH-456', fields: { summary: 'Technologický postup' } },
+              ],
+            },
+          },
+        ],
+      }),
+    });
+    const r = await svc.sync();
+    expect(r.created).toBe(1);
+    const task = tasks.findByNumber('FIE1933-99')!;
+    const epic = epics.get(task.epicId)!;
+    expect(epic.name).toBe('Technologický postup');
+    expect(epic.jiraEpicKey).toBe('TEH-456');
+  });
+
+  it('updates an existing epic\'s name when Jira renames it', async () => {
+    const old = epics.create({
+      projectId: pps.id,
+      name: 'Old name',
+      jiraEpicKey: 'TEH-456',
+    });
+    const svc = new JiraBoardService(db, {
+      config: CONFIG,
+      epicLinkFieldId: 'customfield_10006',
+      deps: makeFetchDeps({
+        cookies: ['session=abc'],
+        responses: [
+          {
+            status: 200,
+            body: {
+              issues: [{
+                key: 'FIE1933-100',
+                fields: {
+                  summary: '[TEH] x',
+                  status: { name: 'To Do' },
+                  timeoriginalestimate: null,
+                  labels: [],
+                  components: [],
+                  customfield_10006: 'TEH-456',
+                },
+              }],
+            },
+          },
+          {
+            status: 200,
+            body: { issues: [{ key: 'TEH-456', fields: { summary: 'Renamed epic' } }] },
+          },
+        ],
+      }),
+    });
+    await svc.sync();
+    expect(epics.get(old.id)!.name).toBe('Renamed epic');
   });
 
   it('counts and lists unrouted keys when no project glob matches', async () => {

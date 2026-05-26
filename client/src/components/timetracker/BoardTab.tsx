@@ -27,13 +27,22 @@ const COLUMNS: Array<{ id: BoardColumn; label: string }> = [
   { id: 'done', label: 'Done' },
 ];
 
-function formatSecs(secs: number | null): string | null {
-  if (secs == null) return null;
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
+function formatMinutes(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
   if (h > 0 && m > 0) return `${h}h ${m}m`;
   if (h > 0) return `${h}h`;
   return `${m}m`;
+}
+
+function formatCardTime(loggedMin: number, estimateSecs: number | null): string | null {
+  const estimateMin = estimateSecs == null ? null : Math.round(estimateSecs / 60);
+  if (loggedMin > 0 && estimateMin != null && estimateMin > 0) {
+    return `${formatMinutes(loggedMin)} / ${formatMinutes(estimateMin)}`;
+  }
+  if (loggedMin > 0) return formatMinutes(loggedMin);
+  if (estimateMin != null && estimateMin > 0) return formatMinutes(estimateMin);
+  return null;
 }
 
 function formatSynced(iso: string | null): string {
@@ -212,7 +221,12 @@ export function BoardTab({ active }: Props) {
               {byCol[col.id].map((c) => {
                 const code = areaCodeFromComponent(c.component);
                 const { bg, fg } = areaCodeColours(code);
-                const est = formatSecs(c.estimateSeconds);
+                const timeLabel = formatCardTime(c.loggedMinutes, c.estimateSeconds);
+                const timeTooltip = c.estimateSeconds
+                  ? `Logged ${formatMinutes(c.loggedMinutes)} / estimate ${formatMinutes(
+                      Math.round(c.estimateSeconds / 60),
+                    )}`
+                  : `Logged ${formatMinutes(c.loggedMinutes)}`;
                 return (
                   <Box
                     key={c.taskId}
@@ -242,9 +256,13 @@ export function BoardTab({ active }: Props) {
                       >
                         {c.jiraKey}
                       </Typography>
-                      {est && (
-                        <Typography variant="caption" color="text.disabled">
-                          ⏱ {est}
+                      {timeLabel && (
+                        <Typography
+                          variant="caption"
+                          color="text.disabled"
+                          title={timeTooltip}
+                        >
+                          ⏱ {timeLabel}
                         </Typography>
                       )}
                     </Stack>

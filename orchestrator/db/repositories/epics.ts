@@ -88,6 +88,18 @@ export class EpicsRepo {
     return row ? toRow(row) : null;
   }
 
+  /**
+   * Find the epic (in a specific project) that mirrors a Jira Epic Link.
+   * Used by the board sync to route an issue's task into the same epic
+   * Jira has it under, instead of guessing from area-code prefixes.
+   */
+  findByJiraEpicKey(projectId: number, jiraEpicKey: string): EpicRow | null {
+    const row = this.db
+      .prepare(LIST_SQL + ' WHERE e.project_id = ? AND e.jira_epic_key = ? LIMIT 1')
+      .get(projectId, jiraEpicKey) as DbRow | undefined;
+    return row ? toRow(row) : null;
+  }
+
   create(input: EpicInput): EpicRow {
     // Append at the end of the project's epic order. Steps of 1000 leave room
     // to splice between two rows later without renumbering.
