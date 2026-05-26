@@ -1,5 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { openLoginUrl, readJiraCookieHeader } from './browserCookies.js';
+import {
+  openLoginUrl,
+  readJiraCookieHeader,
+  type CookieReadDiagnostic,
+} from './browserCookies.js';
 
 const KEYCHAIN_SERVICE = 'watchtower-jira-cookie';
 const KEYCHAIN_ACCOUNT = 'default';
@@ -35,13 +39,15 @@ export async function runBoardSignIn(): Promise<SignInResult> {
   openLoginUrl(LOGIN_URL);
 
   const startedAt = Date.now();
-  let triedAtLeastOnce = false;
+  let lastProbeStatus: number | null = null;
+  let lastDiagnostics: CookieReadDiagnostic[] = [];
 
   while (Date.now() - startedAt < TIMEOUT_MS) {
     await sleep(POLL_MS);
-    const header = readJiraCookieHeader(DOMAIN);
+    const diagnostics: CookieReadDiagnostic[] = [];
+    const header = readJiraCookieHeader(DOMAIN, diagnostics);
+    lastDiagnostics = diagnostics;
     if (!header) continue;
-    triedAtLeastOnce = true;
 
     let res: Response;
     try {
@@ -51,6 +57,7 @@ export async function runBoardSignIn(): Promise<SignInResult> {
     } catch {
       continue;
     }
+    lastProbeStatus = res.status;
 
     if (res.status === 200) {
       const stored = storeCookieInKeychain(header);
@@ -65,10 +72,35 @@ export async function runBoardSignIn(): Promise<SignInResult> {
 
   return {
     ok: false,
-    error: triedAtLeastOnce
-      ? 'Sign-in timed out: Jira didn\'t accept the cookies in your browser. Try logging in again.'
-      : 'Sign-in timed out: no Jira cookies appeared in your browser. Make sure you completed the login in Brave or Chrome.',
+    error: buildTimeoutMessage(lastProbeStatus, lastDiagnostics),
   };
+}
+
+function buildTimeoutMessage(
+  lastProbeStatus: number | null,
+  diagnostics: CookieReadDiagnostic[],
+): string {
+  if (lastProbeStatus !== null) {
+    return (
+      `Sign-in timed out: cookies were captured but Jira rejected them ` +
+      `(HTTP ${lastProbeStatus}). Try logging in again in the browser window that just opened.`
+    );
+  }
+  if (diagnostics.length === 0) {
+    return 'Sign-in timed out: no supported browser (Brave or Chrome) found.';
+  }
+  const lines = diagnostics.map((d) => {
+    if (!d.cookiesPathExists) return `${d.browser}: cookies file missing at ${d.cookiesPath}`;
+    if (!d.keychainEntryFound)
+      return `${d.browser}: Keychain entry not accessible. Approve the prompt in macOS Keychain Access.`;
+    if (d.rowsReturned === 0) return `${d.browser}: 0 cookies stored for jira.skoda.vwgroup.com yet.`;
+    if (d.rowsFailedDecrypt > 0 && d.rowsDecrypted === 0) {
+      const tags = d.versionTagsSeen.join(', ') || 'unknown';
+      return `${d.browser}: ${d.rowsReturned} rows, all failed to decrypt (version tags: ${tags}; expected "v10").`;
+    }
+    return `${d.browser}: ${d.rowsReturned} rows, ${d.rowsDecrypted} decrypted, ${d.rowsWithPlaintext} plaintext.`;
+  });
+  return `Sign-in timed out — no usable cookies for jira.skoda.vwgroup.com. ${lines.join(' | ')}`;
 }
 
 function sleep(ms: number): Promise<void> {

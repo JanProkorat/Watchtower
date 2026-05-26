@@ -53,6 +53,19 @@ interface CookiePair {
   value: string;
 }
 
+export interface CookieReadDiagnostic {
+  browser: string;
+  cookiesPath: string;
+  cookiesPathExists: boolean;
+  keychainEntryFound: boolean;
+  rowsReturned: number;
+  rowsWithPlaintext: number;
+  rowsDecrypted: number;
+  rowsFailedDecrypt: number;
+  versionTagsSeen: string[];
+  error?: string;
+}
+
 function readSafeStorageKey(entry: string): string | null {
   const r = spawnSync(
     'security',
@@ -122,34 +135,74 @@ function readCookieRowsForDomain(
 /**
  * Return a `Cookie:` header value containing all cookies for `domainSuffix`
  * across the supported browsers, or null if none found / decrypt failed.
- * Tries browsers in priority order (Brave first, then Chrome).
+ * Tries browsers in priority order (Brave first, then Chrome). Populates
+ * `diagnostics` with what was tried for each browser so callers can surface
+ * actionable failure detail.
  */
-export function readJiraCookieHeader(domainSuffix: string): string | null {
+export function readJiraCookieHeader(
+  domainSuffix: string,
+  diagnostics?: CookieReadDiagnostic[],
+): string | null {
   for (const browser of BROWSERS) {
-    if (!existsSync(browser.cookiesPath)) continue;
+    const diag: CookieReadDiagnostic = {
+      browser: browser.name,
+      cookiesPath: browser.cookiesPath,
+      cookiesPathExists: existsSync(browser.cookiesPath),
+      keychainEntryFound: false,
+      rowsReturned: 0,
+      rowsWithPlaintext: 0,
+      rowsDecrypted: 0,
+      rowsFailedDecrypt: 0,
+      versionTagsSeen: [],
+    };
+
+    if (!diag.cookiesPathExists) {
+      diagnostics?.push(diag);
+      continue;
+    }
     const password = readSafeStorageKey(browser.keychainEntry);
-    if (!password) continue;
+    diag.keychainEntryFound = Boolean(password);
+    if (!password) {
+      diag.error = `Keychain entry "${browser.keychainEntry}" not accessible.`;
+      diagnostics?.push(diag);
+      continue;
+    }
     const key = deriveAesKey(password);
 
     const rows = readCookieRowsForDomain(browser.cookiesPath, domainSuffix);
-    if (!rows || rows.length === 0) continue;
+    if (!rows) {
+      diag.error = 'Could not open the cookies database (may be locked).';
+      diagnostics?.push(diag);
+      continue;
+    }
+    diag.rowsReturned = rows.length;
 
-    // Dedupe by name (rows are unordered); prefer the first non-empty value we
-    // can resolve. Skip rows that decrypt to empty (no real session).
     const seen = new Set<string>();
     const pairs: CookiePair[] = [];
+    const tagSet = new Set<string>();
     for (const row of rows) {
       if (seen.has(row.name)) continue;
       let value = row.value;
-      if ((!value || value.length === 0) && row.encrypted_value && row.encrypted_value.length > 0) {
+      if (value && value.length > 0) {
+        diag.rowsWithPlaintext += 1;
+      } else if (row.encrypted_value && row.encrypted_value.length > 0) {
+        if (row.encrypted_value.length >= 3) {
+          tagSet.add(row.encrypted_value.slice(0, 3).toString('utf8'));
+        }
         const decrypted = decryptV10(row.encrypted_value, key);
-        if (decrypted == null) continue;
+        if (decrypted == null) {
+          diag.rowsFailedDecrypt += 1;
+          continue;
+        }
+        diag.rowsDecrypted += 1;
         value = decrypted;
       }
       if (!value) continue;
       seen.add(row.name);
       pairs.push({ name: row.name, value });
     }
+    diag.versionTagsSeen = Array.from(tagSet);
+    diagnostics?.push(diag);
 
     if (pairs.length > 0) {
       return pairs.map((p) => `${p.name}=${p.value}`).join('; ');
@@ -159,13 +212,18 @@ export function readJiraCookieHeader(domainSuffix: string): string | null {
 }
 
 /**
- * Open `url` in Brave if installed (its profile is the one jira-fetch already
- * primes), otherwise fall back to the system default via `open`.
+ * Open `url` in a NEW Brave window (not a tab in an existing window). Falls
+ * back to a default-browser `open` when Brave isn't installed. Prefers Brave
+ * because the user's passkeys and SSO state already live in that profile.
  */
 export function openLoginUrl(url: string): void {
   const brave = BROWSERS[0]!;
   if (existsSync(brave.appPath)) {
-    spawn('open', ['-a', 'Brave Browser', url], { detached: true, stdio: 'ignore' }).unref();
+    // Use Brave's own binary with --new-window so the URL lands in a fresh
+    // window instead of appending a tab to whatever the user has open. The
+    // child detaches so we don't keep a stale process handle around.
+    const exe = `${brave.appPath}/Contents/MacOS/Brave Browser`;
+    spawn(exe, ['--new-window', url], { detached: true, stdio: 'ignore' }).unref();
     return;
   }
   spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
