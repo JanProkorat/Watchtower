@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { BoardTaskDetailDrawer } from './BoardTaskDetailDrawer.js';
 import {
   Alert,
   Box,
@@ -58,6 +59,7 @@ interface Props {
 export function BoardTab({ active }: Props) {
   const { snapshot, auth, syncing, syncError, lastSyncResult, sync, signInAndSync } =
     useBoard(active);
+  const [selectedCard, setSelectedCard] = useState<BoardCardPayload | null>(null);
   const { showError } = useToast();
 
   const byCol = useMemo(() => {
@@ -73,8 +75,7 @@ export function BoardTab({ active }: Props) {
   };
 
   const handleClickCard = (c: BoardCardPayload) => {
-    if (!auth?.baseUrl) return;
-    openInBrowser(`${auth.baseUrl}/browse/${c.jiraKey}`);
+    setSelectedCard(c);
   };
 
   const handleBoardLink = () => {
@@ -303,6 +304,14 @@ export function BoardTab({ active }: Props) {
           </Box>
         ))}
       </Box>
+
+      <BoardTaskDetailDrawer
+        open={selectedCard !== null}
+        card={selectedCard}
+        jiraBaseUrl={auth?.baseUrl ?? null}
+        onClose={() => setSelectedCard(null)}
+        onOpenJira={openInBrowser}
+      />
     </Box>
   );
 }
