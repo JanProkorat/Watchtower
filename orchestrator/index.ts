@@ -46,6 +46,8 @@ import {
 import { readSettings, writeSettings } from './services/claudeSettings.js';
 import { listSkills } from './services/claudeSkills.js';
 import { listAgents } from './services/claudeAgents.js';
+import { JiraSyncService } from './services/jiraSync.js';
+import { JiraBoardService } from './services/jiraBoard.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
 
@@ -234,14 +236,17 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
     },
     onExit: (code) => {
       const lifespan = Date.now() - spawnedAt;
-      // If --resume fails fast, the session probably never had any persisted
+      // If --resume exits fast, the session probably never had any persisted
       // content (e.g. the user closed the app right after launching claude,
-      // before sending any prompt). Claude has nothing to restore. Fall back
-      // to a fresh spawn in the same cwd, reusing the same row id +
-      // session id (via --session-id) so future resumes still work.
-      if (opts.resumeSessionId && code !== 0 && lifespan < RESUME_FAIL_FAST_MS) {
+      // before sending any prompt). Claude has nothing to restore — and may
+      // exit either with code 0 ("session not found, nothing to do") or
+      // non-zero, depending on the build. Either way, no human could have
+      // interacted with it in under RESUME_FAIL_FAST_MS, so fall back to a
+      // fresh spawn in the same cwd, reusing the same row id + session id
+      // (via --session-id) so future resumes still work.
+      if (opts.resumeSessionId && lifespan < RESUME_FAIL_FAST_MS) {
         console.log(
-          `[orchestrator] resume failed for ${opts.id} (exit ${code} in ${lifespan}ms) — spawning fresh`,
+          `[orchestrator] resume exited fast for ${opts.id} (code ${code} in ${lifespan}ms) — spawning fresh`,
         );
         spawnPtyForInstance({
           id: opts.id,
@@ -622,6 +627,25 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
 
     case 'agents:list': {
       return { agents: listAgents() };
+    }
+
+    case 'jira:syncPreview':
+      return new JiraSyncService(handle!.db).preview(req.payload);
+
+    case 'jira:sync':
+      return await new JiraSyncService(handle!.db).sync(req.payload);
+
+    case 'board:authPing':
+      return new JiraBoardService(handle!.db).authPing();
+
+    case 'board:get':
+      return new JiraBoardService(handle!.db).getSnapshot();
+
+    case 'board:sync': {
+      const svc = new JiraBoardService(handle!.db);
+      const result = await svc.sync();
+      const snapshot = { ...svc.getSnapshot(), lastSyncResult: result };
+      return { snapshot, result };
     }
   }
 }
