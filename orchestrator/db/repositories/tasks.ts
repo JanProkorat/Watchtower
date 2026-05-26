@@ -14,6 +14,11 @@ export interface TaskRow {
   createdAt: string;
   /** Joined: total minutes logged against this task. */
   totalMinutes: number;
+  /** Jira board mirror — populated only while the task is on the user's board. */
+  jiraStatus: string | null;
+  jiraEstimateSecs: number | null;
+  jiraComponent: string | null;
+  jiraSyncedAt: string | null;
 }
 
 export interface TaskInput {
@@ -35,6 +40,10 @@ type DbRow = {
   estimated_minutes: number | null;
   created_at: string;
   total_minutes: number;
+  jira_status: string | null;
+  jira_estimate_secs: number | null;
+  jira_component: string | null;
+  jira_synced_at: string | null;
 };
 
 function toRow(r: DbRow): TaskRow {
@@ -48,6 +57,10 @@ function toRow(r: DbRow): TaskRow {
     estimatedMinutes: r.estimated_minutes,
     createdAt: r.created_at,
     totalMinutes: r.total_minutes,
+    jiraStatus: r.jira_status,
+    jiraEstimateSecs: r.jira_estimate_secs,
+    jiraComponent: r.jira_component,
+    jiraSyncedAt: r.jira_synced_at,
   };
 }
 
@@ -55,6 +68,7 @@ const LIST_SQL = `
   SELECT
     t.id, t.epic_id, t.number, t.title, t.description, t.status,
     t.estimated_minutes, t.created_at,
+    t.jira_status, t.jira_estimate_secs, t.jira_component, t.jira_synced_at,
     (SELECT COALESCE(SUM(w.minutes), 0) FROM worklogs w WHERE w.task_id = t.id) AS total_minutes
   FROM tasks t
 `;
@@ -135,5 +149,63 @@ export class TasksRepo {
   delete(id: number): void {
     // worklogs cascade via ON DELETE CASCADE on the schema FK
     this.db.prepare(`DELETE FROM tasks WHERE id = ?`).run(id);
+  }
+
+  /** Look up a task by its `number` (Jira key or local key). */
+  findByNumber(number: string): TaskRow | null {
+    const row = this.db
+      .prepare(LIST_SQL + ' WHERE t.number = ? LIMIT 1')
+      .get(number) as DbRow | undefined;
+    return row ? toRow(row) : null;
+  }
+
+  /**
+   * Set the four jira_* mirror columns. Only used by the board sync —
+   * the rest of TimeTracker leaves these untouched.
+   */
+  updateJiraFields(
+    id: number,
+    fields: {
+      jiraStatus: string | null;
+      estimateSeconds: number | null;
+      component: string | null;
+      syncedAt: string;
+    },
+  ): void {
+    this.db
+      .prepare(
+        `UPDATE tasks
+            SET jira_status = ?, jira_estimate_secs = ?, jira_component = ?, jira_synced_at = ?
+          WHERE id = ?`,
+      )
+      .run(
+        fields.jiraStatus,
+        fields.estimateSeconds,
+        fields.component,
+        fields.syncedAt,
+        id,
+      );
+  }
+
+  /**
+   * Clear `jira_status` on every row whose `number` is NOT in `keepNumbers`.
+   * Used by the board sync to drop tickets that have fallen off the user's
+   * board. Returns the number of rows cleared.
+   */
+  clearJiraStatusExcept(keepNumbers: string[]): number {
+    if (keepNumbers.length === 0) {
+      const r = this.db
+        .prepare(`UPDATE tasks SET jira_status = NULL WHERE jira_status IS NOT NULL`)
+        .run() as { changes: number };
+      return r.changes;
+    }
+    const placeholders = keepNumbers.map(() => '?').join(',');
+    const r = this.db
+      .prepare(
+        `UPDATE tasks SET jira_status = NULL
+           WHERE jira_status IS NOT NULL AND number NOT IN (${placeholders})`,
+      )
+      .run(...keepNumbers) as { changes: number };
+    return r.changes;
   }
 }
