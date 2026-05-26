@@ -21,6 +21,8 @@ export interface BoardState {
 
 export interface UseBoard extends BoardState {
   sync(): Promise<void>;
+  /** Run the Playwright SSO refresh, then sync on success. */
+  signInAndSync(): Promise<void>;
 }
 
 /** Exported for unit tests — pure, no DOM access. */
@@ -71,6 +73,26 @@ export function useBoard(active: boolean): UseBoard {
     }
   }, []);
 
+  const signInAndSync = useCallback(async () => {
+    setState((s) => ({ ...s, syncing: true, syncError: null }));
+    try {
+      const r = await window.watchtower.invoke('board:signIn', {});
+      if (!r.ok) {
+        setState((s) => ({ ...s, syncing: false, syncError: r.error ?? 'Sign-in failed' }));
+        return;
+      }
+    } catch (err) {
+      setState((s) => ({
+        ...s,
+        syncing: false,
+        syncError: err instanceof Error ? err.message : String(err),
+      }));
+      return;
+    }
+    // Cookie stored — sync immediately. sync() flips `syncing` back to false.
+    await sync();
+  }, [sync]);
+
   useEffect(() => {
     if (!active) return;
     let cancelled = false;
@@ -81,9 +103,18 @@ export function useBoard(active: boolean): UseBoard {
       ]);
       if (cancelled) return;
       setState((s) => ({ ...s, snapshot, auth, loading: false }));
+      // Auto-sync only when:
+      //   * we haven't already auto-synced in this session
+      //   * the user has a cookie stored
+      //   * the board has been populated before (i.e. not first-ever load — we
+      //     don't want to silently fire an HTTP call against a possibly-stale
+      //     cookie without the user knowing)
+      //   * the snapshot is stale
+      const hasData = (snapshot.cards.length ?? 0) > 0;
       if (
         !autoSyncedOnceRef.current &&
         auth.cookiePresent &&
+        hasData &&
         isStale(snapshot, Date.now())
       ) {
         autoSyncedOnceRef.current = true;
@@ -95,5 +126,5 @@ export function useBoard(active: boolean): UseBoard {
     };
   }, [active, sync]);
 
-  return { ...state, sync };
+  return { ...state, sync, signInAndSync };
 }

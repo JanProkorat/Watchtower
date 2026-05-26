@@ -64,6 +64,7 @@ export type IpcRequest =
   | { kind: 'board:authPing'; payload: Record<string, never> }
   | { kind: 'board:get'; payload: Record<string, never> }
   | { kind: 'board:sync'; payload: Record<string, never> }
+  | { kind: 'board:signIn'; payload: Record<string, never> }
   | { kind: 'openExternalUrl'; payload: { url: string } };
 
 export interface RunningInstancePayload {
@@ -506,6 +507,7 @@ export type IpcResponse =
   | { kind: 'board:authPing'; payload: BoardAuthPingPayload }
   | { kind: 'board:get'; payload: BoardSnapshotPayload }
   | { kind: 'board:sync'; payload: { snapshot: BoardSnapshotPayload; result: BoardSyncResultPayload } }
+  | { kind: 'board:signIn'; payload: { ok: boolean; error?: string } }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } };
 
 export interface AgentRowPayload {

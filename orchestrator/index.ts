@@ -647,6 +647,9 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       const snapshot = { ...svc.getSnapshot(), lastSyncResult: result };
       return { snapshot, result };
     }
+
+    case 'board:signIn':
+      return await new JiraBoardService(handle!.db).signIn();
   }
 }
 

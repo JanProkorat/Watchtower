@@ -47,7 +47,8 @@ interface Props {
 }
 
 export function BoardTab({ active }: Props) {
-  const { snapshot, auth, syncing, syncError, lastSyncResult, sync } = useBoard(active);
+  const { snapshot, auth, syncing, syncError, lastSyncResult, sync, signInAndSync } =
+    useBoard(active);
   const { showError } = useToast();
 
   const byCol = useMemo(() => {
@@ -113,7 +114,7 @@ export function BoardTab({ active }: Props) {
           <Button
             variant="contained"
             size="small"
-            onClick={() => void sync()}
+            onClick={() => void signInAndSync()}
             disabled={syncing}
             startIcon={syncing ? <CircularProgress size={14} /> : <VpnKeyIcon />}
           >

@@ -60,7 +60,8 @@ export type OrchRequest =
   | { id: string; kind: 'jira:sync'; payload: OrchJiraSyncRequest }
   | { id: string; kind: 'board:authPing'; payload: Record<string, never> }
   | { id: string; kind: 'board:get'; payload: Record<string, never> }
-  | { id: string; kind: 'board:sync'; payload: Record<string, never> };
+  | { id: string; kind: 'board:sync'; payload: Record<string, never> }
+  | { id: string; kind: 'board:signIn'; payload: Record<string, never> };
 
 export interface OrchRunningInstance {
   id: string;
@@ -476,7 +477,8 @@ export type OrchResponse =
         snapshot: import('./ipcContract.js').BoardSnapshotPayload;
         result: import('./ipcContract.js').BoardSyncResultPayload;
       };
-    };
+    }
+  | { kind: 'board:signIn'; payload: { ok: boolean; error?: string } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

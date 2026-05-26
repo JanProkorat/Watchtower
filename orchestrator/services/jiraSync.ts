@@ -66,24 +66,46 @@ export const defaultDeps: JiraSyncDeps = {
   },
   runRefresh(cfg) {
     return new Promise<void>((resolve, reject) => {
+      // Pipe stdio so the chatty Playwright output doesn't flow through the
+      // orchestrator's inherited pipe (which has been observed to destabilise
+      // the utility process). We drain both streams and capture stderr so it
+      // can be surfaced to the renderer when the child exits non-zero.
       const child = spawn('node', [cfg.refreshScript], {
-        stdio: ['ignore', 'inherit', 'inherit'],
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
+      let stderr = '';
+      child.stdout?.on('data', () => {
+        /* drain — refresh script prints nothing meaningful on stdout */
+      });
+      child.stderr?.on('data', (chunk: Buffer) => {
+        // Cap the buffer so a runaway script can't blow up memory.
+        if (stderr.length < 16_384) stderr += chunk.toString('utf8');
+      });
+
       const timer = setTimeout(() => {
         child.kill('SIGTERM');
         reject(new Error('Jira SSO browser timed out (5 min)'));
       }, REFRESH_TIMEOUT_MS);
+
       child.on('error', (err) => {
         clearTimeout(timer);
-        reject(err);
+        // ENOENT — `node` not found on PATH inside the utility process. Surface
+        // a hint that's actionable instead of the cryptic underlying message.
+        const msg = (err as NodeJS.ErrnoException).code === 'ENOENT'
+          ? 'Cookie refresh failed: `node` not on PATH for the orchestrator child'
+          : `Cookie refresh failed: ${err.message}`;
+        reject(new Error(msg));
       });
+
       child.on('exit', (code) => {
         clearTimeout(timer);
+        const tail = stderr ? ` — stderr: ${stderr.trim().slice(-400)}` : '';
         if (code === 0) resolve();
         else if (code === 2)
-          reject(new Error('SSO login timed out (close any leftover browser window and retry)'));
-        else if (code === 3) reject(new Error('Keychain write failed during cookie refresh'));
-        else reject(new Error(`Cookie refresh exited with code ${code}`));
+          reject(new Error(`SSO login timed out (close any leftover browser window and retry)${tail}`));
+        else if (code === 3)
+          reject(new Error(`Keychain write failed during cookie refresh${tail}`));
+        else reject(new Error(`Cookie refresh exited with code ${code}${tail}`));
       });
     });
   },

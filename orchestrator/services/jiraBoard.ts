@@ -131,26 +131,43 @@ export class JiraBoardService {
     return { cards, syncedAt, lastSyncResult: null };
   }
 
+  /**
+   * Run the Playwright SSO refresh, then re-read the cookie.
+   * No HTTP, no DB I/O. Used by the explicit "Sign in to Jira" button.
+   */
+  async signIn(): Promise<{ ok: boolean; error?: string }> {
+    if (!this.cfg.baseUrl || !this.cfg.keychainAccount) {
+      return {
+        ok: false,
+        error: 'Jira board is not configured — set JIRA_BASE_URL and JIRA_KEYCHAIN_ACCOUNT.',
+      };
+    }
+    try {
+      await this.deps.runRefresh(this.cfg);
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+    const cookie = this.deps.readCookie(this.cfg);
+    if (!cookie) {
+      return { ok: false, error: 'Cookie refresh ran but no cookie was stored.' };
+    }
+    return { ok: true };
+  }
+
   async sync(): Promise<BoardSyncResultPayload> {
     const startedAt = this.deps.now().toISOString();
     if (!this.cfg.baseUrl || !this.cfg.keychainAccount) {
       return notConfiguredResult(startedAt, this.deps.now());
     }
 
-    let cookie = this.deps.readCookie(this.cfg);
-    let neededBrowserRefresh = false;
-    const ensureCookie = async () => {
-      neededBrowserRefresh = true;
-      await this.deps.runRefresh(this.cfg);
-      cookie = this.deps.readCookie(this.cfg);
-      if (!cookie) throw new Error('Cookie refresh ran but no cookie was stored');
-    };
+    const cookie = this.deps.readCookie(this.cfg);
     if (!cookie) {
-      try {
-        await ensureCookie();
-      } catch (err) {
-        return earlyError(startedAt, this.deps.now(), neededBrowserRefresh, (err as Error).message);
-      }
+      return earlyError(
+        startedAt,
+        this.deps.now(),
+        false,
+        'No Jira session cookie. Sign in to Jira first.',
+      );
     }
 
     const url = `${this.cfg.baseUrl}/rest/api/2/search`;
@@ -159,32 +176,32 @@ export class JiraBoardService {
       fields: SEARCH_FIELDS,
       maxResults: MAX_RESULTS,
     });
-    const callOnce = async () =>
-      this.deps.fetch(url, {
-        method: 'POST',
-        headers: {
-          Cookie: cookie,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: reqBody,
-      });
+    const res = await this.deps.fetch(url, {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: reqBody,
+    });
 
-    let res = await callOnce();
     if (isAuthFailure(res.status)) {
-      try {
-        await ensureCookie();
-      } catch (err) {
-        return earlyError(startedAt, this.deps.now(), neededBrowserRefresh, (err as Error).message);
-      }
-      res = await callOnce();
+      // Don't auto-refresh — surface the auth failure so the UI can flip to
+      // "Sign in" mode. The user clicks once to refresh deliberately.
+      return earlyError(
+        startedAt,
+        this.deps.now(),
+        false,
+        'Jira session expired. Sign in to Jira to refresh.',
+      );
     }
     if (res.status < 200 || res.status >= 300) {
       const text = await res.text().catch(() => '');
       return earlyError(
         startedAt,
         this.deps.now(),
-        neededBrowserRefresh,
+        false,
         `Jira HTTP ${res.status}: ${text.slice(0, 400) || 'no body'}`,
       );
     }
@@ -268,7 +285,7 @@ export class JiraBoardService {
       unrouted,
       unroutedKeys,
       removedFromBoard,
-      neededBrowserRefresh,
+      neededBrowserRefresh: false,
     };
   }
 }
