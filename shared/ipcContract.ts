@@ -58,7 +58,13 @@ export type IpcRequest =
   | { kind: 'claudeSettings:read'; payload: { scope: 'global' | 'project'; projectPath?: string } }
   | { kind: 'claudeSettings:write'; payload: { scope: 'global' | 'project'; projectPath?: string; content: string } }
   | { kind: 'skills:list'; payload: Record<string, never> }
-  | { kind: 'agents:list'; payload: Record<string, never> };
+  | { kind: 'agents:list'; payload: Record<string, never> }
+  | { kind: 'jira:syncPreview'; payload: JiraSyncRequestPayload }
+  | { kind: 'jira:sync'; payload: JiraSyncRequestPayload }
+  | { kind: 'board:authPing'; payload: Record<string, never> }
+  | { kind: 'board:get'; payload: Record<string, never> }
+  | { kind: 'board:sync'; payload: Record<string, never> }
+  | { kind: 'openExternalUrl'; payload: { url: string } };
 
 export interface RunningInstancePayload {
   id: string;
@@ -494,7 +500,13 @@ export type IpcResponse =
   | { kind: 'claudeSettings:read'; payload: ClaudeSettingsReadPayload }
   | { kind: 'claudeSettings:write'; payload: { ok: boolean; backupPath?: string; error?: string } }
   | { kind: 'skills:list'; payload: { skills: SkillRowPayload[] } }
-  | { kind: 'agents:list'; payload: { agents: AgentRowPayload[] } };
+  | { kind: 'agents:list'; payload: { agents: AgentRowPayload[] } }
+  | { kind: 'jira:syncPreview'; payload: JiraSyncResultPayload }
+  | { kind: 'jira:sync'; payload: JiraSyncResultPayload }
+  | { kind: 'board:authPing'; payload: BoardAuthPingPayload }
+  | { kind: 'board:get'; payload: BoardSnapshotPayload }
+  | { kind: 'board:sync'; payload: { snapshot: BoardSnapshotPayload; result: BoardSyncResultPayload } }
+  | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } };
 
 export interface AgentRowPayload {
   name: string;
@@ -512,6 +524,106 @@ export interface SkillRowPayload {
   source: string;
   description: string;
   body: string;
+}
+
+export interface JiraSyncRequestPayload {
+  /** Inclusive ISO YYYY-MM-DD. */
+  from: string;
+  /** Inclusive ISO YYYY-MM-DD. */
+  to: string;
+  /** Optional project filter; omit to sync across all projects. */
+  projectId?: number;
+  /** Skip worklogs already posted to Jira. Default true. */
+  onlyUnposted?: boolean;
+}
+
+export type JiraSyncEntryStatus = 'posted' | 'skipped' | 'failed' | 'pending';
+
+export interface JiraSyncEntryPayload {
+  worklogId: number;
+  taskId: number;
+  taskNumber: string;
+  taskTitle: string;
+  workDate: string;
+  minutes: number;
+  /** Human-readable, e.g. "2h 30m" — Jira's `timeSpent` shape. */
+  timeSpent: string;
+  comment: string;
+  status: JiraSyncEntryStatus;
+  reason?: string;
+  jiraWorklogId?: string;
+  jiraWorklogUrl?: string;
+  alreadyPosted?: boolean;
+}
+
+export interface JiraSyncResultPayload {
+  totalCandidates: number;
+  skippedNoJiraKey: number;
+  skippedAlreadyPosted: number;
+  skippedTaskNotOpen: number;
+  attempted: number;
+  posted: number;
+  failed: number;
+  tasksMarkedDone: number;
+  neededBrowserRefresh: boolean;
+  /** `true` for the preview endpoint, `false` for the actual sync run. */
+  dryRun: boolean;
+  /** Top-level message when the call could not even start (e.g. config missing). */
+  error?: string;
+  entries: JiraSyncEntryPayload[];
+}
+
+// ─── Board (Jira Kanban) ───
+export interface BoardAuthPingPayload {
+  /** JIRA_BASE_URL and JIRA_KEYCHAIN_ACCOUNT are both set. */
+  configured: boolean;
+  /** A non-empty cookie is stored in Keychain right now. */
+  cookiePresent: boolean;
+  /** baseUrl, or null when not configured — used for the "Open in Jira" link. */
+  baseUrl: string | null;
+}
+
+export type BoardColumn = 'todo' | 'doing' | 'done';
+
+export interface BoardCardPayload {
+  taskId: number;
+  jiraKey: string;
+  title: string;
+  /** Raw Jira status (e.g. "In Review"); preserved for tooltips. */
+  jiraStatus: string;
+  /** Pre-computed column from the merged Jira→Watchtower mapping. */
+  column: BoardColumn;
+  estimateSeconds: number | null;
+  component: string | null;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  epicId: number;
+  epicName: string;
+  syncedAt: string | null;
+}
+
+export interface BoardSnapshotPayload {
+  cards: BoardCardPayload[];
+  /** Newest jira_synced_at across all cards in the snapshot. */
+  syncedAt: string | null;
+  /** Result of the most recent sync call, if one ran in this session. */
+  lastSyncResult: BoardSyncResultPayload | null;
+}
+
+export interface BoardSyncResultPayload {
+  ok: boolean;
+  startedAt: string;
+  finishedAt: string;
+  fetched: number;
+  upserted: number;
+  created: number;
+  unrouted: number;
+  unroutedKeys: string[];
+  removedFromBoard: number;
+  neededBrowserRefresh: boolean;
+  /** Top-level fatal error (config/auth/network). Per-card failures don't set this. */
+  error?: string;
 }
 
 export interface ClaudeSettingsReadPayload {
