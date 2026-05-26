@@ -1,7 +1,6 @@
 import type { SqliteLike } from '../db/migrations.js';
 import {
   defaultDeps,
-  loadJiraConfigFromEnv,
   type JiraConfig,
   type JiraSyncDeps,
 } from './jiraSync.js';
@@ -20,6 +19,26 @@ import type {
 
 /** Deps for the board sync — identical surface to the worklog sync. */
 export type BoardSyncDeps = JiraSyncDeps;
+
+/**
+ * Watchtower-owned Keychain slot. NOT shared with jira-fetch (which uses
+ * service=jira-skoda-cookie / account=dzc1cj8). The board's BrowserWindow
+ * sign-in writes here; this service reads from here. First-ever load on a
+ * clean machine therefore reports cookiePresent=false even if the user has
+ * already authenticated to jira-fetch — which matches the user's mental
+ * model that "I haven't signed in to the board yet."
+ */
+export function loadBoardJiraConfig(): JiraConfig {
+  return {
+    baseUrl: process.env.JIRA_BASE_URL || 'https://jira.skoda.vwgroup.com',
+    keychainService: 'watchtower-jira-cookie',
+    keychainAccount: 'default',
+    // The board uses an Electron BrowserWindow for sign-in (electron/boardSignIn.ts),
+    // not the Playwright shell-out the worklog sync uses, so this field is
+    // unused on the board path. Kept for type compatibility with JiraConfig.
+    refreshScript: '',
+  };
+}
 
 /** Raw Jira status → merged Watchtower column. */
 export const STATUS_TO_COLUMN: Record<string, BoardColumn> = {
@@ -91,7 +110,7 @@ export class JiraBoardService {
     private readonly db: SqliteLike,
     opts: JiraBoardServiceOptions = {},
   ) {
-    this.cfg = opts.config ?? loadJiraConfigFromEnv();
+    this.cfg = opts.config ?? loadBoardJiraConfig();
     this.deps = opts.deps ?? defaultDeps;
   }
 
@@ -129,29 +148,6 @@ export class JiraBoardService {
       return max;
     }, null);
     return { cards, syncedAt, lastSyncResult: null };
-  }
-
-  /**
-   * Run the Playwright SSO refresh, then re-read the cookie.
-   * No HTTP, no DB I/O. Used by the explicit "Sign in to Jira" button.
-   */
-  async signIn(): Promise<{ ok: boolean; error?: string }> {
-    if (!this.cfg.baseUrl || !this.cfg.keychainAccount) {
-      return {
-        ok: false,
-        error: 'Jira board is not configured — set JIRA_BASE_URL and JIRA_KEYCHAIN_ACCOUNT.',
-      };
-    }
-    try {
-      await this.deps.runRefresh(this.cfg);
-    } catch (err) {
-      return { ok: false, error: (err as Error).message };
-    }
-    const cookie = this.deps.readCookie(this.cfg);
-    if (!cookie) {
-      return { ok: false, error: 'Cookie refresh ran but no cookie was stored.' };
-    }
-    return { ok: true };
   }
 
   async sync(): Promise<BoardSyncResultPayload> {

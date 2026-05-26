@@ -370,51 +370,6 @@ describe('JiraBoardService.sync', () => {
     expect(r.error).toMatch(/not configured/i);
   });
 
-  it('signIn() runs runRefresh and reports success when a cookie lands', async () => {
-    let refreshed = 0;
-    const svc = new JiraBoardService(db, {
-      config: CONFIG,
-      deps: makeFetchDeps({
-        cookies: ['fresh-cookie'],
-        refresh: async () => { refreshed += 1; },
-        responses: [{ status: 200 }],
-      }),
-    });
-    const r = await svc.signIn();
-    expect(refreshed).toBe(1);
-    expect(r.ok).toBe(true);
-  });
-
-  it('signIn() reports failure when refresh runs but no cookie is stored', async () => {
-    const svc = new JiraBoardService(db, {
-      config: CONFIG,
-      deps: makeFetchDeps({
-        cookies: ['', ''],
-        refresh: async () => {},
-        responses: [{ status: 200 }],
-      }),
-    });
-    const r = await svc.signIn();
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/no cookie/i);
-  });
-
-  it('signIn() propagates the refresh script\'s error message', async () => {
-    const svc = new JiraBoardService(db, {
-      config: CONFIG,
-      deps: makeFetchDeps({
-        cookies: [''],
-        refresh: async () => {
-          throw new Error('Cookie refresh exited with code 1 — stderr: Cannot find module \'playwright\'');
-        },
-        responses: [{ status: 200 }],
-      }),
-    });
-    const r = await svc.signIn();
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/playwright/);
-  });
-
   it('prefers a Jira components entry over a label for the chip', async () => {
     const calls: Array<{ url: string; body?: unknown }> = [];
     const svc = new JiraBoardService(db, {
