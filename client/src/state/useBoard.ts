@@ -21,8 +21,11 @@ export interface BoardState {
 
 export interface UseBoard extends BoardState {
   sync(): Promise<void>;
-  /** Validate + store a user-pasted Cookie header, then sync on success. */
-  submitCookie(cookie: string): Promise<{ ok: boolean; error?: string }>;
+  /**
+   * Open Jira in the system browser, poll Brave/Chrome for the resulting
+   * cookies, store them in Watchtower's Keychain, and sync on success.
+   */
+  signInAndSync(): Promise<void>;
 }
 
 /** Exported for unit tests — pure, no DOM access. */
@@ -73,23 +76,25 @@ export function useBoard(active: boolean): UseBoard {
     }
   }, []);
 
-  const submitCookie = useCallback(
-    async (cookie: string): Promise<{ ok: boolean; error?: string }> => {
-      try {
-        const r = await window.watchtower.invoke('board:signIn', { cookie });
-        if (!r.ok) return { ok: false, error: r.error ?? 'Sign-in failed' };
-        // Cookie stored — re-ping auth so the UI flips to "signed in", then sync.
-        const auth = await window.watchtower.invoke('board:authPing', {});
-        setState((s) => ({ ...s, auth, syncError: null }));
-        await sync();
-        return { ok: true };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return { ok: false, error: message };
+  const signInAndSync = useCallback(async () => {
+    setState((s) => ({ ...s, syncing: true, syncError: null }));
+    try {
+      const r = await window.watchtower.invoke('board:signIn', {});
+      if (!r.ok) {
+        setState((s) => ({ ...s, syncing: false, syncError: r.error ?? 'Sign-in failed' }));
+        return;
       }
-    },
-    [sync],
-  );
+    } catch (err) {
+      setState((s) => ({
+        ...s,
+        syncing: false,
+        syncError: err instanceof Error ? err.message : String(err),
+      }));
+      return;
+    }
+    // Cookie landed in Keychain — sync immediately. sync() flips `syncing` back.
+    await sync();
+  }, [sync]);
 
   useEffect(() => {
     if (!active) return;
@@ -124,5 +129,5 @@ export function useBoard(active: boolean): UseBoard {
     };
   }, [active, sync]);
 
-  return { ...state, sync, submitCookie };
+  return { ...state, sync, signInAndSync };
 }
