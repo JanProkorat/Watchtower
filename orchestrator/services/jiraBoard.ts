@@ -5,12 +5,17 @@ import {
   type JiraConfig,
   type JiraSyncDeps,
 } from './jiraSync.js';
+import { ProjectsRepo } from '../db/repositories/projects.js';
+import { EpicsRepo } from '../db/repositories/epics.js';
+import { TasksRepo } from '../db/repositories/tasks.js';
+import { detectAreaCode, pickProjectForKey } from './jiraRouting.js';
 import type {
   BoardAuthPingPayload,
   BoardCardPayload,
   BoardColumn,
   BoardSnapshotPayload,
   BoardSyncResultPayload,
+  ProjectViewPayload,
 } from '../../shared/ipcContract.js';
 
 /** Deps for the board sync — identical surface to the worklog sync. */
@@ -127,6 +132,207 @@ export class JiraBoardService {
   }
 
   async sync(): Promise<BoardSyncResultPayload> {
-    throw new Error('JiraBoardService.sync not implemented');
+    const startedAt = this.deps.now().toISOString();
+    if (!this.cfg.baseUrl || !this.cfg.keychainAccount) {
+      return notConfiguredResult(startedAt, this.deps.now());
+    }
+
+    let cookie = this.deps.readCookie(this.cfg);
+    let neededBrowserRefresh = false;
+    const ensureCookie = async () => {
+      neededBrowserRefresh = true;
+      await this.deps.runRefresh(this.cfg);
+      cookie = this.deps.readCookie(this.cfg);
+      if (!cookie) throw new Error('Cookie refresh ran but no cookie was stored');
+    };
+    if (!cookie) {
+      try {
+        await ensureCookie();
+      } catch (err) {
+        return earlyError(startedAt, this.deps.now(), neededBrowserRefresh, (err as Error).message);
+      }
+    }
+
+    const url = `${this.cfg.baseUrl}/rest/api/2/search`;
+    const reqBody = JSON.stringify({
+      jql: JQL,
+      fields: SEARCH_FIELDS,
+      maxResults: MAX_RESULTS,
+    });
+    const callOnce = async () =>
+      this.deps.fetch(url, {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: reqBody,
+      });
+
+    let res = await callOnce();
+    if (isAuthFailure(res.status)) {
+      try {
+        await ensureCookie();
+      } catch (err) {
+        return earlyError(startedAt, this.deps.now(), neededBrowserRefresh, (err as Error).message);
+      }
+      res = await callOnce();
+    }
+    if (res.status < 200 || res.status >= 300) {
+      const text = await res.text().catch(() => '');
+      return earlyError(
+        startedAt,
+        this.deps.now(),
+        neededBrowserRefresh,
+        `Jira HTTP ${res.status}: ${text.slice(0, 400) || 'no body'}`,
+      );
+    }
+
+    const data = (await res.json().catch(() => ({}))) as { issues?: JiraIssueHit[] };
+    const issues = data.issues ?? [];
+
+    const projectsRepo = new ProjectsRepo(this.db);
+    const epicsRepo = new EpicsRepo(this.db);
+    const tasksRepo = new TasksRepo(this.db);
+    // ProjectRow is structurally compatible with ProjectViewPayload (same field names).
+    const allProjects = projectsRepo.list({}) as unknown as ProjectViewPayload[];
+
+    const syncedAt = this.deps.now().toISOString();
+    let created = 0;
+    let upserted = 0;
+    let unrouted = 0;
+    const unroutedKeys: string[] = [];
+    const seenKeys: string[] = [];
+
+    for (const hit of issues) {
+      seenKeys.push(hit.key);
+      const rawStatus = hit.fields.status.name;
+      const column = STATUS_TO_COLUMN[rawStatus];
+      const localStatus = column ? COLUMN_TO_LOCAL_STATUS[column] : 'open';
+
+      const existing = tasksRepo.findByNumber(hit.key);
+      if (existing) {
+        tasksRepo.update(existing.id, {
+          title: hit.fields.summary,
+          status: localStatus,
+        });
+        tasksRepo.updateJiraFields(existing.id, {
+          jiraStatus: rawStatus,
+          estimateSeconds: hit.fields.timeoriginalestimate ?? null,
+          component: pickComponent(hit),
+          syncedAt,
+        });
+        upserted += 1;
+        continue;
+      }
+
+      const project = pickProjectForKey(hit.key, allProjects);
+      if (!project) {
+        unrouted += 1;
+        unroutedKeys.push(hit.key);
+        continue;
+      }
+      const areaCode = detectAreaCode(hit.fields.summary, null);
+      const epicName = areaCode ?? 'Other';
+      const existingEpics = epicsRepo.listForProject(project.id);
+      const epic =
+        existingEpics.find((e) => e.name === epicName) ??
+        epicsRepo.create({ projectId: project.id, name: epicName });
+
+      const newTask = tasksRepo.create({
+        epicId: epic.id,
+        number: hit.key,
+        title: hit.fields.summary,
+        status: localStatus,
+      });
+      tasksRepo.updateJiraFields(newTask.id, {
+        jiraStatus: rawStatus,
+        estimateSeconds: hit.fields.timeoriginalestimate ?? null,
+        component: pickComponent(hit),
+        syncedAt,
+      });
+      created += 1;
+      upserted += 1;
+    }
+
+    const removedFromBoard = tasksRepo.clearJiraStatusExcept(seenKeys);
+
+    return {
+      ok: true,
+      startedAt,
+      finishedAt: this.deps.now().toISOString(),
+      fetched: issues.length,
+      upserted,
+      created,
+      unrouted,
+      unroutedKeys,
+      removedFromBoard,
+      neededBrowserRefresh,
+    };
   }
+}
+
+// ─── sync helpers ──────────────────────────────────────────────────────────
+
+const JQL = 'assignee = currentUser() AND resolution = Unresolved ORDER BY priority DESC, updated DESC';
+const SEARCH_FIELDS = ['summary', 'status', 'timeoriginalestimate', 'labels', 'components'];
+const MAX_RESULTS = 200;
+
+interface JiraIssueHit {
+  key: string;
+  fields: {
+    summary: string;
+    status: { name: string };
+    timeoriginalestimate: number | null;
+    labels?: string[];
+    components?: Array<{ name: string }>;
+  };
+}
+
+function pickComponent(hit: JiraIssueHit): string | null {
+  const comp = hit.fields.components?.[0]?.name;
+  if (comp) return comp;
+  return hit.fields.labels?.[0] ?? null;
+}
+
+function isAuthFailure(status: number): boolean {
+  return status === 401 || status === 403 || status === 302 || status === 303;
+}
+
+function notConfiguredResult(startedAt: string, now: Date): BoardSyncResultPayload {
+  return {
+    ok: false,
+    startedAt,
+    finishedAt: now.toISOString(),
+    fetched: 0,
+    upserted: 0,
+    created: 0,
+    unrouted: 0,
+    unroutedKeys: [],
+    removedFromBoard: 0,
+    neededBrowserRefresh: false,
+    error: 'Jira board is not configured — set JIRA_BASE_URL and JIRA_KEYCHAIN_ACCOUNT.',
+  };
+}
+
+function earlyError(
+  startedAt: string,
+  now: Date,
+  neededBrowserRefresh: boolean,
+  error: string,
+): BoardSyncResultPayload {
+  return {
+    ok: false,
+    startedAt,
+    finishedAt: now.toISOString(),
+    fetched: 0,
+    upserted: 0,
+    created: 0,
+    unrouted: 0,
+    unroutedKeys: [],
+    removedFromBoard: 0,
+    neededBrowserRefresh,
+    error,
+  };
 }
