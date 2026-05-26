@@ -189,12 +189,15 @@ export class JiraBoardService {
     if (isAuthFailure(res.status) || res.status === 0) {
       // status === 0 happens when redirect:'manual' returns an opaque-redirect
       // response (some runtimes); treat it the same as a 302.
-      return earlyError(
-        startedAt,
-        this.deps.now(),
-        false,
-        'Jira session expired. Sign in to Jira to refresh.',
-      );
+      return {
+        ...earlyError(
+          startedAt,
+          this.deps.now(),
+          false,
+          'Jira session expired. Sign in to Jira to refresh.',
+        ),
+        authFailed: true,
+      };
     }
     if (res.status < 200 || res.status >= 300) {
       const text = await res.text().catch(() => '');

@@ -624,6 +624,13 @@ export interface BoardSyncResultPayload {
   unroutedKeys: string[];
   removedFromBoard: number;
   neededBrowserRefresh: boolean;
+  /**
+   * `true` when sync failed because Jira rejected the stored cookie
+   * (302 to SSO, 401, 403). The UI uses this to flip the action button
+   * from "Refresh" to "Sign in to Jira" even though a (now-stale)
+   * cookie is still present in Keychain.
+   */
+  authFailed?: boolean;
   /** Top-level fatal error (config/auth/network). Per-card failures don't set this. */
   error?: string;
 }

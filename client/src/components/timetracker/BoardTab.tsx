@@ -78,6 +78,12 @@ export function BoardTab({ active }: Props) {
     lastSyncResult?.neededBrowserRefresh ??
     snapshot?.lastSyncResult?.neededBrowserRefresh ??
     false;
+  // A stored cookie that Jira just rejected is functionally "signed out" —
+  // show the Sign-in button instead of Refresh so the action matches the
+  // error message.
+  const authFailed =
+    lastSyncResult?.authFailed ?? snapshot?.lastSyncResult?.authFailed ?? false;
+  const showSignIn = !auth?.cookiePresent || authFailed;
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, p: 2, gap: 2 }}>
@@ -96,21 +102,15 @@ export function BoardTab({ active }: Props) {
         <Typography variant="caption" color="text.secondary">·</Typography>
         <Typography variant="caption" color="text.secondary">
           <ScheduleIcon sx={{ fontSize: 13, verticalAlign: -2, mr: 0.5 }} />
-          {auth?.cookiePresent ? formatSynced(snapshot?.syncedAt ?? null) : 'Not signed in'}
+          {showSignIn
+            ? authFailed
+              ? 'Session expired'
+              : 'Not signed in'
+            : formatSynced(snapshot?.syncedAt ?? null)}
         </Typography>
         <Box sx={{ flex: 1 }} />
         {reauthenticated && <Chip size="small" color="info" label="Re-authenticated" />}
-        {auth?.cookiePresent ? (
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() => void sync()}
-            disabled={syncing}
-            startIcon={syncing ? <CircularProgress size={14} /> : <RefreshIcon />}
-          >
-            {syncing ? 'Syncing…' : 'Refresh'}
-          </Button>
-        ) : (
+        {showSignIn ? (
           <Button
             variant="contained"
             size="small"
@@ -119,6 +119,16 @@ export function BoardTab({ active }: Props) {
             startIcon={syncing ? <CircularProgress size={14} /> : <VpnKeyIcon />}
           >
             {syncing ? 'Waiting for sign-in…' : 'Sign in to Jira'}
+          </Button>
+        ) : (
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => void sync()}
+            disabled={syncing}
+            startIcon={syncing ? <CircularProgress size={14} /> : <RefreshIcon />}
+          >
+            {syncing ? 'Syncing…' : 'Refresh'}
           </Button>
         )}
       </Stack>
