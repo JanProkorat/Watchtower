@@ -133,6 +133,23 @@ export class JiraBoardService {
 
   async sync(): Promise<BoardSyncResultPayload> {
     const startedAt = this.deps.now().toISOString();
+    try {
+      return await this.syncInner(startedAt);
+    } catch (err) {
+      // Last-resort catch: any unanticipated throw (DB constraint, JSON
+      // parse error, network exception, etc.) returns a clean envelope
+      // instead of bubbling out of the IPC handler and killing the
+      // orchestrator process.
+      return earlyError(
+        startedAt,
+        this.deps.now(),
+        false,
+        `Board sync crashed: ${(err as Error).message ?? String(err)}`,
+      );
+    }
+  }
+
+  private async syncInner(startedAt: string): Promise<BoardSyncResultPayload> {
     if (!this.cfg.baseUrl || !this.cfg.keychainAccount) {
       return notConfiguredResult(startedAt, this.deps.now());
     }

@@ -53,6 +53,18 @@ import type { InstanceStatus } from '../shared/stateModel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Safety net: log unhandled rejections / uncaught exceptions so a stray
+// throw inside an async handler doesn't kill the utility process and force
+// a full orchestrator restart. We log them through `console.error` (piped
+// to the Electron main's stderr via utilityProcess.stdio: 'inherit') so
+// they remain visible without bringing the orchestrator down.
+process.on('unhandledRejection', (reason) => {
+  console.error('[orchestrator] unhandledRejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[orchestrator] uncaughtException:', err);
+});
+
 let api: PortApi | null = null;
 let handle: BootstrapHandle | null = null;
 const pty = new PtyManager();
