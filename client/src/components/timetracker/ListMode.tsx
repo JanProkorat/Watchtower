@@ -6,6 +6,7 @@ import { WorklogsList } from './WorklogsList.js';
 import { TaskGridView } from './TaskGridView.js';
 import { TimeOffTab } from './TimeOffTab.js';
 import { ReportsTab } from './ReportsTab.js';
+import { BoardTab } from './BoardTab.js';
 
 interface Props {
   tab: ListTab;
@@ -22,6 +23,7 @@ const TAB_LABELS: Record<ListTab, string> = {
   grid: 'Task grid',
   timeoff: 'Time off',
   reports: 'Reports',
+  board: 'Board',
 };
 
 export function ListMode({
@@ -63,6 +65,7 @@ export function ListMode({
         {tab === 'grid' && <TaskGridView />}
         {tab === 'timeoff' && <TimeOffTab />}
         {tab === 'reports' && <ReportsTab />}
+        {tab === 'board' && <BoardTab active={tab === 'board'} />}
       </Box>
     </Box>
   );
