@@ -14,6 +14,11 @@ describe('parseTimeTrackerHash', () => {
     expect(parseTimeTrackerHash('#timetracker/grid')).toEqual({ mode: 'list', tab: 'grid' });
     expect(parseTimeTrackerHash('#timetracker/timeoff')).toEqual({ mode: 'list', tab: 'timeoff' });
     expect(parseTimeTrackerHash('#timetracker/reports')).toEqual({ mode: 'list', tab: 'reports' });
+    expect(parseTimeTrackerHash('#timetracker/board')).toEqual({ mode: 'list', tab: 'board' });
+  });
+
+  it('round-trips the board hash', () => {
+    expect(timetrackerHash({ mode: 'list', tab: 'board' })).toBe('#timetracker/board');
   });
 
   it('parses every detail-mode tab', () => {
