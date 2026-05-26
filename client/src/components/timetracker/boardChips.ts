@@ -1,9 +1,9 @@
 /**
- * Area-code chip styling for the Jira Kanban board.
+ * Epic chip styling for the Jira Kanban board.
  *
- * Curated palette per known Skoda Green Code project area code, derived
- * from the prototype's `chip-*` classes. Unknown codes fall back to a
- * neutral grey so a new area shows up clearly without breaking layout.
+ * Maps an epic name to a deterministic colour from a small curated palette
+ * — same name always gets the same chip colour, so a user can recognise
+ * "their" epics at a glance across syncs.
  */
 
 export interface ChipColours {
@@ -11,29 +11,35 @@ export interface ChipColours {
   fg: string;
 }
 
-const PALETTE: Record<string, ChipColours> = {
-  TEH:      { bg: '#7c3aed', fg: '#ffffff' },
-  VYR:      { bg: '#d97706', fg: '#1f1300' },
-  KP:       { bg: '#2563eb', fg: '#ffffff' },
-  INFRA:    { bg: '#0ea5e9', fg: '#ffffff' },
-  LOG:      { bg: '#16a34a', fg: '#ffffff' },
-  KONTROLA: { bg: '#ef4444', fg: '#ffffff' },
-  STR:      { bg: '#6366f1', fg: '#ffffff' },
-};
+// Eight slots, each with a foreground colour chosen for legibility against
+// the background. Slot order is stable; do not reorder without invalidating
+// the visual pairing every user has learned.
+const PALETTE: ChipColours[] = [
+  { bg: '#7c3aed', fg: '#ffffff' }, // violet
+  { bg: '#d97706', fg: '#1f1300' }, // amber
+  { bg: '#2563eb', fg: '#ffffff' }, // blue
+  { bg: '#0ea5e9', fg: '#ffffff' }, // sky
+  { bg: '#16a34a', fg: '#ffffff' }, // green
+  { bg: '#ef4444', fg: '#ffffff' }, // red
+  { bg: '#6366f1', fg: '#ffffff' }, // indigo
+  { bg: '#ea580c', fg: '#1f1300' }, // orange
+];
 
 const FALLBACK: ChipColours = { bg: '#4b5563', fg: '#ffffff' };
 
-export function areaCodeColours(areaCode: string | null): ChipColours {
-  if (!areaCode) return FALLBACK;
-  return PALETTE[areaCode] ?? FALLBACK;
+function hashString(s: string): number {
+  // FNV-1a-ish — small, fast, well-distributed enough for an 8-slot palette.
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
 }
 
-/**
- * Strip the area-code prefix off a component label.
- * `"TEH-Technologický postup"` → `"TEH"`.
- */
-export function areaCodeFromComponent(component: string | null): string | null {
-  if (!component) return null;
-  const m = /^([A-Z][A-Z0-9]*)/.exec(component);
-  return m?.[1] ?? null;
+/** Colour pair for the given epic name; falls back to neutral grey on empty. */
+export function epicColours(epicName: string | null | undefined): ChipColours {
+  if (!epicName || epicName.length === 0) return FALLBACK;
+  const idx = hashString(epicName) % PALETTE.length;
+  return PALETTE[idx]!;
 }

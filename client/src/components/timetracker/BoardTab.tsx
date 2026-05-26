@@ -16,7 +16,7 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { useBoard } from '../../state/useBoard.js';
 import { useToast } from '../../state/useToast.js';
-import { areaCodeColours, areaCodeFromComponent } from './boardChips.js';
+import { epicColours } from './boardChips.js';
 import type {
   BoardCardPayload,
   BoardColumn,
@@ -220,8 +220,7 @@ export function BoardTab({ active }: Props) {
                 </Typography>
               )}
               {byCol[col.id].map((c) => {
-                const code = areaCodeFromComponent(c.component);
-                const { bg, fg } = areaCodeColours(code);
+                const { bg, fg } = epicColours(c.epicName);
                 const timeLabel = formatCardTime(c.loggedMinutes, c.estimateSeconds);
                 const timeTooltip = c.estimateSeconds
                   ? `Logged ${formatMinutes(c.loggedMinutes)} / estimate ${formatMinutes(
@@ -275,12 +274,12 @@ export function BoardTab({ active }: Props) {
                         WebkitLineClamp: 3,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        mb: c.component ? 0.75 : 0,
+                        mb: c.epicName ? 0.75 : 0,
                       }}
                     >
                       {c.title}
                     </Typography>
-                    {c.component && (
+                    {c.epicName && (
                       <Box
                         sx={{
                           display: 'inline-block',
@@ -292,9 +291,14 @@ export function BoardTab({ active }: Props) {
                           bgcolor: bg,
                           color: fg,
                           letterSpacing: '0.02em',
+                          maxWidth: '100%',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
                         }}
+                        title={c.epicName}
                       >
-                        {c.component}
+                        {c.epicName}
                       </Box>
                     )}
                   </Box>

@@ -18,7 +18,7 @@ import type {
   WorklogViewPayload,
 } from '../../../../shared/ipcContract.js';
 import { formatDateShortCz } from '../../util/format.js';
-import { areaCodeColours, areaCodeFromComponent } from './boardChips.js';
+import { epicColours } from './boardChips.js';
 
 interface Props {
   open: boolean;
@@ -88,7 +88,7 @@ export function BoardTaskDetailDrawer({
     );
   }
 
-  const chipColours = areaCodeColours(areaCodeFromComponent(card.component));
+  const chipColours = epicColours(card.epicName);
   const totalLogged = worklogs.reduce((sum, w) => sum + w.minutes, 0) || card.loggedMinutes;
 
   return (
@@ -112,10 +112,10 @@ export function BoardTaskDetailDrawer({
           </IconButton>
         </Stack>
 
-        {/* Meta row: status, component chip, project, epic */}
+        {/* Meta row: status, epic chip, project */}
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
           <Chip size="small" label={card.jiraStatus} variant="outlined" />
-          {card.component && (
+          {card.epicName && (
             <Box
               sx={{
                 fontSize: 11,
@@ -128,11 +128,11 @@ export function BoardTaskDetailDrawer({
                 letterSpacing: '0.02em',
               }}
             >
-              {card.component}
+              {card.epicName}
             </Box>
           )}
           <Typography variant="caption" color="text.secondary">
-            · {card.projectName} / {card.epicName}
+            · {card.projectName}
           </Typography>
         </Stack>
 
