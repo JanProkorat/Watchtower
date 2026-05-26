@@ -12,11 +12,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
-
-const require = createRequire(import.meta.url);
-const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
+import Database from 'better-sqlite3';
 
 interface BrowserSpec {
   name: string;
@@ -47,8 +44,8 @@ interface CookieRow {
   name: string;
   /** Plaintext value (rare — only set for non-secure cookies). */
   value: string;
-  /** Encrypted v10 blob. */
-  encrypted_value: Uint8Array;
+  /** Encrypted v10 blob (Buffer from better-sqlite3, Uint8Array-compatible). */
+  encrypted_value: Buffer;
 }
 
 interface CookiePair {
@@ -70,11 +67,11 @@ function deriveAesKey(password: string): Buffer {
   return crypto.pbkdf2Sync(password, 'saltysalt', 1003, 16, 'sha1');
 }
 
-function decryptV10(blob: Uint8Array, key: Buffer): string | null {
+function decryptV10(blob: Buffer, key: Buffer): string | null {
   if (blob.length < 3) return null;
-  const versionTag = Buffer.from(blob.slice(0, 3)).toString('utf8');
+  const versionTag = blob.slice(0, 3).toString('utf8');
   if (versionTag !== 'v10') return null;
-  const ciphertext = Buffer.from(blob.slice(3));
+  const ciphertext = blob.slice(3);
   const iv = Buffer.alloc(16, 0x20);
   try {
     const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
@@ -101,10 +98,9 @@ function readCookieRowsForDomain(
     copyFileSync(cookiesPath, dst);
     if (existsSync(`${cookiesPath}-wal`)) copyFileSync(`${cookiesPath}-wal`, `${dst}-wal`);
     if (existsSync(`${cookiesPath}-shm`)) copyFileSync(`${cookiesPath}-shm`, `${dst}-shm`);
-    const db = new DatabaseSync(dst, { readOnly: true });
+    const db = new Database(dst, { readonly: true, fileMustExist: true });
     try {
-      // The trailing `%` on a normal LIKE matches anything ending with the
-      // suffix; we want hosts ending in `.skoda.vwgroup.com` OR equal to it.
+      // We want hosts ending in `.skoda.vwgroup.com` OR equal to it.
       const rows = db
         .prepare(
           `SELECT host_key, name, value, encrypted_value
