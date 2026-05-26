@@ -174,6 +174,10 @@ export class JiraBoardService {
     });
     const res = await this.deps.fetch(url, {
       method: 'POST',
+      // Don't follow Jira's "session expired → IdP" 302; we want to read it
+      // here and treat it as an auth failure. Auto-follow ends in a redirect
+      // loop through ADFS → "redirect count exceeded".
+      redirect: 'manual',
       headers: {
         Cookie: cookie,
         'Content-Type': 'application/json',
@@ -182,9 +186,9 @@ export class JiraBoardService {
       body: reqBody,
     });
 
-    if (isAuthFailure(res.status)) {
-      // Don't auto-refresh — surface the auth failure so the UI can flip to
-      // "Sign in" mode. The user clicks once to refresh deliberately.
+    if (isAuthFailure(res.status) || res.status === 0) {
+      // status === 0 happens when redirect:'manual' returns an opaque-redirect
+      // response (some runtimes); treat it the same as a 302.
       return earlyError(
         startedAt,
         this.deps.now(),
