@@ -95,15 +95,11 @@ export function BoardTab({ active }: Props) {
         <Typography variant="caption" color="text.secondary">·</Typography>
         <Typography variant="caption" color="text.secondary">
           <ScheduleIcon sx={{ fontSize: 13, verticalAlign: -2, mr: 0.5 }} />
-          {auth?.configured === false
-            ? 'Not configured'
-            : auth?.cookiePresent
-              ? formatSynced(snapshot?.syncedAt ?? null)
-              : 'Not signed in'}
+          {auth?.cookiePresent ? formatSynced(snapshot?.syncedAt ?? null) : 'Not signed in'}
         </Typography>
         <Box sx={{ flex: 1 }} />
         {reauthenticated && <Chip size="small" color="info" label="Re-authenticated" />}
-        {auth?.configured && auth.cookiePresent && (
+        {auth?.cookiePresent ? (
           <Button
             variant="contained"
             size="small"
@@ -113,8 +109,7 @@ export function BoardTab({ active }: Props) {
           >
             {syncing ? 'Syncing…' : 'Refresh'}
           </Button>
-        )}
-        {auth?.configured && !auth.cookiePresent && (
+        ) : (
           <Button
             variant="contained"
             size="small"
@@ -126,13 +121,6 @@ export function BoardTab({ active }: Props) {
           </Button>
         )}
       </Stack>
-
-      {auth && !auth.configured && (
-        <Alert severity="info">
-          Jira sync isn't configured. Set <code>JIRA_BASE_URL</code> and{' '}
-          <code>JIRA_KEYCHAIN_ACCOUNT</code> and restart Watchtower.
-        </Alert>
-      )}
 
       {syncError && <Alert severity="error">{syncError}</Alert>}
 
