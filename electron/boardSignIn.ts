@@ -16,6 +16,20 @@ const DOMAIN = 'skoda.vwgroup.com';
 
 const POLL_MS = 2000;
 const TIMEOUT_MS = 5 * 60 * 1000;
+/**
+ * If after this many polls we still haven't read a single cookie from any
+ * browser, give up early — the user either denied Keychain access, doesn't
+ * have a supported browser, or is on a Brave version using v20 app-bound
+ * encryption (which we can't decrypt). Forces the diagnostic out quickly
+ * instead of making the user stare at "Waiting for sign-in…" for 5 minutes.
+ */
+const FAST_FAIL_POLLS_NO_COOKIES = 15;  // ~30 seconds
+/**
+ * Same idea, but for the case where cookies ARE coming through but Jira
+ * keeps rejecting them. Usually means the user closed the login window
+ * before SSO completed, or hit a different IdP path.
+ */
+const FAST_FAIL_POLLS_PROBE_REJECT = 30;  // ~60 seconds
 
 export interface SignInResult {
   ok: boolean;
@@ -36,18 +50,43 @@ export interface SignInResult {
  * Other cookies in Brave's database aren't touched.
  */
 export async function runBoardSignIn(): Promise<SignInResult> {
+  // Pre-flight: probe every supported browser ONCE before opening the login
+  // window. If nothing's readable at all (no cookies file, no Keychain
+  // access, or DB locked), bail out immediately with an actionable error
+  // instead of spawning a Brave window the user is then stuck staring at.
+  {
+    const preDiag: CookieReadDiagnostic[] = [];
+    readJiraCookieHeader(DOMAIN, preDiag);
+    const usable = preDiag.find(
+      (d) => d.cookiesPathExists && d.keychainEntryFound,
+    );
+    if (!usable) {
+      return { ok: false, error: buildPreflightMessage(preDiag) };
+    }
+  }
+
   openLoginUrl(LOGIN_URL);
 
   const startedAt = Date.now();
   let lastProbeStatus: number | null = null;
   let lastDiagnostics: CookieReadDiagnostic[] = [];
+  let pollsWithoutCookies = 0;
+  let pollsWithProbeReject = 0;
 
   while (Date.now() - startedAt < TIMEOUT_MS) {
     await sleep(POLL_MS);
     const diagnostics: CookieReadDiagnostic[] = [];
     const header = readJiraCookieHeader(DOMAIN, diagnostics);
     lastDiagnostics = diagnostics;
-    if (!header) continue;
+
+    if (!header) {
+      pollsWithoutCookies += 1;
+      if (pollsWithoutCookies >= FAST_FAIL_POLLS_NO_COOKIES) {
+        return { ok: false, error: buildNoCookieMessage(diagnostics) };
+      }
+      continue;
+    }
+    pollsWithoutCookies = 0;
 
     let res: Response;
     try {
@@ -66,14 +105,63 @@ export async function runBoardSignIn(): Promise<SignInResult> {
       }
       return { ok: true };
     }
-    // 401/403/redirect → cookie present but not yet authenticated.
-    // Keep polling — the user might still be on the IdP page.
+
+    // Auth failure even though cookies exist — keep polling for a bit (user
+    // might still be redirecting through IdP), then bail out with detail.
+    pollsWithProbeReject += 1;
+    if (pollsWithProbeReject >= FAST_FAIL_POLLS_PROBE_REJECT) {
+      return {
+        ok: false,
+        error:
+          `Sign-in failed: Jira rejected your browser's cookies (HTTP ${res.status}). ` +
+          `Make sure you're fully signed in to ${BASE_URL} in Brave, then click Sign in again.`,
+      };
+    }
   }
 
   return {
     ok: false,
     error: buildTimeoutMessage(lastProbeStatus, lastDiagnostics),
   };
+}
+
+function buildPreflightMessage(diag: CookieReadDiagnostic[]): string {
+  if (diag.length === 0) {
+    return 'Sign-in failed: no supported browser (Brave or Chrome) found.';
+  }
+  const lines = diag.map((d) => {
+    if (!d.cookiesPathExists) {
+      return `${d.browser}: not installed (no cookies file at ${d.cookiesPath}).`;
+    }
+    if (!d.keychainEntryFound) {
+      return (
+        `${d.browser}: Keychain entry "${d.browser} Safe Storage" not accessible — ` +
+        `open Keychain Access and grant Watchtower permission to read it, then retry.`
+      );
+    }
+    return `${d.browser}: ${d.error ?? 'unknown read error'}.`;
+  });
+  return `Sign-in pre-check failed. ${lines.join(' | ')}`;
+}
+
+function buildNoCookieMessage(diag: CookieReadDiagnostic[]): string {
+  const detail = diag
+    .map((d) => {
+      if (!d.cookiesPathExists) return null;
+      if (!d.keychainEntryFound) return `${d.browser}: Keychain access denied.`;
+      if (d.rowsReturned === 0) return `${d.browser}: 0 cookies for jira.skoda.vwgroup.com.`;
+      if (d.rowsFailedDecrypt > 0 && d.rowsDecrypted === 0) {
+        const tags = d.versionTagsSeen.join(', ') || 'none';
+        return (
+          `${d.browser}: ${d.rowsReturned} cookies present but all failed to decrypt ` +
+          `(version tags: ${tags}; we only handle v10).`
+        );
+      }
+      return `${d.browser}: ${d.rowsReturned} cookies, ${d.rowsDecrypted} decrypted, ${d.rowsWithPlaintext} plaintext.`;
+    })
+    .filter(Boolean)
+    .join(' | ');
+  return `Sign-in failed: no Jira cookies readable from your browser. ${detail}`;
 }
 
 function buildTimeoutMessage(
