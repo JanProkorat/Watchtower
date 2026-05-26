@@ -23,10 +23,14 @@ export interface UseBoard extends BoardState {
   sync(): Promise<void>;
 }
 
-function isStale(snapshot: BoardSnapshotPayload | null, now: number): boolean {
+/** Exported for unit tests — pure, no DOM access. */
+export function isStale(snapshot: BoardSnapshotPayload | null, now: number): boolean {
   if (!snapshot?.syncedAt) return true;
   return now - Date.parse(snapshot.syncedAt) > STALE_MS;
 }
+
+/** Stale threshold, exported for tests that need to pin the boundary. */
+export const STALE_THRESHOLD_MS = STALE_MS;
 
 /**
  * Owns the Kanban tab's state. On activation it loads from the local DB
