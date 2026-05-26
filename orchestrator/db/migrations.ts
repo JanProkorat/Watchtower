@@ -89,6 +89,21 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
                  ON epics(project_id, display_order)`);
     },
   },
+  {
+    version: 6,
+    up: (db) => {
+      // Phase 31 Jira Kanban board — cached per-task Jira metadata,
+      // populated only while a task is on the user's current board
+      // (i.e. in the latest sync's result set). `jira_status IS NULL`
+      // is the "not on board" sentinel.
+      db.exec(`ALTER TABLE tasks ADD COLUMN jira_status TEXT`);
+      db.exec(`ALTER TABLE tasks ADD COLUMN jira_estimate_secs INTEGER`);
+      db.exec(`ALTER TABLE tasks ADD COLUMN jira_component TEXT`);
+      db.exec(`ALTER TABLE tasks ADD COLUMN jira_synced_at TEXT`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_jira_status
+                 ON tasks(jira_status) WHERE jira_status IS NOT NULL`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {
