@@ -139,12 +139,14 @@ export class JiraBoardService {
       // Last-resort catch: any unanticipated throw (DB constraint, JSON
       // parse error, network exception, etc.) returns a clean envelope
       // instead of bubbling out of the IPC handler and killing the
-      // orchestrator process.
+      // orchestrator process. Node's undici fetch reports "fetch failed"
+      // generically; the real reason lives in `err.cause` (e.g.
+      // ENOTFOUND / certificate chain / ECONNREFUSED) — chase it.
       return earlyError(
         startedAt,
         this.deps.now(),
         false,
-        `Board sync crashed: ${(err as Error).message ?? String(err)}`,
+        `Board sync crashed: ${formatErrorChain(err)}`,
       );
     }
   }
@@ -325,6 +327,21 @@ function notConfiguredResult(startedAt: string, now: Date): BoardSyncResultPaylo
     neededBrowserRefresh: false,
     error: 'Jira board is not configured — set JIRA_BASE_URL and JIRA_KEYCHAIN_ACCOUNT.',
   };
+}
+
+function formatErrorChain(err: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = err;
+  let depth = 0;
+  while (current && depth < 5) {
+    const e = current as { message?: string; code?: string; cause?: unknown };
+    const piece = e.code ? `${e.message ?? '(no message)'} [${e.code}]` : e.message ?? String(current);
+    parts.push(piece);
+    if (!e.cause) break;
+    current = e.cause;
+    depth += 1;
+  }
+  return parts.join(' → ');
 }
 
 function earlyError(
