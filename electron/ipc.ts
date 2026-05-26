@@ -6,7 +6,7 @@ import type { IpcRequest, IpcResponse } from '../shared/ipcContract.js';
 import { getMainWindow, createMainWindow } from './window.js';
 import { getOrchestrator } from './orchestratorHost.js';
 import { fireMacNotification, fireTestNotification } from './notifications.js';
-import { runBoardSignIn } from './boardSignIn.js';
+import { storeBoardCookie } from './boardSignIn.js';
 
 const ELECTRON_ONLY_KINDS = new Set<IpcRequest['kind']>([
   'chooseDirectory',
@@ -87,7 +87,8 @@ export function registerIpc(): void {
       }
 
       if (kind === 'board:signIn') {
-        return await runBoardSignIn();
+        const { cookie } = payload as { cookie: string };
+        return await storeBoardCookie(cookie);
       }
 
       if (kind === 'openExternalUrl') {

@@ -64,7 +64,7 @@ export type IpcRequest =
   | { kind: 'board:authPing'; payload: Record<string, never> }
   | { kind: 'board:get'; payload: Record<string, never> }
   | { kind: 'board:sync'; payload: Record<string, never> }
-  | { kind: 'board:signIn'; payload: Record<string, never> }
+  | { kind: 'board:signIn'; payload: { cookie: string } }
   | { kind: 'openExternalUrl'; payload: { url: string } };
 
 export interface RunningInstancePayload {

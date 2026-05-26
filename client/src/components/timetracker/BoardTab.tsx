@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { BoardSignInDialog, JIRA_LOGIN_URL } from './BoardSignInDialog.js';
 import {
   Alert,
   Box,
@@ -47,8 +48,9 @@ interface Props {
 }
 
 export function BoardTab({ active }: Props) {
-  const { snapshot, auth, syncing, syncError, lastSyncResult, sync, signInAndSync } =
+  const { snapshot, auth, syncing, syncError, lastSyncResult, sync, submitCookie } =
     useBoard(active);
+  const [signInOpen, setSignInOpen] = useState(false);
   const { showError } = useToast();
 
   const byCol = useMemo(() => {
@@ -114,14 +116,21 @@ export function BoardTab({ active }: Props) {
           <Button
             variant="contained"
             size="small"
-            onClick={() => void signInAndSync()}
+            onClick={() => setSignInOpen(true)}
             disabled={syncing}
             startIcon={syncing ? <CircularProgress size={14} /> : <VpnKeyIcon />}
           >
-            {syncing ? 'Opening…' : 'Sign in to Jira'}
+            {syncing ? 'Syncing…' : 'Sign in to Jira'}
           </Button>
         )}
       </Stack>
+
+      <BoardSignInDialog
+        open={signInOpen}
+        onClose={() => setSignInOpen(false)}
+        onSubmit={submitCookie}
+        onOpenJira={() => openInBrowser(JIRA_LOGIN_URL)}
+      />
 
       {syncError && <Alert severity="error">{syncError}</Alert>}
 

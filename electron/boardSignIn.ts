@@ -1,17 +1,11 @@
-import { BrowserWindow, session } from 'electron';
 import { spawnSync } from 'node:child_process';
 
-const PARTITION = 'persist:watchtower-jira';
 const KEYCHAIN_SERVICE = 'watchtower-jira-cookie';
 const KEYCHAIN_ACCOUNT = 'default';
 const KEYCHAIN_LABEL = 'Watchtower — Jira session cookies';
 
 const BASE_URL = 'https://jira.skoda.vwgroup.com';
-const LOGIN_URL = `${BASE_URL}/login.jsp`;
 const MYSELF_URL = `${BASE_URL}/rest/api/2/myself`;
-
-const POLL_MS = 2000;
-const TIMEOUT_MS = 5 * 60 * 1000;
 
 export interface SignInResult {
   ok: boolean;
@@ -19,71 +13,64 @@ export interface SignInResult {
 }
 
 /**
- * Open a Jira login window in a dedicated Electron session partition.
- * Polls /rest/api/2/myself every 2s; when it returns 200, captures the
- * session cookies, writes them to Keychain, and closes the window.
+ * Validate a user-pasted Cookie header value against Jira, and on success
+ * write it to the Watchtower-specific Keychain slot. The renderer hands us
+ * the raw paste from devtools; we strip any leading "Cookie: " and probe
+ * `/rest/api/2/myself` to confirm the session is alive before storing.
  *
- * Doesn't share Keychain or cookies with the jira-fetch skill — Watchtower
- * has its own slot, so "no cookie stored" really means "user hasn't signed
- * into the Watchtower board yet".
+ * We don't try to read system-browser cookie databases — too invasive and
+ * too brittle across Brave/Chrome/Safari/etc. The paste step is the price
+ * we pay for native Touch ID / passkey support in the user's system browser.
  */
-export async function runBoardSignIn(): Promise<SignInResult> {
-  let win: BrowserWindow | null = null;
+export async function storeBoardCookie(rawCookie: string): Promise<SignInResult> {
+  const cookie = stripCookieHeaderPrefix((rawCookie ?? '').trim());
+  if (!cookie) {
+    return { ok: false, error: 'Empty cookie value.' };
+  }
+  if (!/=/.test(cookie)) {
+    return {
+      ok: false,
+      error: 'That doesn\'t look like a Cookie header. Paste the full `name=value; …` string.',
+    };
+  }
+
+  let res: Response;
   try {
-    win = new BrowserWindow({
-      width: 1100,
-      height: 800,
-      title: 'Sign in to Jira',
-      backgroundColor: '#0e0f12',
-      webPreferences: { partition: PARTITION },
+    res = await fetch(MYSELF_URL, {
+      headers: { Cookie: cookie, Accept: 'application/json' },
     });
-    await win.loadURL(LOGIN_URL);
   } catch (err) {
-    win?.destroy();
-    return { ok: false, error: `Could not open sign-in window: ${(err as Error).message}` };
+    return {
+      ok: false,
+      error: `Could not reach Jira: ${(err as Error).message}`,
+    };
   }
 
-  const sess = session.fromPartition(PARTITION);
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt < TIMEOUT_MS) {
-    if (!win || win.isDestroyed()) {
-      return { ok: false, error: 'Sign-in window was closed before login completed.' };
-    }
-
-    const cookies = await sess.cookies.get({ url: BASE_URL });
-    if (cookies.length > 0) {
-      const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-      try {
-        const res = await fetch(MYSELF_URL, {
-          headers: { Cookie: cookieHeader, Accept: 'application/json' },
-        });
-        if (res.status === 200) {
-          const stored = storeCookieInKeychain(cookieHeader);
-          win.close();
-          if (!stored) {
-            return { ok: false, error: 'Sign-in succeeded but Keychain write failed.' };
-          }
-          return { ok: true };
-        }
-      } catch {
-        // Network blip — keep polling.
-      }
-    }
-
-    await sleep(POLL_MS);
+  if (res.status === 401 || res.status === 403 || res.status === 302 || res.status === 303) {
+    return {
+      ok: false,
+      error: 'Jira rejected the cookie (auth failed). Log in again in your browser and copy a fresh Cookie header.',
+    };
+  }
+  if (res.status < 200 || res.status >= 300) {
+    return {
+      ok: false,
+      error: `Jira returned HTTP ${res.status} when checking the cookie.`,
+    };
   }
 
-  if (win && !win.isDestroyed()) win.close();
-  return { ok: false, error: 'Sign-in timed out after 5 minutes.' };
+  const stored = storeCookieInKeychain(cookie);
+  if (!stored) {
+    return { ok: false, error: 'Cookie validated, but writing to macOS Keychain failed.' };
+  }
+  return { ok: true };
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function stripCookieHeaderPrefix(s: string): string {
+  return s.replace(/^cookie:\s*/i, '').trim();
 }
 
 function storeCookieInKeychain(value: string): boolean {
-  // Delete-then-add so the new value replaces any prior entry cleanly.
   spawnSync(
     'security',
     ['delete-generic-password', '-s', KEYCHAIN_SERVICE, '-a', KEYCHAIN_ACCOUNT],
