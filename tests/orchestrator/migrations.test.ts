@@ -40,7 +40,7 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(6);
+    expect(version.v).toBe(8);
   });
 
   it('v2 adds the display_order column with spawned_at as default', () => {
@@ -68,5 +68,21 @@ describe('migrations', () => {
       )
       .get();
     expect(idx).toBeTruthy();
+  });
+
+  it('v7 adds jira_board_url to projects', () => {
+    runMigrations(db as unknown as SqliteLike);
+    const cols = (
+      db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>
+    ).map((c) => c.name);
+    expect(cols).toContain('jira_board_url');
+  });
+
+  it('v8 adds shortcut to epics', () => {
+    runMigrations(db as unknown as SqliteLike);
+    const cols = (
+      db.prepare(`PRAGMA table_info(epics)`).all() as Array<{ name: string }>
+    ).map((c) => c.name);
+    expect(cols).toContain('shortcut');
   });
 });

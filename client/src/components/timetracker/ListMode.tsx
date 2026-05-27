@@ -1,7 +1,5 @@
 import { Box, Tab, Tabs } from '@mui/material';
 import { LIST_TABS, type ListTab } from '../../util/timetrackerUrl.js';
-import { EmptyTabState } from './EmptyTabState.js';
-import { ProjectsList } from './ProjectsList.js';
 import { WorklogsList } from './WorklogsList.js';
 import { TaskGridView } from './TaskGridView.js';
 import { TimeOffTab } from './TimeOffTab.js';
@@ -9,10 +7,8 @@ import { ReportsTab } from './ReportsTab.js';
 import { BoardTab } from './BoardTab.js';
 
 interface Props {
-  tab: ListTab;
+  tab: Exclude<ListTab, 'projects'>;
   onTabChange(tab: ListTab): void;
-  /** Project row → open detail mode for that project. */
-  onOpenProject(projectId: number): void;
   onActivateInstance(id: string): void;
   onOpenNewInstanceForCwd(cwd: string): void;
 }
@@ -26,13 +22,12 @@ const TAB_LABELS: Record<ListTab, string> = {
   board: 'Board',
 };
 
-export function ListMode({
-  tab,
-  onTabChange,
-  onOpenProject,
-  onActivateInstance,
-  onOpenNewInstanceForCwd,
-}: Props) {
+/**
+ * Hosts the non-projects tabs (Worklogs, Task grid, Time off, Reports,
+ * Board). The Projects tab gets its own master-detail page in
+ * `ModuleTimeTracker` and never lands here.
+ */
+export function ListMode({ tab, onTabChange }: Props) {
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
@@ -54,13 +49,6 @@ export function ListMode({
       </Box>
 
       <Box sx={{ flex: 1, display: 'flex', overflow: 'auto', minHeight: 0 }}>
-        {tab === 'projects' && (
-          <ProjectsList
-            onOpenProject={onOpenProject}
-            onActivateInstance={onActivateInstance}
-            onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
-          />
-        )}
         {tab === 'worklogs' && <WorklogsList />}
         {tab === 'grid' && <TaskGridView />}
         {tab === 'timeoff' && <TimeOffTab />}

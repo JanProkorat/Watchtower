@@ -8,6 +8,7 @@ import { ProjectsRepo } from '../../orchestrator/db/repositories/projects.js';
 import { EpicsRepo } from '../../orchestrator/db/repositories/epics.js';
 import { TasksRepo } from '../../orchestrator/db/repositories/tasks.js';
 import { WorklogsRepo } from '../../orchestrator/db/repositories/worklogs.js';
+import { ProjectRatesRepo } from '../../orchestrator/db/repositories/projectRates.js';
 import { DashboardOverviewService } from '../../orchestrator/db/dashboardOverview.js';
 
 const require = createRequire(import.meta.url);
@@ -28,6 +29,7 @@ describe('DashboardOverviewService', () => {
   let epics: EpicsRepo;
   let tasks: TasksRepo;
   let worklogs: WorklogsRepo;
+  let rates: ProjectRatesRepo;
 
   beforeEach(() => {
     db = freshDb();
@@ -36,6 +38,7 @@ describe('DashboardOverviewService', () => {
     epics = new EpicsRepo(db);
     tasks = new TasksRepo(db);
     worklogs = new WorklogsRepo(db);
+    rates = new ProjectRatesRepo(db);
   });
 
   function seedTask(projectName: string, color: string, taskNumber: string) {
@@ -336,5 +339,200 @@ describe('DashboardOverviewService', () => {
     expect(day!.worklogs.map((w) => w.taskNumber)).toEqual(['BIG-1', 'SMALL-1']);
     expect(day!.worklogs[0].minutes).toBe(90);
     expect(day!.worklogs[1].minutes).toBe(30);
+  });
+
+  describe('activeContracts', () => {
+    it('returns one entry per project with a current contract (end_date or md_limit)', () => {
+      const a = projects.create({ name: 'Alpha', color: '#aaa', kind: 'work' });
+      const b = projects.create({ name: 'Bravo', color: '#bbb', kind: 'work' });
+      projects.create({ name: 'Charlie', color: '#ccc', kind: 'work' }); // no contract → excluded
+      rates.create({
+        projectId: a.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 12000,
+        currency: 'CZK',
+        endDate: '2026-06-30',
+        mdLimit: 115,
+      });
+      rates.create({
+        projectId: b.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'hourly',
+        rateAmount: 1500,
+        currency: 'EUR',
+        mdLimit: 50,
+      });
+
+      const res = service.run({
+        projectId: null,
+        sprintAnchor: '2026-05-27',
+        todayDate: '2026-05-27',
+      });
+
+      expect(res.activeContracts.map((c) => c.projectName)).toEqual(['Alpha', 'Bravo']);
+      expect(res.activeContracts[0]).toMatchObject({
+        projectId: a.id,
+        projectName: 'Alpha',
+        projectColor: '#aaa',
+        currency: 'CZK',
+      });
+      expect(res.activeContracts[0].contract).toMatchObject({
+        projectId: a.id,
+        mdLimit: 115,
+        endDate: '2026-06-30',
+      });
+    });
+
+    it('excludes archived projects', () => {
+      const p = projects.create({ name: 'Archived', color: '#aaa', kind: 'work' });
+      rates.create({
+        projectId: p.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 1,
+        currency: 'CZK',
+        endDate: '2026-12-31',
+        mdLimit: 10,
+      });
+      projects.archive(p.id, true);
+
+      const res = service.run({
+        projectId: null,
+        sprintAnchor: '2026-05-27',
+        todayDate: '2026-05-27',
+      });
+      expect(res.activeContracts).toEqual([]);
+    });
+
+    it('excludes contracts without end_date AND without md_limit', () => {
+      const p = projects.create({ name: 'Open', color: '#aaa', kind: 'work' });
+      rates.create({
+        projectId: p.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'hourly',
+        rateAmount: 100,
+        currency: 'CZK',
+        // No endDate, no mdLimit → excluded.
+      });
+
+      const res = service.run({
+        projectId: null,
+        sprintAnchor: '2026-05-27',
+        todayDate: '2026-05-27',
+      });
+      expect(res.activeContracts).toEqual([]);
+    });
+
+    it('ignores the request projectId filter — surfaces every active contract', () => {
+      const a = projects.create({ name: 'Alpha', color: '#aaa', kind: 'work' });
+      const b = projects.create({ name: 'Bravo', color: '#bbb', kind: 'work' });
+      for (const pid of [a.id, b.id]) {
+        rates.create({
+          projectId: pid,
+          effectiveFrom: '2026-01-01',
+          rateType: 'daily',
+          rateAmount: 10000,
+          currency: 'CZK',
+          endDate: '2026-12-31',
+          mdLimit: 100,
+        });
+      }
+
+      const res = service.run({
+        projectId: a.id,
+        sprintAnchor: '2026-05-27',
+        todayDate: '2026-05-27',
+      });
+      expect(res.activeContracts.map((c) => c.projectName)).toEqual(['Alpha', 'Bravo']);
+    });
+
+    it('sorts highest-overshoot first, then alphabetically when scores tie', () => {
+      const high = projects.create({ name: 'High', color: '#a00', kind: 'work' });
+      const low = projects.create({ name: 'Low', color: '#0a0', kind: 'work' });
+      const aOpen = projects.create({ name: 'A-Open', color: '#00a', kind: 'work' });
+      const zOpen = projects.create({ name: 'Z-Open', color: '#aa0', kind: 'work' });
+
+      // Both have an end_date so projectedTotalMds is computable. We can't
+      // easily control mdsUsed (depends on real elapsed workdays from
+      // effectiveFrom→today), so we tilt the score via mdLimit alone: a
+      // tiny mdLimit forces "projectedTotalMds - mdLimit" to be huge.
+      rates.create({
+        projectId: high.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 1,
+        currency: 'CZK',
+        endDate: '2026-12-31',
+        mdLimit: 1,
+      });
+      rates.create({
+        projectId: low.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 1,
+        currency: 'CZK',
+        endDate: '2026-12-31',
+        mdLimit: 10_000,
+      });
+      // "Open" contracts can't compute projectedTotalMds (no end_date) and
+      // therefore tie at the bottom — alphabetical order between them.
+      rates.create({
+        projectId: aOpen.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 1,
+        currency: 'CZK',
+        mdLimit: 100,
+      });
+      rates.create({
+        projectId: zOpen.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 1,
+        currency: 'CZK',
+        mdLimit: 100,
+      });
+
+      const res = service.run({
+        projectId: null,
+        sprintAnchor: '2026-05-27',
+        todayDate: '2026-05-27',
+      });
+      expect(res.activeContracts.map((c) => c.projectName)).toEqual([
+        'High',
+        'Low',
+        'A-Open',
+        'Z-Open',
+      ]);
+    });
+
+    it('contract.mdsUsed accumulates logged minutes inside the contract period', () => {
+      const p = projects.create({ name: 'P', color: '#aaa', kind: 'work' });
+      const e = epics.create({ projectId: p.id, name: 'E' });
+      const t = tasks.create({ epicId: e.id, number: 'T-1', title: 'T-1' });
+      rates.create({
+        projectId: p.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 10000,
+        currency: 'CZK',
+        endDate: '2026-12-31',
+        mdLimit: 100,
+        hoursPerDay: 8,
+      });
+      // 1 MD = 8h = 480 min.
+      worklogs.create({ taskId: t.id, workDate: '2026-05-25', minutes: 480 });
+      worklogs.create({ taskId: t.id, workDate: '2026-05-26', minutes: 240 });
+
+      const res = service.run({
+        projectId: null,
+        sprintAnchor: '2026-05-27',
+        todayDate: '2026-05-27',
+      });
+      expect(res.activeContracts).toHaveLength(1);
+      expect(res.activeContracts[0].contract.mdsUsed).toBe(1.5);
+      expect(res.activeContracts[0].contract.mdsRemaining).toBe(98.5);
+    });
   });
 });

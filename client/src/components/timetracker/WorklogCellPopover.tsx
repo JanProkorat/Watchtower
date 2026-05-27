@@ -1,6 +1,8 @@
 import { Box, Button, Popover, Stack, Typography } from '@mui/material';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import { formatWeekdayDateLongCz } from '../../util/format.js';
+import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
 import type { WorklogViewPayload } from '../../../../shared/ipcContract.js';
 
 function fmtHoursTrim(minutes: number): string {
@@ -29,6 +31,8 @@ interface Props {
  */
 export function WorklogCellPopover({ anchor, ymd, worklogs, onClose, onEdit, onAdd }: Props) {
   const open = anchor != null;
+  const lockedThrough = useWorklogLock();
+  const locked = isLocked(ymd, lockedThrough);
   return (
     <Popover
       open={open}
@@ -115,11 +119,28 @@ export function WorklogCellPopover({ anchor, ymd, worklogs, onClose, onEdit, onA
           </Stack>
         )}
 
+        {locked && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              px: 1,
+              pt: 0.75,
+              color: 'warning.main',
+              fontSize: 11,
+            }}
+          >
+            <LockOutlinedIcon sx={{ fontSize: 14 }} />
+            <span>Locked through {lockedThrough}</span>
+          </Box>
+        )}
         <Button
           startIcon={<AddIcon fontSize="small" />}
           onClick={onAdd}
           size="small"
           fullWidth
+          disabled={locked}
           sx={{ mt: 0.5, justifyContent: 'flex-start', textTransform: 'none', px: 1 }}
         >
           Add worklog

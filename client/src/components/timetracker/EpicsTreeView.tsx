@@ -1,118 +1,116 @@
-import { useMemo, useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import {
   Alert,
   Box,
   Button,
   Chip,
   IconButton,
+  MenuItem,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import TaskAltIcon from '@mui/icons-material/TaskAlt';
-import AdjustIcon from '@mui/icons-material/Adjust';
-import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import type {
   EpicViewPayload,
   TaskViewPayload,
 } from '../../../../shared/ipcContract.js';
+import { formatMinutes, formatMinutesReadable } from '../../util/format.js';
 import { useEpicsAndTasks } from '../../state/useEpicsAndTasks.js';
 import { EpicDrawer } from './EpicDrawer.js';
 import { TaskDrawer } from './TaskDrawer.js';
+import { TaskDetailDrawer } from './TaskDetailDrawer.js';
 
 const PAGE_SIZE = 20;
 
+type StatusFilter = 'all' | 'open' | 'in_progress' | 'done';
+
 interface Props {
   projectId: number;
+  /**
+   * Embed mode: skip the standalone toolbar (the surrounding pane provides
+   * its own framing). The "+ Add epic" affordance still renders, just
+   * inline above the list.
+   */
+  embedded?: boolean;
+  /** Project name shown in the Task detail breadcrumb. */
+  projectName?: string;
+  /** Project colour used as the breadcrumb dot + accent gradient. */
+  projectColor?: string;
+  /** Optional Jira base URL — when present, task keys link to the ticket. */
+  jiraBaseUrl?: string | null;
+  /** Open external URL in the system browser. */
+  onOpenExternal?(url: string): void;
 }
 
-function fmtMinutes(minutes: number): string {
-  if (minutes <= 0) return '—';
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
-
-const STATUS_COPY: Record<'planned' | 'active' | 'done', string> = {
-  planned: 'planned',
-  active: 'active',
-  done: 'done',
-};
-
-const TASK_STATUS_COPY: Record<'open' | 'in_progress' | 'done', string> = {
-  open: 'to do',
-  in_progress: 'doing',
-  done: 'done',
-};
-
-const STATUS_COLOR: Record<
-  'planned' | 'active' | 'done',
-  'default' | 'primary' | 'success' | 'warning'
-> = {
-  planned: 'default',
-  active: 'primary',
-  done: 'success',
-};
-
-export function EpicsTreeView({ projectId }: Props) {
+export function EpicsTreeView({
+  projectId,
+  embedded = false,
+  projectName = '',
+  projectColor = '#7C5CFF',
+  jiraBaseUrl = null,
+  onOpenExternal,
+}: Props) {
   const state = useEpicsAndTasks(projectId);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const [search, setSearch] = useState<string>('');
-  // Per-epic pagination — reset to page 0 when the search filter changes so
-  // the user never lands on an out-of-range page.
+  const [searchByEpic, setSearchByEpic] = useState<Map<number, string>>(new Map());
+  const [statusByEpic, setStatusByEpic] = useState<Map<number, StatusFilter>>(new Map());
   const [pageByEpic, setPageByEpic] = useState<Map<number, number>>(new Map());
   const [epicDrawerOpen, setEpicDrawerOpen] = useState(false);
   const [editingEpic, setEditingEpic] = useState<EpicViewPayload | null>(null);
-  const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<TaskViewPayload | null>(null);
-  const [taskDrawerDefaultEpic, setTaskDrawerDefaultEpic] = useState<number | null>(null);
-
-  // Pre-compute the filtered task list per epic so the row count + paging
-  // controls don't re-filter on every render.
-  const filteredTasksByEpic = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const result = new Map<number, TaskViewPayload[]>();
-    for (const [epicId, tasks] of state.tasksByEpic) {
-      const filtered = q
-        ? tasks.filter(
-            (t) =>
-              t.title.toLowerCase().includes(q) ||
-              t.number.toLowerCase().includes(q),
-          )
-        : tasks;
-      result.set(epicId, filtered);
-    }
-    return result;
-  }, [state.tasksByEpic, search]);
-
-  // When the search query changes, snap every epic's page back to 0 to keep
-  // the visible window in sync with the new (smaller) result set.
-  const setSearchAndResetPages = (next: string) => {
-    setSearch(next);
-    setPageByEpic(new Map());
-  };
-
-  const setEpicPage = (epicId: number, page: number) => {
-    setPageByEpic((prev) => {
-      const next = new Map(prev);
-      next.set(epicId, page);
-      return next;
-    });
-  };
+  /** Create-task form drawer (used by the "+ Add task" affordance). */
+  const [taskCreateOpen, setTaskCreateOpen] = useState(false);
+  const [taskCreateDefaultEpic, setTaskCreateDefaultEpic] = useState<number | null>(null);
+  /** Task detail + worklog drawer (used by row clicks). */
+  const [detailTask, setDetailTask] = useState<TaskViewPayload | null>(null);
 
   const toggleExpand = (id: number) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  };
+
+  const setEpicSearch = (epicId: number, q: string) => {
+    setSearchByEpic((prev) => {
+      const next = new Map(prev);
+      next.set(epicId, q);
+      return next;
+    });
+    setPageByEpic((prev) => {
+      const next = new Map(prev);
+      next.set(epicId, 0);
+      return next;
+    });
+  };
+
+  const setEpicStatus = (epicId: number, s: StatusFilter) => {
+    setStatusByEpic((prev) => {
+      const next = new Map(prev);
+      next.set(epicId, s);
+      return next;
+    });
+    setPageByEpic((prev) => {
+      const next = new Map(prev);
+      next.set(epicId, 0);
+      return next;
+    });
+  };
+
+  const setEpicPage = (epicId: number, page: number) => {
+    setPageByEpic((prev) => {
+      const next = new Map(prev);
+      next.set(epicId, page);
       return next;
     });
   };
@@ -128,58 +126,68 @@ export function EpicsTreeView({ projectId }: Props) {
   };
 
   const openCreateTask = (epicId: number) => {
-    setEditingTask(null);
-    setTaskDrawerDefaultEpic(epicId);
-    setTaskDrawerOpen(true);
+    setTaskCreateDefaultEpic(epicId);
+    setTaskCreateOpen(true);
   };
 
-  const openEditTask = (task: TaskViewPayload) => {
-    setEditingTask(task);
-    setTaskDrawerDefaultEpic(task.epicId);
-    setTaskDrawerOpen(true);
+  const openTaskDetail = (task: TaskViewPayload) => {
+    setDetailTask(task);
   };
+
+  const detailEpicName =
+    detailTask !== null
+      ? (state.epics.find((e) => e.id === detailTask.epicId)?.name ?? '')
+      : '';
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <Stack
-        direction="row"
-        spacing={1.5}
-        alignItems="center"
-        sx={{ px: 2, py: 1.25, borderBottom: 1, borderColor: 'divider' }}
-      >
-        <TextField
-          size="small"
-          placeholder="Search tasks (title or number)…"
-          value={search}
-          onChange={(e) => setSearchAndResetPages(e.target.value)}
-          sx={{ minWidth: 260 }}
-        />
-        <Typography variant="caption" sx={{ color: 'text.secondary', flex: 1 }}>
-          {state.epics.length} {state.epics.length === 1 ? 'epic' : 'epics'}
-          {search.trim() && totalFilteredTaskCount(filteredTasksByEpic) > 0
-            ? ` · ${totalFilteredTaskCount(filteredTasksByEpic)} matching ${
-                totalFilteredTaskCount(filteredTasksByEpic) === 1 ? 'task' : 'tasks'
-              }`
-            : ''}
-        </Typography>
-        <Button
-          variant="contained"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={openCreateEpic}
+      {!embedded && (
+        <Stack
+          direction="row"
+          spacing={1.5}
+          alignItems="center"
+          sx={{ px: 2, py: 1.25, borderBottom: 1, borderColor: 'divider' }}
         >
-          New epic
-        </Button>
-      </Stack>
+          <Typography variant="caption" sx={{ color: 'text.secondary', flex: 1 }}>
+            {state.epics.length} {state.epics.length === 1 ? 'epic' : 'epics'}
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={openCreateEpic}
+          >
+            New epic
+          </Button>
+        </Stack>
+      )}
 
-      <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 1.5 }}>
+      <Box
+        sx={{
+          flex: 1,
+          overflow: embedded ? 'visible' : 'auto',
+          px: embedded ? 0 : 2,
+          py: embedded ? 0 : 1.5,
+        }}
+      >
         {state.error && (
           <Alert severity="error" sx={{ mb: 1.5 }}>
             {state.error}
           </Alert>
         )}
 
-        {!state.loading && state.epics.length === 0 && (
+        {embedded && (
+          <Button
+            size="small"
+            startIcon={<AddIcon fontSize="small" />}
+            onClick={openCreateEpic}
+            sx={{ textTransform: 'none', mb: 1.5 }}
+          >
+            Add epic
+          </Button>
+        )}
+
+        {!state.loading && state.epics.length === 0 && !embedded && (
           <Box sx={{ textAlign: 'center', color: 'text.secondary', mt: 6 }}>
             <Typography variant="body2" sx={{ mb: 1.5 }}>
               No epics yet.
@@ -195,23 +203,44 @@ export function EpicsTreeView({ projectId }: Props) {
           </Box>
         )}
 
-        <Stack spacing={1}>
-          {state.epics.map((epic) => (
-            <EpicCard
-              key={epic.id}
-              epic={epic}
-              tasks={filteredTasksByEpic.get(epic.id) ?? []}
-              totalUnfiltered={state.tasksByEpic.get(epic.id)?.length ?? 0}
-              searchActive={search.trim().length > 0}
-              page={pageByEpic.get(epic.id) ?? 0}
-              onPageChange={(p) => setEpicPage(epic.id, p)}
-              expanded={expanded.has(epic.id)}
-              onToggle={() => toggleExpand(epic.id)}
-              onEdit={() => openEditEpic(epic)}
-              onAddTask={() => openCreateTask(epic.id)}
-              onEditTask={openEditTask}
-            />
-          ))}
+        <Stack spacing={1.25}>
+          {state.epics.map((epic) => {
+            const allTasks = state.tasksByEpic.get(epic.id) ?? [];
+            const search = (searchByEpic.get(epic.id) ?? '').trim().toLowerCase();
+            const status = statusByEpic.get(epic.id) ?? 'all';
+            const filtered = allTasks.filter((t) => {
+              if (status !== 'all' && t.status !== status) return false;
+              if (
+                search &&
+                !t.title.toLowerCase().includes(search) &&
+                !t.number.toLowerCase().includes(search)
+              ) {
+                return false;
+              }
+              return true;
+            });
+            return (
+              <EpicCard
+                key={epic.id}
+                epic={epic}
+                tasks={filtered}
+                totalCount={allTasks.length}
+                search={searchByEpic.get(epic.id) ?? ''}
+                status={status}
+                page={pageByEpic.get(epic.id) ?? 0}
+                onSearchChange={(q) => setEpicSearch(epic.id, q)}
+                onStatusChange={(s) => setEpicStatus(epic.id, s)}
+                onPageChange={(p) => setEpicPage(epic.id, p)}
+                expanded={expanded.has(epic.id)}
+                onToggle={() => toggleExpand(epic.id)}
+                onEditEpic={() => openEditEpic(epic)}
+                onDeleteEpic={() => state.deleteEpic(epic.id)}
+                onEditTask={openTaskDetail}
+                onDeleteTask={(t) => state.deleteTask(t.id)}
+                onAddTask={() => openCreateTask(epic.id)}
+              />
+            );
+          })}
         </Stack>
       </Box>
 
@@ -238,284 +267,486 @@ export function EpicsTreeView({ projectId }: Props) {
       />
 
       <TaskDrawer
-        open={taskDrawerOpen}
-        task={editingTask}
-        defaultEpicId={taskDrawerDefaultEpic ?? state.epics[0]?.id ?? 0}
+        open={taskCreateOpen}
+        task={null}
+        defaultEpicId={taskCreateDefaultEpic ?? state.epics[0]?.id ?? 0}
         epics={state.epics}
-        onClose={() => setTaskDrawerOpen(false)}
+        onClose={() => setTaskCreateOpen(false)}
         onSubmit={async (input) => {
-          if (editingTask) {
-            await state.updateTask(editingTask.id, input);
-          } else {
-            await state.createTask(input);
-          }
+          await state.createTask(input);
         }}
-        onDelete={
-          editingTask
-            ? async () => {
-                await state.deleteTask(editingTask.id);
-              }
-            : undefined
-        }
+      />
+
+      <TaskDetailDrawer
+        open={detailTask !== null}
+        task={detailTask}
+        projectName={projectName}
+        projectColor={projectColor}
+        epicName={detailEpicName}
+        taskUrlTemplate={jiraBaseUrl ? `${jiraBaseUrl}/browse/{n}` : null}
+        onClose={() => setDetailTask(null)}
+        onUpdate={async (input) => {
+          if (!detailTask) return;
+          const fresh = await state.updateTask(detailTask.id, input);
+          setDetailTask(fresh);
+        }}
+        onDelete={async () => {
+          if (!detailTask) return;
+          await state.deleteTask(detailTask.id);
+          setDetailTask(null);
+        }}
+        onOpenExternal={onOpenExternal}
       />
     </Box>
   );
 }
 
-function EpicCard({
-  epic,
-  tasks,
-  totalUnfiltered,
-  searchActive,
-  page,
-  onPageChange,
-  expanded,
-  onToggle,
-  onEdit,
-  onAddTask,
-  onEditTask,
-}: {
+interface EpicCardProps {
   epic: EpicViewPayload;
   tasks: TaskViewPayload[];
-  /** All tasks in this epic before search narrowing — used in the header counter. */
-  totalUnfiltered: number;
-  /** True when a non-empty search query is filtering the list. */
-  searchActive: boolean;
+  totalCount: number;
+  search: string;
+  status: StatusFilter;
   page: number;
+  onSearchChange(q: string): void;
+  onStatusChange(s: StatusFilter): void;
   onPageChange(page: number): void;
   expanded: boolean;
   onToggle(): void;
-  onEdit(): void;
-  onAddTask(): void;
+  onEditEpic(): void;
+  onDeleteEpic(): Promise<void> | void;
   onEditTask(task: TaskViewPayload): void;
-}) {
+  onDeleteTask(task: TaskViewPayload): Promise<void> | void;
+  onAddTask(): void;
+}
+
+const GRID_COLS = '180px 1fr 110px 110px 48px';
+
+function EpicCard({
+  epic,
+  tasks,
+  totalCount,
+  search,
+  status,
+  page,
+  onSearchChange,
+  onStatusChange,
+  onPageChange,
+  expanded,
+  onToggle,
+  onDeleteEpic,
+  onEditTask,
+  onDeleteTask,
+  onAddTask,
+}: EpicCardProps) {
   const totalPages = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
   const safePage = Math.min(Math.max(0, page), totalPages - 1);
   const sliceStart = safePage * PAGE_SIZE;
   const sliceEnd = Math.min(sliceStart + PAGE_SIZE, tasks.length);
   const visibleTasks = tasks.slice(sliceStart, sliceEnd);
   const showPaging = tasks.length > PAGE_SIZE;
+  const filterActive = search.trim().length > 0 || status !== 'all';
+
+  const handleDeleteEpic = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (
+      !window.confirm(
+        `Delete epic "${epic.name}"? This also removes its ${epic.taskCount} task${
+          epic.taskCount === 1 ? '' : 's'
+        } and their worklogs. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    void onDeleteEpic();
+  };
 
   return (
     <Box
       sx={{
         border: 1,
         borderColor: 'divider',
-        borderRadius: 1,
+        borderRadius: 1.5,
         overflow: 'hidden',
         backgroundColor: 'background.paper',
       }}
     >
+      {/* Header */}
       <Box
         onClick={onToggle}
         sx={{
-          display: 'grid',
-          gridTemplateColumns: '20px minmax(0, 1fr) auto auto auto auto',
-          gap: 2,
+          display: 'flex',
           alignItems: 'center',
-          px: 1.5,
-          py: 1.25,
+          gap: 1.25,
+          px: 2.25,
+          py: 1.5,
           cursor: 'pointer',
+          borderBottom: expanded ? 1 : 0,
+          borderColor: 'divider',
           ':hover': { backgroundColor: 'action.hover' },
         }}
       >
-        {expanded ? (
-          <ExpandMoreIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-        ) : (
-          <ChevronRightIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-        )}
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
-            {epic.name}
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {searchActive && tasks.length !== totalUnfiltered
-              ? `${tasks.length} of ${totalUnfiltered} ${totalUnfiltered === 1 ? 'task' : 'tasks'} match`
-              : `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`}
-            {epic.totalMinutes > 0 ? ` · ${fmtMinutes(epic.totalMinutes)} logged` : ''}
-          </Typography>
-        </Box>
-        <Typography
-          variant="caption"
+        <Typography sx={{ fontSize: 16, fontWeight: 600, color: 'text.primary' }}>
+          {epic.name}
+        </Typography>
+        <Chip
+          label={`${totalCount} ${totalCount === 1 ? 'task' : 'tasks'}`}
+          size="small"
           sx={{
+            height: 22,
+            fontSize: 11.5,
+            fontWeight: 500,
+            bgcolor: 'action.hover',
             color: 'text.secondary',
+            border: 0,
+            borderRadius: 999,
+          }}
+        />
+        <Chip
+          label={formatMinutesReadable(epic.totalMinutes)}
+          size="small"
+          sx={{
+            height: 22,
+            fontSize: 11.5,
+            fontWeight: 600,
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
+            border: 0,
+            borderRadius: 999,
             fontVariantNumeric: 'tabular-nums',
-            minWidth: 70,
-            textAlign: 'right',
+          }}
+        />
+        <Box sx={{ flex: 1 }} />
+        <Tooltip title="Delete epic">
+          <IconButton
+            size="small"
+            onClick={handleDeleteEpic}
+            sx={{
+              color: 'text.disabled',
+              '&:hover': { color: 'error.main', backgroundColor: 'action.hover' },
+            }}
+            aria-label="Delete epic"
+          >
+            <DeleteOutlineIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <IconButton
+          size="small"
+          sx={{ color: 'text.secondary' }}
+          aria-label={expanded ? 'Collapse' : 'Expand'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
           }}
         >
-          {fmtMinutes(epic.totalMinutes)}
-        </Typography>
-        {epic.jiraEpicKey ? (
-          <Typography
-            variant="caption"
-            sx={{ color: 'text.secondary', fontFamily: 'Menlo, monospace', fontSize: 11 }}
-          >
-            {epic.jiraEpicKey}
-          </Typography>
-        ) : (
-          <Box />
-        )}
-        <Chip
-          label={STATUS_COPY[epic.status]}
-          size="small"
-          variant="outlined"
-          color={STATUS_COLOR[epic.status]}
-          sx={{ height: 20, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}
-        />
-        <Stack direction="row" spacing={0.5} onClick={(e) => e.stopPropagation()}>
-          <Tooltip title="Add task">
-            <IconButton size="small" onClick={onAddTask}>
-              <AddIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Edit epic">
-            <IconButton size="small" onClick={onEdit}>
-              <EditIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
+          {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+        </IconButton>
       </Box>
 
       {expanded && (
-        <Box sx={{ borderTop: 1, borderColor: 'divider', backgroundColor: 'action.hover' }}>
+        <>
+          {/* Filter row */}
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 1.5,
+              px: 2.25,
+              py: 1.75,
+              borderBottom: 1,
+              borderColor: 'divider',
+            }}
+          >
+            <TextField
+              size="small"
+              placeholder="Search number or title"
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              sx={{ flex: 1 }}
+            />
+            <TextField
+              select
+              label="Status"
+              size="small"
+              value={status}
+              onChange={(e) => onStatusChange(e.target.value as StatusFilter)}
+              sx={{ width: 180 }}
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="open">Open</MenuItem>
+              <MenuItem value="in_progress">In progress</MenuItem>
+              <MenuItem value="done">Done</MenuItem>
+            </TextField>
+          </Box>
+
           {tasks.length === 0 ? (
-            <Box sx={{ py: 1.5, textAlign: 'center' }}>
-              {searchActive && totalUnfiltered > 0 ? (
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  No tasks in this epic match your search.
-                </Typography>
-              ) : (
+            <Box sx={{ py: 4, textAlign: 'center' }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mb: filterActive ? 0 : 1.5 }}>
+                {filterActive ? 'No tasks match the filters.' : 'No tasks in this epic yet.'}
+              </Typography>
+              {!filterActive && (
                 <Button
                   size="small"
                   variant="outlined"
                   startIcon={<AddIcon fontSize="small" />}
                   onClick={onAddTask}
                 >
-                  Add task to this epic
+                  Add task
                 </Button>
               )}
             </Box>
           ) : (
             <>
-              <Stack divider={<Box sx={{ height: 1, backgroundColor: 'divider' }} />}>
-                {visibleTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onEdit={() => onEditTask(task)} />
-                ))}
-              </Stack>
-              {showPaging && (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 1,
-                    py: 0.75,
-                    borderTop: 1,
-                    borderColor: 'divider',
-                  }}
-                >
-                  <IconButton
-                    size="small"
-                    disabled={safePage === 0}
-                    onClick={() => onPageChange(safePage - 1)}
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeftIcon fontSize="small" />
-                  </IconButton>
-                  <Typography
-                    variant="caption"
-                    sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {sliceStart + 1}–{sliceEnd} of {tasks.length}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    disabled={safePage >= totalPages - 1}
-                    onClick={() => onPageChange(safePage + 1)}
-                    aria-label="Next page"
-                  >
-                    <ChevronRightIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              )}
-              <Box sx={{ py: 1, textAlign: 'center', borderTop: 1, borderColor: 'divider' }}>
+              {/* Column headers */}
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: GRID_COLS,
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                }}
+              >
+                <HeaderCell label="Number" />
+                <HeaderCell label="Title" />
+                <HeaderCell label="Status" />
+                <HeaderCell label="Logged" />
+                <Box />
+              </Box>
+              {/* Task rows */}
+              {visibleTasks.map((task, idx) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  isLast={idx === visibleTasks.length - 1}
+                  onEdit={() => onEditTask(task)}
+                  onDelete={() => onDeleteTask(task)}
+                />
+              ))}
+              {/* Footer: pagination + add task */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 3,
+                  px: 2.25,
+                  py: 1,
+                  borderTop: 1,
+                  borderColor: 'divider',
+                }}
+              >
                 <Button
                   size="small"
-                  variant="text"
                   startIcon={<AddIcon fontSize="small" />}
                   onClick={onAddTask}
+                  sx={{ textTransform: 'none' }}
                 >
                   Add task
                 </Button>
+                {showPaging && (
+                  <Stack
+                    direction="row"
+                    spacing={3}
+                    alignItems="center"
+                    sx={{ color: 'text.secondary', fontSize: 12.5 }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      <span>Rows per page:</span>
+                      <Box component="span" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                        {PAGE_SIZE}
+                      </Box>
+                    </Box>
+                    <Box sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {sliceStart + 1}–{sliceEnd} of {tasks.length}
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 0.25 }}>
+                      <IconButton
+                        size="small"
+                        disabled={safePage === 0}
+                        onClick={() => onPageChange(safePage - 1)}
+                        aria-label="Previous page"
+                      >
+                        <ChevronLeftIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        disabled={safePage >= totalPages - 1}
+                        onClick={() => onPageChange(safePage + 1)}
+                        aria-label="Next page"
+                      >
+                        <ChevronRightIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Stack>
+                )}
               </Box>
             </>
           )}
-        </Box>
+        </>
       )}
     </Box>
   );
 }
 
-function totalFilteredTaskCount(
-  filteredTasksByEpic: Map<number, TaskViewPayload[]>,
-): number {
-  let count = 0;
-  for (const tasks of filteredTasksByEpic.values()) count += tasks.length;
-  return count;
-}
-
-function TaskRow({ task, onEdit }: { task: TaskViewPayload; onEdit(): void }) {
-  const StatusIcon =
-    task.status === 'done'
-      ? TaskAltIcon
-      : task.status === 'in_progress'
-        ? AdjustIcon
-        : RadioButtonUncheckedIcon;
-  const statusColor =
-    task.status === 'done'
-      ? 'success.main'
-      : task.status === 'in_progress'
-        ? 'primary.main'
-        : 'text.disabled';
+function HeaderCell({ label }: { label: string }) {
   return (
     <Box
       sx={{
-        display: 'grid',
-        gridTemplateColumns: '16px minmax(0, 1fr) 110px 70px 80px auto',
-        gap: 1.5,
-        alignItems: 'center',
-        px: 4,
-        py: 1,
+        px: 2.25,
+        py: 1.5,
+        fontSize: 11,
+        fontWeight: 600,
+        color: 'text.secondary',
+        letterSpacing: 0,
       }}
     >
-      <StatusIcon fontSize="small" sx={{ color: statusColor, fontSize: 14 }} />
-      <Box sx={{ minWidth: 0 }}>
-        <Typography variant="body2" noWrap>
-          {task.title}
-        </Typography>
-      </Box>
-      <Typography
-        variant="caption"
-        sx={{ color: 'text.secondary', fontFamily: 'Menlo, monospace', fontSize: 11 }}
-      >
-        {task.number}
-      </Typography>
-      <Typography
-        variant="caption"
-        sx={{ color: 'text.primary', fontVariantNumeric: 'tabular-nums' }}
-      >
-        {fmtMinutes(task.totalMinutes)}
-      </Typography>
-      <Chip
-        label={TASK_STATUS_COPY[task.status]}
-        size="small"
-        variant="outlined"
-        sx={{ height: 18, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}
-      />
-      <IconButton size="small" onClick={onEdit}>
-        <EditIcon fontSize="small" />
-      </IconButton>
+      {label}
     </Box>
+  );
+}
+
+function TaskRow({
+  task,
+  isLast,
+  onEdit,
+  onDelete,
+}: {
+  task: TaskViewPayload;
+  isLast: boolean;
+  onEdit(): void;
+  onDelete(): Promise<void> | void;
+}) {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (
+      !window.confirm(
+        `Delete task ${task.number} "${task.title}"? Its worklogs are also removed. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    void onDelete();
+  };
+
+  return (
+    <Box
+      onClick={onEdit}
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: GRID_COLS,
+        alignItems: 'center',
+        cursor: 'pointer',
+        borderBottom: isLast ? 0 : 1,
+        borderColor: 'divider',
+        ':hover': { backgroundColor: 'action.hover' },
+      }}
+    >
+      <Box sx={{ px: 2.25, py: 1.5 }}>
+        <Box
+          component="span"
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.75,
+            color: 'primary.main',
+            fontFamily: 'ui-monospace, Menlo, monospace',
+            fontSize: 13,
+            fontWeight: 500,
+          }}
+        >
+          {task.number}
+          <OpenInNewIcon sx={{ fontSize: 14 }} />
+        </Box>
+      </Box>
+      <Box
+        sx={{
+          px: 2.25,
+          py: 1.5,
+          fontSize: 13,
+          color: 'text.primary',
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {task.title}
+      </Box>
+      <Box sx={{ px: 2.25, py: 1.5 }}>
+        <StatusChip status={task.status} />
+      </Box>
+      <Box
+        sx={{
+          px: 2.25,
+          py: 1.5,
+          fontSize: 13,
+          fontFamily: 'ui-monospace, Menlo, monospace',
+          fontVariantNumeric: 'tabular-nums',
+          color: 'text.primary',
+        }}
+      >
+        {task.totalMinutes > 0 ? formatMinutes(task.totalMinutes) : '—'}
+      </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'center', px: 0.75 }}>
+        <Tooltip title="Delete task">
+          <IconButton
+            size="small"
+            onClick={handleDelete}
+            sx={{ color: 'primary.main' }}
+            aria-label="Delete task"
+          >
+            <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    </Box>
+  );
+}
+
+function StatusChip({ status }: { status: 'open' | 'in_progress' | 'done' }) {
+  const COMMON = {
+    height: 22,
+    fontSize: 11.5,
+    border: 0,
+    borderRadius: 999,
+  } as const;
+  if (status === 'done') {
+    return (
+      <Chip
+        label="Done"
+        size="small"
+        sx={{
+          ...COMMON,
+          fontWeight: 600,
+          bgcolor: 'success.main',
+          color: 'success.contrastText',
+        }}
+      />
+    );
+  }
+  if (status === 'in_progress') {
+    return (
+      <Chip
+        label="In progress"
+        size="small"
+        sx={{
+          ...COMMON,
+          fontWeight: 500,
+          bgcolor: 'action.selected',
+          color: 'primary.main',
+        }}
+      />
+    );
+  }
+  return (
+    <Chip
+      label="Open"
+      size="small"
+      sx={{
+        ...COMMON,
+        fontWeight: 500,
+        bgcolor: 'action.hover',
+        color: 'text.secondary',
+      }}
+    />
   );
 }

@@ -3,13 +3,17 @@ import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   Divider,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
+import { CZ_DATE_FORMAT } from '../util/format.js';
+import { WORKLOG_LOCK_SETTING_KEY } from '../util/lockSetting.js';
 
 interface Saved {
   quietMs: string;
@@ -216,6 +220,10 @@ export function SettingsPanel() {
 
         <Divider />
 
+        <WorklogLockSettings />
+
+        <Divider />
+
         <SettingRow
           label="Claude Code hooks"
           description="Watchtower needs hooks in ~/.claude/settings.json to receive SessionStart / Notification / Stop events. Hooks installed on first run can be reinstalled (e.g. after a helper path change) or removed entirely."
@@ -266,5 +274,106 @@ export function SettingsPanel() {
         </SettingRow>
       </Stack>
     </Box>
+  );
+}
+
+function WorklogLockSettings() {
+  const [lockDate, setLockDate] = useState<Dayjs | null>(null);
+  const [savedValue, setSavedValue] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.watchtower
+      .invoke('getSetting', { key: WORKLOG_LOCK_SETTING_KEY })
+      .then((r) => {
+        if (cancelled) return;
+        const v = r.value?.trim() || null;
+        setSavedValue(v);
+        setLockDate(v ? dayjs(v) : null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const valid = lockDate === null || (lockDate?.isValid() ?? false);
+  const nextValue = lockDate?.isValid() ? lockDate.format('YYYY-MM-DD') : null;
+  const dirty = nextValue !== savedValue;
+
+  const save = async () => {
+    if (!valid) return;
+    setBusy(true);
+    setError(null);
+    try {
+      // Empty string clears the setting — the WorklogsRepo treats anything
+      // not matching YYYY-MM-DD as "no lock", and useWorklogLock matches.
+      await window.watchtower.invoke('setSetting', {
+        key: WORKLOG_LOCK_SETTING_KEY,
+        value: nextValue ?? '',
+      });
+      setSavedValue(nextValue);
+      // Notify open useWorklogLock subscribers to re-read without an
+      // app-wide invalidation channel.
+      window.dispatchEvent(new Event('worklog-lock-changed'));
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 2500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SettingRow
+      label="Worklog lock"
+      description="Once a month is invoiced, set the lock to the last day of that month. Worklogs on or before this date can't be added, edited, or deleted — unlock by clearing the field."
+    >
+      {loading ? (
+        <CircularProgress size={20} />
+      ) : (
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="flex-start">
+          <DatePicker
+            label="Lock through"
+            value={lockDate}
+            onChange={(v) => setLockDate(v)}
+            format={CZ_DATE_FORMAT}
+            slotProps={{
+              textField: { size: 'small', sx: { width: { xs: '100%', sm: 220 } } },
+              field: { clearable: true },
+            }}
+          />
+          <Button
+            variant="contained"
+            size="small"
+            disabled={!valid || busy || !dirty}
+            onClick={() => void save()}
+            sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
+          >
+            {busy ? 'Saving…' : nextValue ? 'Save' : 'Clear'}
+          </Button>
+        </Stack>
+      )}
+      {error && (
+        <Alert severity="error" sx={{ mt: 1.5 }}>
+          {error}
+        </Alert>
+      )}
+      {savedFlash && (
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+          <CheckCircleIcon color="success" fontSize="small" />
+          <Typography variant="body2" color="success.main">
+            Saved
+          </Typography>
+        </Stack>
+      )}
+    </SettingRow>
   );
 }

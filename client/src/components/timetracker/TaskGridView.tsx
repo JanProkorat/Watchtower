@@ -50,6 +50,16 @@ const LOGGED_COL_WIDTH = 90;
 const DAY_COL_WIDTH = 44;
 const TOTAL_ROW_HEIGHT = 32;
 
+function throwIfLockedResponse(res: unknown): void {
+  if (
+    res &&
+    typeof res === 'object' &&
+    (res as { error?: unknown }).error === 'locked'
+  ) {
+    throw new Error((res as { message: string }).message);
+  }
+}
+
 function fmtHoursTrim(minutes: number): string {
   if (minutes <= 0) return '';
   const h = minutes / 60;
@@ -416,22 +426,22 @@ export function TaskGridView({ projectId }: Props) {
         initialWorkDate={worklogDrawerWorkDate}
         onClose={() => setWorklogDrawerOpen(false)}
         onSubmit={async (input) => {
-          if (worklogDrawerEditing) {
-            await window.watchtower.invoke('worklogs:update', {
-              id: worklogDrawerEditing.id,
-              input,
-            });
-          } else {
-            await window.watchtower.invoke('worklogs:create', input);
-          }
+          const res = worklogDrawerEditing
+            ? await window.watchtower.invoke('worklogs:update', {
+                id: worklogDrawerEditing.id,
+                input,
+              })
+            : await window.watchtower.invoke('worklogs:create', input);
+          throwIfLockedResponse(res);
           await grid.refresh();
         }}
         onDelete={
           worklogDrawerEditing
             ? async () => {
-                await window.watchtower.invoke('worklogs:delete', {
+                const res = await window.watchtower.invoke('worklogs:delete', {
                   id: worklogDrawerEditing.id,
                 });
+                throwIfLockedResponse(res);
                 await grid.refresh();
               }
             : undefined

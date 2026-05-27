@@ -11,6 +11,7 @@ import { SprintStrip } from './SprintStrip.js';
 import { SessionsCard } from './SessionsCard.js';
 import { LastThirtyDays } from './LastThirtyDays.js';
 import { TopProjectsCard } from './TopProjectsCard.js';
+import { ActiveContractsCard } from './ActiveContractsCard.js';
 
 const FILTER_KEY = 'watchtower.dashboard.projectId';
 
@@ -41,6 +42,9 @@ export interface ModuleDashboardProps {
   onActivateInstance(id: string): void;
   onKillInstance(id: string): Promise<void>;
   onStartNewInstance(): void;
+  /** Click on an active-contracts card → switch to the TimeTracker module
+   *  with the project selected. */
+  onOpenProject(projectId: number): void;
 }
 
 export function ModuleDashboard({
@@ -48,6 +52,7 @@ export function ModuleDashboard({
   onActivateInstance,
   onKillInstance,
   onStartNewInstance,
+  onOpenProject,
 }: ModuleDashboardProps) {
   const [today, setToday] = useState<string>(todayIso);
   const [sprintAnchor, setSprintAnchor] = useState<string>(today);
@@ -163,6 +168,11 @@ export function ModuleDashboard({
               sprint={overview.data.sprint}
               todayDate={today}
               onAnchorChange={setSprintAnchor}
+              onSyncComplete={() => void overview.refresh()}
+            />
+            <ActiveContractsCard
+              contracts={overview.data.activeContracts}
+              onOpenProject={onOpenProject}
             />
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <Box sx={{ flex: 2, minWidth: 0 }}>

@@ -7,7 +7,12 @@ import { runMigrations, type SqliteLike } from '../../orchestrator/db/migrations
 import { ProjectsRepo } from '../../orchestrator/db/repositories/projects.js';
 import { EpicsRepo } from '../../orchestrator/db/repositories/epics.js';
 import { TasksRepo } from '../../orchestrator/db/repositories/tasks.js';
-import { WorklogsRepo } from '../../orchestrator/db/repositories/worklogs.js';
+import {
+  WorklogLockedError,
+  WorklogsRepo,
+  WORKLOG_LOCK_SETTING_KEY,
+} from '../../orchestrator/db/repositories/worklogs.js';
+import { SettingsRepo } from '../../orchestrator/db/repositories/settings.js';
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
@@ -221,6 +226,90 @@ describe('WorklogsRepo', () => {
       worklogs.create({ taskId, workDate: '2026-05-25', minutes: 30 });
       tasks.delete(taskId);
       expect(worklogs.list({ projectId }).length).toBe(0);
+    });
+  });
+
+  describe('worklog lock (worklogs.locked_through setting)', () => {
+    function setLock(value: string | null): void {
+      new SettingsRepo(db).set(WORKLOG_LOCK_SETTING_KEY, value ?? '');
+    }
+
+    it('lockedThrough() returns null when unset, when blank, or when not a date', () => {
+      expect(worklogs.lockedThrough()).toBeNull();
+      setLock('not-a-date');
+      expect(worklogs.lockedThrough()).toBeNull();
+      setLock('2026-04-30');
+      expect(worklogs.lockedThrough()).toBe('2026-04-30');
+    });
+
+    it('create on or before the lock throws WorklogLockedError', () => {
+      setLock('2026-04-30');
+      expect(() =>
+        worklogs.create({ taskId, workDate: '2026-04-30', minutes: 30 }),
+      ).toThrowError(WorklogLockedError);
+      expect(() =>
+        worklogs.create({ taskId, workDate: '2026-04-15', minutes: 30 }),
+      ).toThrowError(WorklogLockedError);
+    });
+
+    it('create after the lock is allowed', () => {
+      setLock('2026-04-30');
+      const w = worklogs.create({ taskId, workDate: '2026-05-01', minutes: 30 });
+      expect(w.workDate).toBe('2026-05-01');
+    });
+
+    it('update on a locked row throws even when not moving the date', () => {
+      const w = worklogs.create({ taskId, workDate: '2026-04-15', minutes: 30 });
+      setLock('2026-04-30');
+      expect(() => worklogs.update(w.id, { description: 'edit' })).toThrowError(
+        WorklogLockedError,
+      );
+    });
+
+    it('update that moves a row OUT of the locked range still throws', () => {
+      const w = worklogs.create({ taskId, workDate: '2026-04-15', minutes: 30 });
+      setLock('2026-04-30');
+      expect(() => worklogs.update(w.id, { workDate: '2026-05-05' })).toThrowError(
+        WorklogLockedError,
+      );
+    });
+
+    it('update that moves a row INTO the locked range throws', () => {
+      const w = worklogs.create({ taskId, workDate: '2026-05-05', minutes: 30 });
+      setLock('2026-04-30');
+      expect(() => worklogs.update(w.id, { workDate: '2026-04-20' })).toThrowError(
+        WorklogLockedError,
+      );
+    });
+
+    it('update outside the lock is allowed', () => {
+      const w = worklogs.create({ taskId, workDate: '2026-05-05', minutes: 30 });
+      setLock('2026-04-30');
+      const u = worklogs.update(w.id, { description: 'edited', workDate: '2026-05-06' });
+      expect(u.description).toBe('edited');
+      expect(u.workDate).toBe('2026-05-06');
+    });
+
+    it('delete of a locked row throws', () => {
+      const w = worklogs.create({ taskId, workDate: '2026-04-15', minutes: 30 });
+      setLock('2026-04-30');
+      expect(() => worklogs.delete(w.id)).toThrowError(WorklogLockedError);
+      expect(worklogs.get(w.id)).not.toBeNull();
+    });
+
+    it('delete after the lock is allowed', () => {
+      const w = worklogs.create({ taskId, workDate: '2026-05-05', minutes: 30 });
+      setLock('2026-04-30');
+      worklogs.delete(w.id);
+      expect(worklogs.get(w.id)).toBeNull();
+    });
+
+    it('clearing the lock re-enables mutations on old dates', () => {
+      setLock('2026-04-30');
+      expect(() => worklogs.create({ taskId, workDate: '2026-04-15', minutes: 30 })).toThrow();
+      setLock(null);
+      const w = worklogs.create({ taskId, workDate: '2026-04-15', minutes: 30 });
+      expect(w.workDate).toBe('2026-04-15');
     });
   });
 

@@ -7,7 +7,9 @@ import {
   CircularProgress,
   Drawer,
   IconButton,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -23,40 +25,58 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
 import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import LaunchIcon from '@mui/icons-material/Launch';
+import EditIcon from '@mui/icons-material/Edit';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckIcon from '@mui/icons-material/Check';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
 import type {
-  BoardCardPayload,
+  TaskInputPayload,
+  TaskViewPayload,
   WorklogInputPayload,
   WorklogViewPayload,
 } from '../../../../shared/ipcContract.js';
 import {
   CZ_DATE_FORMAT,
+  buildTaskUrl,
   formatDateCz,
+  formatHoursTrim,
   formatMinutes,
   parseMinutes,
 } from '../../util/format.js';
 
 interface Props {
   open: boolean;
-  card: BoardCardPayload | null;
-  jiraBaseUrl: string | null;
+  task: TaskViewPayload | null;
+  projectName: string;
+  projectColor: string;
+  epicName: string;
+  /** Per-task URL template (e.g. https://.../browse/{n}) — optional. */
+  taskUrlTemplate?: string | null;
   onClose(): void;
-  onOpenJira(url: string): void;
-  onRemove(taskId: number): void;
+  onUpdate(input: Partial<TaskInputPayload>): Promise<void>;
+  onDelete?(): Promise<void> | void;
+  onOpenExternal?(url: string): void;
 }
 
-export function BoardTaskDetailDrawer({
+const STATUS_OPTIONS: { value: 'open' | 'in_progress' | 'done'; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'done', label: 'Done' },
+];
+
+export function TaskDetailDrawer({
   open,
-  card,
-  jiraBaseUrl,
+  task,
+  projectName,
+  projectColor,
+  epicName,
+  taskUrlTemplate,
   onClose,
-  onOpenJira,
-  onRemove,
+  onUpdate,
+  onDelete,
+  onOpenExternal,
 }: Props) {
   const [worklogs, setWorklogs] = useState<WorklogViewPayload[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,11 +88,11 @@ export function BoardTaskDetailDrawer({
   const [editDescription, setEditDescription] = useState('');
 
   const reload = async () => {
-    if (!card) return;
+    if (!task) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await window.watchtower.invoke('worklogs:list', { taskId: card.taskId });
+      const res = await window.watchtower.invoke('worklogs:list', { taskId: task.id });
       const sorted = [...res.worklogs].sort((a, b) =>
         a.workDate < b.workDate ? 1 : a.workDate > b.workDate ? -1 : b.id - a.id,
       );
@@ -85,36 +105,28 @@ export function BoardTaskDetailDrawer({
   };
 
   useEffect(() => {
-    if (!open || !card) return;
+    if (!open || !task) return;
     setEditingWorklogId(null);
     void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, card?.taskId]);
+  }, [open, task?.id]);
 
-  if (!card) {
+  if (!task) {
     return (
-      <Drawer
-        anchor="right"
-        open={open}
-        onClose={onClose}
-        PaperProps={{
-          sx: {
-            width: { xs: '100%', sm: '95%', md: 880, lg: 1040, xl: 1200 },
-            maxWidth: '100vw',
-          },
-        }}
-      >
+      <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 880 } }}>
         <Box sx={{ p: 3 }} />
       </Drawer>
     );
   }
 
   const totalMinutes =
-    worklogs.reduce((sum, w) => sum + (w.reportedMinutes ?? w.minutes), 0) ||
-    card.loggedMinutes;
-  const estimateMinutes =
-    card.estimateSeconds != null ? Math.round(card.estimateSeconds / 60) : null;
-  const externalUrl = jiraBaseUrl ? `${jiraBaseUrl}/browse/${card.jiraKey}` : null;
+    worklogs.reduce((sum, w) => sum + (w.reportedMinutes ?? w.minutes), 0) || task.totalMinutes;
+  const externalUrl = taskUrlTemplate ? buildTaskUrl(taskUrlTemplate, task.number) : null;
+  const handleOpenExternal = (e: React.MouseEvent) => {
+    if (!externalUrl) return;
+    e.preventDefault();
+    onOpenExternal?.(externalUrl);
+  };
 
   const handleAddWorklog = async (values: {
     work_date: string;
@@ -125,7 +137,7 @@ export function BoardTaskDetailDrawer({
     setError(null);
     try {
       const input: WorklogInputPayload = {
-        taskId: card.taskId,
+        taskId: task.id,
         workDate: values.work_date,
         minutes: values.minutes,
         reportedMinutes: values.reported_minutes,
@@ -160,9 +172,7 @@ export function BoardTaskDetailDrawer({
   };
 
   const handleDeleteWorklog = async (w: WorklogViewPayload) => {
-    if (
-      !window.confirm(`Smazat worklog z ${formatDateCz(w.workDate)} (${formatMinutes(w.minutes)})?`)
-    ) {
+    if (!window.confirm(`Smazat worklog z ${formatDateCz(w.workDate)} (${formatMinutes(w.minutes)})?`)) {
       return;
     }
     setError(null);
@@ -173,6 +183,38 @@ export function BoardTaskDetailDrawer({
         return;
       }
       await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const changeStatus = async (next: 'open' | 'in_progress' | 'done') => {
+    if (next === task.status) return;
+    try {
+      await onUpdate({ status: next });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const saveEstimate = async (value: number | null) => {
+    try {
+      await onUpdate({ estimatedMinutes: value });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!onDelete) return;
+    if (
+      !window.confirm(`Smazat úkol ${task.number} "${task.title}"? Worklogy budou také odstraněny.`)
+    ) {
+      return;
+    }
+    try {
+      await onDelete();
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -261,7 +303,7 @@ export function BoardTaskDetailDrawer({
                 left: 0,
                 right: 0,
                 height: 3,
-                background: `linear-gradient(90deg, ${card.projectColor}, ${alpha(card.projectColor, 0.25)})`,
+                background: `linear-gradient(90deg, ${projectColor}, ${alpha(projectColor, 0.25)})`,
               }}
             />
             <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1, mt: 0.5 }}>
@@ -270,44 +312,51 @@ export function BoardTaskDetailDrawer({
                   width: 10,
                   height: 10,
                   borderRadius: '50%',
-                  bgcolor: card.projectColor,
+                  bgcolor: projectColor,
                 }}
               />
               <Typography variant="overline" color="text.secondary">
-                {card.projectName} · {card.epicName || 'Epic'}
+                {projectName} · {epicName}
               </Typography>
             </Stack>
             <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
               <Typography variant="overline" color="text.secondary">
-                {card.jiraKey}
+                {task.number}
               </Typography>
               {externalUrl && (
                 <Tooltip title={externalUrl}>
                   <IconButton
                     size="small"
-                    onClick={() => onOpenJira(externalUrl)}
+                    component="a"
+                    href={externalUrl}
+                    onClick={handleOpenExternal}
                   >
                     <OpenInNewIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
               )}
             </Stack>
-            <Typography variant="h6">{card.title}</Typography>
+            <Typography variant="h6">{task.title}</Typography>
             <Stack
               direction="row"
               spacing={2}
               sx={{ mt: 2, alignItems: 'center', flexWrap: 'wrap', gap: 1 }}
             >
-              <Chip size="small" label={card.jiraStatus} variant="outlined" />
-              <Chip
-                color="primary"
-                variant={estimateMinutes != null ? 'filled' : 'outlined'}
-                label={
-                  estimateMinutes != null
-                    ? `${formatMinutes(totalMinutes)} / ${formatMinutes(estimateMinutes)}`
-                    : `${formatMinutes(totalMinutes)} logged`
-                }
-                className="tt-num"
+              <Select
+                size="small"
+                value={task.status}
+                onChange={(e) => void changeStatus(e.target.value as 'open' | 'in_progress' | 'done')}
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </Select>
+              <EstimateChip
+                totalMinutes={totalMinutes}
+                estimatedMinutes={task.estimatedMinutes}
+                onSave={(v) => void saveEstimate(v)}
               />
             </Stack>
           </Paper>
@@ -459,28 +508,106 @@ export function BoardTaskDetailDrawer({
             )}
           </Paper>
 
-          <Stack direction="row" spacing={1} sx={{ mt: 2, justifyContent: 'flex-end' }}>
-            {externalUrl && (
+          {onDelete && (
+            <Stack direction="row" sx={{ mt: 2, justifyContent: 'flex-end' }}>
               <Button
                 size="small"
-                startIcon={<LaunchIcon fontSize="small" />}
-                onClick={() => onOpenJira(externalUrl)}
+                color="error"
+                startIcon={<DeleteOutlineIcon fontSize="small" />}
+                onClick={() => void handleDeleteTask()}
               >
-                Open in Jira
+                Smazat úkol
               </Button>
-            )}
-            <Button
-              size="small"
-              color="error"
-              startIcon={<DeleteOutlineIcon fontSize="small" />}
-              onClick={() => onRemove(card.taskId)}
-            >
-              Remove from board
-            </Button>
-          </Stack>
+            </Stack>
+          )}
         </Box>
       </Box>
     </Drawer>
+  );
+}
+
+interface EstimateChipProps {
+  totalMinutes: number;
+  estimatedMinutes: number | null;
+  onSave: (value: number | null) => void;
+}
+
+function EstimateChip({ totalMinutes, estimatedMinutes, onSave }: EstimateChipProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(estimatedMinutes != null ? formatHoursTrim(estimatedMinutes) : '');
+    }
+  }, [estimatedMinutes, editing]);
+
+  const parsed = draft.trim() === '' ? null : parseMinutes(draft);
+  const valid =
+    draft.trim() === '' || (Number.isFinite(parsed) && (parsed as number) > 0);
+
+  const commit = () => {
+    if (!valid) return;
+    onSave(draft.trim() === '' ? null : (parsed as number));
+    setEditing(false);
+  };
+
+  const overrun =
+    estimatedMinutes != null && estimatedMinutes > 0 && totalMinutes > estimatedMinutes;
+  const nearLimit =
+    estimatedMinutes != null &&
+    estimatedMinutes > 0 &&
+    !overrun &&
+    totalMinutes / estimatedMinutes >= 0.8;
+  const chipColor: 'primary' | 'warning' | 'error' = overrun
+    ? 'error'
+    : nearLimit
+      ? 'warning'
+      : 'primary';
+
+  if (editing) {
+    return (
+      <Stack direction="row" spacing={1} alignItems="center">
+        <TextField
+          size="small"
+          autoFocus
+          label="Estimate"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+          error={!valid}
+          placeholder="e.g. 2.5, 2h 30m"
+          sx={{ width: 180 }}
+        />
+        <IconButton size="small" color="primary" onClick={commit} disabled={!valid} aria-label="save estimate">
+          <CheckIcon fontSize="small" />
+        </IconButton>
+        <IconButton size="small" onClick={() => setEditing(false)} aria-label="cancel">
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+    );
+  }
+
+  return (
+    <Tooltip title="Click to edit estimate">
+      <Chip
+        color={chipColor}
+        variant={estimatedMinutes != null ? 'filled' : 'outlined'}
+        onClick={() => setEditing(true)}
+        deleteIcon={<EditIcon fontSize="small" />}
+        onDelete={() => setEditing(true)}
+        label={
+          estimatedMinutes != null
+            ? `${formatMinutes(totalMinutes)} / ${formatMinutes(estimatedMinutes)}`
+            : `${formatMinutes(totalMinutes)} logged · set estimate`
+        }
+        className="tt-num"
+      />
+    </Tooltip>
   );
 }
 

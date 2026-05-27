@@ -206,24 +206,32 @@ export class TasksRepo {
   }
 
   /**
-   * Clear `jira_status` on every row whose `number` is NOT in `keepNumbers`.
-   * Used by the board sync to drop tickets that have fallen off the user's
-   * board. Returns the number of rows cleared.
+   * Clear `jira_status` on tasks in `projectId` whose `number` is NOT in
+   * `keepNumbers`. Used by the per-project board sync to drop tickets that
+   * fell off the current board, without touching other projects' tickets.
+   * Returns the number of rows cleared.
    */
-  clearJiraStatusExcept(keepNumbers: string[]): number {
+  clearJiraStatusExceptForProject(projectId: number, keepNumbers: string[]): number {
+    const baseSql = `
+      UPDATE tasks SET jira_status = NULL,
+                       jira_estimate_secs = NULL,
+                       jira_component = NULL,
+                       jira_synced_at = NULL
+        WHERE jira_status IS NOT NULL
+          AND id IN (
+            SELECT t.id FROM tasks t
+              JOIN epics e ON e.id = t.epic_id
+             WHERE e.project_id = ?`;
     if (keepNumbers.length === 0) {
       const r = this.db
-        .prepare(`UPDATE tasks SET jira_status = NULL WHERE jira_status IS NOT NULL`)
-        .run() as { changes: number };
+        .prepare(`${baseSql})`)
+        .run(projectId) as { changes: number };
       return r.changes;
     }
     const placeholders = keepNumbers.map(() => '?').join(',');
     const r = this.db
-      .prepare(
-        `UPDATE tasks SET jira_status = NULL
-           WHERE jira_status IS NOT NULL AND number NOT IN (${placeholders})`,
-      )
-      .run(...keepNumbers) as { changes: number };
+      .prepare(`${baseSql} AND t.number NOT IN (${placeholders}))`)
+      .run(projectId, ...keepNumbers) as { changes: number };
     return r.changes;
   }
 }

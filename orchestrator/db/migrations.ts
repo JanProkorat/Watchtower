@@ -104,6 +104,28 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
                  ON tasks(jira_status) WHERE jira_status IS NOT NULL`);
     },
   },
+  {
+    version: 7,
+    up: (db) => {
+      // Per-project Jira board URL. Stored verbatim (the rapidView /
+      // quickFilter ids are parsed at sync time) so the user can paste
+      // a full board URL from the browser without thinking about it.
+      // NULL = no board configured = project doesn't appear in the
+      // Board tab's project selector.
+      db.exec(`ALTER TABLE projects ADD COLUMN jira_board_url TEXT`);
+    },
+  },
+  {
+    version: 8,
+    up: (db) => {
+      // Per-epic shortcut for substring routing during board sync. When a
+      // task's linked Jira epic name CONTAINS this string, the task is
+      // assigned to the local epic. Lets one local "Technology" epic
+      // collect everything from Jira epics named "TEH - …", "TEH-456",
+      // etc. NULL means the epic doesn't participate in shortcut routing.
+      db.exec(`ALTER TABLE epics ADD COLUMN shortcut TEXT`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

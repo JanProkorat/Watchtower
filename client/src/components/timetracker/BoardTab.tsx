@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BoardTaskDetailDrawer } from './BoardTaskDetailDrawer.js';
 import {
   Alert,
@@ -7,7 +7,9 @@ import {
   Chip,
   CircularProgress,
   IconButton,
+  MenuItem,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -22,6 +24,7 @@ import { epicColours } from './boardChips.js';
 import type {
   BoardCardPayload,
   BoardColumn,
+  ProjectViewPayload,
 } from '../../../../shared/ipcContract.js';
 
 const COLUMNS: Array<{ id: BoardColumn; label: string }> = [
@@ -29,6 +32,8 @@ const COLUMNS: Array<{ id: BoardColumn; label: string }> = [
   { id: 'doing', label: 'Doing' },
   { id: 'done', label: 'Done' },
 ];
+
+const SELECTED_PROJECT_STORAGE_KEY = 'watchtower:board:selectedProjectId';
 
 function formatMinutes(min: number): string {
   const h = Math.floor(min / 60);
@@ -54,15 +59,98 @@ function formatSynced(iso: string | null): string {
   return `Synced ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function readStoredProjectId(): number | null {
+  try {
+    const raw = window.localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY);
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredProjectId(id: number | null): void {
+  try {
+    if (id === null) window.localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY);
+    else window.localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, String(id));
+  } catch {
+    /* localStorage may be unavailable; nothing to do */
+  }
+}
+
 interface Props {
   active: boolean;
 }
 
 export function BoardTab({ active }: Props) {
-  const { snapshot, auth, syncing, syncError, lastSyncResult, sync, signInAndSync, remove } =
-    useBoard(active);
-  const [selectedCard, setSelectedCard] = useState<BoardCardPayload | null>(null);
+  const [projectsWithBoard, setProjectsWithBoard] = useState<ProjectViewPayload[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(() =>
+    readStoredProjectId(),
+  );
+
   const { showError } = useToast();
+
+  // Load the set of active projects that have a Jira board URL configured. We
+  // do this every time the tab becomes active so a project edit in another
+  // tab is picked up without a full page reload.
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    (async () => {
+      setProjectsLoading(true);
+      setProjectsError(null);
+      try {
+        const res = await window.watchtower.invoke('projects:list', { archived: false });
+        if (cancelled) return;
+        const withBoard = res.projects.filter(
+          (p) => p.jiraBoardUrl !== null && p.jiraBoardUrl.trim() !== '',
+        );
+        setProjectsWithBoard(withBoard);
+      } catch (err) {
+        if (!cancelled) {
+          setProjectsError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (!cancelled) setProjectsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active]);
+
+  // Reconcile the selected project with the list of projects-with-board.
+  // If the stored selection points at a project that's been archived / had
+  // its URL cleared, fall back to the first available; if there are none,
+  // clear the selection entirely.
+  useEffect(() => {
+    if (projectsLoading) return;
+    const stillValid =
+      selectedProjectId !== null &&
+      projectsWithBoard.some((p) => p.id === selectedProjectId);
+    if (stillValid) return;
+    const next = projectsWithBoard[0]?.id ?? null;
+    setSelectedProjectId(next);
+    writeStoredProjectId(next);
+  }, [projectsLoading, projectsWithBoard, selectedProjectId]);
+
+  const handleSelectProject = (id: number) => {
+    setSelectedProjectId(id);
+    writeStoredProjectId(id);
+  };
+
+  const selectedProject = useMemo(
+    () => projectsWithBoard.find((p) => p.id === selectedProjectId) ?? null,
+    [projectsWithBoard, selectedProjectId],
+  );
+
+  const { snapshot, auth, syncing, syncError, lastSyncResult, sync, signInAndSync, remove } =
+    useBoard(active, selectedProjectId);
+
+  const [selectedCard, setSelectedCard] = useState<BoardCardPayload | null>(null);
 
   const handleRemove = (taskId: number) => {
     void remove(taskId).catch((err: unknown) =>
@@ -87,8 +175,8 @@ export function BoardTab({ active }: Props) {
   };
 
   const handleBoardLink = () => {
-    if (!auth?.baseUrl) return;
-    openInBrowser(`${auth.baseUrl}/secure/RapidBoard.jspa?rapidView=51682`);
+    if (!selectedProject?.jiraBoardUrl) return;
+    openInBrowser(selectedProject.jiraBoardUrl);
   };
 
   const unrouted = lastSyncResult?.unroutedKeys ?? snapshot?.lastSyncResult?.unroutedKeys ?? [];
@@ -102,13 +190,60 @@ export function BoardTab({ active }: Props) {
   const authFailed =
     lastSyncResult?.authFailed ?? snapshot?.lastSyncResult?.authFailed ?? false;
   const showSignIn = !auth?.cookiePresent || authFailed;
+  const syncWarning =
+    lastSyncResult?.warning ?? snapshot?.lastSyncResult?.warning ?? null;
+
+  // Empty state #1 — no projects have a board URL configured. Tell the user
+  // where to set it and stop here; nothing else on this screen is useful
+  // until at least one project has a URL.
+  if (!projectsLoading && projectsWithBoard.length === 0) {
+    return (
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, p: 2, gap: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>Board</Typography>
+        {projectsError && <Alert severity="error">{projectsError}</Alert>}
+        <Alert severity="info">
+          <strong>No Jira board configured.</strong>
+          <Box sx={{ mt: 0.5 }}>
+            Open the Projects tab, edit a project, and paste its Jira board URL into the
+            <em> Jira board URL</em> field. The project will then appear in the selector here.
+          </Box>
+        </Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, p: 2, gap: 2 }}>
       {/* Header */}
       <Stack direction="row" alignItems="center" spacing={2}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>Board</Typography>
-        {auth?.baseUrl && (
+        <TextField
+          select
+          size="small"
+          value={selectedProjectId ?? ''}
+          onChange={(e) => handleSelectProject(Number(e.target.value))}
+          sx={{ minWidth: 220 }}
+          aria-label="Project"
+        >
+          {projectsWithBoard.map((p) => (
+            <MenuItem key={p.id} value={p.id}>
+              <Box
+                component="span"
+                sx={{
+                  display: 'inline-block',
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  bgcolor: p.color,
+                  mr: 1,
+                  verticalAlign: 'middle',
+                }}
+              />
+              {p.name}
+            </MenuItem>
+          ))}
+        </TextField>
+        {selectedProject?.jiraBoardUrl && (
           <Button
             size="small"
             onClick={handleBoardLink}
@@ -143,7 +278,7 @@ export function BoardTab({ active }: Props) {
             variant="contained"
             size="small"
             onClick={() => void sync()}
-            disabled={syncing}
+            disabled={syncing || selectedProjectId === null}
             startIcon={syncing ? <CircularProgress size={14} /> : <RefreshIcon />}
           >
             {syncing ? 'Syncing…' : 'Refresh'}
@@ -153,13 +288,15 @@ export function BoardTab({ active }: Props) {
 
       {syncError && <Alert severity="error">{syncError}</Alert>}
 
+      {syncWarning && <Alert severity="warning">{syncWarning}</Alert>}
+
       {unrouted.length > 0 && (
         <Alert severity="warning" icon={<WarningAmberIcon fontSize="small" />}>
           <strong>
-            {unrouted.length} {unrouted.length === 1 ? 'ticket' : 'tickets'} couldn't be slotted into any local project.
+            {unrouted.length} {unrouted.length === 1 ? 'ticket' : 'tickets'} couldn't be slotted into any local epic.
           </strong>
           <Box sx={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11.5, mt: 0.5 }}>
-            {unrouted.join(', ')} · Add a matching glob to a project's Jira keys to include them.
+            {unrouted.join(', ')}
           </Box>
         </Alert>
       )}

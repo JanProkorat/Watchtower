@@ -11,6 +11,7 @@ export interface ProjectRow {
   isDefault: boolean;
   folderPath: string | null;
   jiraGlobs: string[];
+  jiraBoardUrl: string | null;
   description: string | null;
   createdAt: string;
   /** epic_count joined at list time — 0 until Phase 15 lands epics CRUD. */
@@ -26,6 +27,7 @@ export interface ProjectInput {
   isDefault?: boolean;
   folderPath?: string | null;
   jiraGlobs?: string[];
+  jiraBoardUrl?: string | null;
   description?: string | null;
 }
 
@@ -45,11 +47,25 @@ type DbRow = {
   is_default: number;
   folder_path: string | null;
   jira_globs: string | null;
+  jira_board_url: string | null;
   description: string | null;
   created_at: string;
   epic_count: number;
   total_minutes: number;
 };
+
+/**
+ * Trim incoming Jira board URLs; treat empty / whitespace-only strings as
+ * "unset" so the DB stores a clean NULL. Validation (rapidView present,
+ * numeric) happens lazily in the sync service — pasting nonsense in the
+ * drawer should still save and surface the error on next sync rather than
+ * blocking the save.
+ */
+function normaliseBoardUrl(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 function parseGlobs(raw: string | null): string[] {
   if (!raw) return [];
@@ -72,6 +88,7 @@ function toRow(r: DbRow): ProjectRow {
     isDefault: r.is_default === 1,
     folderPath: r.folder_path,
     jiraGlobs: parseGlobs(r.jira_globs),
+    jiraBoardUrl: r.jira_board_url,
     description: r.description,
     createdAt: r.created_at,
     epicCount: r.epic_count,
@@ -91,7 +108,7 @@ const DEFAULTS = {
 const LIST_SQL = `
   SELECT
     p.id, p.name, p.color, p.archived, p.kind, p.is_default,
-    p.folder_path, p.jira_globs, p.description, p.created_at,
+    p.folder_path, p.jira_globs, p.jira_board_url, p.description, p.created_at,
     (SELECT COUNT(*) FROM epics e WHERE e.project_id = p.id) AS epic_count,
     (SELECT COALESCE(SUM(w.minutes), 0)
        FROM worklogs w
@@ -145,18 +162,27 @@ export class ProjectsRepo {
     // been refactored yet — keeping it in sync with `kind` avoids drift.
     const isBillable = kind === 'work' ? 1 : 0;
     const globs = input.jiraGlobs ? JSON.stringify(input.jiraGlobs) : null;
+    const boardUrl = normaliseBoardUrl(input.jiraBoardUrl);
 
     this.db.exec('BEGIN IMMEDIATE');
     try {
       if (isDefault) this.clearDefault();
       const info = this.db
         .prepare(
-          `INSERT INTO projects (name, color, archived, is_billable, kind, is_default, folder_path, jira_globs, description)
-           VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO projects (name, color, archived, is_billable, kind, is_default, folder_path, jira_globs, jira_board_url, description)
+           VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(input.name, color, isBillable, kind, isDefault, input.folderPath ?? null, globs, input.description ?? null) as {
-        lastInsertRowid: number | bigint;
-      };
+        .run(
+          input.name,
+          color,
+          isBillable,
+          kind,
+          isDefault,
+          input.folderPath ?? null,
+          globs,
+          boardUrl,
+          input.description ?? null,
+        ) as { lastInsertRowid: number | bigint };
       this.db.exec('COMMIT');
       const id = Number(info.lastInsertRowid);
       return this.get(id)!;
@@ -183,6 +209,9 @@ export class ProjectsRepo {
     if (input.folderPath !== undefined) push('folder_path', input.folderPath);
     if (input.jiraGlobs !== undefined) {
       push('jira_globs', input.jiraGlobs.length ? JSON.stringify(input.jiraGlobs) : null);
+    }
+    if (input.jiraBoardUrl !== undefined) {
+      push('jira_board_url', normaliseBoardUrl(input.jiraBoardUrl));
     }
     if (input.description !== undefined) push('description', input.description);
 

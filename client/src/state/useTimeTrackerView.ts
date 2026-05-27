@@ -4,7 +4,6 @@ import {
   parseTimeTrackerHash,
   timetrackerHash,
   viewsEqual,
-  type DetailTab,
   type ListTab,
   type TimeTrackerView,
 } from '../util/timetrackerUrl.js';
@@ -17,7 +16,7 @@ const STORAGE_KEY = 'watchtower.timetracker.view';
  * Three sources of truth, in priority order on first mount:
  *   1. URL hash — supports back/forward and deep links
  *   2. localStorage — survives a hash that other modules have stomped
- *   3. DEFAULT_VIEW (list mode, Projects tab)
+ *   3. DEFAULT_VIEW (Projects, no project selected)
  *
  * Updates write to both history.pushState and localStorage. A popstate
  * listener re-syncs from the hash on Cmd+[ / Cmd+].
@@ -28,10 +27,8 @@ const STORAGE_KEY = 'watchtower.timetracker.view';
  */
 export interface UseTimeTrackerViewResult {
   view: TimeTrackerView;
-  setListTab(tab: ListTab): void;
-  openProject(projectId: number, initialTab?: DetailTab): void;
-  closeProject(): void;
-  setDetailTab(tab: DetailTab): void;
+  setTab(tab: ListTab): void;
+  selectProject(projectId: number | null): void;
 }
 
 function readPersisted(): TimeTrackerView | null {
@@ -109,28 +106,20 @@ export function useTimeTrackerView(enabled: boolean): UseTimeTrackerViewResult {
     [enabled],
   );
 
-  const setListTab = useCallback(
-    (tab: ListTab) => update({ mode: 'list', tab }),
-    [update],
-  );
-
-  const openProject = useCallback(
-    (projectId: number, initialTab: DetailTab = 'epics') =>
-      update({ mode: 'detail', projectId, tab: initialTab }),
-    [update],
-  );
-
-  const closeProject = useCallback(() => update({ mode: 'list', tab: 'projects' }), [update]);
-
-  const setDetailTab = useCallback(
-    (tab: DetailTab) =>
-      update(
-        view.mode === 'detail'
-          ? { mode: 'detail', projectId: view.projectId, tab }
-          : { mode: 'list', tab: 'projects' },
-      ),
+  const setTab = useCallback(
+    (tab: ListTab) => {
+      // Leaving the projects tab clears the selection; entering it preserves
+      // any previously-selected project so back/forward feels natural.
+      const projectId = tab === 'projects' && view.tab === 'projects' ? view.projectId : null;
+      update({ tab, projectId });
+    },
     [update, view],
   );
 
-  return { view, setListTab, openProject, closeProject, setDetailTab };
+  const selectProject = useCallback(
+    (projectId: number | null) => update({ tab: 'projects', projectId }),
+    [update],
+  );
+
+  return { view, setTab, selectProject };
 }

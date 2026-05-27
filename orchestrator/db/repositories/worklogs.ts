@@ -2,6 +2,29 @@ import type { SqliteLike } from '../migrations.js';
 
 export type WorklogSource = 'manual' | 'watchtower-auto' | 'jira-sync' | string;
 
+/** Settings key for the inclusive "lock through" date (ISO YYYY-MM-DD). */
+export const WORKLOG_LOCK_SETTING_KEY = 'worklogs.locked_through';
+
+/**
+ * Thrown by `WorklogsRepo.create/update/delete` when the mutation would touch
+ * a row whose `work_date` falls within the locked window. Mirrors the
+ * structure of `RateOverlapError` so the orchestrator can convert it into
+ * a tagged IPC response.
+ */
+export class WorklogLockedError extends Error {
+  constructor(
+    public readonly lockedThrough: string,
+    public readonly attemptedDate: string,
+  ) {
+    super(
+      `Worklogs on or before ${lockedThrough} are locked. Unlock in Settings to edit.`,
+    );
+    this.name = 'WorklogLockedError';
+  }
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 export interface WorklogRow {
   id: number;
   taskId: number;
@@ -106,6 +129,27 @@ const SELECT_JOINED = `
 export class WorklogsRepo {
   constructor(private db: SqliteLike) {}
 
+  /**
+   * Returns the inclusive lock date (ISO YYYY-MM-DD) or null when no lock is
+   * set. Reads directly from the `settings` table so the repo stays
+   * self-contained — no SettingsRepo dependency.
+   */
+  lockedThrough(): string | null {
+    const row = this.db
+      .prepare(`SELECT value FROM settings WHERE key = ?`)
+      .get(WORKLOG_LOCK_SETTING_KEY) as { value: string | null } | undefined;
+    const v = row?.value?.trim();
+    return v && DATE_RE.test(v) ? v : null;
+  }
+
+  private throwIfLocked(...candidateDates: (string | null | undefined)[]): void {
+    const lock = this.lockedThrough();
+    if (!lock) return;
+    for (const d of candidateDates) {
+      if (d && d <= lock) throw new WorklogLockedError(lock, d);
+    }
+  }
+
   list(filter: WorklogListFilter = {}): WorklogRow[] {
     const where: string[] = [];
     const params: unknown[] = [];
@@ -160,6 +204,7 @@ export class WorklogsRepo {
   }
 
   create(input: WorklogInput): WorklogRow {
+    this.throwIfLocked(input.workDate);
     // Treat undefined as "no preference, default to 'manual'", but preserve
     // an explicit null (it disables the (source, external_id) dedupe index).
     const source = input.source === undefined ? 'manual' : input.source;
@@ -184,6 +229,11 @@ export class WorklogsRepo {
   }
 
   update(id: number, input: Partial<WorklogInput>): WorklogRow {
+    // Check both the row's current date AND the proposed new date — moving a
+    // row into or out of the locked window counts as a mutation either way.
+    const existing = this.get(id);
+    this.throwIfLocked(existing?.workDate, input.workDate);
+
     const sets: string[] = [];
     const params: unknown[] = [];
     const push = (col: string, value: unknown) => {
@@ -210,6 +260,8 @@ export class WorklogsRepo {
   }
 
   delete(id: number): void {
+    const existing = this.get(id);
+    this.throwIfLocked(existing?.workDate);
     this.db.prepare(`DELETE FROM worklogs WHERE id = ?`).run(id);
   }
 }

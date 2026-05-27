@@ -81,6 +81,12 @@ export function TaskDrawer({
   }, [open, task, defaultEpicId]);
 
   const isEdit = task !== null;
+  // A task that's been marked Done is treated as read-only — only the Status
+  // dropdown stays editable so the user can re-open the task to edit fields.
+  // The draft.status check (not task.status) means flipping Done → Doing in
+  // the dropdown immediately unlocks the rest of the form within this open
+  // session, without forcing a save round-trip.
+  const taskDone = isEdit && draft.status === 'done';
   const canSubmit =
     draft.title.trim().length > 0 && draft.number.trim().length > 0 && !submitting;
 
@@ -144,6 +150,11 @@ export function TaskDrawer({
           }}
         >
           {error && <Alert severity="error">{error}</Alert>}
+          {taskDone && (
+            <Alert severity="info">
+              This task is marked Done — change status to reopen it for editing.
+            </Alert>
+          )}
 
           <TextField
             select
@@ -152,6 +163,7 @@ export function TaskDrawer({
             value={draft.epicId}
             onChange={(e) => setDraft({ ...draft, epicId: Number(e.target.value) })}
             fullWidth
+            disabled={taskDone}
           >
             {epics.map((e) => (
               <MenuItem key={e.id} value={e.id}>
@@ -169,6 +181,7 @@ export function TaskDrawer({
             helperText="Used as the worklog Jira key when the project has a matching glob"
             required
             fullWidth
+            disabled={taskDone}
             sx={{ '& input': { fontFamily: 'Menlo, monospace', fontSize: 13 } }}
           />
 
@@ -179,6 +192,7 @@ export function TaskDrawer({
             onChange={(e) => setDraft({ ...draft, title: e.target.value })}
             required
             fullWidth
+            disabled={taskDone}
           />
 
           <TextField
@@ -189,6 +203,7 @@ export function TaskDrawer({
             multiline
             minRows={3}
             fullWidth
+            disabled={taskDone}
           />
 
           <Box sx={{ display: 'flex', gap: 2 }}>
@@ -218,6 +233,7 @@ export function TaskDrawer({
               onChange={(e) => setDraft({ ...draft, estimateHours: e.target.value })}
               inputProps={{ min: 0, step: 0.25 }}
               sx={{ flex: 1 }}
+              disabled={taskDone}
             />
           </Box>
         </Box>
@@ -241,7 +257,8 @@ export function TaskDrawer({
                 await onDelete();
                 onClose();
               }}
-              disabled={submitting}
+              disabled={submitting || taskDone}
+              title={taskDone ? 'Reopen the task to delete it.' : undefined}
             >
               Delete
             </Button>

@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Watchtower — epic & task detail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+  --tracking-tight: -0.014em;
+  --tracking-label: 0.05em;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-input: 6px;
+}
+
+/* light (default — matches screenshots) */
+[data-mode="light"] {
+  --bg: #FAFAFB;
+  --paper: #FFFFFF;
+  --drawer: #FFFFFF;
+  --rail: #F4F4F6;
+  --border: #E5E7EB;
+  --border-strong: #D4D4D8;
+  --hover: #F4F4F6;
+  --active: #EDE9FF;
+  --text: #18181B;
+  --text-2: #52525B;
+  --text-3: #9CA3AF;
+  --accent: #7C5CFF;
+  --accent-fg: #FFFFFF;
+  --accent-soft: #EDE9FF;
+  --info: #38BDF8;
+  --success: #16A34A;
+  --success-fg: #FFFFFF;
+  --warning: #D97706;
+  --danger:  #DC2626;
+  --neutral-chip: #EEEEF1;
+  --neutral-chip-fg: #52525B;
+  --shadow-drawer: 0 0 0 1px var(--border), -8px 0 32px rgba(15,15,20,0.06);
+}
+/* dark — kept tuned so the same components look fine in dark */
+[data-mode="dark"] {
+  --bg: #0F0F12;
+  --paper: #18181B;
+  --drawer: #1F1F23;
+  --rail: #131316;
+  --border: #2A2A2F;
+  --border-strong: #3A3A42;
+  --hover: #232328;
+  --active: #2A2542;
+  --text: #ECEDEE;
+  --text-2: #A1A1AA;
+  --text-3: #71717A;
+  --accent: #A78BFA;
+  --accent-fg: #18181B;
+  --accent-soft: #2A2542;
+  --info: #38BDF8;
+  --success: #22C55E;
+  --success-fg: #0F0F12;
+  --warning: #F59E0B;
+  --danger:  #F87171;
+  --neutral-chip: #2A2A30;
+  --neutral-chip-fg: #A1A1AA;
+  --shadow-drawer: 0 0 0 1px var(--border), -8px 0 32px rgba(0,0,0,0.5);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+  font-feature-settings: "cv11","ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- mode toggle ---------- */
+.mode-toggle {
+  position: fixed; top: 12px; right: 12px;
+  z-index: 100;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+  display: flex; gap: 2px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.mode-toggle button {
+  border: 0; background: transparent;
+  color: var(--text-2);
+  font: 500 12px/1 var(--font-sans);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.mode-toggle button.on { background: var(--accent); color: var(--accent-fg); }
+
+/* ---------- app shell ---------- */
+.app {
+  display: flex;
+  height: 100vh;
+}
+.rail {
+  width: 56px;
+  background: var(--rail);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 12px 0; gap: 4px;
+  flex-shrink: 0;
+}
+.rail .logo {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--info));
+  display: grid; place-items: center;
+  color: #fff;
+  font: 700 14px/1 var(--font-sans);
+  margin-bottom: 8px;
+}
+.rail .icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: grid; place-items: center;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.rail .icon:hover { background: var(--hover); color: var(--text); }
+.rail .icon.on { background: var(--accent-soft); color: var(--accent); }
+.rail .icon svg { width: 20px; height: 20px; }
+.rail .spacer { flex: 1; }
+
+.main {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
+  position: relative;
+}
+.topbar {
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 20px;
+  gap: 12px;
+  background: var(--paper);
+  flex-shrink: 0;
+}
+.topbar h1 {
+  font: 600 14px/1 var(--font-sans);
+  margin: 0; color: var(--text);
+}
+.topbar .crumb { color: var(--text-3); font-size: 13px; }
+.topbar .crumb::before { content: "/"; margin: 0 8px; color: var(--text-3); }
+.topbar .crumb.cur { color: var(--text); }
+.topbar .right { margin-left: auto; display: flex; gap: 8px; }
+
+/* page area */
+.page {
+  flex: 1; min-height: 0; overflow: auto;
+  padding: 24px 28px 80px;
+  background: var(--bg);
+}
+.proj-head {
+  display: flex; align-items: baseline; gap: 10px;
+  margin-bottom: 4px;
+}
+.proj-head h2 {
+  font: 700 22px/1.2 var(--font-sans);
+  letter-spacing: var(--tracking-tight);
+  margin: 0; color: var(--text);
+}
+.proj-head .key {
+  font: 500 12px/1 var(--font-mono);
+  color: var(--text-3);
+}
+.proj-sub { color: var(--text-2); font-size: 13px; margin-bottom: 22px; }
+
+/* ---------- epic card ---------- */
+.epic-card {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.epic-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px;
+}
+.epic-card:not(.collapsed) .epic-head { border-bottom: 1px solid var(--border); }
+.epic-head h3 {
+  font: 600 16px/1.2 var(--font-sans);
+  letter-spacing: -0.005em;
+  margin: 0; color: var(--text);
+}
+.epic-head .grow { flex: 1; }
+
+/* chips */
+.chip {
+  display: inline-flex; align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font: 500 11.5px/1 var(--font-sans);
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  background: var(--paper);
+  color: var(--text-2);
+}
+.chip.neutral { background: var(--neutral-chip); color: var(--neutral-chip-fg); border-color: transparent; }
+.chip.md      { background: var(--accent);      color: var(--accent-fg);       border-color: transparent; font-weight: 600; }
+.chip.done    { background: var(--success);     color: var(--success-fg);      border-color: transparent; font-weight: 600; }
+.chip.open    { background: var(--neutral-chip); color: var(--neutral-chip-fg); border-color: transparent; }
+.chip.prog    { background: var(--accent-soft); color: var(--accent);          border-color: transparent; }
+.chip.warn    { background: color-mix(in oklab, var(--warning) 16%, var(--paper)); color: var(--warning); border-color: transparent; }
+.chip.err     { background: color-mix(in oklab, var(--danger)  16%, var(--paper)); color: var(--danger);  border-color: transparent; }
+
+/* icon button */
+.icon-btn {
+  width: 32px; height: 32px;
+  border: 0; background: transparent;
+  color: var(--text-3);
+  border-radius: 8px;
+  display: grid; place-items: center;
+  cursor: pointer;
+}
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+.icon-btn.accent { color: var(--accent); }
+.icon-btn.accent:hover { background: var(--accent-soft); color: var(--accent); }
+.icon-btn svg { width: 16px; height: 16px; }
+
+/* filter row */
+.epic-filters {
+  display: flex; gap: 12px;
+  padding: 14px 18px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.field {
+  position: relative;
+}
+.field.search { flex: 1; }
+.field.select { width: 180px; }
+.field input,
+.field select {
+  width: 100%;
+  height: 40px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  padding: 0 14px;
+  font: 400 13.5px/1 var(--font-sans);
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.field input::placeholder { color: var(--text-3); }
+.field input:focus,
+.field.active select,
+.field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* floating label */
+.field.float label {
+  position: absolute;
+  left: 11px; top: -7px;
+  background: var(--paper);
+  padding: 0 4px;
+  font: 500 11px/1 var(--font-sans);
+  color: var(--text-3);
+  pointer-events: none;
+}
+.field.float.active label { color: var(--accent); }
+.field.select select { appearance: none; padding-right: 36px; cursor: pointer; font-weight: 500; }
+.field.select::after {
+  content: ""; position: absolute; right: 16px; top: 50%;
+  width: 7px; height: 7px;
+  border-right: 1.5px solid var(--text-2);
+  border-bottom: 1.5px solid var(--text-2);
+  transform: translateY(-75%) rotate(45deg);
+  pointer-events: none;
+}
+
+/* table */
+.epic-table {
+  display: grid;
+  grid-template-columns: 150px 1fr 110px 110px 48px;
+  font-size: 13px;
+}
+.epic-table .th, .epic-table .td {
+  padding: 12px 18px;
+  display: flex; align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.epic-table .th {
+  font: 600 11px/1 var(--font-sans);
+  color: var(--text-2);
+  padding-top: 12px; padding-bottom: 12px;
+}
+.epic-table .td { color: var(--text); }
+.epic-table .row { display: contents; cursor: pointer; }
+.epic-table .row:hover .td { background: var(--hover); }
+.epic-table .row:last-child .td { border-bottom: 0; }
+
+.key-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--accent);
+  font: 500 13px/1.3 var(--font-mono);
+  text-decoration: none;
+}
+.key-link:hover { text-decoration: underline; }
+.key-link svg { width: 13px; height: 13px; color: var(--accent); }
+
+.t-title { color: var(--text); font-weight: 400; }
+.t-time {
+  color: var(--text); font: 500 13px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.epic-table .td.act { padding: 0 6px; justify-content: center; }
+.epic-table .td.act .icon-btn { width: 28px; height: 28px; }
+
+/* footer */
+.epic-foot {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 24px;
+  padding: 10px 18px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.epic-foot .rpp { display: flex; align-items: center; gap: 6px; }
+.epic-foot select {
+  background: transparent; border: 0; color: var(--text);
+  font: 500 12.5px var(--font-sans); cursor: pointer; outline: none;
+  padding-right: 18px;
+}
+.epic-foot .nav { display: flex; gap: 2px; }
+.epic-foot .nav button {
+  width: 28px; height: 28px;
+  border: 0; background: transparent; color: var(--text-2);
+  border-radius: 6px; cursor: pointer;
+}
+.epic-foot .nav button:hover { background: var(--hover); color: var(--text); }
+.epic-foot .nav button:disabled { color: var(--text-3); cursor: default; }
+
+/* ---------- task detail drawer ---------- */
+.drawer {
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  width: 640px;
+  background: var(--drawer);
+  box-shadow: var(--shadow-drawer);
+  display: flex; flex-direction: column;
+  z-index: 5;
+}
+.drawer-head {
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 4px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.drawer-head h3 {
+  font: 600 16px/1.2 var(--font-sans);
+  letter-spacing: -0.005em;
+  margin: 0; color: var(--text);
+}
+.drawer-head .grow { flex: 1; }
+
+.accent-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--info), var(--accent));
+}
+
+.drawer-body {
+  flex: 1; overflow: auto;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 14px;
+  background: var(--bg);
+}
+
+.task-card {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.task-breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  font: 600 10.5px/1 var(--font-sans);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 10px;
+}
+.task-breadcrumb .dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--info);
+}
+.task-key {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text-2);
+  font: 500 12px/1 var(--font-mono);
+  text-decoration: none;
+  margin-bottom: 8px;
+}
+.task-key:hover { color: var(--accent); }
+.task-key svg { width: 13px; height: 13px; color: var(--accent); }
+
+.task-title {
+  font: 700 20px/1.3 var(--font-sans);
+  letter-spacing: var(--tracking-tight);
+  margin: 0 0 14px;
+  color: var(--text);
+}
+.task-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.status-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 32px;
+  padding: 0 10px 0 14px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--border);
+  background: var(--paper);
+  color: var(--text);
+  font: 500 13px/1 var(--font-sans);
+  cursor: pointer;
+}
+.status-pill::after {
+  content: ""; width: 7px; height: 7px;
+  border-right: 1.5px solid var(--text-2);
+  border-bottom: 1.5px solid var(--text-2);
+  transform: rotate(45deg) translate(-2px,-2px);
+  margin-left: 2px;
+}
+
+.time-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 32px;
+  padding: 0 5px 0 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: 600 13px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  border: 0;
+}
+.time-pill .edit {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,0.18);
+}
+[data-mode="dark"] .time-pill .edit { background: rgba(0,0,0,0.18); }
+.time-pill .edit svg { width: 12px; height: 12px; }
+
+/* worklog cards */
+.worklog-card h4 {
+  font: 700 14px/1.2 var(--font-sans);
+  letter-spacing: -0.005em;
+  margin: 0 0 14px;
+  color: var(--text);
+}
+.worklog-add-grid {
+  display: grid;
+  grid-template-columns: 120px 110px 110px 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn {
+  font: 600 13px/1 var(--font-sans);
+  padding: 0 18px;
+  height: 40px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--border);
+  background: var(--paper);
+  color: var(--text);
+  cursor: pointer;
+}
+.btn:hover { background: var(--hover); border-color: var(--border-strong); }
+.btn.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+.btn.primary:hover { filter: brightness(0.94); background: var(--accent); }
+.btn.primary:disabled {
+  background: color-mix(in oklab, var(--text-3) 30%, var(--paper));
+  color: var(--text-3);
+  cursor: not-allowed;
+  border-color: var(--border);
+  filter: none;
+}
+.btn.ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+.btn.ghost:hover { background: var(--hover); color: var(--text); }
+
+/* worklog list (inside a separate card, with column headers) */
+.worklog-list {
+  display: grid;
+  grid-template-columns: 110px 80px 90px 1fr 110px;
+  font-size: 13px;
+}
+.worklog-list .th, .worklog-list .td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start;
+}
+.worklog-list .th {
+  font: 600 12px/1 var(--font-sans);
+  color: var(--text);
+  padding-top: 14px; padding-bottom: 14px;
+}
+.worklog-list .td.desc { color: var(--text); line-height: 1.45; }
+.worklog-list .row { display: contents; }
+.worklog-list .row:hover .td { background: var(--hover); }
+.worklog-list .td.act {
+  justify-content: flex-end; gap: 0; padding: 8px 8px;
+}
+.worklog-list .row:last-child .td { border-bottom: 0; }
+
+/* date input with calendar icon (in add worklog) */
+.date-input { position: relative; }
+.date-input input {
+  width: 100%;
+  height: 40px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  padding: 0 36px 0 14px;
+  font: 400 13.5px/1 var(--font-sans);
+  color: var(--text);
+  outline: none;
+}
+.date-input .icon-suffix {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  color: var(--text-3); pointer-events: none;
+}
+.date-input .icon-suffix svg { width: 18px; height: 18px; }
+.date-input input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+</style>
+</head>
+<body data-mode="light">
+
+<div class="mode-toggle" id="modeToggle">
+  <button data-mode-val="light" class="on">Light</button>
+  <button data-mode-val="dark">Dark</button>
+</div>
+
+<div class="app">
+  <!-- module rail -->
+  <nav class="rail">
+    <div class="logo">W</div>
+    <div class="icon" title="Dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+    </div>
+    <div class="icon on" title="Time tracker">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="7"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6M12 2v4"/></svg>
+    </div>
+    <div class="icon" title="Instances">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l2 2-2 2M11 13h5"/></svg>
+    </div>
+    <div class="icon" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 1 1 4.3 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </div>
+    <div class="spacer"></div>
+  </nav>
+
+  <main class="main">
+    <header class="topbar">
+      <h1>Time tracker</h1>
+      <span class="crumb">Projects</span>
+      <span class="crumb cur">Green Code · Technology</span>
+      <div class="right">
+        <button class="btn ghost">Filtr</button>
+        <button class="btn primary">+ Nový epic</button>
+      </div>
+    </header>
+
+    <div class="page">
+
+      <div class="proj-head">
+        <h2>Technology</h2>
+        <span class="key">FIE1933 · TEH</span>
+      </div>
+      <div class="proj-sub">aktivní kontrakt · 1 850 Kč/h · 115 MD limit · zbývá 28 MD</div>
+
+      <!-- EPIC CARD: expanded (matches Screenshot 1) -->
+      <article class="epic-card">
+        <header class="epic-head">
+          <h3>Technology</h3>
+          <span class="chip neutral">335 tasks</span>
+          <span class="chip md">221.8 MD</span>
+          <span class="grow"></span>
+          <button class="icon-btn" aria-label="Smazat epic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Sbalit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 15l6-6 6 6"/></svg>
+          </button>
+        </header>
+
+        <div class="epic-filters">
+          <div class="field search">
+            <input placeholder="Search number or title" />
+          </div>
+          <div class="field select float">
+            <label>Status</label>
+            <select><option></option><option>Open</option><option>Done</option></select>
+          </div>
+        </div>
+
+        <div class="epic-table">
+          <div class="th">Number</div>
+          <div class="th">Title</div>
+          <div class="th">Status</div>
+          <div class="th">Logged</div>
+          <div class="th"></div>
+
+          <div class="row">
+            <div class="td"><a class="key-link">FIE1933-19619 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg></a></div>
+            <div class="td t-title">[TEH] Nelze smazat pozici, která je v EK - BE</div>
+            <div class="td"><span class="chip done">Done</span></div>
+            <div class="td t-time">30m</div>
+            <div class="td act"><button class="icon-btn accent" aria-label="Smazat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg></button></div>
+          </div>
+          <div class="row">
+            <div class="td"><a class="key-link">FIE1933-19382 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg></a></div>
+            <div class="td t-title">Nastavení oprávnění rolí + Nasazení na TEST a PROD</div>
+            <div class="td"><span class="chip done">Done</span></div>
+            <div class="td t-time">2h</div>
+            <div class="td act"><button class="icon-btn accent" aria-label="Smazat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg></button></div>
+          </div>
+          <div class="row">
+            <div class="td"><a class="key-link">FIE1933-18794 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg></a></div>
+            <div class="td t-title">[TEH] Do hlavičky požadavku na TEH se nevrací Limit</div>
+            <div class="td"><span class="chip done">Done</span></div>
+            <div class="td t-time">1h</div>
+            <div class="td act"><button class="icon-btn accent" aria-label="Smazat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg></button></div>
+          </div>
+          <div class="row">
+            <div class="td"><a class="key-link">FIE1933-19781 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg></a></div>
+            <div class="td t-title">[TEH] Narovnání operací pro možnost editace - BE</div>
+            <div class="td"><span class="chip open">Open</span></div>
+            <div class="td t-time">1h 30m</div>
+            <div class="td act"><button class="icon-btn accent" aria-label="Smazat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg></button></div>
+          </div>
+          <div class="row">
+            <div class="td"><a class="key-link">FIE1933-19779 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg></a></div>
+            <div class="td t-title">[TEH] Operace odebraná z EK se neposune do stavu 0 - BE</div>
+            <div class="td"><span class="chip open">Open</span></div>
+            <div class="td t-time">3h</div>
+            <div class="td act"><button class="icon-btn accent" aria-label="Smazat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg></button></div>
+          </div>
+          <div class="row">
+            <div class="td"><a class="key-link">FIE1933-19775 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg></a></div>
+            <div class="td t-title">[TEH] Umožnit uživatelům bez skupiny dat přístup do Tech. postupu - BE</div>
+            <div class="td"><span class="chip open">Open</span></div>
+            <div class="td t-time">2h 13m</div>
+            <div class="td act"><button class="icon-btn accent" aria-label="Smazat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg></button></div>
+          </div>
+          <div class="row">
+            <div class="td"><a class="key-link">FIE1933-19793 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg></a></div>
+            <div class="td t-title">[TEH] Seznam požadavků na NC - Nelze filtrovat "odpárované" požadavky - BE</div>
+            <div class="td"><span class="chip open">Open</span></div>
+            <div class="td t-time">1h 11m</div>
+            <div class="td act"><button class="icon-btn accent" aria-label="Smazat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg></button></div>
+          </div>
+          <div class="row">
+            <div class="td"><a class="key-link">FIE1933-19834 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg></a></div>
+            <div class="td t-title">[TEH] Reporty - Neplní se Začátek dle KP a Konec dle KP - BE</div>
+            <div class="td"><span class="chip open">Open</span></div>
+            <div class="td t-time">24m</div>
+            <div class="td act"><button class="icon-btn accent" aria-label="Smazat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg></button></div>
+          </div>
+        </div>
+
+        <footer class="epic-foot">
+          <div class="rpp">Rows per page: <select><option>20</option><option>50</option><option>100</option></select></div>
+          <div class="num">1–11 of 11</div>
+          <div class="nav">
+            <button disabled aria-label="Předchozí">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <button disabled aria-label="Další">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+        </footer>
+      </article>
+
+      <!-- EPIC CARD: collapsed -->
+      <article class="epic-card collapsed">
+        <header class="epic-head">
+          <h3>Manufactory</h3>
+          <span class="chip neutral">128 tasks</span>
+          <span class="chip md">87.3 MD</span>
+          <span class="grow"></span>
+          <button class="icon-btn" aria-label="Smazat epic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Rozbalit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        </header>
+      </article>
+
+      <article class="epic-card collapsed">
+        <header class="epic-head">
+          <h3>Quality Control</h3>
+          <span class="chip neutral">76 tasks</span>
+          <span class="chip md">42.5 MD</span>
+          <span class="grow"></span>
+          <button class="icon-btn" aria-label="Smazat epic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg>
+          </button>
+          <button class="icon-btn" aria-label="Rozbalit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        </header>
+      </article>
+
+    </div>
+
+    <!-- TASK DETAIL DRAWER (matches Screenshot 3) -->
+    <aside class="drawer">
+      <header class="drawer-head">
+        <h3>Task detail</h3>
+        <span class="grow"></span>
+        <button class="icon-btn" aria-label="Otevřít v novém okně">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg>
+        </button>
+        <button class="icon-btn" aria-label="Zavřít">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="accent-bar"></div>
+
+      <div class="drawer-body">
+
+        <!-- Header card -->
+        <div class="task-card">
+          <div class="task-breadcrumb">
+            <span class="dot"></span>
+            <span>Green Code · Technology</span>
+          </div>
+          <a class="task-key">FIE1933-19781
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 4h6v6M10 14L20 4M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg>
+          </a>
+          <h2 class="task-title">[TEH] Narovnání operací pro možnost editace - BE</h2>
+          <div class="task-meta">
+            <button class="status-pill">Open</button>
+            <button class="time-pill">
+              <span class="num">1h 30m / 2h</span>
+              <span class="edit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Add worklog card -->
+        <div class="task-card worklog-card">
+          <h4>Add worklog</h4>
+          <div class="worklog-add-grid">
+            <div class="field float active" style="margin-bottom: 0">
+              <label>Date</label>
+              <div class="date-input">
+                <input value="27. 05." />
+                <span class="icon-suffix">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                </span>
+              </div>
+            </div>
+            <div class="field"><input placeholder="Tracked" /></div>
+            <div class="field"><input placeholder="Reported" /></div>
+            <div class="field"><input placeholder="Description" /></div>
+            <button class="btn primary" disabled>Add</button>
+          </div>
+        </div>
+
+        <!-- Worklog list card -->
+        <div class="task-card" style="padding: 0">
+          <div class="worklog-list">
+            <div class="th">Date</div>
+            <div class="th">Tracked</div>
+            <div class="th">Reported</div>
+            <div class="th">Description</div>
+            <div class="th"></div>
+
+            <div class="row">
+              <div class="td num">14. 5. 2026</div>
+              <div class="td num">15m</div>
+              <div class="td num">1h 30m</div>
+              <div class="td desc">Narovnání lock_state na PROD: 4 873 technologických operací s rozpracovaným nebo dokončeným RFNC odemčeno (lock_state 20 → 10). Operace s aktivním požadavkem na externí kooperaci ponechány zamčené.</div>
+              <div class="td act">
+                <button class="icon-btn accent" aria-label="Nevykázáno"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8c2.5 0 4.7.9 6.5 2.2M23 12s-4 8-11 8c-2.5 0-4.7-.9-6.5-2.2"/><path d="M3 3l18 18"/><circle cx="12" cy="12" r="3"/></svg></button>
+                <button class="icon-btn accent" aria-label="Upravit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+                <button class="icon-btn accent" aria-label="Smazat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </main>
+</div>
+
+<script>
+const root = document.body;
+const mt = document.getElementById('modeToggle');
+mt.addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  root.dataset.mode = btn.dataset.modeVal;
+  mt.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === btn));
+});
+</script>
+
+</body>
+</html>

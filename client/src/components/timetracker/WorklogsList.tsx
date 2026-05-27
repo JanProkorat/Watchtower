@@ -20,6 +20,7 @@ import {
   type SourceFilter,
 } from '../../state/useWorklogs.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
+import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
 import { WorklogDrawer } from './WorklogDrawer.js';
 import type { ProjectViewPayload, WorklogViewPayload } from '../../../../shared/ipcContract.js';
 
@@ -75,6 +76,7 @@ const SOURCE_LABELS: Record<string, string> = {
 export function WorklogsList({ projectId }: Props) {
   const state = useWorklogs({ projectId: projectId ?? null });
   const { showError } = useToast();
+  const lockedThrough = useWorklogLock();
   const [projects, setProjects] = useState<ProjectViewPayload[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<WorklogViewPayload | null>(null);
@@ -244,19 +246,25 @@ export function WorklogsList({ projectId }: Props) {
               </Typography>
             </Box>
             <Stack spacing={0.5}>
-              {group.rows.map((w) => (
-                <WorklogRow
-                  key={w.id}
-                  worklog={w}
-                  onEdit={() => {
-                    setEditing(w);
-                    setDrawerOpen(true);
-                  }}
-                  onDelete={() => {
-                    state.remove(w.id).catch((err) => showError(toastMessage(err)));
-                  }}
-                />
-              ))}
+              {group.rows.map((w) => {
+                const rowLocked = isLocked(w.workDate, lockedThrough);
+                return (
+                  <WorklogRow
+                    key={w.id}
+                    worklog={w}
+                    locked={rowLocked}
+                    lockedThrough={lockedThrough}
+                    onEdit={() => {
+                      setEditing(w);
+                      setDrawerOpen(true);
+                    }}
+                    onDelete={() => {
+                      if (rowLocked) return;
+                      state.remove(w.id).catch((err) => showError(toastMessage(err)));
+                    }}
+                  />
+                );
+              })}
             </Stack>
           </Box>
         ))}
@@ -288,10 +296,14 @@ export function WorklogsList({ projectId }: Props) {
 
 function WorklogRow({
   worklog,
+  locked,
+  lockedThrough,
   onEdit,
   onDelete,
 }: {
   worklog: WorklogViewPayload;
+  locked: boolean;
+  lockedThrough: string | null;
   onEdit(): void;
   onDelete(): void;
 }) {
@@ -400,15 +412,19 @@ function WorklogRow({
         <Box />
       )}
       <Stack direction="row" spacing={0.25}>
-        <Tooltip title="Edit">
+        <Tooltip title={locked ? `Locked through ${lockedThrough}` : 'Edit'}>
+          {/* Edit still opens the drawer (read-only with notice) when locked. */}
           <IconButton size="small" onClick={onEdit}>
             <EditIcon fontSize="small" />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Delete">
-          <IconButton size="small" onClick={onDelete}>
-            <DeleteOutlineIcon fontSize="small" />
-          </IconButton>
+        <Tooltip title={locked ? `Locked through ${lockedThrough}` : 'Delete'}>
+          {/* Span wrapper keeps the tooltip working while the button is disabled. */}
+          <span>
+            <IconButton size="small" onClick={onDelete} disabled={locked}>
+              <DeleteOutlineIcon fontSize="small" />
+            </IconButton>
+          </span>
         </Tooltip>
       </Stack>
     </Box>

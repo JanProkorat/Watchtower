@@ -10,6 +10,13 @@ export interface EpicRow {
   status: EpicStatus;
   displayOrder: number;
   jiraEpicKey: string | null;
+  /**
+   * Substring used during board sync to route Jira tasks here. When the
+   * linked Jira epic's name CONTAINS this string, the task is routed to
+   * this local epic. NULL → this epic doesn't participate in shortcut
+   * routing (it can still match by exact name as a fallback).
+   */
+  shortcut: string | null;
   githubIssueUrl: string | null;
   createdAt: string;
   /** Joined: total tasks under this epic. */
@@ -24,6 +31,7 @@ export interface EpicInput {
   description?: string | null;
   status?: EpicStatus;
   jiraEpicKey?: string | null;
+  shortcut?: string | null;
   githubIssueUrl?: string | null;
 }
 
@@ -35,6 +43,7 @@ type DbRow = {
   status: EpicStatus;
   display_order: number | null;
   jira_epic_key: string | null;
+  shortcut: string | null;
   github_issue_url: string | null;
   created_at: string;
   task_count: number;
@@ -50,6 +59,7 @@ function toRow(r: DbRow): EpicRow {
     status: r.status,
     displayOrder: r.display_order ?? 0,
     jiraEpicKey: r.jira_epic_key,
+    shortcut: r.shortcut,
     githubIssueUrl: r.github_issue_url,
     createdAt: r.created_at,
     taskCount: r.task_count,
@@ -57,10 +67,16 @@ function toRow(r: DbRow): EpicRow {
   };
 }
 
+function normaliseShortcut(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 const LIST_SQL = `
   SELECT
     e.id, e.project_id, e.name, e.description, e.status, e.display_order,
-    e.jira_epic_key, e.github_issue_url, e.created_at,
+    e.jira_epic_key, e.shortcut, e.github_issue_url, e.created_at,
     (SELECT COUNT(*) FROM tasks t WHERE t.epic_id = e.id) AS task_count,
     (SELECT COALESCE(SUM(w.minutes), 0)
        FROM worklogs w
@@ -111,8 +127,8 @@ export class EpicsRepo {
     const info = this.db
       .prepare(
         `INSERT INTO epics
-           (project_id, name, description, status, display_order, jira_epic_key, github_issue_url)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           (project_id, name, description, status, display_order, jira_epic_key, shortcut, github_issue_url)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.projectId,
@@ -121,6 +137,7 @@ export class EpicsRepo {
         input.status ?? 'planned',
         displayOrder,
         input.jiraEpicKey ?? null,
+        normaliseShortcut(input.shortcut),
         input.githubIssueUrl ?? null,
       ) as { lastInsertRowid: number | bigint };
 
@@ -138,6 +155,7 @@ export class EpicsRepo {
     if (input.description !== undefined) push('description', input.description);
     if (input.status !== undefined) push('status', input.status);
     if (input.jiraEpicKey !== undefined) push('jira_epic_key', input.jiraEpicKey);
+    if (input.shortcut !== undefined) push('shortcut', normaliseShortcut(input.shortcut));
     if (input.githubIssueUrl !== undefined) push('github_issue_url', input.githubIssueUrl);
 
     if (sets.length > 0) {

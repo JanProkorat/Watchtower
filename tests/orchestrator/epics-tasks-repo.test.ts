@@ -41,8 +41,20 @@ describe('EpicsRepo', () => {
     expect(e.name).toBe('Phase 1');
     expect(e.status).toBe('planned');
     expect(e.displayOrder).toBe(1000);
+    expect(e.shortcut).toBeNull();
     expect(e.taskCount).toBe(0);
     expect(e.totalMinutes).toBe(0);
+  });
+
+  it('round-trips shortcut on create and update (trimmed; empty → NULL)', () => {
+    const e = epics.create({ projectId, name: 'Technology', shortcut: '  TEH  ' });
+    expect(e.shortcut).toBe('TEH');
+
+    const updated = epics.update(e.id, { shortcut: '' });
+    expect(updated.shortcut).toBeNull();
+
+    const restored = epics.update(e.id, { shortcut: 'VYR' });
+    expect(restored.shortcut).toBe('VYR');
   });
 
   it('appends new epics at the end of the project\'s order', () => {
@@ -208,7 +220,7 @@ describe('TasksRepo', () => {
       expect(got.jiraSyncedAt).toBe('2026-05-26T14:32:00.000Z');
     });
 
-    it('clearJiraStatusExcept clears rows whose number is NOT in the keep-set', () => {
+    it('clearJiraStatusExceptForProject clears rows whose number is NOT in the keep-set', () => {
       const a = tasks.create({ epicId, number: 'A-1', title: 'a' });
       const b = tasks.create({ epicId, number: 'A-2', title: 'b' });
       const c = tasks.create({ epicId, number: 'A-3', title: 'c' });
@@ -220,14 +232,14 @@ describe('TasksRepo', () => {
           syncedAt: '2026-05-26T00:00:00Z',
         });
       }
-      const cleared = tasks.clearJiraStatusExcept(['A-1', 'A-2']);
+      const cleared = tasks.clearJiraStatusExceptForProject(projectId, ['A-1', 'A-2']);
       expect(cleared).toBe(1);
       expect(tasks.get(a.id)?.jiraStatus).toBe('To Do');
       expect(tasks.get(b.id)?.jiraStatus).toBe('To Do');
       expect(tasks.get(c.id)?.jiraStatus).toBeNull();
     });
 
-    it('clearJiraStatusExcept with an empty keep-set clears all', () => {
+    it('clearJiraStatusExceptForProject with an empty keep-set clears all rows in that project', () => {
       const a = tasks.create({ epicId, number: 'A-1', title: 'a' });
       tasks.updateJiraFields(a.id, {
         jiraStatus: 'To Do',
@@ -235,9 +247,28 @@ describe('TasksRepo', () => {
         component: null,
         syncedAt: '2026-05-26T00:00:00Z',
       });
-      const cleared = tasks.clearJiraStatusExcept([]);
+      const cleared = tasks.clearJiraStatusExceptForProject(projectId, []);
       expect(cleared).toBe(1);
       expect(tasks.get(a.id)?.jiraStatus).toBeNull();
+    });
+
+    it('clearJiraStatusExceptForProject leaves tasks in other projects untouched', () => {
+      const otherProjectId = seedProject(db, 'Other');
+      const otherEpic = epics.create({ projectId: otherProjectId, name: 'X' });
+      const here = tasks.create({ epicId, number: 'H-1', title: 'here' });
+      const there = tasks.create({ epicId: otherEpic.id, number: 'T-1', title: 'there' });
+      for (const id of [here.id, there.id]) {
+        tasks.updateJiraFields(id, {
+          jiraStatus: 'To Do',
+          estimateSeconds: null,
+          component: null,
+          syncedAt: '2026-05-26T00:00:00Z',
+        });
+      }
+      const cleared = tasks.clearJiraStatusExceptForProject(projectId, []);
+      expect(cleared).toBe(1);
+      expect(tasks.get(here.id)?.jiraStatus).toBeNull();
+      expect(tasks.get(there.id)?.jiraStatus).toBe('To Do');
     });
   });
 });
@@ -259,9 +290,9 @@ describe('migrations · v5 extends epics + tasks', () => {
     expect(cols.map((c) => c.name)).toContain('description');
   });
 
-  it('bumps schema version to 6', () => {
+  it('bumps schema version to 8', () => {
     const db = freshDb();
     const row = db.prepare(`SELECT MAX(version) v FROM schema_version`).get() as { v: number };
-    expect(row.v).toBe(6);
+    expect(row.v).toBe(8);
   });
 });

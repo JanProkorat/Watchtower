@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   detectAreaCode,
+  extractEpicShortcut,
   pickProjectForKey,
 } from '../../orchestrator/services/jiraRouting.js';
 import type { ProjectViewPayload } from '../../shared/ipcContract.js';
@@ -42,6 +43,42 @@ describe('detectAreaCode', () => {
 
   it('summary tag wins over epic prefix', () => {
     expect(detectAreaCode('[KP] foo', 'TEH-something')).toBe('KP');
+  });
+});
+
+describe('extractEpicShortcut', () => {
+  it('extracts the uppercase code before a hyphen', () => {
+    expect(extractEpicShortcut('TEH - Technologický postup')).toBe('TEH');
+    expect(extractEpicShortcut('VYR-Výroba')).toBe('VYR');
+    expect(extractEpicShortcut('KP - Capacity Planning')).toBe('KP');
+  });
+
+  it('handles en-dash, em-dash, colon, and slash separators', () => {
+    expect(extractEpicShortcut('VYR — Výroba')).toBe('VYR');
+    expect(extractEpicShortcut('TEH – Tech')).toBe('TEH');
+    expect(extractEpicShortcut('KK: Kvalita')).toBe('KK');
+    expect(extractEpicShortcut('SZ/Servis')).toBe('SZ');
+  });
+
+  it('extracts the prefix from an epic key (TEH-456 → TEH)', () => {
+    expect(extractEpicShortcut('TEH-456')).toBe('TEH');
+    expect(extractEpicShortcut('FIE1933-19000')).toBe('FIE1933');
+  });
+
+  it('preserves mixed-case area names like Infrastruktura', () => {
+    expect(extractEpicShortcut('Infrastruktura')).toBe('Infrastruktura');
+    expect(extractEpicShortcut('Infrastruktura - Síť')).toBe('Infrastruktura');
+  });
+
+  it('returns null for empty / whitespace-only / null input', () => {
+    expect(extractEpicShortcut(null)).toBeNull();
+    expect(extractEpicShortcut(undefined)).toBeNull();
+    expect(extractEpicShortcut('')).toBeNull();
+    expect(extractEpicShortcut('   ')).toBeNull();
+  });
+
+  it('returns the whole string trimmed when no separator is present', () => {
+    expect(extractEpicShortcut('  OnlyOneWord  ')).toBe('OnlyOneWord');
   });
 });
 

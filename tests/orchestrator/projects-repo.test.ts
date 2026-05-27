@@ -37,6 +37,7 @@ describe('ProjectsRepo', () => {
       expect(p.isDefault).toBe(false);
       expect(p.folderPath).toBeNull();
       expect(p.jiraGlobs).toEqual([]);
+      expect(p.jiraBoardUrl).toBeNull();
       expect(p.description).toBeNull();
       expect(p.epicCount).toBe(0);
       expect(p.totalMinutes).toBe(0);
@@ -127,6 +128,18 @@ describe('ProjectsRepo', () => {
       const raw = db.prepare(`SELECT jira_globs FROM projects WHERE id = ?`).get(p.id) as { jira_globs: string | null };
       expect(raw.jira_globs).toBeNull();
       expect(repo.get(p.id)?.jiraGlobs).toEqual([]);
+    });
+
+    it('round-trips jiraBoardUrl, trimming whitespace and treating empty strings as NULL', () => {
+      const url = 'https://jira.skoda.vwgroup.com/secure/RapidBoard.jspa?rapidView=51682&quickFilter=84114';
+      const p = repo.create({ name: 'FIE', jiraBoardUrl: `  ${url}  ` });
+      expect(p.jiraBoardUrl).toBe(url);
+      expect(repo.get(p.id)?.jiraBoardUrl).toBe(url);
+
+      repo.update(p.id, { jiraBoardUrl: '   ' });
+      const raw = db.prepare(`SELECT jira_board_url FROM projects WHERE id = ?`).get(p.id) as { jira_board_url: string | null };
+      expect(raw.jira_board_url).toBeNull();
+      expect(repo.get(p.id)?.jiraBoardUrl).toBeNull();
     });
   });
 

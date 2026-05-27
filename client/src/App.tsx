@@ -124,6 +124,12 @@ export function App() {
     setPendingNewCwd(cwd);
     setNewOpen(true);
   };
+  const switchToTimeTrackerProject = (projectId: number) => {
+    // Set the hash before flipping the module so useTimeTrackerView reads
+    // the right view on its initial mount.
+    window.location.hash = `#timetracker/projects/${projectId}`;
+    setActiveModule('timetracker');
+  };
 
   // Show the first-run wizard until the user explicitly finishes or skips it.
   useEffect(() => {
@@ -249,6 +255,7 @@ export function App() {
             onActivateInstance={switchToInstance}
             onKillInstance={(id) => kill(id)}
             onStartNewInstance={() => setNewOpen(true)}
+            onOpenProject={switchToTimeTrackerProject}
           />
         )}
         {activeModule === 'settings' && <ModuleSettings active />}

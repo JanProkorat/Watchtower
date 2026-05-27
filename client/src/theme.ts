@@ -18,7 +18,9 @@ const shared: ThemeOptions = {
   components: {
     MuiButton: {
       defaultProps: { disableElevation: true },
-      styleOverrides: { root: { borderRadius: 10 } },
+      styleOverrides: {
+        root: { borderRadius: 10 },
+      },
     },
     MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
     MuiCssBaseline: {
@@ -28,7 +30,11 @@ const shared: ThemeOptions = {
         body: { fontFeatureSettings: '"cv11", "ss01"' },
       },
     },
-    MuiChip: { styleOverrides: { root: { fontWeight: 500 } } },
+    MuiChip: {
+      styleOverrides: {
+        root: { fontWeight: 500 },
+      },
+    },
   },
 };
 
@@ -72,7 +78,9 @@ export const darkTheme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: { backgroundImage: 'none' },
-        outlined: { borderColor: 'rgba(255,255,255,0.08)' },
+        outlined: {
+          borderColor: 'rgba(255,255,255,0.08)',
+        },
       },
     },
   },
@@ -118,10 +126,10 @@ export const lightTheme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: { backgroundImage: 'none' },
-        outlined: { borderColor: 'rgba(15,18,24,0.08)' },
+        outlined: {
+          borderColor: 'rgba(15,18,24,0.08)',
+        },
       },
     },
   },
 });
-
-export type ThemeMode = 'light' | 'dark';

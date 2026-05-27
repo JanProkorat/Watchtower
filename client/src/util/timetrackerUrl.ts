@@ -2,37 +2,36 @@
  * URL-hash routing for the TimeTracker module.
  *
  * Hash format:
- *   #timetracker/projects                       — list mode, Projects tab
- *   #timetracker/worklogs                       — list mode, Worklogs tab
- *   #timetracker/grid                           — list mode, Task grid tab
- *   #timetracker/timeoff                        — list mode, Time off tab
- *   #timetracker/reports                        — list mode, Reports tab
- *   #timetracker/detail/<projectId>/epics       — detail mode, Epics & Tasks tab
- *   #timetracker/detail/<projectId>/worklogs    — detail mode, Worklogs tab
- *   #timetracker/detail/<projectId>/contracts   — detail mode, Contracts tab
+ *   #timetracker/projects           — Projects tab, no project selected
+ *   #timetracker/projects/<id>      — Projects tab, project <id> selected
+ *   #timetracker/worklogs           — Worklogs tab
+ *   #timetracker/grid               — Task grid tab
+ *   #timetracker/timeoff            — Time off tab
+ *   #timetracker/reports            — Reports tab
+ *   #timetracker/board              — Board tab
  *
- * Parsing is strict: an unknown tab or non-numeric project id returns null and
- * the caller falls back to the default landing (list mode, Projects tab).
+ * Parsing is strict: an unknown tab or non-numeric project id returns null
+ * and the caller falls back to the default landing (Projects, no selection).
  */
 
 export const LIST_TABS = ['projects', 'worklogs', 'grid', 'timeoff', 'reports', 'board'] as const;
 export type ListTab = (typeof LIST_TABS)[number];
 
-export const DETAIL_TABS = ['epics', 'worklogs', 'contracts'] as const;
-export type DetailTab = (typeof DETAIL_TABS)[number];
+/**
+ * Single, flat view shape. `projectId` is only meaningful when
+ * `tab === 'projects'`; other tabs ignore it (the helpers below keep it
+ * `null` for those tabs as a normalisation).
+ */
+export interface TimeTrackerView {
+  tab: ListTab;
+  /** Only valid when tab === 'projects'. */
+  projectId: number | null;
+}
 
-export type TimeTrackerView =
-  | { mode: 'list'; tab: ListTab }
-  | { mode: 'detail'; projectId: number; tab: DetailTab };
-
-export const DEFAULT_VIEW: TimeTrackerView = { mode: 'list', tab: 'projects' };
+export const DEFAULT_VIEW: TimeTrackerView = { tab: 'projects', projectId: null };
 
 function isListTab(s: string | undefined): s is ListTab {
   return s !== undefined && (LIST_TABS as readonly string[]).includes(s);
-}
-
-function isDetailTab(s: string | undefined): s is DetailTab {
-  return s !== undefined && (DETAIL_TABS as readonly string[]).includes(s);
 }
 
 /** Strip the leading '#' if present. */
@@ -45,35 +44,37 @@ export function parseTimeTrackerHash(hash: string): TimeTrackerView | null {
   if (!trimmed.startsWith('timetracker/')) return null;
   const parts = trimmed.slice('timetracker/'.length).split('/');
 
-  if (parts[0] === 'detail') {
-    // detail/<projectId>/<tab>
-    if (parts.length !== 3) return null;
-    const projectId = Number(parts[1]);
-    if (!Number.isFinite(projectId) || !Number.isInteger(projectId) || projectId <= 0) {
-      return null;
+  // Projects can optionally carry a project id: /projects[/<id>]
+  if (parts[0] === 'projects') {
+    if (parts.length === 1) return { tab: 'projects', projectId: null };
+    if (parts.length === 2) {
+      const projectId = Number(parts[1]);
+      if (!Number.isFinite(projectId) || !Number.isInteger(projectId) || projectId <= 0) {
+        return null;
+      }
+      return { tab: 'projects', projectId };
     }
-    if (!isDetailTab(parts[2])) return null;
-    return { mode: 'detail', projectId, tab: parts[2] };
+    return null;
   }
 
   if (parts.length === 1 && isListTab(parts[0])) {
-    return { mode: 'list', tab: parts[0] };
+    return { tab: parts[0], projectId: null };
   }
 
   return null;
 }
 
 export function timetrackerHash(view: TimeTrackerView): string {
-  if (view.mode === 'list') return `#timetracker/${view.tab}`;
-  return `#timetracker/detail/${view.projectId}/${view.tab}`;
+  if (view.tab === 'projects' && view.projectId !== null) {
+    return `#timetracker/projects/${view.projectId}`;
+  }
+  return `#timetracker/${view.tab}`;
 }
 
 /** Convenience equality so callers can avoid redundant history.pushState. */
 export function viewsEqual(a: TimeTrackerView, b: TimeTrackerView): boolean {
-  if (a.mode !== b.mode) return false;
-  if (a.mode === 'list' && b.mode === 'list') return a.tab === b.tab;
-  if (a.mode === 'detail' && b.mode === 'detail') {
-    return a.projectId === b.projectId && a.tab === b.tab;
-  }
-  return false;
+  if (a.tab !== b.tab) return false;
+  // projectId only matters on the projects tab.
+  if (a.tab === 'projects') return a.projectId === b.projectId;
+  return true;
 }

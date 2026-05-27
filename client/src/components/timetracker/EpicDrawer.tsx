@@ -24,6 +24,7 @@ interface Props {
 
 interface Draft {
   name: string;
+  shortcut: string;
   description: string;
   status: 'planned' | 'active' | 'done';
   jiraEpicKey: string;
@@ -31,13 +32,21 @@ interface Draft {
 }
 
 function emptyDraft(): Draft {
-  return { name: '', description: '', status: 'planned', jiraEpicKey: '', githubIssueUrl: '' };
+  return {
+    name: '',
+    shortcut: '',
+    description: '',
+    status: 'planned',
+    jiraEpicKey: '',
+    githubIssueUrl: '',
+  };
 }
 
 function draftOf(epic: EpicViewPayload | null): Draft {
   if (!epic) return emptyDraft();
   return {
     name: epic.name,
+    shortcut: epic.shortcut ?? '',
     description: epic.description ?? '',
     status: epic.status,
     jiraEpicKey: epic.jiraEpicKey ?? '',
@@ -69,6 +78,7 @@ export function EpicDrawer({ open, epic, projectId, onClose, onSubmit, onDelete 
       await onSubmit({
         projectId,
         name: draft.name.trim(),
+        shortcut: draft.shortcut.trim() ? draft.shortcut.trim() : null,
         description: draft.description.trim() ? draft.description.trim() : null,
         status: draft.status,
         jiraEpicKey: draft.jiraEpicKey.trim() ? draft.jiraEpicKey.trim() : null,
@@ -125,6 +135,17 @@ export function EpicDrawer({ open, epic, projectId, onClose, onSubmit, onDelete 
             required
             fullWidth
             autoFocus
+          />
+
+          <TextField
+            label="Shortcut"
+            size="small"
+            value={draft.shortcut}
+            onChange={(e) => setDraft({ ...draft, shortcut: e.target.value })}
+            placeholder="TEH"
+            helperText="Substring matched against the linked Jira epic's name during board sync. Leave empty to opt out."
+            fullWidth
+            sx={{ '& input': { fontFamily: 'Menlo, monospace', fontSize: 13 } }}
           />
 
           <TextField

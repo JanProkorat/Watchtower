@@ -2,6 +2,13 @@ import type { ProjectViewPayload } from '../../shared/ipcContract.js';
 
 const SUMMARY_TAG = /^\s*\[([A-Z][A-Z0-9]*)\]/;
 const EPIC_PREFIX = /^([A-Z][A-Z0-9]*)[-\s]/;
+/**
+ * Delimiters that separate the "shortcut" from the rest of an epic
+ * summary: ASCII hyphen-minus, en-dash, em-dash, colon, or forward slash.
+ * Surrounding whitespace is consumed. The slash also covers the
+ * "FOO/something" style used in a few Skoda epic names.
+ */
+const EPIC_SHORTCUT_SPLIT = /\s*[-–—:/]\s*/;
 
 /**
  * Extract an area code (`TEH`, `VYR`, `KP`, `INFRA`, …) from a Jira
@@ -37,6 +44,29 @@ export function pickProjectForKey(
     }
   }
   return null;
+}
+
+/**
+ * Pull the categorical "shortcut" out of a Jira epic's summary (or, when
+ * the summary lookup failed, its key). The shortcut is whatever sits
+ * before the first delimiter — works for both UPPERCASE codes ("TEH",
+ * "VYR", "KP", "KK", "SZ") and area-name styles ("Infrastruktura"):
+ *
+ *   "TEH - Technologický postup"        → "TEH"
+ *   "VYR — Výroba"                      → "VYR"
+ *   "Infrastruktura"                    → "Infrastruktura"
+ *   "KP/Capacity Planning"              → "KP"
+ *   "TEH-456" (epic key as fallback)    → "TEH"
+ *
+ * Returns null for empty / whitespace-only input so callers can fall
+ * back to the task's own `[AREA]` summary tag and finally to "Other".
+ */
+export function extractEpicShortcut(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  const first = trimmed.split(EPIC_SHORTCUT_SPLIT)[0]?.trim() ?? '';
+  return first.length > 0 ? first : null;
 }
 
 function matchesGlob(value: string, pattern: string): boolean {

@@ -1,6 +1,8 @@
 import type { SqliteLike } from './migrations.js';
 import { ReportsService } from './reports.js';
+import { ContractStatusService } from './contractStatus.js';
 import type {
+  DashboardActiveContractPayload,
   DashboardOverviewRequestPayload,
   DashboardOverviewResponsePayload,
   DashboardSprintDayPayload,
@@ -61,7 +63,76 @@ export class DashboardOverviewService {
     const month = { minutes: this.sumForMonth(todayDate, projectId), earned: monthEarned };
     const heatmap30d = this.heatmap30d(todayDate, projectId);
     const topProjects = this.topProjects(todayDate, projectId);
-    return { today, month, sprint: { ...sprint, totalEarned: sprintEarned }, heatmap30d, topProjects };
+    const activeContracts = this.activeContracts(todayDate);
+    return {
+      today,
+      month,
+      sprint: { ...sprint, totalEarned: sprintEarned },
+      heatmap30d,
+      topProjects,
+      activeContracts,
+    };
+  }
+
+  /**
+   * Every non-archived `work` project that has an active contract row with
+   * either an end_date or an md_limit. Independent of the dashboard's
+   * project filter — the active-contracts card surfaces budget health
+   * across all projects regardless of which one the user is filtering by.
+   *
+   * Sort order matches TT's dashboard: contracts whose projected total
+   * overshoots their md_limit by the largest amount come first, then ones
+   * within budget, then open-ended / un-projected ones, then alphabetical.
+   */
+  private activeContracts(todayDate: string): DashboardActiveContractPayload[] {
+    interface Row {
+      project_id: number;
+      project_name: string;
+      project_color: string;
+      currency: string | null;
+    }
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT p.id    AS project_id,
+                         p.name  AS project_name,
+                         p.color AS project_color,
+                         (SELECT pr2.currency
+                            FROM project_rates pr2
+                           WHERE pr2.project_id = p.id
+                           ORDER BY pr2.effective_from DESC, pr2.id DESC
+                           LIMIT 1) AS currency
+           FROM projects p
+           JOIN project_rates pr ON pr.project_id = p.id
+          WHERE p.archived = 0
+            AND p.kind = 'work'
+            AND pr.effective_from <= ?
+            AND (pr.end_date IS NULL OR pr.end_date >= ?)
+            AND (pr.end_date IS NOT NULL OR pr.md_limit IS NOT NULL)
+          ORDER BY p.name ASC`,
+      )
+      .all(todayDate, todayDate) as Row[];
+
+    const svc = new ContractStatusService(this.db);
+    const out: DashboardActiveContractPayload[] = [];
+    for (const r of rows) {
+      const contract = svc.forProject(r.project_id, todayDate);
+      if (!contract) continue;
+      out.push({
+        projectId: r.project_id,
+        projectName: r.project_name,
+        projectColor: r.project_color,
+        currency: r.currency,
+        contract,
+      });
+    }
+
+    out.sort((a, b) => {
+      const sa = overshootScore(a.contract.projectedTotalMds, a.contract.mdLimit);
+      const sb = overshootScore(b.contract.projectedTotalMds, b.contract.mdLimit);
+      if (sa !== sb) return sb - sa;
+      return a.projectName.localeCompare(b.projectName);
+    });
+    return out;
   }
 
   private sumForDate(date: string, projectId: number | null): number {
@@ -186,6 +257,14 @@ export class DashboardOverviewService {
       minutes: r.minutes,
     }));
   }
+}
+
+function overshootScore(
+  projected: number | null,
+  limit: number | null,
+): number {
+  if (projected == null || limit == null) return -Infinity;
+  return projected - limit;
 }
 
 function sprintWindow(anchor: string, startDate: string, lengthDays: number) {

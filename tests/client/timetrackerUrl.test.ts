@@ -8,44 +8,29 @@ import {
 } from '../../client/src/util/timetrackerUrl.js';
 
 describe('parseTimeTrackerHash', () => {
-  it('parses every list-mode tab', () => {
-    expect(parseTimeTrackerHash('#timetracker/projects')).toEqual({ mode: 'list', tab: 'projects' });
-    expect(parseTimeTrackerHash('#timetracker/worklogs')).toEqual({ mode: 'list', tab: 'worklogs' });
-    expect(parseTimeTrackerHash('#timetracker/grid')).toEqual({ mode: 'list', tab: 'grid' });
-    expect(parseTimeTrackerHash('#timetracker/timeoff')).toEqual({ mode: 'list', tab: 'timeoff' });
-    expect(parseTimeTrackerHash('#timetracker/reports')).toEqual({ mode: 'list', tab: 'reports' });
-    expect(parseTimeTrackerHash('#timetracker/board')).toEqual({ mode: 'list', tab: 'board' });
+  it('parses every tab without a project id', () => {
+    expect(parseTimeTrackerHash('#timetracker/projects')).toEqual({ tab: 'projects', projectId: null });
+    expect(parseTimeTrackerHash('#timetracker/worklogs')).toEqual({ tab: 'worklogs', projectId: null });
+    expect(parseTimeTrackerHash('#timetracker/grid')).toEqual({ tab: 'grid', projectId: null });
+    expect(parseTimeTrackerHash('#timetracker/timeoff')).toEqual({ tab: 'timeoff', projectId: null });
+    expect(parseTimeTrackerHash('#timetracker/reports')).toEqual({ tab: 'reports', projectId: null });
+    expect(parseTimeTrackerHash('#timetracker/board')).toEqual({ tab: 'board', projectId: null });
   });
 
-  it('round-trips the board hash', () => {
-    expect(timetrackerHash({ mode: 'list', tab: 'board' })).toBe('#timetracker/board');
-  });
-
-  it('parses every detail-mode tab', () => {
-    expect(parseTimeTrackerHash('#timetracker/detail/42/epics')).toEqual({
-      mode: 'detail',
+  it('parses a selected project on the projects tab', () => {
+    expect(parseTimeTrackerHash('#timetracker/projects/42')).toEqual({
+      tab: 'projects',
       projectId: 42,
-      tab: 'epics',
     });
-    expect(parseTimeTrackerHash('#timetracker/detail/42/worklogs')).toEqual({
-      mode: 'detail',
-      projectId: 42,
-      tab: 'worklogs',
-    });
-    expect(parseTimeTrackerHash('#timetracker/detail/42/contracts')).toEqual({
-      mode: 'detail',
-      projectId: 42,
-      tab: 'contracts',
+    expect(parseTimeTrackerHash('#timetracker/projects/1')).toEqual({
+      tab: 'projects',
+      projectId: 1,
     });
   });
 
   it('tolerates a missing leading #', () => {
-    expect(parseTimeTrackerHash('timetracker/projects')).toEqual({ mode: 'list', tab: 'projects' });
-    expect(parseTimeTrackerHash('timetracker/detail/7/epics')).toEqual({
-      mode: 'detail',
-      projectId: 7,
-      tab: 'epics',
-    });
+    expect(parseTimeTrackerHash('timetracker/projects')).toEqual({ tab: 'projects', projectId: null });
+    expect(parseTimeTrackerHash('timetracker/projects/7')).toEqual({ tab: 'projects', projectId: 7 });
   });
 
   it('returns null for an unrelated hash', () => {
@@ -55,54 +40,56 @@ describe('parseTimeTrackerHash', () => {
     expect(parseTimeTrackerHash('#settings/general')).toBeNull();
   });
 
-  it('returns null for unknown list tabs', () => {
+  it('returns null for unknown tabs', () => {
     expect(parseTimeTrackerHash('#timetracker/dashboard')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/projects/extra')).toBeNull();
+    expect(parseTimeTrackerHash('#timetracker/projects/extra/segment')).toBeNull();
   });
 
-  it('returns null for unknown or malformed detail-mode hashes', () => {
-    expect(parseTimeTrackerHash('#timetracker/detail')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/detail/42')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/detail/abc/epics')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/detail/-1/epics')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/detail/0/epics')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/detail/1.5/epics')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/detail/42/dashboard')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/detail/42/epics/extra')).toBeNull();
+  it('returns null for non-positive / non-integer / malformed project ids', () => {
+    expect(parseTimeTrackerHash('#timetracker/projects/abc')).toBeNull();
+    expect(parseTimeTrackerHash('#timetracker/projects/-1')).toBeNull();
+    expect(parseTimeTrackerHash('#timetracker/projects/0')).toBeNull();
+    expect(parseTimeTrackerHash('#timetracker/projects/1.5')).toBeNull();
+  });
+
+  it('does not accept project ids on tabs other than projects', () => {
+    expect(parseTimeTrackerHash('#timetracker/worklogs/42')).toBeNull();
+    expect(parseTimeTrackerHash('#timetracker/board/42')).toBeNull();
   });
 });
 
 describe('timetrackerHash', () => {
-  it('serialises every list-mode view to a stable hash', () => {
-    expect(timetrackerHash({ mode: 'list', tab: 'projects' })).toBe('#timetracker/projects');
-    expect(timetrackerHash({ mode: 'list', tab: 'worklogs' })).toBe('#timetracker/worklogs');
-    expect(timetrackerHash({ mode: 'list', tab: 'grid' })).toBe('#timetracker/grid');
-    expect(timetrackerHash({ mode: 'list', tab: 'timeoff' })).toBe('#timetracker/timeoff');
-    expect(timetrackerHash({ mode: 'list', tab: 'reports' })).toBe('#timetracker/reports');
+  it('serialises every tab without a selection to a stable hash', () => {
+    expect(timetrackerHash({ tab: 'projects', projectId: null })).toBe('#timetracker/projects');
+    expect(timetrackerHash({ tab: 'worklogs', projectId: null })).toBe('#timetracker/worklogs');
+    expect(timetrackerHash({ tab: 'grid', projectId: null })).toBe('#timetracker/grid');
+    expect(timetrackerHash({ tab: 'timeoff', projectId: null })).toBe('#timetracker/timeoff');
+    expect(timetrackerHash({ tab: 'reports', projectId: null })).toBe('#timetracker/reports');
+    expect(timetrackerHash({ tab: 'board', projectId: null })).toBe('#timetracker/board');
   });
 
-  it('serialises every detail-mode view to a stable hash', () => {
-    expect(timetrackerHash({ mode: 'detail', projectId: 42, tab: 'epics' })).toBe(
-      '#timetracker/detail/42/epics',
-    );
-    expect(timetrackerHash({ mode: 'detail', projectId: 7, tab: 'worklogs' })).toBe(
-      '#timetracker/detail/7/worklogs',
-    );
-    expect(timetrackerHash({ mode: 'detail', projectId: 1, tab: 'contracts' })).toBe(
-      '#timetracker/detail/1/contracts',
+  it('serialises a selected project on the projects tab', () => {
+    expect(timetrackerHash({ tab: 'projects', projectId: 42 })).toBe('#timetracker/projects/42');
+    expect(timetrackerHash({ tab: 'projects', projectId: 1 })).toBe('#timetracker/projects/1');
+  });
+
+  it('ignores projectId on non-projects tabs (defensive normalisation)', () => {
+    // The hook never sets projectId for non-projects tabs, but if a caller
+    // builds the view by hand we still produce a clean hash.
+    expect(timetrackerHash({ tab: 'worklogs', projectId: 99 } as TimeTrackerView)).toBe(
+      '#timetracker/worklogs',
     );
   });
 
   it('round-trips parse↔serialise for every view', () => {
     const samples: TimeTrackerView[] = [
-      { mode: 'list', tab: 'projects' },
-      { mode: 'list', tab: 'worklogs' },
-      { mode: 'list', tab: 'grid' },
-      { mode: 'list', tab: 'timeoff' },
-      { mode: 'list', tab: 'reports' },
-      { mode: 'detail', projectId: 42, tab: 'epics' },
-      { mode: 'detail', projectId: 7, tab: 'worklogs' },
-      { mode: 'detail', projectId: 999, tab: 'contracts' },
+      { tab: 'projects', projectId: null },
+      { tab: 'projects', projectId: 42 },
+      { tab: 'worklogs', projectId: null },
+      { tab: 'grid', projectId: null },
+      { tab: 'timeoff', projectId: null },
+      { tab: 'reports', projectId: null },
+      { tab: 'board', projectId: null },
     ];
     for (const v of samples) {
       expect(parseTimeTrackerHash(timetrackerHash(v))).toEqual(v);
@@ -111,52 +98,41 @@ describe('timetrackerHash', () => {
 });
 
 describe('viewsEqual', () => {
-  it('returns true for identical list views', () => {
-    expect(viewsEqual({ mode: 'list', tab: 'projects' }, { mode: 'list', tab: 'projects' })).toBe(true);
-  });
-
-  it('returns true for identical detail views', () => {
+  it('returns true for identical views', () => {
     expect(
-      viewsEqual(
-        { mode: 'detail', projectId: 42, tab: 'epics' },
-        { mode: 'detail', projectId: 42, tab: 'epics' },
-      ),
+      viewsEqual({ tab: 'projects', projectId: null }, { tab: 'projects', projectId: null }),
+    ).toBe(true);
+    expect(
+      viewsEqual({ tab: 'projects', projectId: 42 }, { tab: 'projects', projectId: 42 }),
     ).toBe(true);
   });
 
-  it('returns false across modes', () => {
+  it('returns false for different tabs', () => {
     expect(
-      viewsEqual({ mode: 'list', tab: 'projects' }, { mode: 'detail', projectId: 1, tab: 'epics' }),
+      viewsEqual({ tab: 'projects', projectId: null }, { tab: 'worklogs', projectId: null }),
     ).toBe(false);
   });
 
-  it('returns false for different list tabs', () => {
+  it('returns false for different project ids on the projects tab', () => {
     expect(
-      viewsEqual({ mode: 'list', tab: 'projects' }, { mode: 'list', tab: 'worklogs' }),
+      viewsEqual({ tab: 'projects', projectId: 1 }, { tab: 'projects', projectId: 2 }),
     ).toBe(false);
   });
 
-  it('returns false for different project ids', () => {
+  it('ignores projectId on non-projects tabs', () => {
+    // The hook normalises projectId to null for non-projects tabs, so two
+    // worklogs views with different (stale) projectIds are still equal.
     expect(
       viewsEqual(
-        { mode: 'detail', projectId: 1, tab: 'epics' },
-        { mode: 'detail', projectId: 2, tab: 'epics' },
+        { tab: 'worklogs', projectId: 99 } as TimeTrackerView,
+        { tab: 'worklogs', projectId: 1 } as TimeTrackerView,
       ),
-    ).toBe(false);
-  });
-
-  it('returns false for different detail tabs', () => {
-    expect(
-      viewsEqual(
-        { mode: 'detail', projectId: 1, tab: 'epics' },
-        { mode: 'detail', projectId: 1, tab: 'contracts' },
-      ),
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 
 describe('DEFAULT_VIEW', () => {
-  it('lands on Projects in list mode', () => {
-    expect(DEFAULT_VIEW).toEqual({ mode: 'list', tab: 'projects' });
+  it('lands on Projects with no selection', () => {
+    expect(DEFAULT_VIEW).toEqual({ tab: 'projects', projectId: null });
   });
 });

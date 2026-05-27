@@ -16,6 +16,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
 import CloseIcon from '@mui/icons-material/Close';
 import { CZ_DATE_FORMAT } from '../../util/format.js';
+import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
 import type {
   ProjectViewPayload,
   TaskViewPayload,
@@ -164,6 +165,14 @@ export function WorklogDrawer({
   }, [open, draft.projectId]);
 
   const isEdit = worklog !== null;
+  const lockedThrough = useWorklogLock();
+  // Editing or moving a row in / out of the locked range is rejected
+  // server-side (orchestrator throws WorklogLockedError); mirror the rule
+  // client-side so the user gets immediate feedback rather than a round-trip.
+  const editingLocked = worklog !== null && isLocked(worklog.workDate, lockedThrough);
+  const dateLocked = isLocked(draft.workDate, lockedThrough);
+  const locked = editingLocked || dateLocked;
+
   const hoursNum = Number(draft.hours);
   const minutes =
     draft.hours.trim() && Number.isFinite(hoursNum) && hoursNum > 0
@@ -184,7 +193,8 @@ export function WorklogDrawer({
     minutes > 0 &&
     draft.workDate.length === 10 &&
     reportedHoursValid &&
-    !submitting;
+    !submitting &&
+    !locked;
 
   const submit = async () => {
     if (!canSubmit || draft.taskId == null) return;
@@ -255,6 +265,12 @@ export function WorklogDrawer({
           }}
         >
           {error && <Alert severity="error">{error}</Alert>}
+          {locked && (
+            <Alert severity="warning">
+              Worklogs on or before {lockedThrough} are locked. Unlock in
+              Settings → Worklog lock to edit.
+            </Alert>
+          )}
 
           <TextField
             select
@@ -269,6 +285,7 @@ export function WorklogDrawer({
               })
             }
             required
+            disabled={editingLocked}
           >
             <MenuItem value="" disabled>
               Select a project…
@@ -290,7 +307,7 @@ export function WorklogDrawer({
             getOptionLabel={(t) => `${t.number} ${t.title}`}
             filterOptions={filterTaskOptions}
             isOptionEqualToValue={(a, b) => a.id === b.id}
-            disabled={draft.projectId == null}
+            disabled={draft.projectId == null || editingLocked}
             noOptionsText={
               tasks.length === 0
                 ? 'This project has no tasks yet.'
@@ -333,6 +350,7 @@ export function WorklogDrawer({
             multiline
             minRows={2}
             fullWidth
+            disabled={editingLocked}
           />
 
           <DatePicker
@@ -342,8 +360,15 @@ export function WorklogDrawer({
               v && setDraft({ ...draft, workDate: v.format('YYYY-MM-DD') })
             }
             format={CZ_DATE_FORMAT}
+            disabled={editingLocked}
             slotProps={{
-              textField: { size: 'small', required: true, sx: { alignSelf: 'flex-start', minWidth: 200 } },
+              textField: {
+                size: 'small',
+                required: true,
+                error: dateLocked,
+                helperText: dateLocked ? `Locked through ${lockedThrough}` : undefined,
+                sx: { alignSelf: 'flex-start', minWidth: 200 },
+              },
             }}
           />
 
@@ -358,6 +383,7 @@ export function WorklogDrawer({
               required
               sx={{ flex: 1 }}
               helperText="The actual time you spent on this task."
+              disabled={editingLocked}
             />
             <TextField
               label="Reported (hours)"
@@ -373,6 +399,7 @@ export function WorklogDrawer({
                   ? `Billed value (differs from tracked).`
                   : 'Defaults to tracked when empty.'
               }
+              disabled={editingLocked}
             />
           </Box>
 
@@ -416,7 +443,8 @@ export function WorklogDrawer({
                 await onDelete();
                 onClose();
               }}
-              disabled={submitting}
+              disabled={submitting || editingLocked}
+              title={editingLocked ? `Locked through ${lockedThrough}` : undefined}
             >
               Delete
             </Button>

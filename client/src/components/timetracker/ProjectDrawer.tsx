@@ -47,6 +47,7 @@ interface DraftState {
   isDefault: boolean;
   folderPath: string;
   jiraGlobs: string[];
+  jiraBoardUrl: string;
   description: string;
 }
 
@@ -58,6 +59,7 @@ function emptyDraft(): DraftState {
     isDefault: false,
     folderPath: '',
     jiraGlobs: [],
+    jiraBoardUrl: '',
     description: '',
   };
 }
@@ -71,6 +73,7 @@ function draftOf(project: ProjectViewPayload | null): DraftState {
     isDefault: project.isDefault,
     folderPath: project.folderPath ?? '',
     jiraGlobs: project.jiraGlobs.length > 0 ? project.jiraGlobs : [],
+    jiraBoardUrl: project.jiraBoardUrl ?? '',
     description: project.description ?? '',
   };
 }
@@ -226,6 +229,17 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
           </Box>
 
           <TextField
+            label="Jira board URL"
+            size="small"
+            value={draft.jiraBoardUrl}
+            onChange={(e) => setDraft({ ...draft, jiraBoardUrl: e.target.value })}
+            placeholder="https://jira.skoda.vwgroup.com/secure/RapidBoard.jspa?rapidView=…"
+            helperText="Paste the full board URL. The board ID and quick filter (if any) are read automatically. Leave empty to hide from the Board tab."
+            fullWidth
+            sx={{ '& input': { fontFamily: 'Menlo, monospace', fontSize: 12 } }}
+          />
+
+          <TextField
             label="Description"
             size="small"
             value={draft.description}
@@ -342,6 +356,7 @@ function toInput(draft: DraftState): ProjectInputPayload {
     isDefault: draft.isDefault,
     folderPath: draft.folderPath.trim() ? draft.folderPath.trim() : null,
     jiraGlobs: draft.jiraGlobs.filter((g) => g.trim() !== ''),
+    jiraBoardUrl: draft.jiraBoardUrl.trim() ? draft.jiraBoardUrl.trim() : null,
     description: draft.description.trim() ? draft.description.trim() : null,
   };
 }

@@ -10,6 +10,18 @@ export function formatDateCz(date: string | null | undefined): string {
   return d.isValid() ? d.format(CZ_DATE_FORMAT) : String(date);
 }
 
+/**
+ * "DD MMM YYYY" with Czech short month abbreviations — e.g. "02 led 2026",
+ * "30 čvn 2026". Used in the rate-history row design to mirror
+ * TimeTracker. Returns "now" for null/undefined so the formatter can be
+ * called on an open-ended contract's `endDate` directly.
+ */
+export function formatDateAbbrCz(date: string | null | undefined): string {
+  if (!date) return 'now';
+  const d = dayjs(date).locale('cs');
+  return d.isValid() ? d.format('DD MMM YYYY') : String(date);
+}
+
 export function formatDateShortCz(date: string | null | undefined): string {
   if (!date) return '';
   const d = dayjs(date);

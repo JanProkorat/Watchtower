@@ -5,6 +5,14 @@ import type {
   WorklogViewPayload,
 } from '../../../shared/ipcContract.js';
 
+function asLockedError(
+  p: unknown,
+): { error: 'locked'; lockedThrough: string; message: string } | null {
+  return p && typeof p === 'object' && (p as { error?: unknown }).error === 'locked'
+    ? (p as { error: 'locked'; lockedThrough: string; message: string })
+    : null;
+}
+
 export type PeriodPreset = 'today' | 'week' | 'month' | 'all';
 export type SourceFilter = 'all' | 'manual' | 'watchtower-auto' | 'jira-sync';
 
@@ -111,8 +119,10 @@ export function useWorklogs(initial: InitialFilter = {}): WorklogsState {
   const create = useCallback(
     async (input: WorklogInputPayload) => {
       const res = await window.watchtower.invoke('worklogs:create', input);
+      const locked = asLockedError(res);
+      if (locked) throw new Error(locked.message);
       await refresh();
-      return res.worklog;
+      return (res as { worklog: WorklogViewPayload }).worklog;
     },
     [refresh],
   );
@@ -120,15 +130,19 @@ export function useWorklogs(initial: InitialFilter = {}): WorklogsState {
   const update = useCallback(
     async (id: number, input: Partial<WorklogInputPayload>) => {
       const res = await window.watchtower.invoke('worklogs:update', { id, input });
+      const locked = asLockedError(res);
+      if (locked) throw new Error(locked.message);
       await refresh();
-      return res.worklog;
+      return (res as { worklog: WorklogViewPayload }).worklog;
     },
     [refresh],
   );
 
   const remove = useCallback(
     async (id: number) => {
-      await window.watchtower.invoke('worklogs:delete', { id });
+      const res = await window.watchtower.invoke('worklogs:delete', { id });
+      const locked = asLockedError(res);
+      if (locked) throw new Error(locked.message);
       await refresh();
     },
     [refresh],
