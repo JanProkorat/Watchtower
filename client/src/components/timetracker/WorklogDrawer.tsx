@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
+  createFilterOptions,
   Drawer,
   IconButton,
   MenuItem,
@@ -105,6 +107,16 @@ const SOURCE_LABELS: Record<string, string> = {
   'watchtower-auto': 'watchtower',
   'jira-sync': 'jira',
 };
+
+// Substring filter over `${number} ${title}`. Explicit (not the default) so we
+// never hit MUI's "input equals selected label → skip filter" edge case, which
+// kept the dropdown showing every option after the user typed over a previous
+// selection.
+const filterTaskOptions = createFilterOptions<TaskViewPayload>({
+  stringify: (t) => `${t.number} ${t.title}`,
+  ignoreCase: true,
+  trim: true,
+});
 
 export function WorklogDrawer({
   open,
@@ -268,39 +280,50 @@ export function WorklogDrawer({
             ))}
           </TextField>
 
-          <TextField
-            select
-            label="Task"
-            size="small"
-            value={draft.taskId ?? ''}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                taskId: e.target.value === '' ? null : Number(e.target.value),
-              })
-            }
-            required
+          <Autocomplete
+            options={tasks}
+            // Driven by draft.taskId — derive the selected option each render
+            // so the field stays in sync if the task list is refetched (e.g.
+            // project change clears taskId to null).
+            value={tasks.find((t) => t.id === draft.taskId) ?? null}
+            onChange={(_, next) => setDraft({ ...draft, taskId: next?.id ?? null })}
+            getOptionLabel={(t) => `${t.number} ${t.title}`}
+            filterOptions={filterTaskOptions}
+            isOptionEqualToValue={(a, b) => a.id === b.id}
             disabled={draft.projectId == null}
-            helperText={
-              draft.projectId == null
-                ? 'Select a project first'
-                : tasks.length === 0
-                  ? 'This project has no tasks yet — create one in the project detail page.'
-                  : undefined
+            noOptionsText={
+              tasks.length === 0
+                ? 'This project has no tasks yet.'
+                : 'No matching tasks.'
             }
-          >
-            <MenuItem value="" disabled>
-              Select a task…
-            </MenuItem>
-            {tasks.map((t) => (
-              <MenuItem key={t.id} value={t.id}>
-                <span style={{ fontFamily: 'Menlo, monospace', fontSize: 12, marginRight: 8 }}>
-                  {t.number}
-                </span>
-                {t.title}
-              </MenuItem>
-            ))}
-          </TextField>
+            renderOption={(props, t) => {
+              // MUI 5 wants `key` extracted from props (it's spread into <li>).
+              const { key, ...liProps } = props as typeof props & { key: string };
+              return (
+                <li key={key} {...liProps}>
+                  <span style={{ fontFamily: 'Menlo, monospace', fontSize: 12, marginRight: 8 }}>
+                    {t.number}
+                  </span>
+                  {t.title}
+                </li>
+              );
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Task"
+                size="small"
+                required
+                helperText={
+                  draft.projectId == null
+                    ? 'Select a project first'
+                    : tasks.length === 0
+                      ? 'This project has no tasks yet — create one in the project detail page.'
+                      : 'Type a task number or title to filter.'
+                }
+              />
+            )}
+          />
 
           <TextField
             label="Description"
