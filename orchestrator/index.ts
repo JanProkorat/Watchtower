@@ -112,6 +112,32 @@ function tasksRepo(): TasksRepo {
   return new TasksRepo(handle!.db);
 }
 
+/**
+ * Joins a task with its epic + project so the Settings UI can render the
+ * "Project · Epic · Title" chip and pre-fill the task number on mount.
+ * Returns null if any join step fails (deleted task / dangling epic).
+ */
+function resolveTaskByNumberPayload(
+  row: { id: number; number: string; title: string; status: 'open' | 'in_progress' | 'done'; epicId: number } | null,
+) {
+  if (!row) return null;
+  const epic = epicsRepo().get(row.epicId);
+  if (!epic) return null;
+  const project = projectsRepo().get(epic.projectId);
+  if (!project) return null;
+  return {
+    id: row.id,
+    number: row.number,
+    title: row.title,
+    status: row.status,
+    epicId: epic.id,
+    epicName: epic.name,
+    projectId: project.id,
+    projectName: project.name,
+    projectColor: project.color,
+  };
+}
+
 function worklogsRepo(): WorklogsRepo {
   return new WorklogsRepo(handle!.db);
 }
@@ -458,27 +484,11 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
     case 'tasks:listForProject':
       return { tasks: tasksRepo().listForProject(req.payload.projectId) };
 
-    case 'tasks:findByNumber': {
-      const row = tasksRepo().findByNumber(req.payload.number.trim());
-      if (!row) return { task: null };
-      const epic = epicsRepo().get(row.epicId);
-      if (!epic) return { task: null };
-      const project = projectsRepo().get(epic.projectId);
-      if (!project) return { task: null };
-      return {
-        task: {
-          id: row.id,
-          number: row.number,
-          title: row.title,
-          status: row.status,
-          epicId: epic.id,
-          epicName: epic.name,
-          projectId: project.id,
-          projectName: project.name,
-          projectColor: project.color,
-        },
-      };
-    }
+    case 'tasks:findByNumber':
+      return { task: resolveTaskByNumberPayload(tasksRepo().findByNumber(req.payload.number.trim())) };
+
+    case 'tasks:findById':
+      return { task: resolveTaskByNumberPayload(tasksRepo().get(req.payload.id)) };
 
     case 'tasks:create':
       return { task: tasksRepo().create(req.payload as TaskInput) };

@@ -412,7 +412,9 @@ function MeetingsDefaultTaskSettings() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Initial load: read the setting and resolve the saved task (if any).
+  // Initial load: read the setting, then resolve the saved task id into the
+  // joined Project · Epic · Title chip + pre-fill the number TextField so the
+  // user can see what's currently configured.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -424,18 +426,14 @@ function MeetingsDefaultTaskSettings() {
         const v = s.value?.trim() || null;
         setSavedTaskId(v);
         if (!v) return;
-        // We stored the task id; fetch all tasks by number is wrong here, so
-        // we look up by id via a tasks:listForEpic call after epic lookup —
-        // simpler: just fetch the joined view via tasks:findByNumber once we
-        // know the number. Without the number cached we need another path:
-        // grab the resolved view by listing the task's epic and filtering.
-        // To avoid a new IPC: we ask for all epics, find the one that has a
-        // task with this id, then resolve from there. Cheaper alternative:
-        // store the task number alongside the id. We keep it simple and just
-        // resolve by listForEpic across the lazy load when the user opens
-        // settings — but the typical case is `v` corresponds to a known
-        // recent task. We just leave `resolved` empty until the user types.
-        // (Settings always shows the current saved id below as a fallback.)
+        const id = Number(v);
+        if (!Number.isFinite(id)) return;
+        const r = await window.watchtower.invoke('tasks:findById', { id });
+        if (cancelled) return;
+        if (r.task) {
+          setTaskNumber(r.task.number);
+          setResolved(r.task);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -593,10 +591,10 @@ function MeetingsDefaultTaskSettings() {
           </Stack>
         )}
         {!resolved && savedTaskId && !lookingUp && !lookupError && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-            Currently saved: task id <strong>{savedTaskId}</strong>. Enter the task
-            number above to verify or change it.
-          </Typography>
+          <Alert severity="warning" sx={{ mt: 1 }}>
+            Saved task id <strong>{savedTaskId}</strong> couldn't be resolved
+            (deleted?). Pick a new one.
+          </Alert>
         )}
         {savedFlash && (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>

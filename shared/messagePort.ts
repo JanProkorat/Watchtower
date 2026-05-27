@@ -29,6 +29,7 @@ export type OrchRequest =
   | { id: string; kind: 'tasks:listForEpic'; payload: { epicId: number } }
   | { id: string; kind: 'tasks:listForProject'; payload: { projectId: number } }
   | { id: string; kind: 'tasks:findByNumber'; payload: { number: string } }
+  | { id: string; kind: 'tasks:findById'; payload: { id: number } }
   | { id: string; kind: 'tasks:create'; payload: OrchTaskInput }
   | { id: string; kind: 'tasks:update'; payload: { id: number; input: Partial<OrchTaskInput> } }
   | { id: string; kind: 'tasks:delete'; payload: { id: number } }
@@ -459,6 +460,7 @@ export type OrchResponse =
   | { kind: 'tasks:listForEpic'; payload: { tasks: OrchTaskView[] } }
   | { kind: 'tasks:listForProject'; payload: { tasks: OrchTaskView[] } }
   | { kind: 'tasks:findByNumber'; payload: { task: OrchTaskByNumber | null } }
+  | { kind: 'tasks:findById'; payload: { task: OrchTaskByNumber | null } }
   | { kind: 'tasks:create'; payload: { task: OrchTaskView } }
   | { kind: 'tasks:update'; payload: { task: OrchTaskView } }
   | { kind: 'tasks:delete'; payload: { ok: true } }

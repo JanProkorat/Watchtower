@@ -31,6 +31,7 @@ export type IpcRequest =
   | { kind: 'tasks:listForEpic'; payload: { epicId: number } }
   | { kind: 'tasks:listForProject'; payload: { projectId: number } }
   | { kind: 'tasks:findByNumber'; payload: { number: string } }
+  | { kind: 'tasks:findById'; payload: { id: number } }
   | { kind: 'tasks:create'; payload: TaskInputPayload }
   | { kind: 'tasks:update'; payload: { id: number; input: Partial<TaskInputPayload> } }
   | { kind: 'tasks:delete'; payload: { id: number } }
@@ -507,6 +508,7 @@ export type IpcResponse =
   | { kind: 'tasks:listForEpic'; payload: { tasks: TaskViewPayload[] } }
   | { kind: 'tasks:listForProject'; payload: { tasks: TaskViewPayload[] } }
   | { kind: 'tasks:findByNumber'; payload: { task: TaskByNumberPayload | null } }
+  | { kind: 'tasks:findById'; payload: { task: TaskByNumberPayload | null } }
   | { kind: 'tasks:create'; payload: { task: TaskViewPayload } }
   | { kind: 'tasks:update'; payload: { task: TaskViewPayload } }
   | { kind: 'tasks:delete'; payload: { ok: true } }
