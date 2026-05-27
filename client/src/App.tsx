@@ -181,7 +181,9 @@ export function App() {
   const doSpawn = async (cwd: string) => {
     try {
       const res = await spawn(cwd);
-      if (!res.instanceId) {
+      if (res.instanceId) {
+        setActiveModule('instances');
+      } else {
         setSpawnError(res.error ?? 'spawn failed — no instance id returned');
       }
     } catch (err) {
@@ -241,23 +243,36 @@ export function App() {
           onToggleMode={toggleThemeMode}
         />
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {activeModule === 'dashboard' ? (
+        {activeModule === 'dashboard' && (
           <ModuleDashboard
             instances={instances}
             onActivateInstance={switchToInstance}
             onKillInstance={(id) => kill(id)}
             onStartNewInstance={() => setNewOpen(true)}
           />
-        ) : activeModule === 'settings' ? (
-          <ModuleSettings active />
-        ) : activeModule === 'timetracker' ? (
+        )}
+        {activeModule === 'settings' && <ModuleSettings active />}
+        {activeModule === 'timetracker' && (
           <ModuleTimeTracker
             active
             onActivateInstance={switchToInstance}
             onOpenNewInstanceForCwd={switchToNewInstanceForCwd}
           />
-        ) : (
-          <>
+        )}
+        {/*
+         * Instances pane stays mounted across module switches so xterm
+         * buffers survive when the user clicks "Open" on a session from
+         * the dashboard. Hiding with display:none (not unmounting) keeps
+         * Terminal subscribed to ptyData; ResizeObserver re-fits on show.
+         */}
+        <Box
+          sx={{
+            display: activeModule === 'instances' ? 'flex' : 'none',
+            flex: 1,
+            flexDirection: 'column',
+            minHeight: 0,
+          }}
+        >
         <TabStrip
           instances={instances}
           activeId={activeId}
@@ -307,8 +322,7 @@ export function App() {
             )
           )}
         </Box>
-          </>
-        )}
+        </Box>
         </Box>
       </Box>
       </Box>

@@ -153,16 +153,16 @@ export function ModuleDashboard({
               sprintEarned={overview.data.sprint.totalEarned}
               monthEarned={overview.data.month.earned}
             />
-            <SprintStrip
-              sprint={overview.data.sprint}
-              todayDate={today}
-              onAnchorChange={setSprintAnchor}
-            />
             <SessionsCard
               instances={instances}
               onActivateInstance={onActivateInstance}
               onKill={handleKill}
               onStartNewInstance={onStartNewInstance}
+            />
+            <SprintStrip
+              sprint={overview.data.sprint}
+              todayDate={today}
+              onAnchorChange={setSprintAnchor}
             />
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <Box sx={{ flex: 2, minWidth: 0 }}>

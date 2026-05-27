@@ -22,10 +22,14 @@ import { formatDateLongCz, formatMinutes } from '../../util/format.js';
 import { SprintDayCell } from './SprintDayCell.js';
 
 const DAY_HEIGHT_DEFAULT = 330;
-const DAY_HEIGHT_MIN = 160;
+const DAY_HEIGHT_MIN = 140;
 const DAY_HEIGHT_MAX = 900;
-// Old key: 'watchtower.dashboard.weekCellHeight' — silently ignored on first load
-const STORAGE_KEY = 'watchtower.dashboard.sprintCalendar.dayHeight';
+// Old keys: 'watchtower.dashboard.weekCellHeight',
+// 'watchtower.dashboard.sprintCalendar.dayHeight',
+// 'watchtower.dashboard.sprintCalendar.dayHeight.v2',
+// 'watchtower.dashboard.sprintCalendar.dayHeight.v3' — silently ignored so the
+// taller default applies for everyone on first load.
+const STORAGE_KEY = 'watchtower.dashboard.sprintCalendar.dayHeight.v4';
 
 function loadDayHeight(): number {
   try {
