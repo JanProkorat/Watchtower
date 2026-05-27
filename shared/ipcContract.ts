@@ -67,10 +67,6 @@ export type IpcRequest =
   | { kind: 'board:signIn'; payload: Record<string, never> }
   | { kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { kind: 'meetings:sync'; payload: MeetingsSyncRequestPayload }
-  | { kind: 'ms365:status'; payload: Record<string, never> }
-  | { kind: 'ms365:startSignIn'; payload: Record<string, never> }
-  | { kind: 'ms365:cancelSignIn'; payload: Record<string, never> }
-  | { kind: 'ms365:signOut'; payload: Record<string, never> }
   | { kind: 'openExternalUrl'; payload: { url: string } };
 
 export interface RunningInstancePayload {
@@ -167,31 +163,12 @@ export interface DashboardTopProjectPayload {
   minutes: number;
 }
 
-export interface ContractStatusPayload {
-  rateId: number;
-  projectId: number;
-  effectiveFrom: string;
-  endDate: string | null;
-  hoursPerDay: number;
-  mdLimit: number | null;
-  minutesLogged: number;
-  mdsUsed: number;
-  mdsRemaining: number | null;
-  elapsedWorkdays: number;
-  totalWorkdays: number | null;
-  workdaysRemaining: number | null;
-  projectedTotalMds: number | null;
-  isActive: boolean;
-  isCompleted: boolean;
-}
-
 export interface DashboardActiveContractPayload {
   projectId: number;
   projectName: string;
   projectColor: string;
-  /** Currency of the most-recent rate row, or null if the project has none. */
   currency: string | null;
-  contract: ContractStatusPayload;
+  contract: ContractReportRowPayload['contract'];
 }
 
 export interface DashboardOverviewResponsePayload {
@@ -218,12 +195,7 @@ export interface DashboardOverviewResponsePayload {
     stats: DashboardHeatmapStatsPayload;
   };
   topProjects: DashboardTopProjectPayload[];
-  /**
-   * Every non-archived `work` project with an active contract that has an
-   * end_date and/or md_limit. Sorted by overshoot (most-over-budget first),
-   * then alphabetically. Always returned regardless of the request's
-   * `projectId` filter — the active-contracts card is a global widget.
-   */
+  /** Non-archived `work` projects with at least one active contract row. */
   activeContracts: DashboardActiveContractPayload[];
 }
 
@@ -232,7 +204,23 @@ export interface ContractReportRowPayload {
   projectName: string;
   projectColor: string;
   archived: number;
-  contract: ContractStatusPayload;
+  contract: {
+    rateId: number;
+    projectId: number;
+    effectiveFrom: string;
+    endDate: string | null;
+    hoursPerDay: number;
+    mdLimit: number | null;
+    minutesLogged: number;
+    mdsUsed: number;
+    mdsRemaining: number | null;
+    elapsedWorkdays: number;
+    totalWorkdays: number | null;
+    workdaysRemaining: number | null;
+    projectedTotalMds: number | null;
+    isActive: boolean;
+    isCompleted: boolean;
+  };
 }
 
 export interface RateChangeMarkerPayload {
@@ -376,25 +364,12 @@ export interface WorklogViewPayload {
   projectColor: string;
 }
 
-/**
- * Returned by `worklogs:create / update / delete` when the mutation would
- * touch a row in the locked window (`worklogs.locked_through` setting).
- * `lockedThrough` is the inclusive ISO date the lock currently extends to.
- */
-export interface WorklogLockedErrorPayload {
-  error: 'locked';
-  lockedThrough: string;
-  message: string;
-}
-
 export interface EpicInputPayload {
   projectId: number;
   name: string;
   description?: string | null;
   status?: 'planned' | 'active' | 'done';
   jiraEpicKey?: string | null;
-  /** See EpicViewPayload.shortcut for semantics. */
-  shortcut?: string | null;
   githubIssueUrl?: string | null;
 }
 
@@ -406,13 +381,6 @@ export interface EpicViewPayload {
   status: 'planned' | 'active' | 'done';
   displayOrder: number;
   jiraEpicKey: string | null;
-  /**
-   * Substring used during board sync to route Jira tasks to this epic.
-   * The router checks whether this string appears anywhere in the linked
-   * Jira epic's name; NULL means the epic is excluded from substring
-   * routing (it can still match by exact name as a fallback).
-   */
-  shortcut: string | null;
   githubIssueUrl: string | null;
   createdAt: string;
   taskCount: number;
@@ -453,13 +421,6 @@ export interface ProjectInputPayload {
   isDefault?: boolean;
   folderPath?: string | null;
   jiraGlobs?: string[];
-  /**
-   * Full Jira board URL (e.g.
-   * `https://jira.skoda.vwgroup.com/secure/RapidBoard.jspa?rapidView=51682&quickFilter=84114`).
-   * `null`/empty means the project has no board — it won't appear in the
-   * Board tab's project selector.
-   */
-  jiraBoardUrl?: string | null;
   description?: string | null;
 }
 
@@ -472,7 +433,6 @@ export interface ProjectViewPayload {
   isDefault: boolean;
   folderPath: string | null;
   jiraGlobs: string[];
-  jiraBoardUrl: string | null;
   description: string | null;
   createdAt: string;
   epicCount: number;
@@ -528,9 +488,9 @@ export type IpcResponse =
   | { kind: 'tasks:update'; payload: { task: TaskViewPayload } }
   | { kind: 'tasks:delete'; payload: { ok: true } }
   | { kind: 'worklogs:list'; payload: { worklogs: WorklogViewPayload[] } }
-  | { kind: 'worklogs:create'; payload: { worklog: WorklogViewPayload } | WorklogLockedErrorPayload }
-  | { kind: 'worklogs:update'; payload: { worklog: WorklogViewPayload } | WorklogLockedErrorPayload }
-  | { kind: 'worklogs:delete'; payload: { ok: true } | WorklogLockedErrorPayload }
+  | { kind: 'worklogs:create'; payload: { worklog: WorklogViewPayload } }
+  | { kind: 'worklogs:update'; payload: { worklog: WorklogViewPayload } }
+  | { kind: 'worklogs:delete'; payload: { ok: true } }
   | { kind: 'contracts:listForProject'; payload: { contracts: ContractViewPayload[] } }
   | { kind: 'contracts:create'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null } }
   | { kind: 'contracts:update'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null } }
@@ -562,10 +522,6 @@ export type IpcResponse =
   | { kind: 'board:signIn'; payload: { ok: boolean; error?: string } }
   | { kind: 'board:remove'; payload: { snapshot: BoardSnapshotPayload } }
   | { kind: 'meetings:sync'; payload: MeetingsSyncResultPayload }
-  | { kind: 'ms365:status'; payload: Ms365StatusPayload }
-  | { kind: 'ms365:startSignIn'; payload: Ms365StartSignInPayload }
-  | { kind: 'ms365:cancelSignIn'; payload: { ok: true } }
-  | { kind: 'ms365:signOut'; payload: { ok: true } }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } };
 
 export interface AgentRowPayload {
@@ -693,14 +649,6 @@ export interface BoardSyncResultPayload {
   authFailed?: boolean;
   /** Top-level fatal error (config/auth/network). Per-card failures don't set this. */
   error?: string;
-  /**
-   * Soft warning surfaced after a successful sync — e.g. the configured
-   * quickFilter couldn't be resolved on this Jira instance, so the board's
-   * base filter was used alone. The sync still ran (`ok: true`); this is
-   * informational so the user understands why they may see more rows than
-   * the browser board shows with the quickFilter active.
-   */
-  warning?: string;
 }
 
 export interface MeetingsSyncRequestPayload {
@@ -719,28 +667,7 @@ export interface MeetingsSyncResultPayload {
   unresolved: number;
   duplicate: number;
   total: number;
-  /** True when the user must sign in to Microsoft 365 before retrying. */
-  needsAuth?: boolean;
   /** Set when the call failed before counts could be produced. */
-  error?: string;
-}
-
-export interface Ms365StatusPayload {
-  /** True iff MS_GRAPH_CLIENT_ID is set in the orchestrator env. */
-  configured: boolean;
-  signedIn: boolean;
-  account: string | null;
-  /** Epoch ms when the cached access token expires; null when not signed in. */
-  expiresAt: number | null;
-  /** Set when even reading status failed (e.g. Keychain read errored). */
-  error?: string;
-}
-
-export interface Ms365StartSignInPayload {
-  userCode: string;
-  verificationUri: string;
-  expiresIn: number;
-  /** Set when sign-in couldn't even start (e.g. config missing). */
   error?: string;
 }
 
@@ -769,14 +696,6 @@ export type IpcPush =
   | {
       kind: 'orchestratorCrashed';
       payload: { code: number | null; restarting: boolean };
-    }
-  | {
-      kind: 'ms365:signInUpdate';
-      payload: {
-        status: 'pending' | 'success' | 'expired' | 'error';
-        account?: string;
-        error?: string;
-      };
     };
 
 export interface WatchtowerBridge {

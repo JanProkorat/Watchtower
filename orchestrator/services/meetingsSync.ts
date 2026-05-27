@@ -1,21 +1,28 @@
-// Outlook → Watchtower meetings sync.
+// Outlook → Watchtower meetings sync — drives the global /sync-meetings
+// Claude slash command.
 //
-// Calls Microsoft Graph directly via the `MsGraphAuthService` token cache,
-// applies the routing rules from `meetingRules`, and inserts worklogs via
-// `WorklogsRepo`. The `(source, external_id)` partial unique index in
-// `timetracker_schema.sql` makes re-runs idempotent — duplicate inserts
-// are counted as `duplicate` rather than treated as errors.
+// The skill at ~/.claude/commands/sync-meetings.md accepts three positional
+// arguments: FROM, TO, and (optionally) DB_PATH. When the user types
+// /sync-meetings in chat without DB_PATH the skill asks them which DB to
+// write to. We pass Watchtower's DB path here so the skill never prompts —
+// the worklogs land directly in Watchtower's SQLite.
+//
+// Known limitation: in the user's environment `claude -p` can hang on
+// Microsoft 365 MCP initialization for non-interactive subprocesses, with
+// no actionable error surface. We still wire this up because the skill
+// itself works fine from chat. If the spawn hangs, the timeout below
+// trips after 180s and returns a clear error.
+//
+// All routing + DB insert logic lives in
+// ~/.claude/commands/log-meetings.mjs, which the skill invokes. The
+// orchestrator just spawns claude, captures the summary line, and reports.
 
+import { spawn } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { SqliteLike } from '../db/migrations.js';
-import { WorklogsRepo } from '../db/repositories/worklogs.js';
-import {
-  decide,
-  type RawEvent,
-  type RuleConfig,
-  type TaskRef,
-} from './meetingRules.js';
-import { MsGraphAuthService, NotAuthenticatedError } from './msGraphAuth.js';
-import { fetchCalendarEvents } from './msGraphCalendar.js';
 
 export interface MeetingsSyncRequest {
   /** Inclusive YYYY-MM-DD. */
@@ -27,64 +34,157 @@ export interface MeetingsSyncRequest {
 export interface MeetingsSyncResult {
   ok: boolean;
   exitCode: number | null;
+  /** The "Summary: …" line from the skill, surfaced verbatim. */
   summary: string;
   logged: number;
   skipped: number;
   unresolved: number;
   duplicate: number;
   total: number;
-  /** True when the user must sign in to Microsoft 365 before retrying. */
-  needsAuth?: boolean;
-  /** Set when the call failed before counts could be produced. */
   error?: string;
 }
 
-export interface MeetingsSyncDeps {
-  auth: Pick<MsGraphAuthService, 'getValidAccessToken'>;
-  fetchEvents(token: string, from: string, to: string): Promise<RawEvent[]>;
-}
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const SETTING_DEFAULT_TASK = 'meetings.default_task_id';
+const SPAWN_TIMEOUT_MS = 180_000;
 
-function lookupTaskByNumber(db: SqliteLike, number: string): TaskRef | null {
-  const row = db
-    .prepare('SELECT id, number, title FROM tasks WHERE number = ? LIMIT 1')
-    .get(number) as TaskRef | undefined;
-  return row ?? null;
+/**
+ * Watchtower's SQLite lives under macOS's Application Support directory.
+ * The path is fixed (matches `supportDir()` in orchestrator/index.ts).
+ */
+function watchtowerDbPath(): string {
+  return join(homedir(), 'Library', 'Application Support', 'Watchtower', 'data.db');
 }
 
-function loadRuleConfig(db: SqliteLike): RuleConfig {
-  const lookupByNumber = (n: string) => lookupTaskByNumber(db, n);
-  const defaultIdRow = db
-    .prepare('SELECT value FROM settings WHERE key = ?')
-    .get(SETTING_DEFAULT_TASK) as { value: string | null } | undefined;
-  const defaultId = defaultIdRow?.value ? Number(defaultIdRow.value) : null;
-  const defaultTask = defaultId
-    ? ((db.prepare('SELECT id, number, title FROM tasks WHERE id = ?').get(defaultId) as
-        | TaskRef
-        | undefined) ?? null)
-    : null;
-  return {
-    green100: lookupByNumber('GREEN-100'),
-    green34: lookupByNumber('GREEN-34'),
-    defaultTask,
-    lookupByNumber,
-  };
+function isRealDir(p: string | undefined | null): p is string {
+  if (!p) return false;
+  try {
+    return existsSync(p) && statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The slash command lives at ~/.claude/commands/sync-meetings.md so claude
+ * picks it up automatically from the user's home directory. We pass
+ * `--add-dir <dir>` only as a safety net for environments where claude's
+ * default search path is unusual; in practice the home dir is always
+ * scanned.
+ */
+function resolveAddDir(): string | null {
+  if (process.env.WATCHTOWER_SKILLS_DIR && isRealDir(process.env.WATCHTOWER_SKILLS_DIR)) {
+    return process.env.WATCHTOWER_SKILLS_DIR;
+  }
+  const repoRoot = resolve(__dirname, '..', '..', '..');
+  if (isRealDir(repoRoot)) return repoRoot;
+  return null;
+}
+
+interface SpawnOutcome {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  error?: string;
+}
+
+function spawnClaudeSync(
+  from: string,
+  to: string,
+  dbPath: string,
+): Promise<SpawnOutcome> {
+  return new Promise<SpawnOutcome>((resolvePromise) => {
+    const addDir = resolveAddDir();
+    const addDirArg = addDir ? ` --add-dir ${JSON.stringify(addDir)}` : '';
+    // dbPath is quoted because it contains "Application Support" with a
+    // space. FROM/TO are pre-validated against ISO_DATE_RE so no shell
+    // metachars are possible.
+    const slashArg = `'/sync-meetings ${from} ${to} ${JSON.stringify(dbPath)}'`;
+    const cmd = `claude -p ${slashArg} --output-format text${addDirArg}`;
+    console.log(`[meetings:sync] spawning: ${cmd}`);
+    const child = spawn('/bin/zsh', ['-lc', cmd], {
+      cwd: homedir(),
+      env: process.env,
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill('SIGKILL');
+      resolvePromise({
+        exitCode: null,
+        stdout,
+        stderr,
+        error: `claude timed out after ${Math.round(SPAWN_TIMEOUT_MS / 1000)}s`,
+      });
+    }, SPAWN_TIMEOUT_MS);
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolvePromise({ exitCode: null, stdout, stderr, error: err.message });
+    });
+    child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      console.log(`[meetings:sync] claude exited with code=${code}`);
+      if (stdout.trim()) console.log(`[meetings:sync] stdout tail: ${stdout.trim().slice(-400)}`);
+      if (stderr.trim()) console.log(`[meetings:sync] stderr tail: ${stderr.trim().slice(-400)}`);
+      resolvePromise({ exitCode: code, stdout, stderr });
+    });
+  });
+}
+
+/**
+ * Parse the skill's "Summary: X logged, Y duplicate, …" line into counts.
+ * Returns zeros if the line is missing or malformed.
+ */
+function parseSummary(stdout: string): {
+  summaryLine: string;
+  logged: number;
+  duplicate: number;
+  skipped: number;
+  unresolved: number;
+  total: number;
+} {
+  const summaryLine =
+    stdout
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith('Summary'))
+      .pop() ?? '';
+  const counts = { logged: 0, duplicate: 0, skipped: 0, unresolved: 0, total: 0 };
+  for (const [field, re] of [
+    ['logged', /(\d+)\s+logged/],
+    ['duplicate', /(\d+)\s+duplicate/],
+    ['skipped', /(\d+)\s+skipped/],
+    ['unresolved', /(\d+)\s+unresolved/],
+    ['total', /(\d+)\s+total/],
+  ] as const) {
+    const m = summaryLine.match(re);
+    if (m?.[1]) counts[field] = Number(m[1]);
+  }
+  return { summaryLine, ...counts };
 }
 
 export class MeetingsSyncService {
-  private worklogs: WorklogsRepo;
-
-  constructor(
-    private db: SqliteLike,
-    private deps: MeetingsSyncDeps = {
-      auth: new MsGraphAuthService(),
-      fetchEvents: (token, from, to) => fetchCalendarEvents(token, from, to),
-    },
-  ) {
-    this.worklogs = new WorklogsRepo(db);
-  }
+  // We accept a db reference for symmetry with other services even though
+  // the actual DB write happens in log-meetings.mjs.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  constructor(private _db: SqliteLike) {}
 
   async sync(request: MeetingsSyncRequest): Promise<MeetingsSyncResult> {
     console.log(`[meetings:sync] start ${request.from} → ${request.to}`);
@@ -95,90 +195,43 @@ export class MeetingsSyncService {
       return emptyResult({ ok: false, error: 'from must be on or before to' });
     }
 
-    let token: string;
-    try {
-      token = await this.deps.auth.getValidAccessToken();
-    } catch (err) {
-      if (err instanceof NotAuthenticatedError) {
-        return emptyResult({
-          ok: false,
-          needsAuth: true,
-          error: 'Sign in to Microsoft 365 in Settings first.',
-        });
-      }
+    const dbPath = watchtowerDbPath();
+    if (!existsSync(dbPath)) {
       return emptyResult({
         ok: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: `Watchtower DB not found at ${dbPath}. Run the app once to initialise it.`,
       });
     }
 
-    let events: RawEvent[];
-    try {
-      events = await this.deps.fetchEvents(token, request.from, request.to);
-    } catch (err) {
+    const claude = await spawnClaudeSync(request.from, request.to, dbPath);
+
+    if (claude.exitCode === null) {
+      return emptyResult({ ok: false, error: claude.error ?? 'claude did not exit' });
+    }
+
+    const parsed = parseSummary(claude.stdout);
+
+    if (claude.exitCode !== 0 && !parsed.summaryLine) {
+      // No summary printed and a non-zero exit means the skill never ran
+      // its logger. Surface stderr/stdout so the user can see what went
+      // wrong (auth, MCP, etc.).
+      const tail = claude.stderr.trim().slice(-400) || claude.stdout.trim().slice(-400);
       return emptyResult({
         ok: false,
-        error: err instanceof Error ? err.message : String(err),
+        exitCode: claude.exitCode,
+        error: tail || `claude exited with code ${claude.exitCode}`,
       });
     }
-    console.log(`[meetings:sync] fetched ${events.length} events from Graph`);
 
-    const config = loadRuleConfig(this.db);
-    let logged = 0;
-    let skipped = 0;
-    let unresolved = 0;
-    let duplicate = 0;
-
-    for (const event of events) {
-      const decision = decide(event, config);
-      if (decision.status === 'skipped') {
-        skipped++;
-        continue;
-      }
-      if (decision.status === 'unresolved' || !decision.worklog) {
-        unresolved++;
-        continue;
-      }
-      const w = decision.worklog;
-      if (!w.externalId) {
-        unresolved++;
-        continue;
-      }
-      try {
-        this.worklogs.create({
-          taskId: w.taskId,
-          workDate: w.workDate,
-          minutes: w.minutes,
-          description: w.description,
-          source: w.source,
-          externalId: w.externalId,
-        });
-        logged++;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (/UNIQUE constraint failed/i.test(msg)) {
-          duplicate++;
-        } else {
-          console.warn('[meetings:sync] insert failed:', msg);
-          unresolved++;
-        }
-      }
-    }
-
-    const total = events.length;
-    const summary =
-      `${logged} logged, ${duplicate} duplicate, ${skipped} skipped, ` +
-      `${unresolved} unresolved, ${total} total`;
-    console.log(`[meetings:sync] done — ${summary}`);
     return {
-      ok: unresolved === 0,
-      exitCode: 0,
-      summary,
-      logged,
-      skipped,
-      unresolved,
-      duplicate,
-      total,
+      ok: claude.exitCode === 0 && parsed.unresolved === 0,
+      exitCode: claude.exitCode,
+      summary: parsed.summaryLine || 'Sync schůzek dokončen.',
+      logged: parsed.logged,
+      duplicate: parsed.duplicate,
+      skipped: parsed.skipped,
+      unresolved: parsed.unresolved,
+      total: parsed.total,
     };
   }
 }

@@ -127,7 +127,11 @@ export function SprintStrip({
     const sprintEnd = dayjs(sprint.toDate).startOf('day');
     const today = dayjs(todayDate).startOf('day');
     // Default: full sprint start → min(today, sprint end). Matches TT.
-    const toDefault = today.isAfter(sprintEnd) ? sprintEnd : today.isBefore(sprintStart) ? sprintStart : today;
+    const toDefault = today.isAfter(sprintEnd)
+      ? sprintEnd
+      : today.isBefore(sprintStart)
+        ? sprintStart
+        : today;
     setSyncFrom(sprintStart);
     setSyncTo(toDefault);
     setSyncAnchor(anchor);
@@ -153,9 +157,7 @@ export function SprintStrip({
         to: syncTo.format('YYYY-MM-DD'),
       });
       setSyncAnchor(null);
-      if (result.needsAuth) {
-        showError('Sign in to Microsoft 365 in Settings → Microsoft 365 first.');
-      } else if (result.error) {
+      if (result.error) {
         showError(`Sync schůzek selhal: ${result.error}`);
       } else {
         const msg = result.summary || 'Sync schůzek dokončen.';
@@ -195,11 +197,7 @@ export function SprintStrip({
                 onClick={(e) => openSyncPopover(e.currentTarget)}
                 disabled={syncing}
               >
-                {syncing ? (
-                  <CircularProgress size={16} />
-                ) : (
-                  <EventRepeatIcon fontSize="small" />
-                )}
+                {syncing ? <CircularProgress size={16} /> : <EventRepeatIcon fontSize="small" />}
               </IconButton>
             </span>
           </Tooltip>
@@ -270,11 +268,16 @@ export function SprintStrip({
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
       >
-        <Box sx={{ p: 2, minWidth: 340 }}>
+        <Box sx={{ p: 2, minWidth: 380 }}>
           <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Sync meetings</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Pick a range within the current sprint ({formatDateLongCz(sprint.fromDate)} —{' '}
             {formatDateLongCz(sprint.toDate)}).
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+            Tip: run <code>/sync-meetings YYYY-MM-DD YYYY-MM-DD</code> in your
+            Claude Code chat first to refresh Outlook events; this button then
+            imports them into Watchtower.
           </Typography>
           <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
             <DatePicker
@@ -300,7 +303,9 @@ export function SprintStrip({
             </Button>
             <Button
               variant="contained"
-              startIcon={syncing ? <CircularProgress size={14} color="inherit" /> : <EventRepeatIcon />}
+              startIcon={
+                syncing ? <CircularProgress size={14} color="inherit" /> : <EventRepeatIcon />
+              }
               disabled={!rangeValid || syncing}
               onClick={() => void submitSync()}
             >
@@ -316,11 +321,7 @@ export function SprintStrip({
             const isToday = d.date === todayDate;
             return (
               <Box key={d.date} ref={isToday ? todayRef : undefined}>
-                <SprintDayCell
-                  day={d}
-                  isToday={isToday}
-                  cellHeight={dayHeight}
-                />
+                <SprintDayCell day={d} isToday={isToday} cellHeight={dayHeight} />
               </Box>
             );
           })}

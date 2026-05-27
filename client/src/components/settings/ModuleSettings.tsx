@@ -7,7 +7,6 @@ import { HooksTab } from './HooksTab.js';
 import { SkillsTab } from './SkillsTab.js';
 import { AgentsTab } from './AgentsTab.js';
 import { McpTab } from './McpTab.js';
-import { Microsoft365Section } from './Microsoft365Section.js';
 
 interface Props {
   /** True while the Settings rail icon is the active module. */
@@ -21,7 +20,6 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   skills: 'Skills',
   agents: 'Agents',
   mcp: 'MCP',
-  microsoft365: 'Microsoft 365',
 };
 
 /**
@@ -60,11 +58,6 @@ export function ModuleSettings({ active }: Props) {
         {view.tab === 'skills' && <SkillsTab />}
         {view.tab === 'agents' && <AgentsTab />}
         {view.tab === 'mcp' && <McpTab />}
-        {view.tab === 'microsoft365' && (
-          <Box sx={{ flex: 1, p: 2, overflow: 'auto' }}>
-            <Microsoft365Section />
-          </Box>
-        )}
       </Box>
     </Box>
   );
