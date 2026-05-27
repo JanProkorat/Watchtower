@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   loadConfig,
   MsGraphAuthService,
+  NotAuthenticatedError,
   type MsGraphAuthDeps,
   type CachedTokens,
 } from '../../orchestrator/services/msGraphAuth.js';
@@ -290,5 +291,114 @@ describe('pollForTokens', () => {
     // expiresIn 2s, interval 1s → after ~2 sleeps we cross the deadline.
     const r = await svc.pollForTokens({ deviceCode: 'devc', interval: 1, expiresIn: 2 });
     expect(r.status).toBe('expired');
+  });
+});
+
+describe('getValidAccessToken', () => {
+  const future = 2_000_000_000_000;
+  const past = 1_500_000_000_000;
+  const now = 1_700_000_000_000;
+
+  it('returns cached token when not expired', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    const tokens: CachedTokens = {
+      accessToken: 'AT',
+      refreshToken: 'RT',
+      expiresAt: future,
+      account: 'u@x.cz',
+    };
+    const svc = new MsGraphAuthService(
+      makeDeps({
+        readSecret: () => JSON.stringify(tokens),
+        now: () => now,
+      }),
+    );
+    expect(await svc.getValidAccessToken()).toBe('AT');
+  });
+
+  it('refreshes when expired and saves new tokens', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    let stored = JSON.stringify({
+      accessToken: 'OLD',
+      refreshToken: 'RT',
+      expiresAt: past,
+      account: 'u@x.cz',
+    });
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ access_token: 'NEW', refresh_token: 'RT2', expires_in: 3600 }),
+    } as unknown as Response));
+    const svc = new MsGraphAuthService(
+      makeDeps({
+        fetch: fetchMock as unknown as typeof fetch,
+        readSecret: () => stored,
+        writeSecret: (_s, _a, v) => {
+          stored = v;
+        },
+        now: () => now,
+      }),
+    );
+    expect(await svc.getValidAccessToken()).toBe('NEW');
+    expect(JSON.parse(stored).refreshToken).toBe('RT2');
+  });
+
+  it('throws NotAuthenticatedError when no tokens are cached', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    const svc = new MsGraphAuthService(makeDeps());
+    await expect(svc.getValidAccessToken()).rejects.toBeInstanceOf(NotAuthenticatedError);
+  });
+
+  it('throws NotAuthenticatedError when refresh fails and clears tokens', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    let stored: string | null = JSON.stringify({
+      accessToken: 'OLD',
+      refreshToken: 'RT',
+      expiresAt: past,
+      account: 'u@x.cz',
+    });
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'invalid_grant' }),
+      text: async () => '{"error":"invalid_grant"}',
+    } as unknown as Response));
+    const svc = new MsGraphAuthService(
+      makeDeps({
+        fetch: fetchMock as unknown as typeof fetch,
+        readSecret: () => stored,
+        writeSecret: (_s, _a, v) => {
+          stored = v;
+        },
+        deleteSecret: () => {
+          stored = null;
+        },
+        now: () => now,
+      }),
+    );
+    await expect(svc.getValidAccessToken()).rejects.toBeInstanceOf(NotAuthenticatedError);
+    expect(stored).toBeNull();
+  });
+});
+
+describe('signOut', () => {
+  it('clears cached tokens', () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    let stored: string | null = JSON.stringify({
+      accessToken: 'AT',
+      refreshToken: 'RT',
+      expiresAt: 0,
+      account: 'u@x.cz',
+    });
+    const svc = new MsGraphAuthService(
+      makeDeps({
+        readSecret: () => stored,
+        deleteSecret: () => {
+          stored = null;
+        },
+      }),
+    );
+    svc.signOut();
+    expect(stored).toBeNull();
   });
 });

@@ -243,4 +243,59 @@ export class MsGraphAuthService {
     const j = (await r.json()) as { userPrincipalName?: string; mail?: string };
     return j.userPrincipalName || j.mail || 'unknown';
   }
+
+  async refreshTokens(refreshToken: string): Promise<CachedTokens> {
+    const cfg = this.config();
+    const tokenUrl = `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/token`;
+    const body = new URLSearchParams({
+      client_id: cfg.clientId,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      scope: 'offline_access Calendars.Read',
+    });
+    const r = await this.deps.fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!r.ok) {
+      const text = await r.text().catch(() => '');
+      throw new Error(`refresh failed (${r.status}): ${text}`);
+    }
+    const j = (await r.json()) as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    };
+    const existing = this.loadTokens();
+    return {
+      accessToken: j.access_token,
+      refreshToken: j.refresh_token ?? refreshToken,
+      expiresAt: this.deps.now() + (j.expires_in ?? 3600) * 1000,
+      account: existing?.account ?? 'unknown',
+    };
+  }
+
+  /** 60-second safety window so we don't hand out a token about to expire. */
+  private static EXPIRY_SLACK_MS = 60_000;
+
+  async getValidAccessToken(): Promise<string> {
+    const cached = this.loadTokens();
+    if (!cached) throw new NotAuthenticatedError();
+    if (cached.expiresAt - MsGraphAuthService.EXPIRY_SLACK_MS > this.deps.now()) {
+      return cached.accessToken;
+    }
+    try {
+      const refreshed = await this.refreshTokens(cached.refreshToken);
+      this.saveTokens(refreshed);
+      return refreshed.accessToken;
+    } catch {
+      this.clearTokens();
+      throw new NotAuthenticatedError('Sign-in expired. Please sign in again.');
+    }
+  }
+
+  signOut(): void {
+    this.clearTokens();
+  }
 }
