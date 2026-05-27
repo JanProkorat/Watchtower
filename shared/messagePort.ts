@@ -59,9 +59,14 @@ export type OrchRequest =
   | { id: string; kind: 'jira:syncPreview'; payload: OrchJiraSyncRequest }
   | { id: string; kind: 'jira:sync'; payload: OrchJiraSyncRequest }
   | { id: string; kind: 'board:authPing'; payload: Record<string, never> }
-  | { id: string; kind: 'board:get'; payload: Record<string, never> }
-  | { id: string; kind: 'board:sync'; payload: Record<string, never> }
-  | { id: string; kind: 'board:remove'; payload: { taskId: number } };
+  | { id: string; kind: 'board:get'; payload: { projectId: number } }
+  | { id: string; kind: 'board:sync'; payload: { projectId: number } }
+  | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
+  | { id: string; kind: 'meetings:sync'; payload: OrchMeetingsSyncRequest }
+  | { id: string; kind: 'ms365:status'; payload: Record<string, never> }
+  | { id: string; kind: 'ms365:startSignIn'; payload: Record<string, never> }
+  | { id: string; kind: 'ms365:cancelSignIn'; payload: Record<string, never> }
+  | { id: string; kind: 'ms365:signOut'; payload: Record<string, never> };
 
 export interface OrchRunningInstance {
   id: string;
@@ -239,6 +244,12 @@ export interface OrchOverlapError {
   conflictingTo: string | null;
 }
 
+export interface OrchWorklogLockedError {
+  error: 'locked';
+  lockedThrough: string;
+  message: string;
+}
+
 export interface OrchWorklogListFilter {
   projectId?: number;
   epicId?: number;
@@ -286,6 +297,7 @@ export interface OrchEpicInput {
   description?: string | null;
   status?: 'planned' | 'active' | 'done';
   jiraEpicKey?: string | null;
+  shortcut?: string | null;
   githubIssueUrl?: string | null;
 }
 
@@ -297,6 +309,7 @@ export interface OrchEpicView {
   status: 'planned' | 'active' | 'done';
   displayOrder: number;
   jiraEpicKey: string | null;
+  shortcut: string | null;
   githubIssueUrl: string | null;
   createdAt: string;
   taskCount: number;
@@ -364,6 +377,39 @@ export interface OrchJiraSyncResult {
   entries: OrchJiraSyncEntry[];
 }
 
+export interface OrchMeetingsSyncRequest {
+  from: string;
+  to: string;
+}
+
+export interface OrchMeetingsSyncResult {
+  ok: boolean;
+  exitCode: number | null;
+  summary: string;
+  logged: number;
+  skipped: number;
+  unresolved: number;
+  duplicate: number;
+  total: number;
+  needsAuth?: boolean;
+  error?: string;
+}
+
+export interface OrchMs365Status {
+  configured: boolean;
+  signedIn: boolean;
+  account: string | null;
+  expiresAt: number | null;
+  error?: string;
+}
+
+export interface OrchMs365StartSignIn {
+  userCode: string;
+  verificationUri: string;
+  expiresIn: number;
+  error?: string;
+}
+
 export interface OrchProjectListFilter {
   archived?: boolean;
   kind?: 'work' | 'time_off';
@@ -377,6 +423,7 @@ export interface OrchProjectInput {
   isDefault?: boolean;
   folderPath?: string | null;
   jiraGlobs?: string[];
+  jiraBoardUrl?: string | null;
   description?: string | null;
 }
 
@@ -389,6 +436,7 @@ export interface OrchProjectView {
   isDefault: boolean;
   folderPath: string | null;
   jiraGlobs: string[];
+  jiraBoardUrl: string | null;
   description: string | null;
   createdAt: string;
   epicCount: number;
@@ -442,9 +490,9 @@ export type OrchResponse =
   | { kind: 'tasks:update'; payload: { task: OrchTaskView } }
   | { kind: 'tasks:delete'; payload: { ok: true } }
   | { kind: 'worklogs:list'; payload: { worklogs: OrchWorklogView[] } }
-  | { kind: 'worklogs:create'; payload: { worklog: OrchWorklogView } }
-  | { kind: 'worklogs:update'; payload: { worklog: OrchWorklogView } }
-  | { kind: 'worklogs:delete'; payload: { ok: true } }
+  | { kind: 'worklogs:create'; payload: { worklog: OrchWorklogView } | OrchWorklogLockedError }
+  | { kind: 'worklogs:update'; payload: { worklog: OrchWorklogView } | OrchWorklogLockedError }
+  | { kind: 'worklogs:delete'; payload: { ok: true } | OrchWorklogLockedError }
   | { kind: 'contracts:listForProject'; payload: { contracts: OrchContractView[] } }
   | { kind: 'contracts:create'; payload: { contract: OrchContractView } | OrchOverlapError }
   | { kind: 'contracts:update'; payload: { contract: OrchContractView } | OrchOverlapError }
@@ -481,7 +529,12 @@ export type OrchResponse =
   | {
       kind: 'board:remove';
       payload: { snapshot: import('./ipcContract.js').BoardSnapshotPayload };
-    };
+    }
+  | { kind: 'meetings:sync'; payload: OrchMeetingsSyncResult }
+  | { kind: 'ms365:status'; payload: OrchMs365Status }
+  | { kind: 'ms365:startSignIn'; payload: OrchMs365StartSignIn }
+  | { kind: 'ms365:cancelSignIn'; payload: { ok: true } }
+  | { kind: 'ms365:signOut'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
@@ -492,7 +545,15 @@ export type OrchPush =
       payload: { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
     }
   | { kind: 'clearAttention'; payload: { instanceId: string } }
-  | { kind: 'badge'; payload: { count: number } };
+  | { kind: 'badge'; payload: { count: number } }
+  | {
+      kind: 'ms365:signInUpdate';
+      payload: {
+        status: 'pending' | 'success' | 'expired' | 'error';
+        account?: string;
+        error?: string;
+      };
+    };
 
 type AnyPort = {
   postMessage(data: unknown): void;
@@ -565,7 +626,18 @@ export class PortApi {
     if ('id' in msg && 'kind' in msg && !('_response' in msg)) {
       if (!this.requestHandler) return;
       const req = msg as OrchRequest;
-      const payload = await this.requestHandler(req);
+      let payload: unknown;
+      try {
+        payload = await this.requestHandler(req);
+      } catch (err) {
+        // Without this guard a throwing handler leaves the renderer's
+        // invoke() promise hanging forever (no response is ever posted).
+        // Fall back to an `{ error }` payload so the caller's await
+        // resolves; the renderer can surface the message instead of
+        // staring at an indefinite spinner.
+        console.error('[PortApi] request handler threw for', req.kind, err);
+        payload = { error: err instanceof Error ? err.message : String(err) };
+      }
       const response: ResponseEnvelope = {
         id: req.id,
         kind: req.kind as OrchResponse['kind'],
