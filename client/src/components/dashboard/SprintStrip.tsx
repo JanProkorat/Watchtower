@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box,
+  Button,
   Chip,
+  CircularProgress,
   IconButton,
   Paper,
   Popover,
@@ -13,12 +15,14 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import EventRepeatIcon from '@mui/icons-material/EventRepeat';
 import TodayIcon from '@mui/icons-material/Today';
 import DragHandleIcon from '@mui/icons-material/DragHandle';
 import dayjs, { type Dayjs } from 'dayjs';
 import 'dayjs/locale/cs';
 import type { DashboardSprintDayPayload } from '../../../../shared/ipcContract.js';
 import { formatDateLongCz, formatMinutes } from '../../util/format.js';
+import { useToast, toastMessage } from '../../state/useToast.js';
 import { SprintDayCell } from './SprintDayCell.js';
 
 const DAY_HEIGHT_DEFAULT = 330;
@@ -54,13 +58,25 @@ export interface SprintStripProps {
   todayDate: string;
   /** Caller updates the sprint anchor; the strip never derives it itself. */
   onAnchorChange(nextAnchor: string): void;
+  /** Optional — called after a successful meetings sync so the dashboard refetches. */
+  onSyncComplete?(): void;
 }
 
-export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripProps) {
+export function SprintStrip({
+  sprint,
+  todayDate,
+  onAnchorChange,
+  onSyncComplete,
+}: SprintStripProps) {
   const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null);
+  const [syncAnchor, setSyncAnchor] = useState<HTMLElement | null>(null);
+  const [syncFrom, setSyncFrom] = useState<Dayjs | null>(null);
+  const [syncTo, setSyncTo] = useState<Dayjs | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [dayHeight, setDayHeight] = useState<number>(loadDayHeight);
   const dragStateRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const todayRef = useRef<HTMLDivElement | null>(null);
+  const { showError, showSuccess } = useToast();
 
   useEffect(() => {
     try {
@@ -106,6 +122,53 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
     }
   }, []);
 
+  const openSyncPopover = (anchor: HTMLElement) => {
+    const sprintStart = dayjs(sprint.fromDate).startOf('day');
+    const sprintEnd = dayjs(sprint.toDate).startOf('day');
+    const today = dayjs(todayDate).startOf('day');
+    // Default: full sprint start → min(today, sprint end). Matches TT.
+    const toDefault = today.isAfter(sprintEnd) ? sprintEnd : today.isBefore(sprintStart) ? sprintStart : today;
+    setSyncFrom(sprintStart);
+    setSyncTo(toDefault);
+    setSyncAnchor(anchor);
+  };
+
+  const sprintStart = dayjs(sprint.fromDate).startOf('day');
+  const sprintEnd = dayjs(sprint.toDate).endOf('day');
+  const fromValid = !!syncFrom && syncFrom.isValid();
+  const toValid = !!syncTo && syncTo.isValid();
+  const rangeValid =
+    fromValid &&
+    toValid &&
+    !syncFrom!.startOf('day').isAfter(syncTo!.startOf('day')) &&
+    !syncFrom!.isBefore(sprintStart) &&
+    !syncTo!.isAfter(sprintEnd);
+
+  const submitSync = async () => {
+    if (!rangeValid || !syncFrom || !syncTo || syncing) return;
+    setSyncing(true);
+    try {
+      const result = await window.watchtower.invoke('meetings:sync', {
+        from: syncFrom.format('YYYY-MM-DD'),
+        to: syncTo.format('YYYY-MM-DD'),
+      });
+      setSyncAnchor(null);
+      if (result.needsAuth) {
+        showError('Sign in to Microsoft 365 in Settings → Microsoft 365 first.');
+      } else if (result.error) {
+        showError(`Sync schůzek selhal: ${result.error}`);
+      } else {
+        const msg = result.summary || 'Sync schůzek dokončen.';
+        showSuccess(msg);
+        onSyncComplete?.();
+      }
+    } catch (err) {
+      showError(`Sync schůzek selhal: ${toastMessage(err)}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
@@ -125,6 +188,21 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
         </Box>
 
         <Stack direction="row" spacing={0.5}>
+          <Tooltip title="Sync meetings">
+            <span>
+              <IconButton
+                size="small"
+                onClick={(e) => openSyncPopover(e.currentTarget)}
+                disabled={syncing}
+              >
+                {syncing ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <EventRepeatIcon fontSize="small" />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
           <Tooltip title="Jump to today">
             <IconButton size="small" onClick={() => onAnchorChange(todayDate)}>
               <TodayIcon fontSize="small" />
@@ -182,6 +260,53 @@ export function SprintStrip({ sprint, todayDate, onAnchorChange }: SprintStripPr
               setPickerAnchor(null);
             }}
           />
+        </Box>
+      </Popover>
+
+      <Popover
+        open={Boolean(syncAnchor)}
+        anchorEl={syncAnchor}
+        onClose={() => (syncing ? undefined : setSyncAnchor(null))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+      >
+        <Box sx={{ p: 2, minWidth: 340 }}>
+          <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Sync meetings</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            Pick a range within the current sprint ({formatDateLongCz(sprint.fromDate)} —{' '}
+            {formatDateLongCz(sprint.toDate)}).
+          </Typography>
+          <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
+            <DatePicker
+              label="From"
+              value={syncFrom}
+              onChange={(v) => setSyncFrom(v)}
+              minDate={sprintStart}
+              maxDate={sprintEnd}
+              slotProps={{ textField: { size: 'small', fullWidth: true } }}
+            />
+            <DatePicker
+              label="To"
+              value={syncTo}
+              onChange={(v) => setSyncTo(v)}
+              minDate={sprintStart}
+              maxDate={sprintEnd}
+              slotProps={{ textField: { size: 'small', fullWidth: true } }}
+            />
+          </Stack>
+          <Stack direction="row" spacing={1} justifyContent="flex-end">
+            <Button onClick={() => setSyncAnchor(null)} disabled={syncing}>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={syncing ? <CircularProgress size={14} color="inherit" /> : <EventRepeatIcon />}
+              disabled={!rangeValid || syncing}
+              onClick={() => void submitSync()}
+            >
+              Sync
+            </Button>
+          </Stack>
         </Box>
       </Popover>
 

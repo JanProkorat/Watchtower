@@ -8,12 +8,21 @@
  *   #settings/skills           — Skills browser
  *   #settings/agents           — Agents browser
  *   #settings/mcp              — MCP servers
+ *   #settings/microsoft365     — Microsoft 365 sign-in for meeting sync
  *
  * Parsing is strict: an unknown tab returns null and the caller falls back
  * to the default landing (General).
  */
 
-export const SETTINGS_TABS = ['general', 'json', 'hooks', 'skills', 'agents', 'mcp'] as const;
+export const SETTINGS_TABS = [
+  'general',
+  'json',
+  'hooks',
+  'skills',
+  'agents',
+  'mcp',
+  'microsoft365',
+] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 export interface SettingsView {
