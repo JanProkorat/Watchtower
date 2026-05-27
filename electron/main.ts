@@ -6,6 +6,7 @@ import { createMainWindow, getMainWindow } from './window.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { registerIpc, pushToRenderer } from './ipc.js';
 import { startOrchestrator, getOrchestrator, onOrchestratorCrash } from './orchestratorHost.js';
+import { applyUserShellPath } from './shellPath.js';
 import {
   focusInstanceTab,
   refreshTrayFromOrchestrator,
@@ -24,6 +25,17 @@ const LIVE_STATUSES = new Set([
 let quitting = false;
 
 app.setName('Watchtower');
+
+// GUI-launched macOS apps inherit a stripped PATH from launchd, missing
+// every user-installed bin dir — including ~/.local/bin where `claude`
+// lives. Repair PATH from the user's login+interactive shell before
+// startOrchestrator() forks the utilityProcess so the orchestrator (and
+// any exec'd `code <path>` for openInVSCode) sees the same lookup paths
+// the user has in Terminal. No-op in dev — npm run dev already inherits
+// the right PATH.
+if (process.platform === 'darwin' && app.isPackaged) {
+  applyUserShellPath();
+}
 
 // In dev (unpackaged) macOS shows Electron's default Dock icon. Packaged
 // builds get the icon from electron-builder via Info.plist. Point the Dock
