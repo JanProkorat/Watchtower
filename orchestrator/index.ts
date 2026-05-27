@@ -435,6 +435,9 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
     case 'epics:list':
       return { epics: epicsRepo().listForProject(req.payload.projectId) };
 
+    case 'epics:listAll':
+      return { epics: epicsRepo().listAll() };
+
     case 'epics:create':
       return { epic: epicsRepo().create(req.payload as EpicInput) };
 
@@ -454,6 +457,28 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
 
     case 'tasks:listForProject':
       return { tasks: tasksRepo().listForProject(req.payload.projectId) };
+
+    case 'tasks:findByNumber': {
+      const row = tasksRepo().findByNumber(req.payload.number.trim());
+      if (!row) return { task: null };
+      const epic = epicsRepo().get(row.epicId);
+      if (!epic) return { task: null };
+      const project = projectsRepo().get(epic.projectId);
+      if (!project) return { task: null };
+      return {
+        task: {
+          id: row.id,
+          number: row.number,
+          title: row.title,
+          status: row.status,
+          epicId: epic.id,
+          epicName: epic.name,
+          projectId: project.id,
+          projectName: project.name,
+          projectColor: project.color,
+        },
+      };
+    }
 
     case 'tasks:create':
       return { task: tasksRepo().create(req.payload as TaskInput) };

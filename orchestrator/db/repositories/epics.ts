@@ -25,6 +25,11 @@ export interface EpicRow {
   totalMinutes: number;
 }
 
+export interface EpicWithProjectRow extends EpicRow {
+  projectName: string;
+  projectColor: string;
+}
+
 export interface EpicInput {
   projectId: number;
   name: string;
@@ -97,6 +102,36 @@ export class EpicsRepo {
       )
       .all(projectId) as DbRow[];
     return rows.map(toRow);
+  }
+
+  /**
+   * All epics across all non-archived projects, joined with project name +
+   * color for the "create-task" fallback form in Settings (where the user
+   * needs to pick an epic out of every project at once).
+   */
+  listAll(): EpicWithProjectRow[] {
+    const rows = this.db
+      .prepare(
+        `
+        SELECT
+          e.id, e.project_id, e.name, e.description, e.status, e.display_order,
+          e.jira_epic_key, e.shortcut, e.github_issue_url, e.created_at,
+          (SELECT COUNT(*) FROM tasks t WHERE t.epic_id = e.id) AS task_count,
+          0 AS total_minutes,
+          p.name  AS project_name,
+          p.color AS project_color
+        FROM epics e
+        JOIN projects p ON p.id = e.project_id
+        WHERE p.archived = 0
+        ORDER BY p.name COLLATE NOCASE ASC, e.display_order ASC, e.id ASC
+        `,
+      )
+      .all() as Array<DbRow & { project_name: string; project_color: string }>;
+    return rows.map((r) => ({
+      ...toRow(r),
+      projectName: r.project_name,
+      projectColor: r.project_color,
+    }));
   }
 
   get(id: number): EpicRow | null {

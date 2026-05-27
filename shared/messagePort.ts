@@ -21,12 +21,14 @@ export type OrchRequest =
   | { id: string; kind: 'projects:archive'; payload: { id: number; archived: boolean } }
   | { id: string; kind: 'projects:delete'; payload: { id: number } }
   | { id: string; kind: 'epics:list'; payload: { projectId: number } }
+  | { id: string; kind: 'epics:listAll'; payload: Record<string, never> }
   | { id: string; kind: 'epics:create'; payload: OrchEpicInput }
   | { id: string; kind: 'epics:update'; payload: { id: number; input: Partial<OrchEpicInput> } }
   | { id: string; kind: 'epics:reorder'; payload: { projectId: number; orderedIds: number[] } }
   | { id: string; kind: 'epics:delete'; payload: { id: number } }
   | { id: string; kind: 'tasks:listForEpic'; payload: { epicId: number } }
   | { id: string; kind: 'tasks:listForProject'; payload: { projectId: number } }
+  | { id: string; kind: 'tasks:findByNumber'; payload: { number: string } }
   | { id: string; kind: 'tasks:create'; payload: OrchTaskInput }
   | { id: string; kind: 'tasks:update'; payload: { id: number; input: Partial<OrchTaskInput> } }
   | { id: string; kind: 'tasks:delete'; payload: { id: number } }
@@ -303,6 +305,11 @@ export interface OrchEpicView {
   totalMinutes: number;
 }
 
+export interface OrchEpicWithProject extends OrchEpicView {
+  projectName: string;
+  projectColor: string;
+}
+
 export interface OrchTaskInput {
   epicId: number;
   number: string;
@@ -322,6 +329,18 @@ export interface OrchTaskView {
   estimatedMinutes: number | null;
   createdAt: string;
   totalMinutes: number;
+}
+
+export interface OrchTaskByNumber {
+  id: number;
+  number: string;
+  title: string;
+  status: 'open' | 'in_progress' | 'done';
+  epicId: number;
+  epicName: string;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
 }
 
 export interface OrchJiraSyncRequest {
@@ -432,12 +451,14 @@ export type OrchResponse =
   | { kind: 'projects:archive'; payload: { ok: true } }
   | { kind: 'projects:delete'; payload: { ok: true } }
   | { kind: 'epics:list'; payload: { epics: OrchEpicView[] } }
+  | { kind: 'epics:listAll'; payload: { epics: OrchEpicWithProject[] } }
   | { kind: 'epics:create'; payload: { epic: OrchEpicView } }
   | { kind: 'epics:update'; payload: { epic: OrchEpicView } }
   | { kind: 'epics:reorder'; payload: { ok: true } }
   | { kind: 'epics:delete'; payload: { ok: true } }
   | { kind: 'tasks:listForEpic'; payload: { tasks: OrchTaskView[] } }
   | { kind: 'tasks:listForProject'; payload: { tasks: OrchTaskView[] } }
+  | { kind: 'tasks:findByNumber'; payload: { task: OrchTaskByNumber | null } }
   | { kind: 'tasks:create'; payload: { task: OrchTaskView } }
   | { kind: 'tasks:update'; payload: { task: OrchTaskView } }
   | { kind: 'tasks:delete'; payload: { ok: true } }

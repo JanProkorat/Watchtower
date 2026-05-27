@@ -23,12 +23,14 @@ export type IpcRequest =
   | { kind: 'projects:archive'; payload: { id: number; archived: boolean } }
   | { kind: 'projects:delete'; payload: { id: number } }
   | { kind: 'epics:list'; payload: { projectId: number } }
+  | { kind: 'epics:listAll'; payload: Record<string, never> }
   | { kind: 'epics:create'; payload: EpicInputPayload }
   | { kind: 'epics:update'; payload: { id: number; input: Partial<EpicInputPayload> } }
   | { kind: 'epics:reorder'; payload: { projectId: number; orderedIds: number[] } }
   | { kind: 'epics:delete'; payload: { id: number } }
   | { kind: 'tasks:listForEpic'; payload: { epicId: number } }
   | { kind: 'tasks:listForProject'; payload: { projectId: number } }
+  | { kind: 'tasks:findByNumber'; payload: { number: string } }
   | { kind: 'tasks:create'; payload: TaskInputPayload }
   | { kind: 'tasks:update'; payload: { id: number; input: Partial<TaskInputPayload> } }
   | { kind: 'tasks:delete'; payload: { id: number } }
@@ -386,6 +388,13 @@ export interface EpicViewPayload {
   totalMinutes: number;
 }
 
+/** EpicViewPayload + joined project name/color, used by the Settings
+ *  default-meetings-task picker which needs to span every project. */
+export interface EpicWithProjectPayload extends EpicViewPayload {
+  projectName: string;
+  projectColor: string;
+}
+
 export interface TaskInputPayload {
   epicId: number;
   number: string;
@@ -405,6 +414,19 @@ export interface TaskViewPayload {
   estimatedMinutes: number | null;
   createdAt: string;
   totalMinutes: number;
+}
+
+/** Task plus the project + epic context needed for the settings UI chip. */
+export interface TaskByNumberPayload {
+  id: number;
+  number: string;
+  title: string;
+  status: 'open' | 'in_progress' | 'done';
+  epicId: number;
+  epicName: string;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
 }
 
 export interface ProjectListFilterPayload {
@@ -477,12 +499,14 @@ export type IpcResponse =
   | { kind: 'projects:archive'; payload: { ok: true } }
   | { kind: 'projects:delete'; payload: { ok: true } }
   | { kind: 'epics:list'; payload: { epics: EpicViewPayload[] } }
+  | { kind: 'epics:listAll'; payload: { epics: EpicWithProjectPayload[] } }
   | { kind: 'epics:create'; payload: { epic: EpicViewPayload } }
   | { kind: 'epics:update'; payload: { epic: EpicViewPayload } }
   | { kind: 'epics:reorder'; payload: { ok: true } }
   | { kind: 'epics:delete'; payload: { ok: true } }
   | { kind: 'tasks:listForEpic'; payload: { tasks: TaskViewPayload[] } }
   | { kind: 'tasks:listForProject'; payload: { tasks: TaskViewPayload[] } }
+  | { kind: 'tasks:findByNumber'; payload: { task: TaskByNumberPayload | null } }
   | { kind: 'tasks:create'; payload: { task: TaskViewPayload } }
   | { kind: 'tasks:update'; payload: { task: TaskViewPayload } }
   | { kind: 'tasks:delete'; payload: { ok: true } }
