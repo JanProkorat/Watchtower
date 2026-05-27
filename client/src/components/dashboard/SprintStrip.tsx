@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   IconButton,
   Paper,
   Popover,
@@ -15,6 +14,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EventRepeatIcon from '@mui/icons-material/EventRepeat';
 import TodayIcon from '@mui/icons-material/Today';
 import DragHandleIcon from '@mui/icons-material/DragHandle';
@@ -24,6 +24,9 @@ import type { DashboardSprintDayPayload } from '../../../../shared/ipcContract.j
 import { formatDateLongCz, formatMinutes } from '../../util/format.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { SprintDayCell } from './SprintDayCell.js';
+
+const WATCHTOWER_DB_PATH =
+  '/Users/jan/Library/Application Support/Watchtower/data.db';
 
 const DAY_HEIGHT_DEFAULT = 330;
 const DAY_HEIGHT_MIN = 140;
@@ -58,21 +61,17 @@ export interface SprintStripProps {
   todayDate: string;
   /** Caller updates the sprint anchor; the strip never derives it itself. */
   onAnchorChange(nextAnchor: string): void;
-  /** Optional — called after a successful meetings sync so the dashboard refetches. */
-  onSyncComplete?(): void;
 }
 
 export function SprintStrip({
   sprint,
   todayDate,
   onAnchorChange,
-  onSyncComplete,
 }: SprintStripProps) {
   const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null);
   const [syncAnchor, setSyncAnchor] = useState<HTMLElement | null>(null);
   const [syncFrom, setSyncFrom] = useState<Dayjs | null>(null);
   const [syncTo, setSyncTo] = useState<Dayjs | null>(null);
-  const [syncing, setSyncing] = useState(false);
   const [dayHeight, setDayHeight] = useState<number>(loadDayHeight);
   const dragStateRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const todayRef = useRef<HTMLDivElement | null>(null);
@@ -148,26 +147,23 @@ export function SprintStrip({
     !syncFrom!.isBefore(sprintStart) &&
     !syncTo!.isAfter(sprintEnd);
 
+  // The button does NOT spawn `claude -p` — that hangs on M365 MCP init
+  // in the orchestrator's subprocess in this user's env (see the abandoned
+  // attempts in git history). Instead we build the slash command the user
+  // would type and copy it to the clipboard; they paste it into their
+  // Claude Code chat (where MCP is already authenticated) and it runs
+  // there, writing worklogs directly into Watchtower's DB.
   const submitSync = async () => {
-    if (!rangeValid || !syncFrom || !syncTo || syncing) return;
-    setSyncing(true);
+    if (!rangeValid || !syncFrom || !syncTo) return;
+    const command =
+      `/sync-meetings ${syncFrom.format('YYYY-MM-DD')} ${syncTo.format('YYYY-MM-DD')} ` +
+      `"${WATCHTOWER_DB_PATH}"`;
     try {
-      const result = await window.watchtower.invoke('meetings:sync', {
-        from: syncFrom.format('YYYY-MM-DD'),
-        to: syncTo.format('YYYY-MM-DD'),
-      });
+      await navigator.clipboard.writeText(command);
       setSyncAnchor(null);
-      if (result.error) {
-        showError(`Sync schůzek selhal: ${result.error}`);
-      } else {
-        const msg = result.summary || 'Sync schůzek dokončen.';
-        showSuccess(msg);
-        onSyncComplete?.();
-      }
+      showSuccess('Příkaz zkopírován do schránky. Vložte ho do Claude Code chatu pro spuštění.');
     } catch (err) {
-      showError(`Sync schůzek selhal: ${toastMessage(err)}`);
-    } finally {
-      setSyncing(false);
+      showError(`Nepodařilo se zkopírovat příkaz: ${toastMessage(err)}`);
     }
   };
 
@@ -191,15 +187,9 @@ export function SprintStrip({
 
         <Stack direction="row" spacing={0.5}>
           <Tooltip title="Sync meetings">
-            <span>
-              <IconButton
-                size="small"
-                onClick={(e) => openSyncPopover(e.currentTarget)}
-                disabled={syncing}
-              >
-                {syncing ? <CircularProgress size={16} /> : <EventRepeatIcon fontSize="small" />}
-              </IconButton>
-            </span>
+            <IconButton size="small" onClick={(e) => openSyncPopover(e.currentTarget)}>
+              <EventRepeatIcon fontSize="small" />
+            </IconButton>
           </Tooltip>
           <Tooltip title="Jump to today">
             <IconButton size="small" onClick={() => onAnchorChange(todayDate)}>
@@ -264,7 +254,7 @@ export function SprintStrip({
       <Popover
         open={Boolean(syncAnchor)}
         anchorEl={syncAnchor}
-        onClose={() => (syncing ? undefined : setSyncAnchor(null))}
+        onClose={() => setSyncAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
       >
@@ -275,9 +265,9 @@ export function SprintStrip({
             {formatDateLongCz(sprint.toDate)}).
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-            Tip: run <code>/sync-meetings YYYY-MM-DD YYYY-MM-DD</code> in your
-            Claude Code chat first to refresh Outlook events; this button then
-            imports them into Watchtower.
+            Klik vám zkopíruje <code>/sync-meetings</code> příkaz do schránky.
+            Vložte ho do svého Claude Code chatu a stiskněte Enter — Watchtower
+            si nové worklogy vyzvedne přímo z DB.
           </Typography>
           <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
             <DatePicker
@@ -298,18 +288,14 @@ export function SprintStrip({
             />
           </Stack>
           <Stack direction="row" spacing={1} justifyContent="flex-end">
-            <Button onClick={() => setSyncAnchor(null)} disabled={syncing}>
-              Cancel
-            </Button>
+            <Button onClick={() => setSyncAnchor(null)}>Cancel</Button>
             <Button
               variant="contained"
-              startIcon={
-                syncing ? <CircularProgress size={14} color="inherit" /> : <EventRepeatIcon />
-              }
-              disabled={!rangeValid || syncing}
+              startIcon={<ContentCopyIcon />}
+              disabled={!rangeValid}
               onClick={() => void submitSync()}
             >
-              Sync
+              Copy command
             </Button>
           </Stack>
         </Box>

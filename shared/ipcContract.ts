@@ -66,7 +66,6 @@ export type IpcRequest =
   | { kind: 'board:sync'; payload: { projectId: number } }
   | { kind: 'board:signIn'; payload: Record<string, never> }
   | { kind: 'board:remove'; payload: { taskId: number; projectId: number } }
-  | { kind: 'meetings:sync'; payload: MeetingsSyncRequestPayload }
   | { kind: 'openExternalUrl'; payload: { url: string } };
 
 export interface RunningInstancePayload {
@@ -521,7 +520,6 @@ export type IpcResponse =
   | { kind: 'board:sync'; payload: { snapshot: BoardSnapshotPayload; result: BoardSyncResultPayload } }
   | { kind: 'board:signIn'; payload: { ok: boolean; error?: string } }
   | { kind: 'board:remove'; payload: { snapshot: BoardSnapshotPayload } }
-  | { kind: 'meetings:sync'; payload: MeetingsSyncResultPayload }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } };
 
 export interface AgentRowPayload {
@@ -648,26 +646,6 @@ export interface BoardSyncResultPayload {
    */
   authFailed?: boolean;
   /** Top-level fatal error (config/auth/network). Per-card failures don't set this. */
-  error?: string;
-}
-
-export interface MeetingsSyncRequestPayload {
-  /** Inclusive YYYY-MM-DD. */
-  from: string;
-  /** Inclusive YYYY-MM-DD. */
-  to: string;
-}
-
-export interface MeetingsSyncResultPayload {
-  ok: boolean;
-  exitCode: number | null;
-  summary: string;
-  logged: number;
-  skipped: number;
-  unresolved: number;
-  duplicate: number;
-  total: number;
-  /** Set when the call failed before counts could be produced. */
   error?: string;
 }
 

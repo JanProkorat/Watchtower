@@ -48,7 +48,6 @@ import { listSkills } from './services/claudeSkills.js';
 import { listAgents } from './services/claudeAgents.js';
 import { JiraSyncService } from './services/jiraSync.js';
 import { JiraBoardService } from './services/jiraBoard.js';
-import { MeetingsSyncService } from './services/meetingsSync.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
 
@@ -665,24 +664,6 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       new TasksRepo(handle!.db).clearJiraStatus(req.payload.taskId);
       return { snapshot: new JiraBoardService(handle!.db).getSnapshot(req.payload.projectId) };
     }
-
-    case 'meetings:sync':
-      try {
-        return await new MeetingsSyncService(handle!.db).sync(req.payload);
-      } catch (err) {
-        console.error('[orchestrator] meetings:sync handler threw:', err);
-        return {
-          ok: false,
-          exitCode: null,
-          summary: '',
-          logged: 0,
-          skipped: 0,
-          unresolved: 0,
-          duplicate: 0,
-          total: 0,
-          error: err instanceof Error ? err.message : String(err),
-        };
-      }
   }
 }
 

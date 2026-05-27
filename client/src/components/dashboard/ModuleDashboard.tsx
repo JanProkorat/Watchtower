@@ -168,7 +168,6 @@ export function ModuleDashboard({
               sprint={overview.data.sprint}
               todayDate={today}
               onAnchorChange={setSprintAnchor}
-              onSyncComplete={() => void overview.refresh()}
             />
             <ActiveContractsCard
               contracts={overview.data.activeContracts}

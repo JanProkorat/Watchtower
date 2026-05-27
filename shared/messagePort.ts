@@ -61,8 +61,7 @@ export type OrchRequest =
   | { id: string; kind: 'board:authPing'; payload: Record<string, never> }
   | { id: string; kind: 'board:get'; payload: { projectId: number } }
   | { id: string; kind: 'board:sync'; payload: { projectId: number } }
-  | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
-  | { id: string; kind: 'meetings:sync'; payload: OrchMeetingsSyncRequest };
+  | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -365,23 +364,6 @@ export interface OrchJiraSyncResult {
   entries: OrchJiraSyncEntry[];
 }
 
-export interface OrchMeetingsSyncRequest {
-  from: string;
-  to: string;
-}
-
-export interface OrchMeetingsSyncResult {
-  ok: boolean;
-  exitCode: number | null;
-  summary: string;
-  logged: number;
-  skipped: number;
-  unresolved: number;
-  duplicate: number;
-  total: number;
-  error?: string;
-}
-
 export interface OrchProjectListFilter {
   archived?: boolean;
   kind?: 'work' | 'time_off';
@@ -499,8 +481,7 @@ export type OrchResponse =
   | {
       kind: 'board:remove';
       payload: { snapshot: import('./ipcContract.js').BoardSnapshotPayload };
-    }
-  | { kind: 'meetings:sync'; payload: OrchMeetingsSyncResult };
+    };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
