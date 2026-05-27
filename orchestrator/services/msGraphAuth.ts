@@ -20,6 +20,14 @@ export interface MsGraphConfig {
   configured: boolean;
 }
 
+export interface DeviceCodeResponse {
+  userCode: string;
+  deviceCode: string;
+  verificationUri: string;
+  expiresIn: number;
+  interval: number;
+}
+
 export interface CachedTokens {
   accessToken: string;
   refreshToken: string;
@@ -120,5 +128,40 @@ export class MsGraphAuthService {
   clearTokens(): void {
     const cfg = this.config();
     this.deps.deleteSecret(cfg.keychainService, cfg.keychainAccount);
+  }
+
+  async startDeviceCode(): Promise<DeviceCodeResponse> {
+    const cfg = this.config();
+    if (!cfg.configured) {
+      throw new Error('MS_GRAPH_CLIENT_ID is not set. See README for setup.');
+    }
+    const body = new URLSearchParams({
+      client_id: cfg.clientId,
+      scope: 'offline_access Calendars.Read',
+    });
+    const url = `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/devicecode`;
+    const r = await this.deps.fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(`Device code request failed (${r.status}): ${text}`);
+    }
+    const j = (await r.json()) as {
+      user_code: string;
+      device_code: string;
+      verification_uri: string;
+      expires_in: number;
+      interval: number;
+    };
+    return {
+      userCode: j.user_code,
+      deviceCode: j.device_code,
+      verificationUri: j.verification_uri,
+      expiresIn: j.expires_in,
+      interval: j.interval,
+    };
   }
 }

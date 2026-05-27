@@ -74,3 +74,55 @@ describe('MsGraphAuthService keychain I/O', () => {
     expect(svc.loadTokens()).toBeNull();
   });
 });
+
+describe('startDeviceCode', () => {
+  it('POSTs client_id + scope to /devicecode and returns the response shape', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        user_code: 'ABCD-EFGH',
+        device_code: 'devc',
+        verification_uri: 'https://microsoft.com/devicelogin',
+        expires_in: 900,
+        interval: 5,
+      }),
+    } as unknown as Response));
+    const svc = new MsGraphAuthService(
+      makeDeps({ fetch: fetchMock as unknown as typeof fetch }),
+    );
+    const r = await svc.startDeviceCode();
+    expect(r).toEqual({
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'devc',
+      verificationUri: 'https://microsoft.com/devicelogin',
+      expiresIn: 900,
+      interval: 5,
+    });
+    const call = fetchMock.mock.calls[0]!;
+    expect(call[0]).toBe('https://login.microsoftonline.com/common/oauth2/v2.0/devicecode');
+    const body = (call[1] as RequestInit).body as URLSearchParams;
+    expect(body.get('client_id')).toBe('abc');
+    expect(body.get('scope')).toBe('offline_access Calendars.Read');
+  });
+
+  it('throws when config is not set', async () => {
+    delete process.env.MS_GRAPH_CLIENT_ID;
+    const svc = new MsGraphAuthService(makeDeps());
+    await expect(svc.startDeviceCode()).rejects.toThrow(/MS_GRAPH_CLIENT_ID/);
+  });
+
+  it('throws on non-2xx', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      text: async () => '{"error":"invalid_client"}',
+    } as unknown as Response));
+    const svc = new MsGraphAuthService(
+      makeDeps({ fetch: fetchMock as unknown as typeof fetch }),
+    );
+    await expect(svc.startDeviceCode()).rejects.toThrow(/invalid_client/);
+  });
+});
