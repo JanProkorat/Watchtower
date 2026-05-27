@@ -20,6 +20,7 @@ import { EpicsRepo, type EpicInput } from './db/repositories/epics.js';
 import { TasksRepo, type TaskInput } from './db/repositories/tasks.js';
 import {
   WorklogsRepo,
+  WorklogLockedError,
   type WorklogInput,
   type WorklogListFilter,
 } from './db/repositories/worklogs.js';
@@ -48,6 +49,8 @@ import { listSkills } from './services/claudeSkills.js';
 import { listAgents } from './services/claudeAgents.js';
 import { JiraSyncService } from './services/jiraSync.js';
 import { JiraBoardService } from './services/jiraBoard.js';
+import { MeetingsSyncService } from './services/meetingsSync.js';
+import { MsGraphAuthService } from './services/msGraphAuth.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
 
@@ -70,6 +73,8 @@ let handle: BootstrapHandle | null = null;
 const pty = new PtyManager();
 let notifier: Notifier | null = null;
 let quietTimers: QuietTimers | null = null;
+const msGraphAuth = new MsGraphAuthService();
+let activeSignInController: AbortController | null = null;
 
 const DEFAULT_QUIET_MS = 90_000;
 
@@ -469,19 +474,40 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       return { worklogs: worklogsRepo().list(req.payload as WorklogListFilter) };
 
     case 'worklogs:create':
-      return { worklog: worklogsRepo().create(req.payload as WorklogInput) };
+      try {
+        return { worklog: worklogsRepo().create(req.payload as WorklogInput) };
+      } catch (err) {
+        if (err instanceof WorklogLockedError) {
+          return { error: 'locked' as const, lockedThrough: err.lockedThrough, message: err.message };
+        }
+        throw err;
+      }
 
     case 'worklogs:update':
-      return {
-        worklog: worklogsRepo().update(
-          req.payload.id,
-          req.payload.input as Partial<WorklogInput>,
-        ),
-      };
+      try {
+        return {
+          worklog: worklogsRepo().update(
+            req.payload.id,
+            req.payload.input as Partial<WorklogInput>,
+          ),
+        };
+      } catch (err) {
+        if (err instanceof WorklogLockedError) {
+          return { error: 'locked' as const, lockedThrough: err.lockedThrough, message: err.message };
+        }
+        throw err;
+      }
 
     case 'worklogs:delete':
-      worklogsRepo().delete(req.payload.id);
-      return { ok: true };
+      try {
+        worklogsRepo().delete(req.payload.id);
+        return { ok: true };
+      } catch (err) {
+        if (err instanceof WorklogLockedError) {
+          return { error: 'locked' as const, lockedThrough: err.lockedThrough, message: err.message };
+        }
+        throw err;
+      }
 
     case 'contracts:listForProject': {
       const rows = projectRatesRepo().listForProject(req.payload.projectId);
@@ -651,18 +677,122 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       return new JiraBoardService(handle!.db).authPing();
 
     case 'board:get':
-      return new JiraBoardService(handle!.db).getSnapshot();
+      return new JiraBoardService(handle!.db).getSnapshot(req.payload.projectId);
 
     case 'board:sync': {
       const svc = new JiraBoardService(handle!.db);
-      const result = await svc.sync();
-      const snapshot = { ...svc.getSnapshot(), lastSyncResult: result };
+      const result = await svc.sync(req.payload.projectId);
+      const snapshot = { ...svc.getSnapshot(req.payload.projectId), lastSyncResult: result };
       return { snapshot, result };
     }
 
     case 'board:remove': {
       new TasksRepo(handle!.db).clearJiraStatus(req.payload.taskId);
-      return { snapshot: new JiraBoardService(handle!.db).getSnapshot() };
+      return {
+        snapshot: new JiraBoardService(handle!.db).getSnapshot(req.payload.projectId),
+      };
+    }
+
+    case 'meetings:sync':
+      try {
+        return await new MeetingsSyncService(handle!.db).sync(req.payload);
+      } catch (err) {
+        console.error('[orchestrator] meetings:sync handler threw:', err);
+        return {
+          ok: false,
+          exitCode: null,
+          summary: '',
+          logged: 0,
+          skipped: 0,
+          unresolved: 0,
+          duplicate: 0,
+          total: 0,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+
+    case 'ms365:status': {
+      const cfg = msGraphAuth.config();
+      const tokens = msGraphAuth.loadTokens();
+      return {
+        configured: cfg.configured,
+        signedIn: tokens !== null,
+        account: tokens?.account ?? null,
+        expiresAt: tokens?.expiresAt ?? null,
+      };
+    }
+
+    case 'ms365:startSignIn': {
+      if (!msGraphAuth.config().configured) {
+        return {
+          userCode: '',
+          verificationUri: '',
+          expiresIn: 0,
+          error: 'MS_GRAPH_CLIENT_ID is not set. See README for setup.',
+        };
+      }
+      // Cancel any prior in-flight flow.
+      activeSignInController?.abort();
+      activeSignInController = new AbortController();
+      let initial;
+      try {
+        initial = await msGraphAuth.startDeviceCode();
+      } catch (err) {
+        activeSignInController = null;
+        return {
+          userCode: '',
+          verificationUri: '',
+          expiresIn: 0,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+      // Poll in the background and push updates to the renderer.
+      const signal = activeSignInController.signal;
+      void msGraphAuth
+        .pollForTokens({
+          deviceCode: initial.deviceCode,
+          interval: initial.interval,
+          expiresIn: initial.expiresIn,
+          signal,
+        })
+        .then((r) => {
+          api?.push({
+            kind: 'ms365:signInUpdate',
+            payload: {
+              status: r.status,
+              account: r.status === 'success' ? r.account : undefined,
+              error: r.status === 'error' ? r.error : undefined,
+            },
+          });
+        })
+        .catch((err) => {
+          api?.push({
+            kind: 'ms365:signInUpdate',
+            payload: {
+              status: 'error',
+              error: err instanceof Error ? err.message : String(err),
+            },
+          });
+        })
+        .finally(() => {
+          activeSignInController = null;
+        });
+      return {
+        userCode: initial.userCode,
+        verificationUri: initial.verificationUri,
+        expiresIn: initial.expiresIn,
+      };
+    }
+
+    case 'ms365:cancelSignIn': {
+      activeSignInController?.abort();
+      activeSignInController = null;
+      return { ok: true as const };
+    }
+
+    case 'ms365:signOut': {
+      msGraphAuth.signOut();
+      return { ok: true as const };
     }
   }
 }
