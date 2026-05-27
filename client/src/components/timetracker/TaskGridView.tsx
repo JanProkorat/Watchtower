@@ -23,9 +23,13 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import AdjustIcon from '@mui/icons-material/Adjust';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import dayjs from 'dayjs';
 import { useTaskGrid } from '../../state/useTaskGrid.js';
 import { TaskDrawer } from './TaskDrawer.js';
 import { WorklogDrawer } from './WorklogDrawer.js';
+import { WorklogCellPopover } from './WorklogCellPopover.js';
+import { JiraSyncDialog } from './JiraSyncDialog.js';
 import type {
   EpicViewPayload,
   ProjectViewPayload,
@@ -83,15 +87,16 @@ export function TaskGridView({ projectId }: Props) {
     projectId ?? projectFilter ?? undefined,
   );
 
-  // Load projects once on mount (only in list mode). On the first load, snap
-  // the filter to the project marked is_default = 1 so the grid lands on the
-  // user's working project instead of the costlier "All projects" scan.
+  // Load projects once on mount. In list mode the first load also snaps the
+  // filter to the project marked is_default = 1 so the grid lands on the
+  // user's working project instead of the costlier "All projects" scan. In
+  // single-project mode the list is still fetched so the Sync-to-Jira dialog
+  // can populate its project dropdown.
   const initialProjectSelectionDoneRef = useRef(false);
   useEffect(() => {
-    if (projectId !== undefined) return;
     void window.watchtower.invoke('projects:list', { archived: false }).then((r) => {
       setProjects(r.projects);
-      if (!initialProjectSelectionDoneRef.current) {
+      if (projectId === undefined && !initialProjectSelectionDoneRef.current) {
         initialProjectSelectionDoneRef.current = true;
         const def = r.projects.find((p) => p.isDefault);
         if (def) setProjectFilter(def.id);
@@ -105,19 +110,24 @@ export function TaskGridView({ projectId }: Props) {
   const [taskDrawerEpicId, setTaskDrawerEpicId] = useState<number | null>(null);
   const [taskDrawerEpics, setTaskDrawerEpics] = useState<EpicViewPayload[]>([]);
 
+  const [jiraSyncOpen, setJiraSyncOpen] = useState(false);
+
   const [worklogDrawerOpen, setWorklogDrawerOpen] = useState(false);
   const [worklogDrawerProjectId, setWorklogDrawerProjectId] = useState<number | null>(null);
   const [worklogDrawerTaskId, setWorklogDrawerTaskId] = useState<number | null>(null);
   const [worklogDrawerWorkDate, setWorklogDrawerWorkDate] = useState<string | null>(null);
-  /**
-   * When the cell-click flow finds an existing worklog (or worklogs) for
-   * that task/date, we open the drawer in edit mode on the first match.
-   * Multiple worklogs on the same cell get a "+ N more" hint in the
-   * description fallback so the user knows the rest live in the list view.
-   */
   const [worklogDrawerEditing, setWorklogDrawerEditing] = useState<WorklogViewPayload | null>(
     null,
   );
+
+  // Cell-click popover. Always opens for every cell so multiple worklogs in
+  // one day are visible and individually addressable — the drawer is reached
+  // by picking a row (edit) or the "Add worklog" footer (create).
+  const [cellPopoverAnchor, setCellPopoverAnchor] = useState<HTMLElement | null>(null);
+  const [cellPopoverYmd, setCellPopoverYmd] = useState<string>('');
+  const [cellPopoverTaskId, setCellPopoverTaskId] = useState<number | null>(null);
+  const [cellPopoverProjectId, setCellPopoverProjectId] = useState<number | null>(null);
+  const [cellPopoverWorklogs, setCellPopoverWorklogs] = useState<WorklogViewPayload[]>([]);
 
   const openTaskDrawer = async (gridTask: TaskGridTaskPayload) => {
     // Fetch the full task row + the project's epics so the drawer has its
@@ -139,37 +149,53 @@ export function TaskGridView({ projectId }: Props) {
     }
   };
 
-  const openWorklogDrawerForCell = async (taskId: number, day: number) => {
+  const openCellPopover = async (taskId: number, day: number, anchor: HTMLElement) => {
     const ymd = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    // Find the project for this task (from the grid payload).
     const gridTask = grid.data?.tasks.find((t) => t.taskId === taskId);
     if (!gridTask) return;
 
-    // Look up any worklog(s) already on this cell so the drawer opens in
-    // edit mode (with real values) when there's an existing one. The grid's
-    // perDay aggregates can hide multiple worklogs per cell; we surface the
-    // first match here and rely on the per-row list view for the rest.
+    setCellPopoverTaskId(taskId);
+    setCellPopoverProjectId(gridTask.projectId);
+    setCellPopoverYmd(ymd);
+    setCellPopoverAnchor(anchor);
+
     try {
       const res = await window.watchtower.invoke('worklogs:list', {
         taskId,
         from: ymd,
         to: ymd,
       });
-      const existing = res.worklogs[0] ?? null;
-      setWorklogDrawerEditing(existing);
-      setWorklogDrawerProjectId(gridTask.projectId);
-      setWorklogDrawerTaskId(existing ? null : taskId);
-      setWorklogDrawerWorkDate(existing ? null : ymd);
-      setWorklogDrawerOpen(true);
+      setCellPopoverWorklogs(res.worklogs);
     } catch {
-      // Network-ish blip: still open in create mode so the user can log
-      // work even if the lookup failed.
-      setWorklogDrawerEditing(null);
-      setWorklogDrawerProjectId(gridTask.projectId);
-      setWorklogDrawerTaskId(taskId);
-      setWorklogDrawerWorkDate(ymd);
-      setWorklogDrawerOpen(true);
+      // Fetch failure: still show the popover with an empty list — the user
+      // can at least hit "Add worklog" to log fresh time.
+      setCellPopoverWorklogs([]);
     }
+  };
+
+  const closeCellPopover = () => {
+    setCellPopoverAnchor(null);
+    // Leave the other state in place — Popover's exit transition reads it
+    // for one more frame; setting null on close + reset on next open is
+    // cleaner than racing the transition.
+  };
+
+  const editFromPopover = (worklog: WorklogViewPayload) => {
+    setWorklogDrawerEditing(worklog);
+    setWorklogDrawerProjectId(cellPopoverProjectId);
+    setWorklogDrawerTaskId(null);
+    setWorklogDrawerWorkDate(null);
+    setWorklogDrawerOpen(true);
+    closeCellPopover();
+  };
+
+  const addFromPopover = () => {
+    setWorklogDrawerEditing(null);
+    setWorklogDrawerProjectId(cellPopoverProjectId);
+    setWorklogDrawerTaskId(cellPopoverTaskId);
+    setWorklogDrawerWorkDate(cellPopoverYmd);
+    setWorklogDrawerOpen(true);
+    closeCellPopover();
   };
 
   const stepMonth = (delta: number) => {
@@ -305,6 +331,15 @@ export function TaskGridView({ projectId }: Props) {
         <Button
           size="small"
           variant="outlined"
+          startIcon={<CloudUploadIcon fontSize="small" />}
+          onClick={() => setJiraSyncOpen(true)}
+        >
+          Sync to Jira
+        </Button>
+
+        <Button
+          size="small"
+          variant="outlined"
           startIcon={<AccessTimeIcon fontSize="small" />}
           onClick={() => {
             setWorklogDrawerEditing(null);
@@ -344,7 +379,7 @@ export function TaskGridView({ projectId }: Props) {
             displayMode={displayMode}
             hideDone={hideDone}
             onTaskKeyClick={openTaskDrawer}
-            onCellClick={openWorklogDrawerForCell}
+            onCellClick={openCellPopover}
           />
         )}
       </Box>
@@ -402,6 +437,27 @@ export function TaskGridView({ projectId }: Props) {
             : undefined
         }
       />
+
+      <WorklogCellPopover
+        anchor={cellPopoverAnchor}
+        ymd={cellPopoverYmd}
+        worklogs={cellPopoverWorklogs}
+        onClose={closeCellPopover}
+        onEdit={editFromPopover}
+        onAdd={addFromPopover}
+      />
+
+      <JiraSyncDialog
+        open={jiraSyncOpen}
+        initialFrom={dayjs(new Date(year, month - 1, 1))}
+        initialTo={dayjs(new Date(year, month, 0))}
+        initialProjectId={projectId ?? projectFilter ?? null}
+        projects={projects}
+        onClose={() => setJiraSyncOpen(false)}
+        onSynced={() => {
+          void grid.refresh();
+        }}
+      />
     </Box>
   );
 }
@@ -429,7 +485,7 @@ function Grid({
   displayMode: 'tracked' | 'reported';
   hideDone: boolean;
   onTaskKeyClick(task: TaskGridTaskPayload): void;
-  onCellClick(taskId: number, day: number): void;
+  onCellClick(taskId: number, day: number, anchor: HTMLElement): void;
 }) {
   const theme = useTheme();
   const paper = theme.palette.background.paper;
@@ -473,6 +529,16 @@ function Grid({
       <Box
         component="table"
         sx={{
+          // height: 100% lets the filler row below absorb any leftover space
+          // so the sticky-bottom totals stay pinned to the container bottom
+          // even when the task list is shorter than the viewport.
+          height: '100%',
+          // width: 100% stretches the table to fill the scroll container.
+          // Day columns use minWidth only (no explicit width), so the browser
+          // distributes leftover horizontal space across them. On narrow
+          // viewports the minWidth clamps each day to its readable size and
+          // the container's overflow-x kicks in.
+          width: '100%',
           borderCollapse: 'separate',
           borderSpacing: 0,
           fontSize: 13,
@@ -530,7 +596,6 @@ function Grid({
                   title={d.holidayName ?? undefined}
                   style={{
                     minWidth: DAY_COL_WIDTH,
-                    width: DAY_COL_WIDTH,
                     textAlign: 'center',
                     fontWeight: 500,
                     lineHeight: 1.1,
@@ -570,6 +635,22 @@ function Grid({
               onCellClick={onCellClick}
             />
           ))}
+
+          {/* Filler row — absorbs any leftover vertical space so the
+              sticky-bottom totals/earnings rows pin against the container's
+              bottom edge instead of floating mid-screen on tall viewports.
+              colSpan covers Key + Logged + every day column. */}
+          <tr aria-hidden>
+            <td
+              colSpan={2 + days.length}
+              style={{
+                height: '100%',
+                padding: 0,
+                border: 'none',
+                background: paper,
+              }}
+            />
+          </tr>
 
           {/* Total hours — sticky above earnings rows */}
           <tr>
@@ -737,7 +818,7 @@ function TaskRow({
   theme: Theme;
   divider: string;
   onKeyClick(): void;
-  onCellClick(taskId: number, day: number): void;
+  onCellClick(taskId: number, day: number, anchor: HTMLElement): void;
 }) {
   const perDay = displayMode === 'tracked' ? task.perDayTracked : task.perDayReported;
   const totalMinutes = displayMode === 'tracked' ? task.totalTracked : task.totalReported;
@@ -854,10 +935,9 @@ function TaskRow({
         return (
           <td
             key={d.day}
-            onClick={() => onCellClick(task.taskId, d.day)}
+            onClick={(e) => onCellClick(task.taskId, d.day, e.currentTarget)}
             style={{
               minWidth: DAY_COL_WIDTH,
-              width: DAY_COL_WIDTH,
               textAlign: 'center',
               cursor: 'pointer',
               fontVariantNumeric: 'tabular-nums',

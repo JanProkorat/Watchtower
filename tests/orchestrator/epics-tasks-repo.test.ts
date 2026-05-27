@@ -180,6 +180,66 @@ describe('TasksRepo', () => {
     const rows = db.prepare(`SELECT * FROM worklogs WHERE task_id = ?`).all(t.id);
     expect(rows).toEqual([]);
   });
+
+  describe('jira fields', () => {
+    it('findByNumber returns null when the key does not exist', () => {
+      expect(tasks.findByNumber('FIE1933-99999')).toBeNull();
+    });
+
+    it('findByNumber returns the row when it exists', () => {
+      const t = tasks.create({ epicId, number: 'FIE1933-19796', title: 'foo' });
+      const found = tasks.findByNumber('FIE1933-19796');
+      expect(found?.id).toBe(t.id);
+      expect(found?.number).toBe('FIE1933-19796');
+    });
+
+    it('updateJiraFields persists status/estimate/component/syncedAt', () => {
+      const t = tasks.create({ epicId, number: 'FIE1933-19796', title: 'foo' });
+      tasks.updateJiraFields(t.id, {
+        jiraStatus: 'In Review',
+        estimateSeconds: 14400,
+        component: 'TEH-Vzory',
+        syncedAt: '2026-05-26T14:32:00.000Z',
+      });
+      const got = tasks.get(t.id)!;
+      expect(got.jiraStatus).toBe('In Review');
+      expect(got.jiraEstimateSecs).toBe(14400);
+      expect(got.jiraComponent).toBe('TEH-Vzory');
+      expect(got.jiraSyncedAt).toBe('2026-05-26T14:32:00.000Z');
+    });
+
+    it('clearJiraStatusExcept clears rows whose number is NOT in the keep-set', () => {
+      const a = tasks.create({ epicId, number: 'A-1', title: 'a' });
+      const b = tasks.create({ epicId, number: 'A-2', title: 'b' });
+      const c = tasks.create({ epicId, number: 'A-3', title: 'c' });
+      for (const id of [a.id, b.id, c.id]) {
+        tasks.updateJiraFields(id, {
+          jiraStatus: 'To Do',
+          estimateSeconds: null,
+          component: null,
+          syncedAt: '2026-05-26T00:00:00Z',
+        });
+      }
+      const cleared = tasks.clearJiraStatusExcept(['A-1', 'A-2']);
+      expect(cleared).toBe(1);
+      expect(tasks.get(a.id)?.jiraStatus).toBe('To Do');
+      expect(tasks.get(b.id)?.jiraStatus).toBe('To Do');
+      expect(tasks.get(c.id)?.jiraStatus).toBeNull();
+    });
+
+    it('clearJiraStatusExcept with an empty keep-set clears all', () => {
+      const a = tasks.create({ epicId, number: 'A-1', title: 'a' });
+      tasks.updateJiraFields(a.id, {
+        jiraStatus: 'To Do',
+        estimateSeconds: null,
+        component: null,
+        syncedAt: '2026-05-26T00:00:00Z',
+      });
+      const cleared = tasks.clearJiraStatusExcept([]);
+      expect(cleared).toBe(1);
+      expect(tasks.get(a.id)?.jiraStatus).toBeNull();
+    });
+  });
 });
 
 describe('migrations · v5 extends epics + tasks', () => {
@@ -199,9 +259,9 @@ describe('migrations · v5 extends epics + tasks', () => {
     expect(cols.map((c) => c.name)).toContain('description');
   });
 
-  it('bumps schema version to 5', () => {
+  it('bumps schema version to 6', () => {
     const db = freshDb();
     const row = db.prepare(`SELECT MAX(version) v FROM schema_version`).get() as { v: number };
-    expect(row.v).toBe(5);
+    expect(row.v).toBe(6);
   });
 });

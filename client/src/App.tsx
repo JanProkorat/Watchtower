@@ -19,6 +19,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import 'dayjs/locale/cs';
 import { darkTheme, lightTheme } from './theme.js';
 import { useThemeMode } from './state/useThemeMode.js';
+import { useActiveModule } from './state/useActiveModule.js';
 import { ToastProvider } from './state/useToast.js';
 import { useInstances } from './state/useInstances.js';
 import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
@@ -30,6 +31,7 @@ import { DashboardTab } from './components/DashboardTab.js';
 import { FirstRunWizard } from './components/FirstRunWizard.js';
 import { ModuleSettings } from './components/settings/ModuleSettings.js';
 import { ModuleTimeTracker } from './components/timetracker/ModuleTimeTracker.js';
+import { ModuleDashboard } from './components/dashboard/ModuleDashboard.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
 const TERMINAL_STATES = new Set(['finished', 'crashed', 'suspended']);
@@ -103,13 +105,13 @@ function LoadingScreen() {
 export function App() {
   const { mode, toggle: toggleThemeMode } = useThemeMode();
   const theme = useMemo(() => (mode === 'dark' ? darkTheme : lightTheme), [mode]);
-  const { instances, activeId, loaded, setActive, spawn, remove, reorder } = useInstances();
+  const { instances, activeId, loaded, setActive, spawn, kill, remove, reorder } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   /** Set by the TimeTracker launch bridge to pre-fill the New-instance modal. */
   const [pendingNewCwd, setPendingNewCwd] = useState<string | undefined>(undefined);
-  const [activeModule, setActiveModule] = useState<ModuleId>('instances');
+  const [activeModule, setActiveModule] = useActiveModule();
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Bridge handlers exposed to the TimeTracker module.
@@ -179,7 +181,9 @@ export function App() {
   const doSpawn = async (cwd: string) => {
     try {
       const res = await spawn(cwd);
-      if (!res.instanceId) {
+      if (res.instanceId) {
+        setActiveModule('instances');
+      } else {
         setSpawnError(res.error ?? 'spawn failed — no instance id returned');
       }
     } catch (err) {
@@ -239,16 +243,36 @@ export function App() {
           onToggleMode={toggleThemeMode}
         />
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {activeModule === 'settings' ? (
-          <ModuleSettings active />
-        ) : activeModule === 'timetracker' ? (
+        {activeModule === 'dashboard' && (
+          <ModuleDashboard
+            instances={instances}
+            onActivateInstance={switchToInstance}
+            onKillInstance={(id) => kill(id)}
+            onStartNewInstance={() => setNewOpen(true)}
+          />
+        )}
+        {activeModule === 'settings' && <ModuleSettings active />}
+        {activeModule === 'timetracker' && (
           <ModuleTimeTracker
             active
             onActivateInstance={switchToInstance}
             onOpenNewInstanceForCwd={switchToNewInstanceForCwd}
           />
-        ) : (
-          <>
+        )}
+        {/*
+         * Instances pane stays mounted across module switches so xterm
+         * buffers survive when the user clicks "Open" on a session from
+         * the dashboard. Hiding with display:none (not unmounting) keeps
+         * Terminal subscribed to ptyData; ResizeObserver re-fits on show.
+         */}
+        <Box
+          sx={{
+            display: activeModule === 'instances' ? 'flex' : 'none',
+            flex: 1,
+            flexDirection: 'column',
+            minHeight: 0,
+          }}
+        >
         <TabStrip
           instances={instances}
           activeId={activeId}
@@ -298,8 +322,7 @@ export function App() {
             )
           )}
         </Box>
-          </>
-        )}
+        </Box>
         </Box>
       </Box>
       </Box>

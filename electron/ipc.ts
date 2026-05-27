@@ -6,11 +6,14 @@ import type { IpcRequest, IpcResponse } from '../shared/ipcContract.js';
 import { getMainWindow, createMainWindow } from './window.js';
 import { getOrchestrator } from './orchestratorHost.js';
 import { fireMacNotification, fireTestNotification } from './notifications.js';
+import { runBoardSignIn } from './boardSignIn.js';
 
 const ELECTRON_ONLY_KINDS = new Set<IpcRequest['kind']>([
   'chooseDirectory',
   'sendTestNotification',
   'openInVSCode',
+  'openExternalUrl',
+  'board:signIn',
 ]);
 
 export function registerIpc(): void {
@@ -81,6 +84,22 @@ export function registerIpc(): void {
             resolve({ ok: false, error: `code: ${err.message}; openPath: ${fallback}` });
           });
         });
+      }
+
+      if (kind === 'board:signIn') {
+        return await runBoardSignIn();
+      }
+
+      if (kind === 'openExternalUrl') {
+        const { url } = payload as { url: string };
+        // https-only guard: refuse anything else so a malicious payload
+        // can't launch local apps via custom URL schemes (file://, mailto:,
+        // tel:, vscode://, etc.).
+        if (!/^https:\/\//.test(url)) {
+          return { ok: false, error: 'openExternalUrl: only https:// URLs are allowed' };
+        }
+        await shell.openExternal(url);
+        return { ok: true };
       }
 
       if (ELECTRON_ONLY_KINDS.has(kind)) {

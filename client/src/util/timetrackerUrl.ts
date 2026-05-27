@@ -15,7 +15,7 @@
  * the caller falls back to the default landing (list mode, Projects tab).
  */
 
-export const LIST_TABS = ['projects', 'worklogs', 'grid', 'timeoff', 'reports'] as const;
+export const LIST_TABS = ['projects', 'worklogs', 'grid', 'timeoff', 'reports', 'board'] as const;
 export type ListTab = (typeof LIST_TABS)[number];
 
 export const DETAIL_TABS = ['epics', 'worklogs', 'contracts'] as const;

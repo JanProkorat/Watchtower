@@ -40,12 +40,33 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(5);
+    expect(version.v).toBe(6);
   });
 
   it('v2 adds the display_order column with spawned_at as default', () => {
     runMigrations(db as unknown as SqliteLike);
     const cols = db.prepare(`PRAGMA table_info(instances)`).all() as Array<{ name: string }>;
     expect(cols.map((c) => c.name)).toContain('display_order');
+  });
+
+  it('v6 adds jira_* columns to tasks and the partial index', () => {
+    runMigrations(db as unknown as SqliteLike);
+    const cols = (
+      db.prepare(`PRAGMA table_info(tasks)`).all() as Array<{ name: string }>
+    ).map((c) => c.name);
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'jira_status',
+        'jira_estimate_secs',
+        'jira_component',
+        'jira_synced_at',
+      ]),
+    );
+    const idx = db
+      .prepare(
+        `SELECT name FROM sqlite_master WHERE type='index' AND name='idx_tasks_jira_status'`,
+      )
+      .get();
+    expect(idx).toBeTruthy();
   });
 });

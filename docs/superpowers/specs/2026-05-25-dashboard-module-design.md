@@ -133,7 +133,7 @@ export interface DashboardOverviewRequestPayload {
   todayDate: string;
 }
 
-export interface DashboardOverviewResponse {
+export interface DashboardOverviewResponsePayload {
   today: { minutes: number };
   month: { minutes: number };
   week: {

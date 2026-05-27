@@ -8,10 +8,14 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 
 interface Saved {
   quietMs: string;
   defaultCwd: string;
+  sprintStartDate: string;
+  sprintLengthDays: string;
 }
 
 function SettingRow({
@@ -37,9 +41,16 @@ function SettingRow({
 }
 
 export function SettingsPanel() {
-  const [saved, setSaved] = useState<Saved>({ quietMs: '90000', defaultCwd: '~/Projects' });
+  const [saved, setSaved] = useState<Saved>({
+    quietMs: '90000',
+    defaultCwd: '~/Projects',
+    sprintStartDate: '2026-01-05',
+    sprintLengthDays: '14',
+  });
   const [quietMs, setQuietMs] = useState<string>('90000');
   const [defaultCwd, setDefaultCwd] = useState<string>('~/Projects');
+  const [sprintStartDate, setSprintStartDate] = useState<string>('2026-01-05');
+  const [sprintLengthDays, setSprintLengthDays] = useState<string>('14');
   const [hookStatus, setHookStatus] = useState<string | null>(null);
   const [hookError, setHookError] = useState<string | null>(null);
 
@@ -48,15 +59,21 @@ export function SettingsPanel() {
     void Promise.all([
       window.watchtower.invoke('getSetting', { key: 'quiet_timer_ms' }),
       window.watchtower.invoke('getSetting', { key: 'default_cwd' }),
-    ]).then(([q, c]) => {
+      window.watchtower.invoke('getSetting', { key: 'dashboard.sprint.startDate' }),
+      window.watchtower.invoke('getSetting', { key: 'dashboard.sprint.lengthDays' }),
+    ]).then(([q, c, sd, sl]) => {
       if (cancelled) return;
       const next: Saved = {
         quietMs: q.value || '90000',
         defaultCwd: c.value || '~/Projects',
+        sprintStartDate: sd.value || '2026-01-05',
+        sprintLengthDays: sl.value || '14',
       };
       setSaved(next);
       setQuietMs(next.quietMs);
       setDefaultCwd(next.defaultCwd);
+      setSprintStartDate(next.sprintStartDate);
+      setSprintLengthDays(next.sprintLengthDays);
     });
     return () => {
       cancelled = true;
@@ -82,6 +99,23 @@ export function SettingsPanel() {
     if (defaultCwd === saved.defaultCwd) return;
     await persist('default_cwd', defaultCwd);
     setSaved((s) => ({ ...s, defaultCwd }));
+  };
+
+  const onSprintStartChange = async (val: string) => {
+    setSprintStartDate(val);
+    await persist('dashboard.sprint.startDate', val);
+    setSaved((s) => ({ ...s, sprintStartDate: val }));
+  };
+
+  const onSprintLengthBlur = async () => {
+    if (sprintLengthDays === saved.sprintLengthDays) return;
+    const n = Number(sprintLengthDays);
+    if (!Number.isInteger(n) || n < 1 || n > 56) {
+      setSprintLengthDays(saved.sprintLengthDays);
+      return;
+    }
+    await persist('dashboard.sprint.lengthDays', sprintLengthDays);
+    setSaved((s) => ({ ...s, sprintLengthDays }));
   };
 
   const reinstallHooks = async () => {
@@ -149,6 +183,34 @@ export function SettingsPanel() {
             onChange={(e) => setDefaultCwd(e.target.value)}
             onBlur={() => void onCwdBlur()}
             slotProps={{ input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } } }}
+          />
+        </SettingRow>
+
+        <Divider />
+
+        <SettingRow
+          label="Sprint start date"
+          description="Reference date used to compute past and future sprints in the Dashboard."
+        >
+          <DatePicker
+            value={dayjs(sprintStartDate)}
+            onChange={(v) => { if (v) void onSprintStartChange(v.format('YYYY-MM-DD')); }}
+            slotProps={{ textField: { size: 'small' } }}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Sprint length (days)"
+          description="How long each sprint lasts. Commonly 7, 14, or 21 days."
+        >
+          <TextField
+            type="number"
+            size="small"
+            value={sprintLengthDays}
+            onChange={(e) => setSprintLengthDays(e.target.value)}
+            onBlur={() => void onSprintLengthBlur()}
+            inputProps={{ min: 1, max: 56 }}
+            sx={{ width: 100 }}
           />
         </SettingRow>
 

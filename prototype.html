@@ -2353,6 +2353,178 @@
   }
   .md-sess-empty .btn { font-size: 11px; padding: 6px 12px; }
 
+  /* ─── TimeTracker · Board (Kanban) ─── */
+  .board-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .board-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+  .board-meta {
+    color: var(--text-secondary);
+    font-size: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .board-meta a {
+    color: #38bdf8;
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(56,189,248,0.35);
+  }
+  .board-meta a:hover { border-bottom-style: solid; }
+  .board-header .spacer { flex: 1; }
+  .board-header .reauth-chip {
+    background: rgba(56,189,248,0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(56,189,248,0.35);
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .board-warnings {
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.3);
+    color: #f59e0b;
+    border-radius: 10px;
+    font-size: 12.5px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .board-warnings strong { color: var(--text-primary); }
+  .board-warnings .keys { color: var(--text-secondary); font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; margin-top: 2px; }
+  .board-configure {
+    margin-bottom: 14px;
+    padding: 12px 16px;
+    background: rgba(56,189,248,0.06);
+    border: 1px solid rgba(56,189,248,0.35);
+    color: #38bdf8;
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .board-configure code {
+    background: rgba(0,0,0,0.4);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-primary);
+  }
+  .board-columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .board-col {
+    background: var(--bg-paper);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    display: flex; flex-direction: column;
+    min-height: 320px;
+    overflow: hidden;
+  }
+  .board-col-head {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    font-weight: 600;
+    background: var(--bg-paper-2);
+  }
+  .board-col-head .count {
+    background: var(--bg-default);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 999px;
+    color: var(--text-primary);
+  }
+  .board-col[data-col="doing"] .board-col-head { border-top: 2px solid #7c5cff; }
+  .board-col[data-col="done"]  .board-col-head { border-top: 2px solid #22d3ee; }
+  .board-col[data-col="todo"]  .board-col-head { border-top: 2px solid var(--text-disabled); }
+  .board-col-body {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .board-col-empty {
+    text-align: center;
+    color: var(--text-disabled);
+    font-size: 12.5px;
+    padding: 24px 12px;
+    font-style: italic;
+  }
+  .board-card {
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex; flex-direction: column; gap: 6px;
+    transition: border-color 120ms, transform 120ms;
+  }
+  .board-card:hover {
+    border-color: #7c5cff;
+    transform: translateY(-1px);
+  }
+  .board-card-top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+  }
+  .board-card-key {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+  .board-card-est {
+    font-size: 11.5px;
+    color: var(--text-disabled);
+    font-variant-numeric: tabular-nums;
+  }
+  .board-card-title {
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--text-primary);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .board-chip {
+    display: inline-block;
+    align-self: flex-start;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: white;
+    letter-spacing: 0.02em;
+    margin-top: 2px;
+  }
+  .board-chip-dark    { background: #1f2937; }
+  .board-chip-tech    { background: #7c3aed; }
+  .board-chip-nc      { background: #ef4444; }
+  .board-chip-req     { background: #ea580c; }
+  .board-chip-blue    { background: #2563eb; }
+  .board-chip-yellow  { background: #d97706; color: #1f1300; }
+  .board-chip-orange  { background: #fb923c; color: #1f1300; }
+  .board-chip-green   { background: #16a34a; }
+
 </style>
 </head>
 <body>
@@ -2371,6 +2543,7 @@
   <button data-scene="tt-grid">TimeTracker · Task grid</button>
   <button data-scene="tt-timeoff">TimeTracker · Time off</button>
   <button data-scene="tt-reports">TimeTracker · Reports</button>
+  <button data-scene="tt-board">TimeTracker · Board</button>
   <button data-scene="tt-project-edit">TT · Project drawer</button>
   <button data-scene="tt-detail">TT · Project detail</button>
   <button data-scene="tt-detail-worklogs">TT · Detail · Worklogs</button>
@@ -3061,6 +3234,7 @@
           <div class="tt-tab" data-tt-sub="grid">Task grid</div>
           <div class="tt-tab" data-tt-sub="timeoff">Time off</div>
           <div class="tt-tab" data-tt-sub="reports">Reports</div>
+          <div class="tt-tab" data-tt-sub="board">Board</div>
         </div>
 
         <!-- ── Projects sub-view ── -->
@@ -3789,6 +3963,205 @@
             </div>
           </div>
         </div>
+
+        <!-- ═══ Board sub (Jira Kanban mirror) ═══ -->
+        <div class="tt-sub" data-tt-sub="board">
+
+          <div class="board-header">
+            <h2>Board</h2>
+            <span class="board-meta">
+              <a href="#" onclick="return false;">↗ Open in Jira</a>
+              <span>·</span>
+              <span id="boardSyncMeta">Synced 14:32</span>
+            </span>
+            <span class="spacer"></span>
+            <span class="reauth-chip" id="boardReauthChip" style="display:none">Re-authenticated</span>
+            <button class="btn btn-primary" id="boardRefreshBtn" onclick="boardFakeRefresh()">↻ Refresh</button>
+            <button class="btn btn-primary" id="boardSigninBtn" style="display:none" onclick="boardFakeSignIn()">⚿ Sign in to Jira</button>
+            <button class="btn" onclick="boardToggleAuth()">demo: toggle auth</button>
+            <button class="btn" onclick="boardToggleWarning()">demo: toggle warning</button>
+          </div>
+
+          <div class="board-warnings" id="boardWarnings" style="display:none">
+            <span>⚠</span>
+            <div>
+              <strong>3 tickets couldn't be slotted into any local project.</strong>
+              <div class="keys">FIE1933-19840, FIE1933-19851, FIE1933-19862 · Add a matching glob to a project's Jira keys to include them.</div>
+            </div>
+          </div>
+
+          <div class="board-configure" id="boardConfigure" style="display:none">
+            Jira sync isn't configured. Set <code>JIRA_BASE_URL</code> and <code>JIRA_KEYCHAIN_ACCOUNT</code> in your environment, then restart Watchtower.
+          </div>
+
+          <div class="board-columns">
+
+            <div class="board-col" data-col="todo">
+              <div class="board-col-head"><span>To do</span><span class="count">1</span></div>
+              <div class="board-col-body">
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: To Do">FIE1933-19845</span>
+                    <span class="board-card-est">⏱ 6h</span>
+                  </div>
+                  <div class="board-card-title">[TEH] Požadavek na Změnu - Nedostatky - BE</div>
+                  <span class="board-chip board-chip-dark">TEH-Změny,reklamace</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="board-col" data-col="doing">
+              <div class="board-col-head"><span>Doing</span><span class="count">8</span></div>
+              <div class="board-col-body">
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: In Progress">FIE1933-19764</span>
+                    <span class="board-card-est">⏱ 2h</span>
+                  </div>
+                  <div class="board-card-title">[KP] Při automatickém spuštění se vyplní jméno uživatele, který toto nastavil - BE</div>
+                  <span class="board-chip board-chip-blue">KP-Algoritmus</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: Waiting">FIE1933-17273</span>
+                    <span class="board-card-est">⏱ 8h</span>
+                  </div>
+                  <div class="board-card-title">[TEH] Požadavky na změnu - nový systémový stav - BE</div>
+                  <span class="board-chip board-chip-green">Technologie (TEH - modul) - CH&amp;B</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: Waiting">FIE1933-18889</span>
+                    <span class="board-card-est">⏱ 8h</span>
+                  </div>
+                  <div class="board-card-title">Mezistřediskové Kooperace - Umožnit uživatelům z jiných středisek práci na dávce - BE</div>
+                  <span class="board-chip board-chip-green">Technologie (TEH - modul) - CH&amp;B</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: Waiting">FIE1933-19103</span>
+                    <span class="board-card-est">⏱ 8h</span>
+                  </div>
+                  <div class="board-card-title">[LOG] Mat. lísteček - Ukládání skld. umístění skld. položky - BE</div>
+                  <span class="board-chip board-chip-yellow">VYR-Logistika</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: Waiting">FIE1933-19812</span>
+                    <span class="board-card-est">⏱ 4h</span>
+                  </div>
+                  <div class="board-card-title">[TEH] Požadavek na TEH - Nejsou propsané správně vyplacené čas - BE</div>
+                  <span class="board-chip board-chip-req">TEH-Požadavek na technologii</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: In Review">FIE1933-19084</span>
+                    <span class="board-card-est">⏱ 16h</span>
+                  </div>
+                  <div class="board-card-title">[INFRA] Update na .NET 10 - BE</div>
+                  <span class="board-chip board-chip-blue">Infrastruktura (INA)</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: In Review">FIE1933-19826</span>
+                    <span class="board-card-est">⏱ 8h</span>
+                  </div>
+                  <div class="board-card-title">[TEH] Migrace vzorových postupů z G1</div>
+                  <span class="board-chip board-chip-blue">TEH-Vzory</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: In Review">FIE1933-19796</span>
+                    <span class="board-card-est">⏱ 4h</span>
+                  </div>
+                  <div class="board-card-title">[VYR] Požadavky na Materiál - Lze vybrat i položku bez pozice - BE</div>
+                  <span class="board-chip board-chip-yellow">VYR-Logistika</span>
+                </div>
+
+              </div>
+            </div>
+
+            <div class="board-col" data-col="done">
+              <div class="board-col-head"><span>Done</span><span class="count">7</span></div>
+              <div class="board-col-body">
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: In Test">FIE1933-19608</span>
+                    <span class="board-card-est">⏱ 4h</span>
+                  </div>
+                  <div class="board-card-title">[TEH] Požadavek na Změnu - Založení nové operace - Narovnat na PRODu</div>
+                  <span class="board-chip board-chip-dark">TEH-Změny,reklamace</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: In Test">FIE1933-19619</span>
+                    <span class="board-card-est">⏱ 2h</span>
+                  </div>
+                  <div class="board-card-title">[TEH] Nelze smazat pozici, která je v EK - BE</div>
+                  <span class="board-chip board-chip-nc">TEH-Požadavek na NC program</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: In Test">FIE1933-19779</span>
+                    <span class="board-card-est">⏱ 3h</span>
+                  </div>
+                  <div class="board-card-title">[TEH] Operace odebraná z EK se neposune do stavu 0 - BE</div>
+                  <span class="board-chip board-chip-tech">TEH-Technologický postup</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: To Accept">FIE1933-19821</span>
+                    <span class="board-card-est">⏱ 2h</span>
+                  </div>
+                  <div class="board-card-title">[TEH] Požadavek na TEH/EK - Zobrazení, že bylo odesláno včetně materiálu - BE</div>
+                  <span class="board-chip board-chip-req">TEH-Požadavek na technologii</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: To Accept">FIE1933-19825</span>
+                    <span class="board-card-est">⏱ 4h</span>
+                  </div>
+                  <div class="board-card-title">[TEH] Tech. postup - Nelze dokončit postup - BE</div>
+                  <span class="board-chip board-chip-tech">TEH-Technologický postup</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: To Accept">FIE1933-19774</span>
+                    <span class="board-card-est">⏱ 4h</span>
+                  </div>
+                  <div class="board-card-title">[VYR] Denní plány - Nedojde ke změně stavu operace při zrušení přechozí operace</div>
+                  <span class="board-chip board-chip-tech">TEH-Technologický postup</span>
+                </div>
+
+                <div class="board-card">
+                  <div class="board-card-top">
+                    <span class="board-card-key" title="Jira status: To Accept">FIE1933-19775</span>
+                    <span class="board-card-est">⏱ 2h</span>
+                  </div>
+                  <div class="board-card-title">[TEH] Umožnit uživatelům bez skupiny dat přístup do Tech. postupu - BE</div>
+                  <span class="board-chip board-chip-req">TEH-Požadavek na technologii</span>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+        <!-- ═══ /Board sub ═══ -->
       </div>
       <!-- ═══ /LIST MODE ═══ -->
 
@@ -4758,6 +5131,7 @@
     'tt-grid':     () => showTimeTracker('list', 'grid'),
     'tt-timeoff':  () => showTimeTracker('list', 'timeoff'),
     'tt-reports':  () => showTimeTracker('list', 'reports'),
+    'tt-board':    () => showTimeTracker('list', 'board'),
     'tt-detail': () => showTimeTracker('detail', 'epics'),
     'tt-detail-worklogs': () => showTimeTracker('detail', 'worklogs'),
     'tt-detail-contracts': () => showTimeTracker('detail', 'contracts'),
@@ -4873,6 +5247,64 @@
   }
   window.launchProjectNew = launchProjectNew;
   window.launchProjectChoose = launchProjectChoose;
+
+  // ── Board demo toggles (prototype-only stand-ins for real auth state) ──
+  let boardAuthState = 'in'; // 'in' | 'out' | 'noenv'
+  function boardApplyAuth() {
+    const refresh = document.getElementById('boardRefreshBtn');
+    const signin  = document.getElementById('boardSigninBtn');
+    const meta    = document.getElementById('boardSyncMeta');
+    const cfg     = document.getElementById('boardConfigure');
+    if (boardAuthState === 'in') {
+      refresh.style.display = 'inline-flex';
+      signin.style.display  = 'none';
+      cfg.style.display     = 'none';
+      meta.textContent = 'Synced 14:32';
+    } else if (boardAuthState === 'out') {
+      refresh.style.display = 'none';
+      signin.style.display  = 'inline-flex';
+      cfg.style.display     = 'none';
+      meta.textContent = 'Not signed in';
+    } else {
+      refresh.style.display = 'none';
+      signin.style.display  = 'none';
+      cfg.style.display     = 'block';
+      meta.textContent = 'Not configured';
+    }
+  }
+  function boardToggleAuth() {
+    boardAuthState = boardAuthState === 'in' ? 'out' : (boardAuthState === 'out' ? 'noenv' : 'in');
+    boardApplyAuth();
+  }
+  function boardToggleWarning() {
+    const w = document.getElementById('boardWarnings');
+    w.style.display = w.style.display === 'none' ? 'flex' : 'none';
+  }
+  function boardFakeRefresh() {
+    const btn  = document.getElementById('boardRefreshBtn');
+    const chip = document.getElementById('boardReauthChip');
+    const meta = document.getElementById('boardSyncMeta');
+    btn.disabled = true;
+    btn.textContent = '↻ Syncing…';
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = '↻ Refresh';
+      const t = new Date();
+      meta.textContent = 'Synced ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+      chip.style.display = 'inline-block';
+      setTimeout(() => { chip.style.display = 'none'; }, 2200);
+    }, 700);
+  }
+  function boardFakeSignIn() {
+    // pretend sign-in flow: opens browser → cookie lands → board fetches → re-render
+    boardAuthState = 'in';
+    boardApplyAuth();
+    boardFakeRefresh();
+  }
+  window.boardToggleAuth    = boardToggleAuth;
+  window.boardToggleWarning = boardToggleWarning;
+  window.boardFakeRefresh   = boardFakeRefresh;
+  window.boardFakeSignIn    = boardFakeSignIn;
 
   function setRail(activeId) {
     document.querySelectorAll('.rail-btn').forEach((b) => b.classList.remove('active'));

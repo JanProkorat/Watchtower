@@ -50,11 +50,17 @@ export type OrchRequest =
   | { id: string; kind: 'reports:heatmap'; payload: { from: string; to: string; projectId?: number } }
   | { id: string; kind: 'reports:contracts'; payload: { projectId?: number } }
   | { id: string; kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } }
+  | { id: string; kind: 'dashboard:overview'; payload: import('./ipcContract.js').DashboardOverviewRequestPayload }
   | { id: string; kind: 'instances:findByCwd'; payload: { cwd: string } }
   | { id: string; kind: 'claudeSettings:read'; payload: { scope: 'global' | 'project'; projectPath?: string } }
   | { id: string; kind: 'claudeSettings:write'; payload: { scope: 'global' | 'project'; projectPath?: string; content: string } }
   | { id: string; kind: 'skills:list'; payload: Record<string, never> }
-  | { id: string; kind: 'agents:list'; payload: Record<string, never> };
+  | { id: string; kind: 'agents:list'; payload: Record<string, never> }
+  | { id: string; kind: 'jira:syncPreview'; payload: OrchJiraSyncRequest }
+  | { id: string; kind: 'jira:sync'; payload: OrchJiraSyncRequest }
+  | { id: string; kind: 'board:authPing'; payload: Record<string, never> }
+  | { id: string; kind: 'board:get'; payload: Record<string, never> }
+  | { id: string; kind: 'board:sync'; payload: Record<string, never> };
 
 export interface OrchRunningInstance {
   id: string;
@@ -317,6 +323,46 @@ export interface OrchTaskView {
   totalMinutes: number;
 }
 
+export interface OrchJiraSyncRequest {
+  from: string;
+  to: string;
+  projectId?: number;
+  onlyUnposted?: boolean;
+}
+
+export type OrchJiraSyncEntryStatus = 'posted' | 'skipped' | 'failed' | 'pending';
+
+export interface OrchJiraSyncEntry {
+  worklogId: number;
+  taskId: number;
+  taskNumber: string;
+  taskTitle: string;
+  workDate: string;
+  minutes: number;
+  timeSpent: string;
+  comment: string;
+  status: OrchJiraSyncEntryStatus;
+  reason?: string;
+  jiraWorklogId?: string;
+  jiraWorklogUrl?: string;
+  alreadyPosted?: boolean;
+}
+
+export interface OrchJiraSyncResult {
+  totalCandidates: number;
+  skippedNoJiraKey: number;
+  skippedAlreadyPosted: number;
+  skippedTaskNotOpen: number;
+  attempted: number;
+  posted: number;
+  failed: number;
+  tasksMarkedDone: number;
+  neededBrowserRefresh: boolean;
+  dryRun: boolean;
+  error?: string;
+  entries: OrchJiraSyncEntry[];
+}
+
 export interface OrchProjectListFilter {
   archived?: boolean;
   kind?: 'work' | 'time_off';
@@ -414,11 +460,23 @@ export type OrchResponse =
   | { kind: 'reports:heatmap'; payload: { heatmap: OrchHeatmapDatum[] } }
   | { kind: 'reports:contracts'; payload: { contracts: OrchContractReportRow[] } }
   | { kind: 'reports:rateChanges'; payload: { rateChanges: OrchRateChangeMarker[] } }
+  | { kind: 'dashboard:overview'; payload: import('./ipcContract.js').DashboardOverviewResponsePayload }
   | { kind: 'instances:findByCwd'; payload: { instances: OrchRunningInstance[] } }
   | { kind: 'claudeSettings:read'; payload: { path: string; exists: boolean; content: string } }
   | { kind: 'claudeSettings:write'; payload: { ok: boolean; backupPath?: string; error?: string } }
   | { kind: 'skills:list'; payload: { skills: Array<{ name: string; path: string; source: string; description: string; body: string }> } }
-  | { kind: 'agents:list'; payload: { agents: Array<{ name: string; path: string; source: string; description: string; model: string; tools: string; body: string }> } };
+  | { kind: 'agents:list'; payload: { agents: Array<{ name: string; path: string; source: string; description: string; model: string; tools: string; body: string }> } }
+  | { kind: 'jira:syncPreview'; payload: OrchJiraSyncResult }
+  | { kind: 'jira:sync'; payload: OrchJiraSyncResult }
+  | { kind: 'board:authPing'; payload: import('./ipcContract.js').BoardAuthPingPayload }
+  | { kind: 'board:get'; payload: import('./ipcContract.js').BoardSnapshotPayload }
+  | {
+      kind: 'board:sync';
+      payload: {
+        snapshot: import('./ipcContract.js').BoardSnapshotPayload;
+        result: import('./ipcContract.js').BoardSyncResultPayload;
+      };
+    };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

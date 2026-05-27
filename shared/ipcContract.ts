@@ -52,12 +52,20 @@ export type IpcRequest =
   | { kind: 'reports:heatmap'; payload: { from: string; to: string; projectId?: number } }
   | { kind: 'reports:contracts'; payload: { projectId?: number } }
   | { kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } }
+  | { kind: 'dashboard:overview'; payload: DashboardOverviewRequestPayload }
   | { kind: 'instances:findByCwd'; payload: { cwd: string } }
   | { kind: 'openInVSCode'; payload: { path: string } }
   | { kind: 'claudeSettings:read'; payload: { scope: 'global' | 'project'; projectPath?: string } }
   | { kind: 'claudeSettings:write'; payload: { scope: 'global' | 'project'; projectPath?: string; content: string } }
   | { kind: 'skills:list'; payload: Record<string, never> }
-  | { kind: 'agents:list'; payload: Record<string, never> };
+  | { kind: 'agents:list'; payload: Record<string, never> }
+  | { kind: 'jira:syncPreview'; payload: JiraSyncRequestPayload }
+  | { kind: 'jira:sync'; payload: JiraSyncRequestPayload }
+  | { kind: 'board:authPing'; payload: Record<string, never> }
+  | { kind: 'board:get'; payload: Record<string, never> }
+  | { kind: 'board:sync'; payload: Record<string, never> }
+  | { kind: 'board:signIn'; payload: Record<string, never> }
+  | { kind: 'openExternalUrl'; payload: { url: string } };
 
 export interface RunningInstancePayload {
   id: string;
@@ -104,6 +112,79 @@ export interface EarningsResponsePayload {
 export interface HeatmapDatumPayload {
   date: string;
   minutes: number;
+}
+
+export interface DashboardOverviewRequestPayload {
+  /** Optional project filter; null = all projects. */
+  projectId: number | null;
+  /** Any ISO date inside the target sprint (YYYY-MM-DD). Server computes the sprint window. */
+  sprintAnchor: string;
+  /** ISO YYYY-MM-DD in the user's local tz, sent by renderer so the orchestrator
+   *  doesn't derive "today" from its own clock. */
+  todayDate: string;
+}
+
+export interface DashboardSprintDayPayload {
+  /** YYYY-MM-DD. */
+  date: string;
+  /** Sum of minutes for the day (respects projectId filter). */
+  minutes: number;
+  worklogs: DashboardSprintWorklogPayload[];
+}
+
+export interface DashboardSprintWorklogPayload {
+  /** Worklog PK — used as React key. */
+  id: number;
+  /** Task key like "FIE1933-19084", or null for ad-hoc tasks without a number. */
+  taskNumber: string | null;
+  /** Task title, e.g. "Operace odebraná z EK se neposune do...". */
+  taskTitle: string;
+  projectName: string;
+  projectColor: string | null;
+  minutes: number;
+  note: string | null;
+}
+
+export interface DashboardHeatmapStatsPayload {
+  currentStreak: number;
+  longestStreak: number;
+  activeDays: number;
+  /** Total minutes / 30 * 7, rounded to nearest minute. */
+  weeklyAvgMinutes: number;
+  busiestDay: { date: string; minutes: number } | null;
+}
+
+export interface DashboardTopProjectPayload {
+  projectId: number;
+  projectName: string;
+  projectColor: string | null;
+  minutes: number;
+}
+
+export interface DashboardOverviewResponsePayload {
+  today: { minutes: number; earned: Record<string, number> };
+  month: { minutes: number; earned: Record<string, number> };
+  sprint: {
+    /** ISO YYYY-MM-DD of the first day of the sprint window. */
+    fromDate: string;
+    /** ISO YYYY-MM-DD of the last day of the sprint window (inclusive). */
+    toDate: string;
+    /** Sprint length in days = days.length. Kept explicit for renderer clarity. */
+    lengthDays: number;
+    /** Sum of minutes across the sprint, respecting projectId filter. */
+    totalMinutes: number;
+    /** Sprint-wide earned totals keyed by currency. */
+    totalEarned: Record<string, number>;
+    /** Per-day list — exactly `lengthDays` entries. */
+    days: DashboardSprintDayPayload[];
+  };
+  heatmap30d: {
+    fromDate: string;
+    toDate: string;
+    days: { date: string; minutes: number }[];
+    stats: DashboardHeatmapStatsPayload;
+  };
+  topProjects: DashboardTopProjectPayload[];
 }
 
 export interface ContractReportRowPayload {
@@ -414,12 +495,20 @@ export type IpcResponse =
   | { kind: 'reports:heatmap'; payload: { heatmap: HeatmapDatumPayload[] } }
   | { kind: 'reports:contracts'; payload: { contracts: ContractReportRowPayload[] } }
   | { kind: 'reports:rateChanges'; payload: { rateChanges: RateChangeMarkerPayload[] } }
+  | { kind: 'dashboard:overview'; payload: DashboardOverviewResponsePayload }
   | { kind: 'instances:findByCwd'; payload: { instances: RunningInstancePayload[] } }
   | { kind: 'openInVSCode'; payload: { ok: boolean; error?: string } }
   | { kind: 'claudeSettings:read'; payload: ClaudeSettingsReadPayload }
   | { kind: 'claudeSettings:write'; payload: { ok: boolean; backupPath?: string; error?: string } }
   | { kind: 'skills:list'; payload: { skills: SkillRowPayload[] } }
-  | { kind: 'agents:list'; payload: { agents: AgentRowPayload[] } };
+  | { kind: 'agents:list'; payload: { agents: AgentRowPayload[] } }
+  | { kind: 'jira:syncPreview'; payload: JiraSyncResultPayload }
+  | { kind: 'jira:sync'; payload: JiraSyncResultPayload }
+  | { kind: 'board:authPing'; payload: BoardAuthPingPayload }
+  | { kind: 'board:get'; payload: BoardSnapshotPayload }
+  | { kind: 'board:sync'; payload: { snapshot: BoardSnapshotPayload; result: BoardSyncResultPayload } }
+  | { kind: 'board:signIn'; payload: { ok: boolean; error?: string } }
+  | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } };
 
 export interface AgentRowPayload {
   name: string;
@@ -437,6 +526,115 @@ export interface SkillRowPayload {
   source: string;
   description: string;
   body: string;
+}
+
+export interface JiraSyncRequestPayload {
+  /** Inclusive ISO YYYY-MM-DD. */
+  from: string;
+  /** Inclusive ISO YYYY-MM-DD. */
+  to: string;
+  /** Optional project filter; omit to sync across all projects. */
+  projectId?: number;
+  /** Skip worklogs already posted to Jira. Default true. */
+  onlyUnposted?: boolean;
+}
+
+export type JiraSyncEntryStatus = 'posted' | 'skipped' | 'failed' | 'pending';
+
+export interface JiraSyncEntryPayload {
+  worklogId: number;
+  taskId: number;
+  taskNumber: string;
+  taskTitle: string;
+  workDate: string;
+  minutes: number;
+  /** Human-readable, e.g. "2h 30m" — Jira's `timeSpent` shape. */
+  timeSpent: string;
+  comment: string;
+  status: JiraSyncEntryStatus;
+  reason?: string;
+  jiraWorklogId?: string;
+  jiraWorklogUrl?: string;
+  alreadyPosted?: boolean;
+}
+
+export interface JiraSyncResultPayload {
+  totalCandidates: number;
+  skippedNoJiraKey: number;
+  skippedAlreadyPosted: number;
+  skippedTaskNotOpen: number;
+  attempted: number;
+  posted: number;
+  failed: number;
+  tasksMarkedDone: number;
+  neededBrowserRefresh: boolean;
+  /** `true` for the preview endpoint, `false` for the actual sync run. */
+  dryRun: boolean;
+  /** Top-level message when the call could not even start (e.g. config missing). */
+  error?: string;
+  entries: JiraSyncEntryPayload[];
+}
+
+// ─── Board (Jira Kanban) ───
+export interface BoardAuthPingPayload {
+  /** JIRA_BASE_URL and JIRA_KEYCHAIN_ACCOUNT are both set. */
+  configured: boolean;
+  /** A non-empty cookie is stored in Keychain right now. */
+  cookiePresent: boolean;
+  /** baseUrl, or null when not configured — used for the "Open in Jira" link. */
+  baseUrl: string | null;
+}
+
+export type BoardColumn = 'todo' | 'doing' | 'done';
+
+export interface BoardCardPayload {
+  taskId: number;
+  jiraKey: string;
+  title: string;
+  /** Raw Jira status (e.g. "In Review"); preserved for tooltips. */
+  jiraStatus: string;
+  /** Pre-computed column from the merged Jira→Watchtower mapping. */
+  column: BoardColumn;
+  estimateSeconds: number | null;
+  /** Total minutes logged locally against this task (sum of worklogs). */
+  loggedMinutes: number;
+  component: string | null;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  epicId: number;
+  epicName: string;
+  syncedAt: string | null;
+}
+
+export interface BoardSnapshotPayload {
+  cards: BoardCardPayload[];
+  /** Newest jira_synced_at across all cards in the snapshot. */
+  syncedAt: string | null;
+  /** Result of the most recent sync call, if one ran in this session. */
+  lastSyncResult: BoardSyncResultPayload | null;
+}
+
+export interface BoardSyncResultPayload {
+  ok: boolean;
+  startedAt: string;
+  finishedAt: string;
+  fetched: number;
+  upserted: number;
+  created: number;
+  unrouted: number;
+  unroutedKeys: string[];
+  removedFromBoard: number;
+  neededBrowserRefresh: boolean;
+  /**
+   * `true` when sync failed because Jira rejected the stored cookie
+   * (302 to SSO, 401, 403). The UI uses this to flip the action button
+   * from "Refresh" to "Sign in to Jira" even though a (now-stale)
+   * cookie is still present in Keychain.
+   */
+  authFailed?: boolean;
+  /** Top-level fatal error (config/auth/network). Per-card failures don't set this. */
+  error?: string;
 }
 
 export interface ClaudeSettingsReadPayload {
