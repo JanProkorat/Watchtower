@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import LaunchIcon from '@mui/icons-material/Launch';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import type {
   BoardCardPayload,
   WorklogViewPayload,
@@ -27,6 +28,8 @@ interface Props {
   onClose(): void;
   /** Open the Jira ticket in the system browser. */
   onOpenJira(url: string): void;
+  /** Drop this card from the board. Drawer is expected to close after. */
+  onRemove(taskId: number): void;
 }
 
 function formatMinutes(min: number): string {
@@ -49,6 +52,7 @@ export function BoardTaskDetailDrawer({
   jiraBaseUrl,
   onClose,
   onOpenJira,
+  onRemove,
 }: Props) {
   const [worklogs, setWorklogs] = useState<WorklogViewPayload[]>([]);
   const [loading, setLoading] = useState(false);
@@ -136,17 +140,26 @@ export function BoardTaskDetailDrawer({
           </Typography>
         </Stack>
 
-        {/* Open in Jira */}
-        {jiraBaseUrl && (
+        {/* Actions */}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+          {jiraBaseUrl && (
+            <Button
+              size="small"
+              startIcon={<LaunchIcon sx={{ fontSize: 16 }} />}
+              onClick={() => onOpenJira(`${jiraBaseUrl}/browse/${card.jiraKey}`)}
+            >
+              Open in Jira
+            </Button>
+          )}
           <Button
             size="small"
-            startIcon={<LaunchIcon sx={{ fontSize: 16 }} />}
-            onClick={() => onOpenJira(`${jiraBaseUrl}/browse/${card.jiraKey}`)}
-            sx={{ alignSelf: 'flex-start', mb: 2 }}
+            color="error"
+            startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+            onClick={() => onRemove(card.taskId)}
           >
-            Open in Jira
+            Remove from board
           </Button>
-        )}
+        </Stack>
 
         <Divider sx={{ mb: 2 }} />
 

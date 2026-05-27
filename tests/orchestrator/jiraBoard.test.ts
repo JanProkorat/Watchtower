@@ -116,9 +116,9 @@ describe('JiraBoardService.getSnapshot', () => {
     const p = projects.create({ name: 'PPS', color: '#7aa7ff' });
     const e = epics.create({ projectId: p.id, name: 'TEH' });
     const cases: Array<[string, 'todo' | 'doing' | 'done']> = [
+      ['New', 'todo'],
       ['To Do', 'todo'],
       ['In Progress', 'doing'],
-      ['Waiting', 'doing'],
       ['In Review', 'doing'],
       ['In Test', 'done'],
       ['To Accept', 'done'],
@@ -139,6 +139,28 @@ describe('JiraBoardService.getSnapshot', () => {
       snap.cards.map((x) => [x.jiraStatus, x.column]),
     );
     for (const [status, col] of cases) expect(byStatus[status]).toBe(col);
+  });
+
+  it('hides tasks whose jira_status is "Waiting" from the snapshot', () => {
+    const p = projects.create({ name: 'PPS', color: '#7aa7ff' });
+    const e = epics.create({ projectId: p.id, name: 'TEH' });
+    const visible = tasks.create({ epicId: e.id, number: 'V-1', title: 'visible' });
+    const hidden = tasks.create({ epicId: e.id, number: 'W-1', title: 'waiting' });
+    tasks.updateJiraFields(visible.id, {
+      jiraStatus: 'In Progress',
+      estimateSeconds: null,
+      component: null,
+      syncedAt: '2026-05-26T14:32:00Z',
+    });
+    tasks.updateJiraFields(hidden.id, {
+      jiraStatus: 'Waiting',
+      estimateSeconds: null,
+      component: null,
+      syncedAt: '2026-05-26T14:32:00Z',
+    });
+    const svc = new JiraBoardService(db, { config: CONFIG, deps: fakeDeps() });
+    const snap = svc.getSnapshot();
+    expect(snap.cards.map((c) => c.jiraKey)).toEqual(['V-1']);
   });
 
   it('orders cards by estimate desc (NULLs last) then key asc', () => {
@@ -249,6 +271,8 @@ describe('JiraBoardService.sync', () => {
     expect(r.unrouted).toBe(0);
     expect(r.removedFromBoard).toBe(0);
     expect(calls[0]!.url).toContain('/rest/api/2/search');
+    // Sanity: JQL must exclude "Waiting" tasks at the source.
+    expect((calls[0]!.body as { jql: string }).jql).toMatch(/status\s*!=\s*"Waiting"/);
 
     const vyr = tasks.findByNumber('FIE1933-19796')!;
     const teh = tasks.findByNumber('FIE1933-19845')!;
@@ -392,6 +416,35 @@ describe('JiraBoardService.sync', () => {
     expect(r.unrouted).toBe(1);
     expect(r.unroutedKeys).toEqual(['OTHER-1']);
     expect(tasks.findByNumber('OTHER-1')).toBeNull();
+  });
+
+  it('removes a single card via TasksRepo.clearJiraStatus without touching siblings', () => {
+    const epic = epics.create({ projectId: pps.id, name: 'TEH' });
+    const keep = tasks.create({ epicId: epic.id, number: 'FIE1933-K', title: 'keep' });
+    const drop = tasks.create({ epicId: epic.id, number: 'FIE1933-D', title: 'drop' });
+    for (const t of [keep, drop]) {
+      tasks.updateJiraFields(t.id, {
+        jiraStatus: 'In Progress',
+        estimateSeconds: 3600,
+        component: 'TEH-X',
+        syncedAt: '2026-05-26T14:32:00Z',
+      });
+    }
+
+    tasks.clearJiraStatus(drop.id);
+
+    const dropped = tasks.get(drop.id)!;
+    expect(dropped.jiraStatus).toBeNull();
+    expect(dropped.jiraEstimateSecs).toBeNull();
+    expect(dropped.jiraComponent).toBeNull();
+    expect(dropped.jiraSyncedAt).toBeNull();
+    // The non-jira columns survive — the task itself stays in TimeTracker.
+    expect(dropped.title).toBe('drop');
+
+    expect(tasks.get(keep.id)!.jiraStatus).toBe('In Progress');
+
+    const svc = new JiraBoardService(db, { config: CONFIG, deps: fakeDeps() });
+    expect(svc.getSnapshot().cards.map((c) => c.jiraKey)).toEqual(['FIE1933-K']);
   });
 
   it('clears jira_status on tasks that fell off the board', async () => {

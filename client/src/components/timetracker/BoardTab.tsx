@@ -6,6 +6,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   Stack,
   Typography,
 } from '@mui/material';
@@ -14,6 +15,7 @@ import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import LaunchIcon from '@mui/icons-material/Launch';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import CloseIcon from '@mui/icons-material/Close';
 import { useBoard } from '../../state/useBoard.js';
 import { useToast } from '../../state/useToast.js';
 import { epicColours } from './boardChips.js';
@@ -57,10 +59,16 @@ interface Props {
 }
 
 export function BoardTab({ active }: Props) {
-  const { snapshot, auth, syncing, syncError, lastSyncResult, sync, signInAndSync } =
+  const { snapshot, auth, syncing, syncError, lastSyncResult, sync, signInAndSync, remove } =
     useBoard(active);
   const [selectedCard, setSelectedCard] = useState<BoardCardPayload | null>(null);
   const { showError } = useToast();
+
+  const handleRemove = (taskId: number) => {
+    void remove(taskId).catch((err: unknown) =>
+      showError(err instanceof Error ? err.message : String(err)),
+    );
+  };
 
   const byCol = useMemo(() => {
     const map: Record<BoardColumn, BoardCardPayload[]> = { todo: [], doing: [], done: [] };
@@ -232,6 +240,7 @@ export function BoardTab({ active }: Props) {
                     key={c.taskId}
                     onClick={() => handleClickCard(c)}
                     sx={{
+                      position: 'relative',
                       bgcolor: 'background.default',
                       border: 1,
                       borderColor: 'divider',
@@ -241,13 +250,36 @@ export function BoardTab({ active }: Props) {
                       cursor: 'pointer',
                       transition: 'border-color 120ms, transform 120ms',
                       '&:hover': { borderColor: 'primary.main', transform: 'translateY(-1px)' },
+                      '&:hover .board-card-remove': { opacity: 1 },
                     }}
                   >
+                    <IconButton
+                      className="board-card-remove"
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemove(c.taskId);
+                      }}
+                      aria-label="Remove from board"
+                      title="Remove from board"
+                      sx={{
+                        position: 'absolute',
+                        top: 2,
+                        right: 2,
+                        opacity: 0,
+                        transition: 'opacity 120ms',
+                        p: 0.25,
+                        color: 'text.disabled',
+                        '&:hover': { color: 'error.main', bgcolor: 'transparent' },
+                      }}
+                    >
+                      <CloseIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
                     <Stack
                       direction="row"
                       justifyContent="space-between"
                       alignItems="center"
-                      sx={{ mb: 0.5 }}
+                      sx={{ mb: 0.5, pr: 2.5 }}
                     >
                       <Typography
                         variant="caption"
@@ -315,6 +347,10 @@ export function BoardTab({ active }: Props) {
         jiraBaseUrl={auth?.baseUrl ?? null}
         onClose={() => setSelectedCard(null)}
         onOpenJira={openInBrowser}
+        onRemove={(taskId) => {
+          handleRemove(taskId);
+          setSelectedCard(null);
+        }}
       />
     </Box>
   );

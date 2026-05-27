@@ -188,6 +188,24 @@ export class TasksRepo {
   }
 
   /**
+   * Clear the four jira_* mirror columns on a single task. Used by the
+   * board's manual "Remove from board" action. The task itself stays in
+   * TimeTracker — only its board mirror is dropped.
+   */
+  clearJiraStatus(id: number): void {
+    this.db
+      .prepare(
+        `UPDATE tasks
+            SET jira_status = NULL,
+                jira_estimate_secs = NULL,
+                jira_component = NULL,
+                jira_synced_at = NULL
+          WHERE id = ?`,
+      )
+      .run(id);
+  }
+
+  /**
    * Clear `jira_status` on every row whose `number` is NOT in `keepNumbers`.
    * Used by the board sync to drop tickets that have fallen off the user's
    * board. Returns the number of rows cleared.

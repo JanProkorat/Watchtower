@@ -26,6 +26,12 @@ export interface UseBoard extends BoardState {
    * cookies, store them in Watchtower's Keychain, and sync on success.
    */
   signInAndSync(): Promise<void>;
+  /**
+   * Drop a single card from the board (clears its jira_* mirror columns).
+   * The task itself stays in TimeTracker; the next sync will bring it back
+   * if it still matches the JQL on Jira.
+   */
+  remove(taskId: number): Promise<void>;
 }
 
 /** Exported for unit tests — pure, no DOM access. */
@@ -129,5 +135,25 @@ export function useBoard(active: boolean): UseBoard {
     };
   }, [active, sync]);
 
-  return { ...state, sync, signInAndSync };
+  const remove = useCallback(async (taskId: number) => {
+    // Optimistic: drop the card locally first so the UI feels instant. The
+    // server round-trip overwrites with the canonical snapshot a moment later.
+    setState((s) => {
+      if (!s.snapshot) return s;
+      const filtered = s.snapshot.cards.filter((c) => c.taskId !== taskId);
+      if (filtered.length === s.snapshot.cards.length) return s;
+      return { ...s, snapshot: { ...s.snapshot, cards: filtered } };
+    });
+    try {
+      const { snapshot } = await window.watchtower.invoke('board:remove', { taskId });
+      setState((s) => ({ ...s, snapshot }));
+    } catch (err) {
+      setState((s) => ({
+        ...s,
+        syncError: err instanceof Error ? err.message : String(err),
+      }));
+    }
+  }, []);
+
+  return { ...state, sync, signInAndSync, remove };
 }

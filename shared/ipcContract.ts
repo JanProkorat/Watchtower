@@ -65,6 +65,7 @@ export type IpcRequest =
   | { kind: 'board:get'; payload: Record<string, never> }
   | { kind: 'board:sync'; payload: Record<string, never> }
   | { kind: 'board:signIn'; payload: Record<string, never> }
+  | { kind: 'board:remove'; payload: { taskId: number } }
   | { kind: 'openExternalUrl'; payload: { url: string } };
 
 export interface RunningInstancePayload {
@@ -508,6 +509,7 @@ export type IpcResponse =
   | { kind: 'board:get'; payload: BoardSnapshotPayload }
   | { kind: 'board:sync'; payload: { snapshot: BoardSnapshotPayload; result: BoardSyncResultPayload } }
   | { kind: 'board:signIn'; payload: { ok: boolean; error?: string } }
+  | { kind: 'board:remove'; payload: { snapshot: BoardSnapshotPayload } }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } };
 
 export interface AgentRowPayload {

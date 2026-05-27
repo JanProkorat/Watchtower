@@ -659,6 +659,11 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       const snapshot = { ...svc.getSnapshot(), lastSyncResult: result };
       return { snapshot, result };
     }
+
+    case 'board:remove': {
+      new TasksRepo(handle!.db).clearJiraStatus(req.payload.taskId);
+      return { snapshot: new JiraBoardService(handle!.db).getSnapshot() };
+    }
   }
 }
 

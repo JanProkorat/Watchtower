@@ -23,14 +23,21 @@ export type BoardSyncDeps = JiraSyncDeps;
 
 /** Raw Jira status → merged Watchtower column. */
 export const STATUS_TO_COLUMN: Record<string, BoardColumn> = {
+  'New':         'todo',
   'To Do':       'todo',
   'In Progress': 'doing',
-  'Waiting':     'doing',
   'In Review':   'doing',
   'In Test':     'done',
   'To Accept':   'done',
   'Done':        'done',
 };
+
+/**
+ * Statuses we deliberately hide from the board even if they're still on the
+ * user's Jira board. Kept separate from STATUS_TO_COLUMN so legacy rows that
+ * synced before the JQL exclusion landed still get dropped from the snapshot.
+ */
+export const HIDDEN_STATUSES: ReadonlySet<string> = new Set(['Waiting']);
 
 /** Merged column → local `tasks.status` enum. */
 export const COLUMN_TO_LOCAL_STATUS: Record<BoardColumn, 'open' | 'in_progress' | 'done'> = {
@@ -120,23 +127,25 @@ export class JiraBoardService {
 
   getSnapshot(): BoardSnapshotPayload {
     const rows = this.db.prepare(SNAPSHOT_SQL).all() as SnapshotRow[];
-    const cards: BoardCardPayload[] = rows.map((r) => ({
-      taskId: r.task_id,
-      jiraKey: r.jira_key,
-      title: r.title,
-      jiraStatus: r.jira_status,
-      // Default unknown statuses to 'doing' — they're in flight by definition.
-      column: STATUS_TO_COLUMN[r.jira_status] ?? 'doing',
-      estimateSeconds: r.jira_estimate_secs,
-      loggedMinutes: r.logged_minutes,
-      component: r.jira_component,
-      projectId: r.project_id,
-      projectName: r.project_name,
-      projectColor: r.project_color,
-      epicId: r.epic_id,
-      epicName: r.epic_name,
-      syncedAt: r.jira_synced_at,
-    }));
+    const cards: BoardCardPayload[] = rows
+      .filter((r) => !HIDDEN_STATUSES.has(r.jira_status))
+      .map((r) => ({
+        taskId: r.task_id,
+        jiraKey: r.jira_key,
+        title: r.title,
+        jiraStatus: r.jira_status,
+        // Default unknown statuses to 'doing' — they're in flight by definition.
+        column: STATUS_TO_COLUMN[r.jira_status] ?? 'doing',
+        estimateSeconds: r.jira_estimate_secs,
+        loggedMinutes: r.logged_minutes,
+        component: r.jira_component,
+        projectId: r.project_id,
+        projectName: r.project_name,
+        projectColor: r.project_color,
+        epicId: r.epic_id,
+        epicName: r.epic_name,
+        syncedAt: r.jira_synced_at,
+      }));
     const syncedAt = cards.reduce<string | null>((max, c) => {
       if (!c.syncedAt) return max;
       if (!max || c.syncedAt > max) return c.syncedAt;
@@ -427,7 +436,9 @@ export class JiraBoardService {
 
 // ─── sync helpers ──────────────────────────────────────────────────────────
 
-const JQL = 'assignee = currentUser() AND resolution = Unresolved ORDER BY priority DESC, updated DESC';
+const JQL =
+  'assignee = currentUser() AND resolution = Unresolved AND status != "Waiting" ' +
+  'ORDER BY priority DESC, updated DESC';
 const MAX_RESULTS = 200;
 
 interface JiraIssueHit {
