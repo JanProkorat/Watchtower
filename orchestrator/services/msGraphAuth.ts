@@ -28,6 +28,18 @@ export interface DeviceCodeResponse {
   interval: number;
 }
 
+export type PollResult =
+  | { status: 'success'; account: string }
+  | { status: 'expired' }
+  | { status: 'error'; error: string };
+
+export interface PollOptions {
+  deviceCode: string;
+  interval: number;
+  expiresIn: number;
+  signal?: AbortSignal;
+}
+
 export interface CachedTokens {
   accessToken: string;
   refreshToken: string;
@@ -163,5 +175,72 @@ export class MsGraphAuthService {
       expiresIn: j.expires_in,
       interval: j.interval,
     };
+  }
+
+  async pollForTokens(opts: PollOptions): Promise<PollResult> {
+    const cfg = this.config();
+    const tokenUrl = `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/token`;
+    const start = this.deps.now();
+    const expiresMs = opts.expiresIn * 1000;
+    let intervalMs = opts.interval * 1000;
+
+    while (true) {
+      if (opts.signal?.aborted) {
+        return { status: 'error', error: 'Sign-in cancelled' };
+      }
+      if (this.deps.now() - start > expiresMs) {
+        return { status: 'expired' };
+      }
+      await this.deps.sleep(intervalMs);
+      if (opts.signal?.aborted) {
+        return { status: 'error', error: 'Sign-in cancelled' };
+      }
+      const body = new URLSearchParams({
+        client_id: cfg.clientId,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        device_code: opts.deviceCode,
+      });
+      const r = await this.deps.fetch(tokenUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+      const j = (await r.json()) as {
+        error?: string;
+        error_description?: string;
+        access_token?: string;
+        refresh_token?: string;
+        expires_in?: number;
+      };
+      if (!r.ok) {
+        const err = j.error;
+        if (err === 'authorization_pending') continue;
+        if (err === 'slow_down') {
+          intervalMs *= 2;
+          continue;
+        }
+        if (err === 'expired_token') return { status: 'expired' };
+        return { status: 'error', error: j.error_description || err || 'Unknown error' };
+      }
+      // Success — fetch /me and store.
+      const account = await this.fetchAccount(j.access_token!);
+      const tokens: CachedTokens = {
+        accessToken: j.access_token!,
+        refreshToken: j.refresh_token!,
+        expiresAt: this.deps.now() + (j.expires_in ?? 3600) * 1000,
+        account,
+      };
+      this.saveTokens(tokens);
+      return { status: 'success', account };
+    }
+  }
+
+  private async fetchAccount(accessToken: string): Promise<string> {
+    const r = await this.deps.fetch('https://graph.microsoft.com/v1.0/me', {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    if (!r.ok) return 'unknown';
+    const j = (await r.json()) as { userPrincipalName?: string; mail?: string };
+    return j.userPrincipalName || j.mail || 'unknown';
   }
 }

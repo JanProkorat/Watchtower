@@ -126,3 +126,169 @@ describe('startDeviceCode', () => {
     await expect(svc.startDeviceCode()).rejects.toThrow(/invalid_client/);
   });
 });
+
+describe('pollForTokens', () => {
+  const codeOpts = { deviceCode: 'devc', interval: 1, expiresIn: 900 };
+
+  it('returns success and saves tokens after authorization_pending → success', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    let calls = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (typeof url === 'string' && url.endsWith('/v1.0/me')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ userPrincipalName: 'u@x.cz' }),
+        } as unknown as Response;
+      }
+      calls++;
+      if (calls === 1) {
+        return {
+          ok: false,
+          status: 400,
+          json: async () => ({ error: 'authorization_pending' }),
+        } as unknown as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          access_token: 'AT',
+          refresh_token: 'RT',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
+      } as unknown as Response;
+    });
+    let stored: string | null = null;
+    const svc = new MsGraphAuthService(
+      makeDeps({
+        fetch: fetchMock as unknown as typeof fetch,
+        readSecret: () => stored,
+        writeSecret: (_s, _a, v) => {
+          stored = v;
+        },
+      }),
+    );
+    const r = await svc.pollForTokens(codeOpts);
+    expect(r.status).toBe('success');
+    if (r.status === 'success') expect(r.account).toBe('u@x.cz');
+    expect(svc.loadTokens()?.accessToken).toBe('AT');
+  });
+
+  it('doubles interval on slow_down', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    let calls = 0;
+    const sleeps: number[] = [];
+    const fetchMock = vi.fn(async (url: string) => {
+      if (typeof url === 'string' && url.endsWith('/v1.0/me')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ userPrincipalName: 'u@x.cz' }),
+        } as unknown as Response;
+      }
+      calls++;
+      if (calls === 1) {
+        return {
+          ok: false,
+          status: 400,
+          json: async () => ({ error: 'slow_down' }),
+        } as unknown as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          access_token: 'AT',
+          refresh_token: 'RT',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        }),
+      } as unknown as Response;
+    });
+    const svc = new MsGraphAuthService(
+      makeDeps({
+        fetch: fetchMock as unknown as typeof fetch,
+        sleep: (ms) => {
+          sleeps.push(ms);
+          return Promise.resolve();
+        },
+      }),
+    );
+    await svc.pollForTokens(codeOpts);
+    expect(sleeps[0]).toBe(1000); // initial interval 1s
+    expect(sleeps[1]).toBe(2000); // doubled
+  });
+
+  it('returns { status: "expired" } on expired_token', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'expired_token' }),
+    } as unknown as Response));
+    const svc = new MsGraphAuthService(
+      makeDeps({ fetch: fetchMock as unknown as typeof fetch }),
+    );
+    const r = await svc.pollForTokens(codeOpts);
+    expect(r.status).toBe('expired');
+  });
+
+  it('returns { status: "error" } on access_denied with the message', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'access_denied', error_description: 'user said no' }),
+    } as unknown as Response));
+    const svc = new MsGraphAuthService(
+      makeDeps({ fetch: fetchMock as unknown as typeof fetch }),
+    );
+    const r = await svc.pollForTokens(codeOpts);
+    expect(r.status).toBe('error');
+    if (r.status === 'error') expect(r.error).toContain('user said no');
+  });
+
+  it('aborts when AbortController is already signalled', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'authorization_pending' }),
+    } as unknown as Response));
+    const svc = new MsGraphAuthService(
+      makeDeps({ fetch: fetchMock as unknown as typeof fetch }),
+    );
+    const ac = new AbortController();
+    ac.abort();
+    const r = await svc.pollForTokens({ ...codeOpts, signal: ac.signal });
+    expect(r.status).toBe('error');
+    if (r.status === 'error') expect(r.error).toMatch(/cancel|abort/i);
+    // Confirms we exit before any HTTP call when the signal is already set.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns expired when expiresIn elapses', async () => {
+    process.env.MS_GRAPH_CLIENT_ID = 'abc';
+    let now = 1_700_000_000_000;
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'authorization_pending' }),
+    } as unknown as Response));
+    const svc = new MsGraphAuthService(
+      makeDeps({
+        fetch: fetchMock as unknown as typeof fetch,
+        now: () => now,
+        sleep: (ms) => {
+          now += ms; // simulate time passing in the polling loop
+          return Promise.resolve();
+        },
+      }),
+    );
+    // expiresIn 2s, interval 1s → after ~2 sleeps we cross the deadline.
+    const r = await svc.pollForTokens({ deviceCode: 'devc', interval: 1, expiresIn: 2 });
+    expect(r.status).toBe('expired');
+  });
+});
