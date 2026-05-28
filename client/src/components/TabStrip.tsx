@@ -1,39 +1,12 @@
-import { useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  horizontalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
+import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { InstanceView } from '../state/useInstances.js';
-
-const DASHBOARD_TAB = '__dashboard__';
-const LIVE_STATUSES = new Set([
-  'spawning',
-  'working',
-  'waiting-permission',
-  'waiting-input',
-  'idle-notify',
-  'resuming',
-]);
-
-function basename(p: string): string {
-  if (!p) return '';
-  const parts = p.split('/').filter(Boolean);
-  return parts[parts.length - 1] ?? p;
-}
+import type { TabId, TabRecord } from '../../../shared/layout.js';
+import { DASHBOARD_TAB_ID } from '../../../shared/layout.js';
 
 const INSTANCE_PALETTE = [
   '#7aa7ff',
@@ -48,7 +21,7 @@ const INSTANCE_PALETTE = [
   '#80cbc4',
 ];
 
-function instanceColor(id: string): string {
+function paletteColor(id: string): string {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
   return INSTANCE_PALETTE[Math.abs(hash) % INSTANCE_PALETTE.length] ?? '#7aa7ff';
@@ -63,8 +36,8 @@ const ATTENTION_COLORS: Record<string, string> = {
   suspended: '#5a6068',
 };
 
-function dotColor(id: string, status: string): string {
-  return ATTENTION_COLORS[status] ?? instanceColor(id);
+function dotColor(id: string, status: string, accent: string | undefined): string {
+  return ATTENTION_COLORS[status] ?? accent ?? paletteColor(id);
 }
 
 interface TabButtonProps {
@@ -73,6 +46,8 @@ interface TabButtonProps {
   status: string; // 'dashboard' for the pinned tab
   active: boolean;
   draggable: boolean;
+  accent?: string;
+  mounted?: boolean;
   dragRef?: (node: HTMLElement | null) => void;
   dragListeners?: React.HTMLAttributes<HTMLElement>;
   dragStyle?: CSSProperties;
@@ -86,6 +61,8 @@ function TabButton({
   status,
   active,
   draggable,
+  accent,
+  mounted,
   dragRef,
   dragListeners,
   dragStyle,
@@ -111,7 +88,11 @@ function TabButton({
         color: active ? 'text.primary' : 'text.secondary',
         backgroundColor: active ? 'background.default' : 'transparent',
         borderBottom: 2,
-        borderBottomColor: active ? 'primary.main' : 'transparent',
+        borderBottomColor: active
+          ? accent ?? 'primary.main'
+          : mounted
+          ? accent ?? 'rgba(255,255,255,0.18)'
+          : 'transparent',
         ':hover': { backgroundColor: active ? 'background.default' : 'action.hover' },
         ':active': { cursor: draggable ? 'grabbing' : 'pointer' },
         fontSize: 13,
@@ -125,7 +106,7 @@ function TabButton({
             width: 8,
             height: 8,
             borderRadius: '50%',
-            backgroundColor: dotColor(id, status),
+            backgroundColor: dotColor(id, status, accent),
             flexShrink: 0,
           }}
         />
@@ -136,7 +117,6 @@ function TabButton({
           component="span"
           role="button"
           aria-label={`close ${label}`}
-          // Stop drag listeners + tab click from firing when the user clicks ×.
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -161,7 +141,8 @@ function TabButton({
   );
 }
 
-interface SortableTabProps extends Omit<TabButtonProps, 'dragRef' | 'dragListeners' | 'dragStyle' | 'draggable'> {
+interface SortableTabProps
+  extends Omit<TabButtonProps, 'dragRef' | 'dragListeners' | 'dragStyle' | 'draggable'> {
   id: string;
 }
 
@@ -188,37 +169,58 @@ function SortableTab(props: SortableTabProps) {
 }
 
 interface Props {
+  tabs: TabRecord[];
   instances: InstanceView[];
-  activeId: string | null;
-  onSelect(id: string): void;
+  mountedTabIds: Set<string>;
+  focusedTabId: TabId | null;
+  onSelect(id: TabId): void;
+  onContextSplit(id: TabId, dir: 'row' | 'col'): void;
+  onCloseInWorkspace(id: TabId): void;
   onNew(): void;
-  onRemove(id: string, isLive: boolean): void;
-  onReorder(orderedIds: string[]): void;
-  onSnooze(id: string, durationMs: number): void;
 }
 
-export function TabStrip({ instances, activeId, onSelect, onNew, onRemove, onReorder, onSnooze }: Props) {
-  // 5px activation distance — clicks (no drag) still toggle the tab, but a
-  // 5+ px drag picks the tab up. Otherwise every click would start a drag.
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-  const value = activeId ?? DASHBOARD_TAB;
-  const ids = instances.map((i) => i.id);
-  const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+const ATTENTION_RANK: Record<string, number> = {
+  'waiting-permission': 4,
+  crashed: 4,
+  'waiting-input': 3,
+  'idle-notify': 2,
+  // everything else: 0
+};
 
-  const handleDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const oldIndex = ids.indexOf(String(active.id));
-    const newIndex = ids.indexOf(String(over.id));
-    if (oldIndex < 0 || newIndex < 0) return;
-    onReorder(arrayMove(ids, oldIndex, newIndex));
-  };
+function worstStatusInTab(tab: TabRecord, instances: InstanceView[]): string {
+  if (tab.kind === 'dashboard') return 'dashboard';
+  let pick: string | null = null;
+  let pickRank = -1;
+  for (const id of tab.columnOrder) {
+    const inst = instances.find((i) => i.id === id);
+    if (!inst) continue;
+    const rank = ATTENTION_RANK[inst.status] ?? 0;
+    if (rank > pickRank) {
+      pick = inst.status;
+      pickRank = rank;
+    }
+  }
+  return pick ?? 'working';
+}
 
-  const openContext = (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    setCtxMenu({ id, x: e.clientX, y: e.clientY });
-  };
-  const closeContext = () => setCtxMenu(null);
+export function TabStrip({
+  tabs,
+  instances,
+  mountedTabIds,
+  focusedTabId,
+  onSelect,
+  onContextSplit,
+  onCloseInWorkspace,
+  onNew,
+}: Props) {
+  const ids = tabs.map((t) => t.id);
+  const [ctxMenu, setCtxMenu] = useState<{ id: TabId; x: number; y: number } | null>(null);
+
+  const aggregateStatus = useMemo(() => {
+    const map = new Map<TabId, string>();
+    for (const t of tabs) map.set(t.id, worstStatusInTab(t, instances));
+    return map;
+  }, [tabs, instances]);
 
   return (
     <Box
@@ -233,32 +235,33 @@ export function TabStrip({ instances, activeId, onSelect, onNew, onRemove, onReo
         overflowY: 'hidden',
       }}
     >
-      <TabButton
-        id={DASHBOARD_TAB}
-        label="Dashboard"
-        status="dashboard"
-        active={value === DASHBOARD_TAB}
-        draggable={false}
-        onClick={() => onSelect(DASHBOARD_TAB)}
-      />
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
-          <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
-            {instances.map((i) => (
-              <Box key={i.id} onContextMenu={(e) => openContext(e, i.id)}>
-                <SortableTab
-                  id={i.id}
-                  label={basename(i.cwd) || i.cwd}
-                  status={i.status}
-                  active={value === i.id}
-                  onClick={() => onSelect(i.id)}
-                  onClose={() => onRemove(i.id, LIVE_STATUSES.has(i.status))}
-                />
-              </Box>
-            ))}
-          </Box>
-        </SortableContext>
-      </DndContext>
+      {/* No DndContext here — App provides one so a tab drag can also drop on workspace leaves. */}
+      <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
+        <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+          {tabs.map((t) => (
+            <Box
+              key={t.id}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setCtxMenu({ id: t.id, x: e.clientX, y: e.clientY });
+              }}
+            >
+              <SortableTab
+                id={t.id}
+                label={t.label}
+                status={aggregateStatus.get(t.id) ?? 'working'}
+                accent={t.color ?? undefined}
+                mounted={mountedTabIds.has(t.id)}
+                active={focusedTabId === t.id}
+                onClick={() => onSelect(t.id)}
+                onClose={
+                  t.id === DASHBOARD_TAB_ID ? undefined : () => onCloseInWorkspace(t.id)
+                }
+              />
+            </Box>
+          ))}
+        </Box>
+      </SortableContext>
       <Box sx={{ flex: 1, minWidth: 0 }} />
       <Tooltip title="New instance" placement="left">
         <IconButton
@@ -271,47 +274,48 @@ export function TabStrip({ instances, activeId, onSelect, onNew, onRemove, onReo
       </Tooltip>
       <Menu
         open={Boolean(ctxMenu)}
-        onClose={closeContext}
+        onClose={() => setCtxMenu(null)}
         anchorReference="anchorPosition"
         anchorPosition={ctxMenu ? { left: ctxMenu.x, top: ctxMenu.y } : undefined}
       >
         <MenuItem
           onClick={() => {
             if (ctxMenu) onSelect(ctxMenu.id);
-            closeContext();
+            setCtxMenu(null);
           }}
         >
-          Open
+          Open here
         </MenuItem>
-        <Divider />
-        {[5, 30, 60].map((m) => (
-          <MenuItem
-            key={m}
-            onClick={() => {
-              if (ctxMenu) onSnooze(ctxMenu.id, m * 60_000);
-              closeContext();
-            }}
-          >
-            Snooze {m} min
-          </MenuItem>
-        ))}
         <Divider />
         <MenuItem
           onClick={() => {
-            if (ctxMenu) {
-              const inst = instances.find((i) => i.id === ctxMenu.id);
-              const isLive = inst ? LIVE_STATUSES.has(inst.status) : false;
-              onRemove(ctxMenu.id, isLive);
-            }
-            closeContext();
+            if (ctxMenu) onContextSplit(ctxMenu.id, 'row');
+            setCtxMenu(null);
+          }}
+        >
+          Split right
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (ctxMenu) onContextSplit(ctxMenu.id, 'col');
+            setCtxMenu(null);
+          }}
+        >
+          Split down
+        </MenuItem>
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            if (ctxMenu) onCloseInWorkspace(ctxMenu.id);
+            setCtxMenu(null);
           }}
           sx={{ color: 'error.main' }}
         >
-          Close tab
+          Close in workspace
         </MenuItem>
       </Menu>
     </Box>
   );
 }
 
-export { DASHBOARD_TAB };
+export const DASHBOARD_TAB = DASHBOARD_TAB_ID;
