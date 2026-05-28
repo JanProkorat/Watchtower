@@ -3,15 +3,10 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { Box, CircularProgress, Typography } from '@mui/material';
+import { useSlotForInstance } from './instances/SlotRegistry.js';
 
 interface Props {
   instanceId: string;
-  active: boolean;
-  /**
-   * Current instance status. We show the "Starting claude…" overlay while
-   * the status is 'spawning' or 'resuming'; once SessionStart fires the
-   * state machine transitions out of those and the overlay hides.
-   */
   status: string;
 }
 
@@ -22,26 +17,28 @@ const STARTING_STATUSES = new Set(['spawning', 'resuming']);
 // claude is up.
 const SPINNER_FALLBACK_MS = 10_000;
 
-export function Terminal({ instanceId, active, status }: Props) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+export function Terminal({ instanceId, status }: Props) {
+  const homeRef = useRef<HTMLDivElement | null>(null);
+  const hostRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const [fallbackElapsed, setFallbackElapsed] = useState(false);
+  const slot = useSlotForInstance(instanceId);
   const isStarting = STARTING_STATUSES.has(status) && !fallbackElapsed;
 
-  // Arm the fallback timer the first time we mount in a starting state.
   useEffect(() => {
     if (!STARTING_STATUSES.has(status)) return;
     const t = setTimeout(() => setFallbackElapsed(true), SPINNER_FALLBACK_MS);
     return () => clearTimeout(t);
-    // intentionally only runs once per mount — we don't reset if status flips
-    // back to a starting variant later (shouldn't happen, but safe).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Mount xterm once per instance. The host element is created via React (the
+  // `hostRef` div below); xterm attaches its canvas inside it. We never let
+  // React unmount the host — instead we reparent it via appendChild between
+  // the hidden "home" pool and whatever slot is currently bound.
   useEffect(() => {
-    if (!containerRef.current) return;
-
+    if (!hostRef.current) return;
     const term = new XTerm({
       fontFamily: 'Menlo, Monaco, "SF Mono", monospace',
       fontSize: 13,
@@ -57,15 +54,12 @@ export function Terminal({ instanceId, active, status }: Props) {
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
-    term.open(containerRef.current);
-    // xterm's renderService isn't always ready synchronously after open();
-    // calling fit() too early triggers "Cannot read properties of undefined
-    // (reading 'dimensions')". Defer to next frame.
+    term.open(hostRef.current);
     requestAnimationFrame(() => {
       try {
         fit.fit();
       } catch {
-        /* element hidden or term torn down before paint */
+        /* hidden */
       }
     });
     termRef.current = term;
@@ -75,93 +69,107 @@ export function Terminal({ instanceId, active, status }: Props) {
       if (p.instanceId !== instanceId) return;
       term.write(p.chunk);
     });
-
     const inputDisp = term.onData((data) => {
       void window.watchtower.invoke('ptyWrite', { instanceId, data });
     });
-
-    // Push initial geometry to the pty so claude renders at the right width.
     void window.watchtower.invoke('ptyResize', {
       instanceId,
       cols: term.cols,
       rows: term.rows,
     });
 
-    const ro = new ResizeObserver(() => {
-      try {
-        fit.fit();
-        void window.watchtower.invoke('ptyResize', {
-          instanceId,
-          cols: term.cols,
-          rows: term.rows,
-        });
-      } catch {
-        // fit can throw if the element is hidden — ignore until next observe.
-      }
-    });
-    ro.observe(containerRef.current);
-
     return () => {
       offData();
       inputDisp.dispose();
-      ro.disconnect();
       term.dispose();
       termRef.current = null;
       fitRef.current = null;
     };
   }, [instanceId]);
 
-  // Re-fit + focus when the tab becomes active (geometry might have changed
-  // while the terminal was hidden behind another tab).
+  // Reparent host into the bound slot (or back to home when no slot is bound).
   useEffect(() => {
-    if (!active) return;
-    const term = termRef.current;
-    const fit = fitRef.current;
-    if (!term || !fit) return;
-    try {
-      fit.fit();
-      void window.watchtower.invoke('ptyResize', {
-        instanceId,
-        cols: term.cols,
-        rows: term.rows,
-      });
-    } catch {
-      /* hidden — ignore */
+    const host = hostRef.current;
+    const home = homeRef.current;
+    if (!host) return;
+    const target = slot ?? home;
+    if (target && host.parentElement !== target) {
+      target.appendChild(host);
+      if (slot) {
+        const fit = fitRef.current;
+        const term = termRef.current;
+        requestAnimationFrame(() => {
+          try {
+            fit?.fit();
+            if (term) {
+              void window.watchtower.invoke('ptyResize', {
+                instanceId,
+                cols: term.cols,
+                rows: term.rows,
+              });
+              term.focus();
+            }
+          } catch {
+            /* hidden */
+          }
+        });
+      }
     }
-    term.focus();
-  }, [active, instanceId]);
+  }, [slot, instanceId]);
+
+  // Re-fit whenever the bound slot resizes.
+  useEffect(() => {
+    if (!slot) return;
+    const fit = fitRef.current;
+    if (!fit) return;
+    const ro = new ResizeObserver(() => {
+      try {
+        fit.fit();
+        const term = termRef.current;
+        if (term) {
+          void window.watchtower.invoke('ptyResize', {
+            instanceId,
+            cols: term.cols,
+            rows: term.rows,
+          });
+        }
+      } catch {
+        /* hidden */
+      }
+    });
+    ro.observe(slot);
+    return () => ro.disconnect();
+  }, [slot, instanceId]);
 
   return (
-    <Box
-      sx={{
-        position: 'absolute',
-        inset: 0,
-        // Hide inactive terminals via visibility (not display:none) so xterm's
-        // canvas dimensions stay valid; we re-fit when they become active.
-        visibility: active ? 'visible' : 'hidden',
-      }}
-    >
-      <Box ref={containerRef} sx={{ position: 'absolute', inset: 0, backgroundColor: '#0e0f12' }} />
-      {isStarting && (
-        <Box
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1.5,
-            backgroundColor: '#0e0f12',
-            color: 'text.secondary',
-          }}
-        >
-          <CircularProgress size={22} thickness={4} />
-          <Typography variant="caption">
-            {status === 'resuming' ? 'Resuming claude…' : 'Starting claude…'}
-          </Typography>
-        </Box>
-      )}
+    <Box ref={homeRef} sx={{ display: 'none' }} aria-hidden>
+      <Box
+        ref={hostRef}
+        sx={{ position: 'absolute', inset: 0, backgroundColor: '#0e0f12' }}
+      >
+        {isStarting && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1.5,
+              backgroundColor: '#0e0f12',
+              color: 'text.secondary',
+              pointerEvents: 'none',
+              zIndex: 10,
+            }}
+          >
+            <CircularProgress size={22} thickness={4} />
+            <Typography variant="caption">
+              {status === 'resuming' ? 'Resuming claude…' : 'Starting claude…'}
+            </Typography>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }
