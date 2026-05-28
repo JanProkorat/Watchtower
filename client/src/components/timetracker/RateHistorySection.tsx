@@ -67,7 +67,7 @@ function formatEarningsCzk(amount: number, currency: string): string {
 export function RateHistorySection({ projectId }: Props) {
   const state = useContracts(projectId);
   const { showError } = useToast();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<ContractViewPayload | null>(null);
 
@@ -152,8 +152,14 @@ export function RateHistorySection({ projectId }: Props) {
         )}
       </Stack>
 
+      {active && (
+        <Box sx={{ px: 2.5, pb: open ? 0 : 2.5 }}>
+          <ActiveContractCard contract={active} bookedDaysOff={bookedDaysOff.length} />
+        </Box>
+      )}
+
       <Collapse in={open} unmountOnExit>
-        <Box sx={{ px: 2.5, pb: 2.5 }}>
+        <Box sx={{ px: 2.5, pb: 2.5, pt: active ? 2 : 0 }}>
           {state.error && (
             <Alert severity="error" sx={{ mb: 1.5 }}>
               {state.error}
@@ -166,8 +172,6 @@ export function RateHistorySection({ projectId }: Props) {
             </Typography>
           )}
 
-          {active && <ActiveContractCard contract={active} bookedDaysOff={bookedDaysOff.length} />}
-
           {!state.loading && sorted.length === 0 && (
             <Typography
               variant="caption"
@@ -177,7 +181,7 @@ export function RateHistorySection({ projectId }: Props) {
             </Typography>
           )}
 
-          <Stack spacing={1} sx={{ mt: active ? 2 : 0 }}>
+          <Stack spacing={1}>
             {sorted.map((c) => (
               <RateRow key={c.id} contract={c} onEdit={() => openEdit(c)} />
             ))}

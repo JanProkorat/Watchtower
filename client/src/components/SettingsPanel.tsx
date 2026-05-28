@@ -168,7 +168,7 @@ export function SettingsPanel() {
   };
 
   return (
-    <Box sx={{ p: 4, height: '100%', overflow: 'auto', maxWidth: 720 }}>
+    <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
       <Typography variant="h5" sx={{ mb: 3 }}>
         Settings
       </Typography>

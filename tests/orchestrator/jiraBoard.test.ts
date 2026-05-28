@@ -162,14 +162,13 @@ describe('JiraBoardService.getSnapshot', () => {
 
   it('maps every documented Jira status to the right column', () => {
     const e = epics.create({ projectId: pps.id, name: 'TEH' });
-    const cases: Array<[string, 'todo' | 'doing' | 'done']> = [
+    const cases: Array<[string, 'todo' | 'doing' | 'to_accept']> = [
       ['New', 'todo'],
       ['To Do', 'todo'],
       ['In Progress', 'doing'],
       ['In Review', 'doing'],
-      ['In Test', 'done'],
-      ['To Accept', 'done'],
-      ['Done', 'done'],
+      ['In Test', 'to_accept'],
+      ['To Accept', 'to_accept'],
     ];
     cases.forEach(([status], i) => {
       const t = tasks.create({ epicId: e.id, number: `K-${i}`, title: status });
@@ -188,18 +187,25 @@ describe('JiraBoardService.getSnapshot', () => {
     for (const [status, col] of cases) expect(byStatus[status]).toBe(col);
   });
 
-  it('hides tasks whose jira_status is "Waiting" from the snapshot', () => {
+  it('hides tasks whose jira_status is "Waiting" or "Done" from the snapshot', () => {
     const e = epics.create({ projectId: pps.id, name: 'TEH' });
     const visible = tasks.create({ epicId: e.id, number: 'V-1', title: 'visible' });
-    const hidden = tasks.create({ epicId: e.id, number: 'W-1', title: 'waiting' });
+    const waiting = tasks.create({ epicId: e.id, number: 'W-1', title: 'waiting' });
+    const finished = tasks.create({ epicId: e.id, number: 'D-1', title: 'finished' });
     tasks.updateJiraFields(visible.id, {
       jiraStatus: 'In Progress',
       estimateSeconds: null,
       component: null,
       syncedAt: '2026-05-26T14:32:00Z',
     });
-    tasks.updateJiraFields(hidden.id, {
+    tasks.updateJiraFields(waiting.id, {
       jiraStatus: 'Waiting',
+      estimateSeconds: null,
+      component: null,
+      syncedAt: '2026-05-26T14:32:00Z',
+    });
+    tasks.updateJiraFields(finished.id, {
+      jiraStatus: 'Done',
       estimateSeconds: null,
       component: null,
       syncedAt: '2026-05-26T14:32:00Z',
@@ -332,6 +338,77 @@ describe('JiraBoardService.sync', () => {
 
     const allEpics = epics.listForProject(pps.id);
     expect(allEpics.map((e) => e.name).sort()).toEqual(['TEH', 'VYR']);
+  });
+
+  it('writes local status=to_accept when the Jira ticket is in the To Accept / In Test column', async () => {
+    const svc = new JiraBoardService(db, {
+      config: CONFIG,
+      epicLinkFieldId: null,
+      deps: makeFetchDeps({
+        cookies: ['session=abc'],
+        responses: [
+          {
+            status: 200,
+            body: {
+              issues: [
+                jiraIssue('FIE1933-1', '[TEH] waiting on QA', 'To Accept', null),
+                jiraIssue('FIE1933-2', '[TEH] in test', 'In Test', null),
+                jiraIssue('FIE1933-3', '[TEH] still working', 'In Progress', null),
+              ],
+              isLast: true,
+            },
+          },
+        ],
+      }),
+    });
+    const r = await svc.sync(pps.id);
+    expect(r.ok).toBe(true);
+    expect(tasks.findByNumber('FIE1933-1')!.status).toBe('to_accept');
+    expect(tasks.findByNumber('FIE1933-2')!.status).toBe('to_accept');
+    expect(tasks.findByNumber('FIE1933-3')!.status).toBe('in_progress');
+  });
+
+  it('preserves a locally-done status when the Jira ticket is still in a non-done column', async () => {
+    // Seed a task that's already locally done (e.g. flipped by the
+    // worklog-lock auto-transition) but whose Jira ticket is still parked
+    // in To Accept. The pull must NOT revert the local status.
+    const epic = epics.create({ projectId: pps.id, name: 'TEH', shortcut: 'TEH' });
+    const seeded = tasks.create({
+      epicId: epic.id,
+      number: 'FIE1933-1',
+      title: 'old title',
+      status: 'done',
+    });
+    tasks.updateJiraFields(seeded.id, {
+      jiraStatus: 'To Accept',
+      estimateSeconds: null,
+      component: null,
+      syncedAt: '2026-05-26T00:00:00Z',
+    });
+
+    const svc = new JiraBoardService(db, {
+      config: CONFIG,
+      epicLinkFieldId: null,
+      deps: makeFetchDeps({
+        cookies: ['session=abc'],
+        responses: [
+          {
+            status: 200,
+            body: {
+              issues: [jiraIssue('FIE1933-1', '[TEH] waiting on QA', 'To Accept', null)],
+              isLast: true,
+            },
+          },
+        ],
+      }),
+    });
+    const r = await svc.sync(pps.id);
+    expect(r.ok).toBe(true);
+    const after = tasks.findByNumber('FIE1933-1')!;
+    expect(after.status).toBe('done');
+    // Title + jira mirror still refresh on every pull.
+    expect(after.title).toBe('[TEH] waiting on QA');
+    expect(after.jiraStatus).toBe('To Accept');
   });
 
   it('lists the board quickfilters and forwards the matching JQL to the board issue endpoint (array response)', async () => {
@@ -828,5 +905,100 @@ describe('JiraBoardService.sync', () => {
     });
     await svc.sync(pps.id);
     expect(tasks.findByNumber('FIE1933-2')!.jiraComponent).toBe('TEH-Vzory');
+  });
+
+  it('stores Jira description on create and refreshes it on subsequent pulls', async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const svc = new JiraBoardService(db, {
+      config: CONFIG,
+      epicLinkFieldId: null,
+      deps: makeFetchDeps({
+        cookies: ['session=abc'],
+        calls,
+        responses: [
+          {
+            status: 200,
+            body: {
+              issues: [
+                {
+                  key: 'FIE1933-77',
+                  fields: {
+                    summary: '[TEH] foo',
+                    description: 'Initial description from Jira',
+                    status: { name: 'To Do' },
+                    timeoriginalestimate: null,
+                    labels: [],
+                    components: [],
+                  },
+                },
+              ],
+              isLast: true,
+            },
+          },
+          {
+            status: 200,
+            body: {
+              issues: [
+                {
+                  key: 'FIE1933-77',
+                  fields: {
+                    summary: '[TEH] foo (renamed)',
+                    description: 'Updated description',
+                    status: { name: 'In Progress' },
+                    timeoriginalestimate: null,
+                    labels: [],
+                    components: [],
+                  },
+                },
+              ],
+              isLast: true,
+            },
+          },
+        ],
+      }),
+    });
+
+    await svc.sync(pps.id);
+    expect(tasks.findByNumber('FIE1933-77')!.description).toBe('Initial description from Jira');
+    // The board issue endpoint must ask Jira for the description field too.
+    expect(new URL(calls[0]!.url).searchParams.get('fields')).toContain('description');
+
+    await svc.sync(pps.id);
+    const updated = tasks.findByNumber('FIE1933-77')!;
+    expect(updated.description).toBe('Updated description');
+    expect(updated.title).toBe('[TEH] foo (renamed)');
+  });
+
+  it('treats blank Jira description as null', async () => {
+    const svc = new JiraBoardService(db, {
+      config: CONFIG,
+      epicLinkFieldId: null,
+      deps: makeFetchDeps({
+        cookies: ['session=abc'],
+        responses: [
+          {
+            status: 200,
+            body: {
+              issues: [
+                {
+                  key: 'FIE1933-3',
+                  fields: {
+                    summary: '[TEH] foo',
+                    description: '   ',
+                    status: { name: 'To Do' },
+                    timeoriginalestimate: null,
+                    labels: [],
+                    components: [],
+                  },
+                },
+              ],
+              isLast: true,
+            },
+          },
+        ],
+      }),
+    });
+    await svc.sync(pps.id);
+    expect(tasks.findByNumber('FIE1933-3')!.description).toBeNull();
   });
 });

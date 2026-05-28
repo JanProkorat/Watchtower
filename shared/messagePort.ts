@@ -169,7 +169,7 @@ export interface OrchTaskGridTask {
   taskId: number;
   taskNumber: string;
   taskTitle: string;
-  status: 'open' | 'in_progress' | 'done';
+  status: 'open' | 'in_progress' | 'to_accept' | 'done';
   estimatedMinutes: number | null;
   totalTracked: number;
   totalReported: number;
@@ -316,7 +316,7 @@ export interface OrchTaskInput {
   number: string;
   title: string;
   description?: string | null;
-  status?: 'open' | 'in_progress' | 'done';
+  status?: 'open' | 'in_progress' | 'to_accept' | 'done';
   estimatedMinutes?: number | null;
 }
 
@@ -326,7 +326,7 @@ export interface OrchTaskView {
   number: string;
   title: string;
   description: string | null;
-  status: 'open' | 'in_progress' | 'done';
+  status: 'open' | 'in_progress' | 'to_accept' | 'done';
   estimatedMinutes: number | null;
   createdAt: string;
   totalMinutes: number;
@@ -336,7 +336,7 @@ export interface OrchTaskByNumber {
   id: number;
   number: string;
   title: string;
-  status: 'open' | 'in_progress' | 'done';
+  status: 'open' | 'in_progress' | 'to_accept' | 'done';
   epicId: number;
   epicName: string;
   projectId: number;

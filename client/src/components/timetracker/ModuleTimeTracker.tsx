@@ -1,96 +1,48 @@
-import type React from 'react';
-import { Box, Tab, Tabs } from '@mui/material';
-import { useTimeTrackerView } from '../../state/useTimeTrackerView.js';
-import { LIST_TABS, type ListTab } from '../../util/timetrackerUrl.js';
+import { Box } from '@mui/material';
+import type { TimeTrackerView } from '../../util/timetrackerUrl.js';
 import { ListMode } from './ListMode.js';
 import { ProjectsPage } from './ProjectsPage.js';
 
 interface Props {
-  /** True while the TimeTracker rail icon is the active module. */
-  active: boolean;
+  /** Lifted view state — sub-tab + selected project. Owned by `App`. */
+  view: TimeTrackerView;
+  /** Switch the projects-tab selection. */
+  onSelectProject(projectId: number | null): void;
   /** Switch to Instances and focus the given instance. */
   onActivateInstance(id: string): void;
   /** Switch to Instances and open the New-instance modal pre-filled. */
   onOpenNewInstanceForCwd(cwd: string): void;
 }
 
-const TAB_LABELS: Record<ListTab, string> = {
-  projects: 'Projects',
-  worklogs: 'Worklogs',
-  grid: 'Task grid',
-  timeoff: 'Time off',
-  reports: 'Reports',
-  board: 'Board',
-};
-
 /**
- * Root of the TimeTracker module. Routes the active tab to either the new
- * master-detail Projects page or the legacy list-mode container that still
- * hosts the other tabs (Worklogs, Task grid, Time off, Reports, Board).
- * The view state is persisted to URL hash + localStorage by the hook so
- * back/forward and deep links work.
+ * Root of the Billing module (formerly TimeTracker). The active sub-tab is
+ * driven entirely by the side nav rail — the in-page tab strip that used to
+ * live here has moved to the rail as a collapsible sub-section under Billing.
  */
-export function ModuleTimeTracker({ active, onActivateInstance, onOpenNewInstanceForCwd }: Props) {
-  const { view, setTab, selectProject } = useTimeTrackerView(active);
-
-  if (view.tab === 'projects') {
-    return (
-      <ListModeShell tab={view.tab} onTabChange={setTab}>
+export function ModuleTimeTracker({
+  view,
+  onSelectProject,
+  onActivateInstance,
+  onOpenNewInstanceForCwd,
+}: Props) {
+  // Small top padding applied uniformly to every Billing sub-page so the
+  // content doesn't crowd against the chrome at the top of the renderer.
+  return (
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, pt: 1.5 }}>
+      {view.tab === 'projects' ? (
         <ProjectsPage
           selectedProjectId={view.projectId}
-          onSelectProject={selectProject}
+          onSelectProject={onSelectProject}
           onActivateInstance={onActivateInstance}
           onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
         />
-      </ListModeShell>
-    );
-  }
-
-  return (
-    <ListMode
-      tab={view.tab}
-      onTabChange={setTab}
-      onActivateInstance={onActivateInstance}
-      onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
-    />
-  );
-}
-
-/**
- * Thin tab-bar wrapper so the new Projects page can render under the same
- * top-of-screen tabs as the other tab views. Kept inline here because it's
- * trivially small and lets ListMode stay focused on its own (non-projects)
- * content.
- */
-function ListModeShell({
-  tab,
-  onTabChange,
-  children,
-}: {
-  tab: ListTab;
-  onTabChange(tab: ListTab): void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
-        <Tabs
-          value={tab}
-          onChange={(_, next: ListTab) => onTabChange(next)}
-          variant="standard"
-          sx={{ minHeight: 44 }}
-        >
-          {LIST_TABS.map((id) => (
-            <Tab
-              key={id}
-              value={id}
-              label={TAB_LABELS[id]}
-              sx={{ textTransform: 'none', fontSize: 13, minHeight: 44, fontWeight: 500 }}
-            />
-          ))}
-        </Tabs>
-      </Box>
-      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>{children}</Box>
+      ) : (
+        <ListMode
+          tab={view.tab}
+          onActivateInstance={onActivateInstance}
+          onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
+        />
+      )}
     </Box>
   );
 }

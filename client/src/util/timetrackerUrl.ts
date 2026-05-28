@@ -1,17 +1,20 @@
 /**
- * URL-hash routing for the TimeTracker module.
+ * URL-hash routing for the Billing module (formerly TimeTracker).
  *
- * Hash format:
- *   #timetracker/projects           — Projects tab, no project selected
- *   #timetracker/projects/<id>      — Projects tab, project <id> selected
- *   #timetracker/worklogs           — Worklogs tab
- *   #timetracker/grid               — Task grid tab
- *   #timetracker/timeoff            — Time off tab
- *   #timetracker/reports            — Reports tab
- *   #timetracker/board              — Board tab
+ * Canonical hash format:
+ *   #billing/projects               — Projects tab, no project selected
+ *   #billing/projects/<id>          — Projects tab, project <id> selected
+ *   #billing/worklogs               — Worklogs tab
+ *   #billing/grid                   — Task grid tab
+ *   #billing/timeoff                — Time off tab
+ *   #billing/reports                — Reports tab
+ *   #billing/board                  — Board tab
  *
- * Parsing is strict: an unknown tab or non-numeric project id returns null
- * and the caller falls back to the default landing (Projects, no selection).
+ * Parsing accepts both `#billing/...` and the legacy `#timetracker/...`
+ * prefix so old bookmarks / persisted state keep working; serialisation
+ * always emits the canonical `#billing/...` form. An unknown tab or
+ * non-numeric project id returns null and the caller falls back to the
+ * default landing (Projects, no selection).
  */
 
 export const LIST_TABS = ['projects', 'worklogs', 'grid', 'timeoff', 'reports', 'board'] as const;
@@ -41,8 +44,17 @@ function trimHash(hash: string): string {
 
 export function parseTimeTrackerHash(hash: string): TimeTrackerView | null {
   const trimmed = trimHash(hash);
-  if (!trimmed.startsWith('timetracker/')) return null;
-  const parts = trimmed.slice('timetracker/'.length).split('/');
+  let body: string;
+  if (trimmed.startsWith('billing/')) {
+    body = trimmed.slice('billing/'.length);
+  } else if (trimmed.startsWith('timetracker/')) {
+    // Legacy prefix — keep accepting so existing localStorage entries +
+    // bookmarks survive the rename. Serialisation always emits the new form.
+    body = trimmed.slice('timetracker/'.length);
+  } else {
+    return null;
+  }
+  const parts = body.split('/');
 
   // Projects can optionally carry a project id: /projects[/<id>]
   if (parts[0] === 'projects') {
@@ -66,9 +78,9 @@ export function parseTimeTrackerHash(hash: string): TimeTrackerView | null {
 
 export function timetrackerHash(view: TimeTrackerView): string {
   if (view.tab === 'projects' && view.projectId !== null) {
-    return `#timetracker/projects/${view.projectId}`;
+    return `#billing/projects/${view.projectId}`;
   }
-  return `#timetracker/${view.tab}`;
+  return `#billing/${view.tab}`;
 }
 
 /** Convenience equality so callers can avoid redundant history.pushState. */

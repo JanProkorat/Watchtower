@@ -1,38 +1,257 @@
-import { Box, Button, Popover, Stack, Typography } from '@mui/material';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import { useEffect, useState } from 'react';
+import {
+  Box,
+  Divider,
+  IconButton,
+  Popover,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { formatWeekdayDateLongCz } from '../../util/format.js';
+import EditIcon from '@mui/icons-material/EditOutlined';
+import DeleteIcon from '@mui/icons-material/DeleteOutline';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import CloudDoneIcon from '@mui/icons-material/CloudDone';
+import CloudOffIcon from '@mui/icons-material/CloudOff';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import {
+  effectiveMinutes,
+  formatEarnings,
+  formatMinutes,
+  formatWeekdayDateLongCz,
+  parseMinutes,
+} from '../../util/format.js';
 import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
-import type { WorklogViewPayload } from '../../../../shared/ipcContract.js';
-
-function fmtHoursTrim(minutes: number): string {
-  if (minutes <= 0) return '0';
-  const h = minutes / 60;
-  if (Number.isInteger(h)) return String(h);
-  return h.toFixed(2).replace(/\.?0+$/, '');
-}
+import type {
+  ContractViewPayload,
+  WorklogViewPayload,
+} from '../../../../shared/ipcContract.js';
 
 interface Props {
   anchor: HTMLElement | null;
-  /** ISO yyyy-mm-dd of the cell — drives the header. */
+  /** ISO yyyy-mm-dd of the cell — drives the header + create work_date. */
   ymd: string;
-  worklogs: WorklogViewPayload[];
+  /** Task whose cell was clicked. Null while the popover is closing. */
+  taskId: number | null;
+  /** Owning project for rate lookups. */
+  projectId: number | null;
   onClose(): void;
-  onEdit(worklog: WorklogViewPayload): void;
-  onAdd(): void;
+  /** Called after any successful create / update / delete so the grid refreshes. */
+  onChanged(): void;
 }
 
 /**
- * Click-on-cell disambiguation. Opens for every cell (0 / 1 / N worklogs) so
- * the UX stays consistent — the user always sees what's there before being
- * routed to the drawer. Clicking a row opens the drawer in edit mode for
- * that specific worklog; the "Add worklog" footer always opens it in create
- * mode for the same task + date.
+ * Click-on-cell editor. Shows every worklog for the (task, day) pair with
+ * inline edit / add / delete / Jira-sync toggling — no drawer round-trips
+ * for everyday changes. Earnings are computed client-side from the project's
+ * rate active on `ymd` so the popover doesn't need a custom IPC.
  */
-export function WorklogCellPopover({ anchor, ymd, worklogs, onClose, onEdit, onAdd }: Props) {
+export function WorklogCellPopover({
+  anchor,
+  ymd,
+  taskId,
+  projectId,
+  onClose,
+  onChanged,
+}: Props) {
   const open = anchor != null;
   const lockedThrough = useWorklogLock();
-  const locked = isLocked(ymd, lockedThrough);
+  const dayLocked = isLocked(ymd, lockedThrough);
+
+  const [worklogs, setWorklogs] = useState<WorklogViewPayload[]>([]);
+  const [rate, setRate] = useState<ContractViewPayload | null>(null);
+
+  // Inline edit state.
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editMinutes, setEditMinutes] = useState('');
+  const [editReported, setEditReported] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+
+  // Inline add state.
+  const [isAdding, setIsAdding] = useState(false);
+  const [addMinutes, setAddMinutes] = useState('');
+  const [addReported, setAddReported] = useState('');
+  const [addDescription, setAddDescription] = useState('');
+
+  // Reset on close so re-opening a different cell doesn't show stale state.
+  useEffect(() => {
+    if (!open) {
+      setEditId(null);
+      setIsAdding(false);
+      setAddMinutes('');
+      setAddReported('');
+      setAddDescription('');
+      setWorklogs([]);
+      setRate(null);
+    }
+  }, [open]);
+
+  // Fetch the day's worklogs + the active rate every time the cell changes.
+  useEffect(() => {
+    if (!open || taskId == null) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await window.watchtower.invoke('worklogs:list', {
+          taskId,
+          from: ymd,
+          to: ymd,
+        });
+        if (!cancelled) setWorklogs(res.worklogs);
+      } catch {
+        if (!cancelled) setWorklogs([]);
+      }
+    })();
+    if (projectId != null) {
+      void (async () => {
+        try {
+          const res = await window.watchtower.invoke('contracts:listForProject', {
+            projectId,
+          });
+          if (cancelled) return;
+          // Pick the rate whose [effectiveFrom, endDate] contains ymd. Falls
+          // back to null so the earnings column renders blank rather than
+          // showing a stale rate.
+          const active =
+            res.contracts.find(
+              (c) =>
+                c.effectiveFrom <= ymd && (c.endDate === null || c.endDate >= ymd),
+            ) ?? null;
+          setRate(active);
+        } catch {
+          if (!cancelled) setRate(null);
+        }
+      })();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [open, taskId, projectId, ymd]);
+
+  // Auto-show the add panel when the list is empty + the day isn't locked, so
+  // a click on an empty cell goes straight to entry. Skip while editing.
+  useEffect(() => {
+    if (open && worklogs.length === 0 && !dayLocked && editId == null) {
+      setIsAdding(true);
+    }
+  }, [open, worklogs.length, dayLocked, editId]);
+
+  const computeEarned = (minutes: number): number | null => {
+    if (!rate) return null;
+    const hours = minutes / 60;
+    return rate.rateType === 'hourly'
+      ? hours * rate.rateAmount
+      : (hours / rate.hoursPerDay) * rate.rateAmount;
+  };
+
+  const reload = async () => {
+    if (taskId == null) return;
+    try {
+      const res = await window.watchtower.invoke('worklogs:list', {
+        taskId,
+        from: ymd,
+        to: ymd,
+      });
+      setWorklogs(res.worklogs);
+    } catch {
+      // ignore — keep showing the last good list
+    }
+  };
+
+  const startEdit = (entry: WorklogViewPayload) => {
+    setEditId(entry.id);
+    setEditMinutes(formatMinutes(entry.minutes));
+    setEditReported(
+      entry.reportedMinutes == null ? '' : formatMinutes(entry.reportedMinutes),
+    );
+    setEditDescription(entry.description ?? '');
+  };
+
+  const commitEdit = async () => {
+    if (editId == null) return;
+    const minutes = parseMinutes(editMinutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) return;
+    const reportedTrimmed = editReported.trim();
+    let reportedMinutes: number | null = null;
+    if (reportedTrimmed !== '') {
+      const parsed = parseMinutes(editReported);
+      if (!Number.isFinite(parsed) || parsed <= 0) return;
+      reportedMinutes = parsed;
+    }
+    await window.watchtower.invoke('worklogs:update', {
+      id: editId,
+      input: {
+        minutes,
+        reportedMinutes,
+        description: editDescription.trim() === '' ? null : editDescription.trim(),
+      },
+    });
+    setEditId(null);
+    await reload();
+    onChanged();
+  };
+
+  const toggleJiraUploaded = async (entry: WorklogViewPayload) => {
+    if (dayLocked) return;
+    await window.watchtower.invoke('worklogs:update', {
+      id: entry.id,
+      input: { jiraUploaded: !entry.jiraUploaded },
+    });
+    await reload();
+    onChanged();
+  };
+
+  const deleteEntry = async (entry: WorklogViewPayload) => {
+    if (dayLocked) return;
+    await window.watchtower.invoke('worklogs:delete', { id: entry.id });
+    await reload();
+    onChanged();
+  };
+
+  const addMinutesParsed = parseMinutes(addMinutes);
+  const addMinutesValid =
+    Number.isFinite(addMinutesParsed) &&
+    addMinutesParsed > 0 &&
+    addMinutesParsed <= 24 * 60;
+  const addReportedTrimmed = addReported.trim();
+  const addReportedParsed =
+    addReportedTrimmed === '' ? null : parseMinutes(addReported);
+  const addReportedValid =
+    addReportedParsed === null ||
+    (Number.isFinite(addReportedParsed) &&
+      addReportedParsed > 0 &&
+      addReportedParsed <= 24 * 60);
+  const addValid =
+    addMinutesValid &&
+    addReportedValid &&
+    taskId != null &&
+    !dayLocked;
+
+  const commitAdd = async () => {
+    if (!addValid || taskId == null) return;
+    await window.watchtower.invoke('worklogs:create', {
+      taskId,
+      workDate: ymd,
+      minutes: addMinutesParsed,
+      reportedMinutes: addReportedParsed,
+      description: addDescription.trim() === '' ? null : addDescription.trim(),
+    });
+    setIsAdding(false);
+    setAddMinutes('');
+    setAddReported('');
+    setAddDescription('');
+    await reload();
+    onChanged();
+  };
+
+  const totalMinutes = worklogs.reduce((acc, e) => acc + effectiveMinutes({
+    minutes: e.minutes,
+    reported_minutes: e.reportedMinutes,
+  }), 0);
+
   return (
     <Popover
       open={open}
@@ -40,93 +259,289 @@ export function WorklogCellPopover({ anchor, ymd, worklogs, onClose, onEdit, onA
       onClose={onClose}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       transformOrigin={{ vertical: 'top', horizontal: 'center' }}
-      slotProps={{ paper: { sx: { minWidth: 280, maxWidth: 380 } } }}
+      slotProps={{ paper: { sx: { p: 2, maxWidth: 460, minWidth: 320 } } }}
     >
-      <Box sx={{ p: 1 }}>
-        <Typography
-          variant="caption"
-          sx={{
-            display: 'block',
-            color: 'text.secondary',
-            px: 1,
-            pb: 0.5,
-            textTransform: 'capitalize',
-          }}
+      <Stack spacing={1.5}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          spacing={1}
         >
-          {formatWeekdayDateLongCz(ymd)}
-        </Typography>
-
-        {worklogs.length === 0 ? (
           <Typography
-            variant="body2"
-            sx={{ color: 'text.disabled', px: 1, py: 1, fontStyle: 'italic' }}
+            variant="caption"
+            color="text.secondary"
+            sx={{ textTransform: 'capitalize' }}
           >
-            No worklogs on this day yet.
+            {formatWeekdayDateLongCz(ymd)}
           </Typography>
-        ) : (
-          <Stack sx={{ mt: 0.25 }}>
-            {worklogs.map((w) => (
-              <Box
-                key={w.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => onEdit(w)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onEdit(w);
-                  }
-                }}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 1.25,
-                  px: 1,
-                  py: 0.75,
-                  borderRadius: 1,
-                  cursor: 'pointer',
-                  '&:hover, &:focus-visible': { background: 'action.hover', outline: 'none' },
-                }}
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Typography
+              variant="subtitle2"
+              sx={{ fontVariantNumeric: 'tabular-nums' }}
+            >
+              {formatMinutes(totalMinutes)}
+            </Typography>
+            {worklogs.length > 0 && !isAdding && (
+              <Tooltip
+                title={dayLocked ? `Locked through ${lockedThrough}` : 'Add worklog'}
               >
-                <Box
-                  sx={{
-                    fontWeight: 600,
-                    fontVariantNumeric: 'tabular-nums',
-                    minWidth: 44,
-                    fontSize: 13,
-                  }}
-                >
-                  {fmtHoursTrim(w.minutes)} h
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => setIsAdding(true)}
+                    disabled={taskId === null || dayLocked}
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
+          </Stack>
+        </Stack>
+        <Divider />
+
+        {worklogs.length === 0 && !isAdding && (
+          <Typography variant="body2" color="text.secondary">
+            No worklogs on this day.
+          </Typography>
+        )}
+
+        {worklogs.length > 0 && (
+          <Stack spacing={1.25} divider={<Divider flexItem />}>
+            {worklogs.map((entry) => {
+              const isEditing = editId === entry.id;
+              const eff = effectiveMinutes({
+                minutes: entry.minutes,
+                reported_minutes: entry.reportedMinutes,
+              });
+              const earned = computeEarned(eff);
+              return (
+                <Box key={entry.id}>
+                  {isEditing ? (
+                    <Stack spacing={1}>
+                      <Stack direction="row" spacing={1}>
+                        <TextField
+                          size="small"
+                          label="Tracked"
+                          value={editMinutes}
+                          onChange={(e) => setEditMinutes(e.target.value)}
+                          sx={{ width: 110 }}
+                          autoFocus
+                        />
+                        <TextField
+                          size="small"
+                          label="Reported"
+                          placeholder="—"
+                          value={editReported}
+                          onChange={(e) => setEditReported(e.target.value)}
+                          sx={{ width: 110 }}
+                        />
+                        <Box sx={{ flexGrow: 1 }} />
+                        <Tooltip title="Save">
+                          <IconButton size="small" onClick={commitEdit}>
+                            <CheckIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Cancel">
+                          <IconButton size="small" onClick={() => setEditId(null)}>
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                      <TextField
+                        size="small"
+                        label="Description"
+                        fullWidth
+                        multiline
+                        minRows={1}
+                        maxRows={4}
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                      />
+                    </Stack>
+                  ) : (
+                    <Stack spacing={0.5}>
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                        sx={{ minHeight: 28 }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {formatMinutes(eff)}
+                        </Typography>
+                        {entry.reportedMinutes != null &&
+                          entry.reportedMinutes !== entry.minutes && (
+                            <Typography variant="caption" color="text.secondary">
+                              (tracked {formatMinutes(entry.minutes)})
+                            </Typography>
+                          )}
+                        <Box sx={{ flexGrow: 1 }} />
+                        {earned != null && rate && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {formatEarnings(earned, rate.currency)}
+                          </Typography>
+                        )}
+                        <Tooltip
+                          title={
+                            dayLocked
+                              ? `Locked through ${lockedThrough}`
+                              : entry.jiraUploaded
+                                ? 'Synced to Jira — click to unmark'
+                                : 'Not in Jira — click to mark as synced'
+                          }
+                        >
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={dayLocked}
+                              onClick={() => {
+                                void toggleJiraUploaded(entry);
+                              }}
+                            >
+                              {entry.jiraUploaded ? (
+                                <CloudDoneIcon
+                                  fontSize="small"
+                                  sx={{ color: 'success.main' }}
+                                />
+                              ) : (
+                                <CloudOffIcon
+                                  fontSize="small"
+                                  sx={{ color: 'text.disabled' }}
+                                />
+                              )}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip
+                          title={dayLocked ? `Locked through ${lockedThrough}` : 'Edit'}
+                        >
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => startEdit(entry)}
+                              disabled={dayLocked}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip
+                          title={dayLocked ? `Locked through ${lockedThrough}` : 'Delete'}
+                        >
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                void deleteEntry(entry);
+                              }}
+                              disabled={dayLocked}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                      {entry.description && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ whiteSpace: 'pre-wrap' }}
+                        >
+                          {entry.description}
+                        </Typography>
+                      )}
+                    </Stack>
+                  )}
                 </Box>
-                <Box
-                  sx={{
-                    flex: 1,
-                    color: w.description ? 'text.primary' : 'text.disabled',
-                    fontSize: 13,
-                    lineHeight: 1.35,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    fontStyle: w.description ? 'normal' : 'italic',
-                  }}
-                >
-                  {w.description || 'no description'}
-                </Box>
-              </Box>
-            ))}
+              );
+            })}
           </Stack>
         )}
 
-        {locked && (
+        {isAdding && (
+          <>
+            {worklogs.length > 0 && <Divider />}
+            <Stack spacing={1}>
+              <Typography variant="caption" color="text.secondary">
+                Add worklog
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  size="small"
+                  label="Tracked"
+                  placeholder="1.5, 1h 30m, 1:30, or 90m"
+                  value={addMinutes}
+                  onChange={(e) => setAddMinutes(e.target.value)}
+                  error={addMinutes !== '' && !addMinutesValid}
+                  autoFocus
+                  sx={{ width: 130 }}
+                />
+                <TextField
+                  size="small"
+                  label="Reported"
+                  placeholder="optional"
+                  value={addReported}
+                  onChange={(e) => setAddReported(e.target.value)}
+                  error={addReportedTrimmed !== '' && !addReportedValid}
+                  sx={{ width: 130 }}
+                />
+                <Box sx={{ flexGrow: 1 }} />
+                <Tooltip title="Add">
+                  <span>
+                    <IconButton
+                      size="small"
+                      disabled={!addValid}
+                      onClick={() => {
+                        void commitAdd();
+                      }}
+                    >
+                      <CheckIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Cancel">
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      setIsAdding(false);
+                      setAddMinutes('');
+                      setAddReported('');
+                      setAddDescription('');
+                    }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+              <TextField
+                size="small"
+                label="Description"
+                fullWidth
+                multiline
+                minRows={1}
+                maxRows={4}
+                value={addDescription}
+                onChange={(e) => setAddDescription(e.target.value)}
+              />
+            </Stack>
+          </>
+        )}
+
+        {dayLocked && (
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
               gap: 0.75,
-              px: 1,
-              pt: 0.75,
               color: 'warning.main',
               fontSize: 11,
             }}
@@ -135,17 +550,7 @@ export function WorklogCellPopover({ anchor, ymd, worklogs, onClose, onEdit, onA
             <span>Locked through {lockedThrough}</span>
           </Box>
         )}
-        <Button
-          startIcon={<AddIcon fontSize="small" />}
-          onClick={onAdd}
-          size="small"
-          fullWidth
-          disabled={locked}
-          sx={{ mt: 0.5, justifyContent: 'flex-start', textTransform: 'none', px: 1 }}
-        >
-          Add worklog
-        </Button>
-      </Box>
+      </Stack>
     </Popover>
   );
 }

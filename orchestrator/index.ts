@@ -20,6 +20,7 @@ import { EpicsRepo, type EpicInput } from './db/repositories/epics.js';
 import { TasksRepo, type TaskInput } from './db/repositories/tasks.js';
 import {
   WorklogsRepo,
+  WORKLOG_LOCK_SETTING_KEY,
   type WorklogInput,
   type WorklogListFilter,
 } from './db/repositories/worklogs.js';
@@ -118,7 +119,7 @@ function tasksRepo(): TasksRepo {
  * Returns null if any join step fails (deleted task / dangling epic).
  */
 function resolveTaskByNumberPayload(
-  row: { id: number; number: string; title: string; status: 'open' | 'in_progress' | 'done'; epicId: number } | null,
+  row: { id: number; number: string; title: string; status: 'open' | 'in_progress' | 'to_accept' | 'done'; epicId: number } | null,
 ) {
   if (!row) return null;
   const epic = epicsRepo().get(row.epicId);
@@ -140,6 +141,22 @@ function resolveTaskByNumberPayload(
 
 function worklogsRepo(): WorklogsRepo {
   return new WorklogsRepo(handle!.db);
+}
+
+/**
+ * Tasks with local status='done' are read-only — see board-screen requirement
+ * that done work cannot be edited or have its worklogs touched. Throws a
+ * plain Error so the renderer's existing catch-and-toast path surfaces it.
+ * The board sync intentionally bypasses this (writes via repo directly) so
+ * Jira can still flip a task back open or update its description.
+ */
+function assertTaskNotDone(taskId: number, op: string): void {
+  const existing = tasksRepo().get(taskId);
+  if (existing && existing.status === 'done') {
+    throw new Error(
+      `Cannot ${op}: task ${existing.number} is marked Done and is locked.`,
+    );
+  }
 }
 
 function projectRatesRepo(): ProjectRatesRepo {
@@ -404,6 +421,12 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
         const n = Number(req.payload.value);
         if (Number.isFinite(n) && n >= 1000) quietTimers.setDuration(n);
       }
+      if (req.payload.key === WORKLOG_LOCK_SETTING_KEY) {
+        const v = req.payload.value.trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+          tasksRepo().markToAcceptDoneOnOrBefore(v);
+        }
+      }
       return { ok: true };
     }
 
@@ -493,30 +516,45 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
     case 'tasks:create':
       return { task: tasksRepo().create(req.payload as TaskInput) };
 
-    case 'tasks:update':
+    case 'tasks:update': {
+      // Block all user edits on a done task. Status field is the only one
+      // a user could plausibly want to change (to re-open), and we still
+      // disallow it — Jira is the source of truth for "is this done".
+      assertTaskNotDone(req.payload.id, 'edit task');
       return { task: tasksRepo().update(req.payload.id, req.payload.input as Partial<TaskInput>) };
+    }
 
     case 'tasks:delete':
+      assertTaskNotDone(req.payload.id, 'delete task');
       tasksRepo().delete(req.payload.id);
       return { ok: true };
 
     case 'worklogs:list':
       return { worklogs: worklogsRepo().list(req.payload as WorklogListFilter) };
 
-    case 'worklogs:create':
-      return { worklog: worklogsRepo().create(req.payload as WorklogInput) };
+    case 'worklogs:create': {
+      const input = req.payload as WorklogInput;
+      assertTaskNotDone(input.taskId, 'add worklog');
+      return { worklog: worklogsRepo().create(input) };
+    }
 
-    case 'worklogs:update':
+    case 'worklogs:update': {
+      const existing = worklogsRepo().get(req.payload.id);
+      if (existing) assertTaskNotDone(existing.taskId, 'edit worklog');
       return {
         worklog: worklogsRepo().update(
           req.payload.id,
           req.payload.input as Partial<WorklogInput>,
         ),
       };
+    }
 
-    case 'worklogs:delete':
+    case 'worklogs:delete': {
+      const existing = worklogsRepo().get(req.payload.id);
+      if (existing) assertTaskNotDone(existing.taskId, 'delete worklog');
       worklogsRepo().delete(req.payload.id);
       return { ok: true };
+    }
 
     case 'contracts:listForProject': {
       const rows = projectRatesRepo().listForProject(req.payload.projectId);

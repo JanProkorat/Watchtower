@@ -23,7 +23,7 @@ import type {
   EpicViewPayload,
   TaskViewPayload,
 } from '../../../../shared/ipcContract.js';
-import { formatMinutes, formatMinutesReadable } from '../../util/format.js';
+import { buildTaskUrl, formatMinutes, formatMinutesReadable } from '../../util/format.js';
 import { useEpicsAndTasks } from '../../state/useEpicsAndTasks.js';
 import { EpicDrawer } from './EpicDrawer.js';
 import { TaskDrawer } from './TaskDrawer.js';
@@ -31,7 +31,7 @@ import { TaskDetailDrawer } from './TaskDetailDrawer.js';
 
 const PAGE_SIZE = 20;
 
-type StatusFilter = 'all' | 'open' | 'in_progress' | 'done';
+type StatusFilter = 'all' | 'open' | 'in_progress' | 'to_accept' | 'done';
 
 interface Props {
   projectId: number;
@@ -45,8 +45,11 @@ interface Props {
   projectName?: string;
   /** Project colour used as the breadcrumb dot + accent gradient. */
   projectColor?: string;
-  /** Optional Jira base URL — when present, task keys link to the ticket. */
-  jiraBaseUrl?: string | null;
+  /**
+   * Per-project URL template (e.g. https://.../browse/{n}). When present,
+   * each task number gets an open-in-new icon that opens the resolved URL.
+   */
+  taskUrlTemplate?: string | null;
   /** Open external URL in the system browser. */
   onOpenExternal?(url: string): void;
 }
@@ -56,7 +59,7 @@ export function EpicsTreeView({
   embedded = false,
   projectName = '',
   projectColor = '#7C5CFF',
-  jiraBaseUrl = null,
+  taskUrlTemplate = null,
   onOpenExternal,
 }: Props) {
   const state = useEpicsAndTasks(projectId);
@@ -238,6 +241,8 @@ export function EpicsTreeView({
                 onEditTask={openTaskDetail}
                 onDeleteTask={(t) => state.deleteTask(t.id)}
                 onAddTask={() => openCreateTask(epic.id)}
+                taskUrlTemplate={taskUrlTemplate}
+                onOpenExternal={onOpenExternal}
               />
             );
           })}
@@ -283,7 +288,7 @@ export function EpicsTreeView({
         projectName={projectName}
         projectColor={projectColor}
         epicName={detailEpicName}
-        taskUrlTemplate={jiraBaseUrl ? `${jiraBaseUrl}/browse/{n}` : null}
+        taskUrlTemplate={taskUrlTemplate}
         onClose={() => setDetailTask(null)}
         onUpdate={async (input) => {
           if (!detailTask) return;
@@ -318,6 +323,8 @@ interface EpicCardProps {
   onEditTask(task: TaskViewPayload): void;
   onDeleteTask(task: TaskViewPayload): Promise<void> | void;
   onAddTask(): void;
+  taskUrlTemplate?: string | null;
+  onOpenExternal?(url: string): void;
 }
 
 const GRID_COLS = '180px 1fr 110px 110px 48px';
@@ -338,6 +345,8 @@ function EpicCard({
   onEditTask,
   onDeleteTask,
   onAddTask,
+  taskUrlTemplate,
+  onOpenExternal,
 }: EpicCardProps) {
   const totalPages = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
   const safePage = Math.min(Math.max(0, page), totalPages - 1);
@@ -417,6 +426,22 @@ function EpicCard({
           }}
         />
         <Box sx={{ flex: 1 }} />
+        <Tooltip title="Add task">
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddTask();
+            }}
+            sx={{
+              color: 'text.disabled',
+              '&:hover': { color: 'primary.main', backgroundColor: 'action.hover' },
+            }}
+            aria-label="Add task"
+          >
+            <AddIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Delete epic">
           <IconButton
             size="small"
@@ -474,6 +499,7 @@ function EpicCard({
               <MenuItem value="all">All</MenuItem>
               <MenuItem value="open">Open</MenuItem>
               <MenuItem value="in_progress">In progress</MenuItem>
+              <MenuItem value="to_accept">To accept</MenuItem>
               <MenuItem value="done">Done</MenuItem>
             </TextField>
           </Box>
@@ -517,32 +543,26 @@ function EpicCard({
                   key={task.id}
                   task={task}
                   isLast={idx === visibleTasks.length - 1}
+                  taskUrlTemplate={taskUrlTemplate}
                   onEdit={() => onEditTask(task)}
                   onDelete={() => onDeleteTask(task)}
+                  onOpenExternal={onOpenExternal}
                 />
               ))}
-              {/* Footer: pagination + add task */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 3,
-                  px: 2.25,
-                  py: 1,
-                  borderTop: 1,
-                  borderColor: 'divider',
-                }}
-              >
-                <Button
-                  size="small"
-                  startIcon={<AddIcon fontSize="small" />}
-                  onClick={onAddTask}
-                  sx={{ textTransform: 'none' }}
+              {/* Footer: pagination only */}
+              {showPaging && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: 3,
+                    px: 2.25,
+                    py: 1,
+                    borderTop: 1,
+                    borderColor: 'divider',
+                  }}
                 >
-                  Add task
-                </Button>
-                {showPaging && (
                   <Stack
                     direction="row"
                     spacing={3}
@@ -577,8 +597,8 @@ function EpicCard({
                       </IconButton>
                     </Box>
                   </Stack>
-                )}
-              </Box>
+                </Box>
+              )}
             </>
           )}
         </>
@@ -607,14 +627,19 @@ function HeaderCell({ label }: { label: string }) {
 function TaskRow({
   task,
   isLast,
+  taskUrlTemplate,
   onEdit,
   onDelete,
+  onOpenExternal,
 }: {
   task: TaskViewPayload;
   isLast: boolean;
+  taskUrlTemplate?: string | null;
   onEdit(): void;
   onDelete(): Promise<void> | void;
+  onOpenExternal?(url: string): void;
 }) {
+  const externalUrl = buildTaskUrl(taskUrlTemplate, task.number);
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (
@@ -625,6 +650,13 @@ function TaskRow({
       return;
     }
     void onDelete();
+  };
+  const handleOpenExternal = (e: React.MouseEvent) => {
+    if (!externalUrl) return;
+    e.stopPropagation();
+    e.preventDefault();
+    if (onOpenExternal) onOpenExternal(externalUrl);
+    else void window.watchtower.invoke('openExternalUrl', { url: externalUrl });
   };
 
   return (
@@ -654,7 +686,20 @@ function TaskRow({
           }}
         >
           {task.number}
-          <OpenInNewIcon sx={{ fontSize: 14 }} />
+          {externalUrl && (
+            <Tooltip title={externalUrl}>
+              <IconButton
+                size="small"
+                component="a"
+                href={externalUrl}
+                onClick={handleOpenExternal}
+                aria-label="Open task in tracker"
+                sx={{ p: 0.25, color: 'primary.main' }}
+              >
+                <OpenInNewIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
       </Box>
       <Box
@@ -702,7 +747,7 @@ function TaskRow({
   );
 }
 
-function StatusChip({ status }: { status: 'open' | 'in_progress' | 'done' }) {
+function StatusChip({ status }: { status: 'open' | 'in_progress' | 'to_accept' | 'done' }) {
   const COMMON = {
     height: 22,
     fontSize: 11.5,
@@ -719,6 +764,20 @@ function StatusChip({ status }: { status: 'open' | 'in_progress' | 'done' }) {
           fontWeight: 600,
           bgcolor: 'success.main',
           color: 'success.contrastText',
+        }}
+      />
+    );
+  }
+  if (status === 'to_accept') {
+    return (
+      <Chip
+        label="To accept"
+        size="small"
+        sx={{
+          ...COMMON,
+          fontWeight: 500,
+          bgcolor: 'warning.light',
+          color: 'warning.contrastText',
         }}
       />
     );

@@ -152,6 +152,16 @@ describe('TasksRepo', () => {
     });
   });
 
+  it('accepts the to_accept status for tasks parked in review', () => {
+    const t = tasks.create({
+      epicId,
+      number: 'FIE1933-19000',
+      title: 'Awaiting acceptance',
+      status: 'to_accept',
+    });
+    expect(tasks.get(t.id)?.status).toBe('to_accept');
+  });
+
   it('listForEpic narrows to the requested epic', () => {
     const otherEpic = epics.create({ projectId, name: 'F' }).id;
     tasks.create({ epicId, number: 'A-1', title: 'A' });
@@ -252,6 +262,30 @@ describe('TasksRepo', () => {
       expect(tasks.get(a.id)?.jiraStatus).toBeNull();
     });
 
+    it('markToAcceptDoneOnOrBefore flips to_accept tasks whose last worklog is on or before the lock', () => {
+      const finished = tasks.create({ epicId, number: 'A-1', title: 'finished', status: 'to_accept' });
+      const ongoing = tasks.create({ epicId, number: 'A-2', title: 'ongoing', status: 'to_accept' });
+      const open = tasks.create({ epicId, number: 'A-3', title: 'still open', status: 'open' });
+      db.prepare(`INSERT INTO worklogs (task_id, work_date, minutes) VALUES (?, '2026-04-10', 60)`).run(finished.id);
+      db.prepare(`INSERT INTO worklogs (task_id, work_date, minutes) VALUES (?, '2026-04-20', 30)`).run(finished.id);
+      db.prepare(`INSERT INTO worklogs (task_id, work_date, minutes) VALUES (?, '2026-04-10', 60)`).run(ongoing.id);
+      db.prepare(`INSERT INTO worklogs (task_id, work_date, minutes) VALUES (?, '2026-05-05', 30)`).run(ongoing.id);
+      db.prepare(`INSERT INTO worklogs (task_id, work_date, minutes) VALUES (?, '2026-04-10', 60)`).run(open.id);
+
+      const changed = tasks.markToAcceptDoneOnOrBefore('2026-04-30');
+      expect(changed).toBe(1);
+      expect(tasks.get(finished.id)?.status).toBe('done');
+      expect(tasks.get(ongoing.id)?.status).toBe('to_accept');
+      expect(tasks.get(open.id)?.status).toBe('open');
+    });
+
+    it('markToAcceptDoneOnOrBefore skips to_accept tasks with no worklogs', () => {
+      const t = tasks.create({ epicId, number: 'A-1', title: 'parked', status: 'to_accept' });
+      const changed = tasks.markToAcceptDoneOnOrBefore('2026-04-30');
+      expect(changed).toBe(0);
+      expect(tasks.get(t.id)?.status).toBe('to_accept');
+    });
+
     it('clearJiraStatusExceptForProject leaves tasks in other projects untouched', () => {
       const otherProjectId = seedProject(db, 'Other');
       const otherEpic = epics.create({ projectId: otherProjectId, name: 'X' });
@@ -290,9 +324,9 @@ describe('migrations · v5 extends epics + tasks', () => {
     expect(cols.map((c) => c.name)).toContain('description');
   });
 
-  it('bumps schema version to 8', () => {
+  it('bumps schema version to 10', () => {
     const db = freshDb();
     const row = db.prepare(`SELECT MAX(version) v FROM schema_version`).get() as { v: number };
-    expect(row.v).toBe(8);
+    expect(row.v).toBe(10);
   });
 });

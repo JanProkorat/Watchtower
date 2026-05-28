@@ -126,6 +126,67 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       db.exec(`ALTER TABLE epics ADD COLUMN shortcut TEXT`);
     },
   },
+  {
+    version: 9,
+    up: (db) => {
+      // Widen tasks.status to include 'to_accept' so the local enum matches
+      // the board's four columns (todo/doing/to_accept/done). Until now the
+      // 'To Accept' / 'In Test' Jira columns were folded into 'in_progress'
+      // locally, which made the task editor lie about the state. SQLite
+      // can't ALTER a CHECK constraint, so we rebuild the table and copy
+      // every row across, flipping rows that are currently on the board's
+      // to_accept column to the new local value.
+      db.exec(`PRAGMA foreign_keys = OFF`);
+      db.exec(`
+        CREATE TABLE tasks_new (
+          id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+          epic_id            INTEGER NOT NULL REFERENCES epics(id) ON DELETE CASCADE,
+          number             TEXT    NOT NULL,
+          title              TEXT    NOT NULL,
+          status             TEXT    NOT NULL DEFAULT 'open'
+                               CHECK (status IN ('open','in_progress','to_accept','done')),
+          estimated_minutes  INTEGER,
+          created_at         TEXT    NOT NULL DEFAULT (datetime('now')),
+          description        TEXT,
+          jira_status        TEXT,
+          jira_estimate_secs INTEGER,
+          jira_component     TEXT,
+          jira_synced_at     TEXT
+        );
+        INSERT INTO tasks_new (
+          id, epic_id, number, title, status, estimated_minutes, created_at,
+          description, jira_status, jira_estimate_secs, jira_component, jira_synced_at
+        )
+        SELECT
+          id, epic_id, number, title,
+          CASE
+            WHEN jira_status IN ('In Test', 'To Accept') THEN 'to_accept'
+            ELSE status
+          END,
+          estimated_minutes, created_at,
+          description, jira_status, jira_estimate_secs, jira_component, jira_synced_at
+        FROM tasks;
+        DROP TABLE tasks;
+        ALTER TABLE tasks_new RENAME TO tasks;
+        CREATE INDEX IF NOT EXISTS idx_tasks_epic ON tasks(epic_id);
+        CREATE INDEX IF NOT EXISTS idx_tasks_number ON tasks(number);
+        CREATE INDEX IF NOT EXISTS idx_tasks_jira_status
+          ON tasks(jira_status) WHERE jira_status IS NOT NULL;
+      `);
+      db.exec(`PRAGMA foreign_keys = ON`);
+    },
+  },
+  {
+    version: 10,
+    up: (db) => {
+      // Per-project URL template for opening a task in its issue tracker.
+      // Stored as a literal string with a `{n}` placeholder that is replaced
+      // with the task number at link build time, e.g.:
+      //   https://jira.skoda.vwgroup.com/browse/{n}
+      // NULL = no template configured = no open-in-new link on task rows.
+      db.exec(`ALTER TABLE projects ADD COLUMN task_url_template TEXT`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

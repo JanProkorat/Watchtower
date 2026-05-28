@@ -1,6 +1,6 @@
 import type { SqliteLike } from '../migrations.js';
 
-export type TaskStatus = 'open' | 'in_progress' | 'done';
+export type TaskStatus = 'open' | 'in_progress' | 'to_accept' | 'done';
 
 export interface TaskRow {
   id: number;
@@ -203,6 +203,30 @@ export class TasksRepo {
           WHERE id = ?`,
       )
       .run(id);
+  }
+
+  /**
+   * Flip every `to_accept` task whose latest worklog falls on or before
+   * `lockDate` to `done`. Called from the `setSetting` handler when the
+   * worklog-lock date advances — once a billing period is invoiced, tasks
+   * sitting in "to accept" with no work after the cut-off are settled.
+   * Tasks with no worklogs are skipped (no signal to act on). Returns the
+   * number of rows updated.
+   */
+  markToAcceptDoneOnOrBefore(lockDate: string): number {
+    const r = this.db
+      .prepare(
+        `UPDATE tasks
+            SET status = 'done'
+          WHERE status = 'to_accept'
+            AND id IN (
+              SELECT task_id FROM worklogs
+               GROUP BY task_id
+              HAVING MAX(work_date) <= ?
+            )`,
+      )
+      .run(lockDate) as { changes: number };
+    return r.changes;
   }
 
   /**

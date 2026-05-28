@@ -168,21 +168,30 @@ describe('TaskGridService', () => {
     expect(res.dailyTotalsTracked).toEqual({ 5: 60 });
   });
 
-  it('sorts tasks by project name, epic display_order, then task id', () => {
+  it('sorts tasks by task number using natural-numeric comparison', () => {
+    // Mix projects + epics to prove the sort is driven by task number
+    // alone (and not by project name / epic display_order, which used to
+    // be the primary keys).
     const projB = s.projectsRepo.create({ name: 'B-proj', kind: 'work' });
     const projA = s.projectsRepo.create({ name: 'A-proj', kind: 'work' });
-    const epicA1 = s.epicsRepo.create({ projectId: projA.id, name: 'A1' }); // display 1000
-    const epicA2 = s.epicsRepo.create({ projectId: projA.id, name: 'A2' }); // display 2000
-    const epicB1 = s.epicsRepo.create({ projectId: projB.id, name: 'B1' });
-    const tA1 = s.tasksRepo.create({ epicId: epicA1.id, number: 'A1-T', title: 'A1' });
-    const tA2 = s.tasksRepo.create({ epicId: epicA2.id, number: 'A2-T', title: 'A2' });
-    const tB1 = s.tasksRepo.create({ epicId: epicB1.id, number: 'B1-T', title: 'B1' });
-    s.worklogsRepo.create({ taskId: tB1.id, workDate: '2026-05-05', minutes: 30 });
-    s.worklogsRepo.create({ taskId: tA2.id, workDate: '2026-05-05', minutes: 30 });
-    s.worklogsRepo.create({ taskId: tA1.id, workDate: '2026-05-05', minutes: 30 });
+    const epicA = s.epicsRepo.create({ projectId: projA.id, name: 'EA' });
+    const epicB = s.epicsRepo.create({ projectId: projB.id, name: 'EB' });
+    // Numeric suffixes are out of lexicographic order on purpose:
+    // FIE-19100 sorts before FIE-19000 alphabetically but should land
+    // after it with numeric comparison.
+    const tHi = s.tasksRepo.create({ epicId: epicB.id, number: 'FIE-19100', title: 'high' });
+    const tLo = s.tasksRepo.create({ epicId: epicA.id, number: 'FIE-19000', title: 'low' });
+    const tMid = s.tasksRepo.create({ epicId: epicA.id, number: 'FIE-2000', title: 'mid' });
+    s.worklogsRepo.create({ taskId: tHi.id, workDate: '2026-05-05', minutes: 30 });
+    s.worklogsRepo.create({ taskId: tLo.id, workDate: '2026-05-05', minutes: 30 });
+    s.worklogsRepo.create({ taskId: tMid.id, workDate: '2026-05-05', minutes: 30 });
 
     const res = s.service.get(2026, 5);
-    expect(res.tasks.map((t) => t.taskNumber)).toEqual(['A1-T', 'A2-T', 'B1-T']);
+    expect(res.tasks.map((t) => t.taskNumber)).toEqual([
+      'FIE-2000',
+      'FIE-19000',
+      'FIE-19100',
+    ]);
   });
 
   it('only shows tasks that have at least one worklog in the month', () => {
@@ -212,8 +221,12 @@ describe('TaskGridService', () => {
         });
       }
       const res = s.service.get(2026, 5);
-      // Only the work project contributes to earnings
-      expect(res.earningsByCurrency).toEqual([{ currency: 'CZK', perDay: { 10: 100 }, totalAmount: 100 }]);
+      // Only the work project contributes to earnings. Expected = 19
+      // workdays (May 2026 minus Labour & Liberation Day) × 100 CZK/h ×
+      // 8 h = 15200 CZK.
+      expect(res.earningsByCurrency).toEqual([
+        { currency: 'CZK', perDay: { 10: 100 }, totalAmount: 100, expectedAmount: 15200 },
+      ]);
     });
 
     it('uses each worklog\'s effective rate (hourly)', () => {
@@ -231,8 +244,14 @@ describe('TaskGridService', () => {
       s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-04', minutes: 60 });
       s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-05', minutes: 90 });
       const res = s.service.get(2026, 5);
+      // Expected = 19 workdays × 1600 × 8 = 243200.
       expect(res.earningsByCurrency).toEqual([
-        { currency: 'CZK', perDay: { 4: 1600, 5: 2400 }, totalAmount: 4000 },
+        {
+          currency: 'CZK',
+          perDay: { 4: 1600, 5: 2400 },
+          totalAmount: 4000,
+          expectedAmount: 243200,
+        },
       ]);
     });
 
@@ -252,8 +271,14 @@ describe('TaskGridService', () => {
       s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-04', minutes: 60 });
       s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-05', minutes: 90 });
       const res = s.service.get(2026, 5);
+      // Expected = 19 workdays × 12800 (MD) = 243200.
       expect(res.earningsByCurrency).toEqual([
-        { currency: 'CZK', perDay: { 4: 1600, 5: 2400 }, totalAmount: 4000 },
+        {
+          currency: 'CZK',
+          perDay: { 4: 1600, 5: 2400 },
+          totalAmount: 4000,
+          expectedAmount: 243200,
+        },
       ]);
     });
 
@@ -280,8 +305,15 @@ describe('TaskGridService', () => {
       s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-10', minutes: 60 }); // old rate → 1000
       s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-20', minutes: 60 }); // new rate → 2000
       const res = s.service.get(2026, 5);
+      // Expected mid-month split: 8 workdays at 1000 CZK/h × 8 h +
+      // 11 workdays at 2000 CZK/h × 8 h = 64000 + 176000 = 240000.
       expect(res.earningsByCurrency).toEqual([
-        { currency: 'CZK', perDay: { 10: 1000, 20: 2000 }, totalAmount: 3000 },
+        {
+          currency: 'CZK',
+          perDay: { 10: 1000, 20: 2000 },
+          totalAmount: 3000,
+          expectedAmount: 240000,
+        },
       ]);
     });
 

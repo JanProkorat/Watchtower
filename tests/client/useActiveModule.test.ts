@@ -22,8 +22,13 @@ describe('useActiveModule helpers', () => {
   });
 
   it('round-trips a valid module id', () => {
-    writeActiveModule('timetracker');
-    expect(readActiveModule()).toBe('timetracker');
+    writeActiveModule('billing');
+    expect(readActiveModule()).toBe('billing');
+  });
+
+  it('maps the legacy timetracker id to billing on read', () => {
+    localStorage.setItem('watchtower.activeModule', 'timetracker');
+    expect(readActiveModule()).toBe('billing');
   });
 
   it('falls back to dashboard on an unknown value', () => {

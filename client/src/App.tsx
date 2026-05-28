@@ -54,6 +54,8 @@ import {
 } from './layout/workspaceTreeOps.js';
 import { pruneLayout } from './layout/pruneLayout.js';
 import { DASHBOARD_TAB_ID, type TabId } from '../../shared/layout.js';
+import { useTimeTrackerView } from './state/useTimeTrackerView.js';
+import { useSettingsView } from './state/useSettingsView.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
 
 declare global {
@@ -92,6 +94,8 @@ export function App() {
   const [newOpen, setNewOpen] = useState(false);
   const [pendingNewCwd, setPendingNewCwd] = useState<string | undefined>(undefined);
   const [activeModule, setActiveModule] = useActiveModule();
+  const billingView = useTimeTrackerView(activeModule === 'billing');
+  const settingsView = useSettingsView(activeModule === 'settings');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [openAdHocCwds, setOpenAdHocCwds] = useState<Set<string>>(new Set());
   const [dragging, setDragging] = useState(false);
@@ -148,8 +152,10 @@ export function App() {
     setNewOpen(true);
   };
   const switchToTimeTrackerProject = (projectId: number) => {
-    window.location.hash = `#timetracker/projects/${projectId}`;
-    setActiveModule('timetracker');
+    // Set the hash before flipping the module so useTimeTrackerView reads
+    // the right view on its initial mount.
+    window.location.hash = `#billing/projects/${projectId}`;
+    setActiveModule('billing');
   };
 
   useEffect(() => {
@@ -289,7 +295,17 @@ export function App() {
             <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
               <ModuleRail
                 active={activeModule}
+                billingTab={billingView.view.tab}
+                settingsTab={settingsView.view.tab}
                 onSelect={setActiveModule}
+                onSelectBillingTab={(tab) => {
+                  setActiveModule('billing');
+                  billingView.setTab(tab);
+                }}
+                onSelectSettingsTab={(tab) => {
+                  setActiveModule('settings');
+                  settingsView.setTab(tab);
+                }}
                 mode={mode}
                 onToggleMode={toggleThemeMode}
               />
@@ -303,10 +319,11 @@ export function App() {
                     onOpenProject={switchToTimeTrackerProject}
                   />
                 )}
-                {activeModule === 'settings' && <ModuleSettings active />}
-                {activeModule === 'timetracker' && (
+                {activeModule === 'settings' && <ModuleSettings view={settingsView.view} />}
+                {activeModule === 'billing' && (
                   <ModuleTimeTracker
-                    active
+                    view={billingView.view}
+                    onSelectProject={billingView.selectProject}
                     onActivateInstance={switchToInstance}
                     onOpenNewInstanceForCwd={switchToNewInstanceForCwd}
                   />

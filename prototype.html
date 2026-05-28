@@ -2525,6 +2525,312 @@
   .board-chip-orange  { background: #fb923c; color: #1f1300; }
   .board-chip-green   { background: #16a34a; }
 
+  /* ─── Memory inspector module ─── */
+  .mem-pane { display: none; flex: 1; min-height: 0; overflow: hidden; }
+  .mem-pane.active { display: flex; }
+
+  .mem-projects {
+    width: 220px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--bg-paper);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .mem-projects-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .mem-projects-header h2 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .mem-refresh-btn {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+  .mem-refresh-btn:hover { color: var(--text-primary); background: rgba(255,255,255,0.04); }
+  .mem-projects-list { flex: 1; overflow: auto; padding: 6px 8px 16px; }
+  .mem-project {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    margin-bottom: 1px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .mem-project:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+  .mem-project.active {
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-weight: 600;
+  }
+  .mem-project .mem-pname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mem-project .mem-count {
+    font-size: 11px;
+    color: var(--text-disabled);
+    font-variant-numeric: tabular-nums;
+  }
+  .mem-project.active .mem-count { color: var(--primary); }
+  .mem-project.all-projects {
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .mem-project.all-projects::after {
+    content: '';
+    position: absolute;
+    left: 8px; right: 8px; bottom: -5px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mem-list {
+    width: 360px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--bg-default);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .mem-list-header { padding: 12px 16px 10px; border-bottom: 1px solid var(--border); }
+  .mem-search-wrap { position: relative; }
+  .mem-search {
+    width: 100%;
+    background: var(--bg-paper);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    border-radius: var(--radius);
+    padding: 8px 12px 8px 32px;
+    outline: none;
+  }
+  .mem-search:focus { border-color: var(--primary); }
+  .mem-search-icon {
+    position: absolute;
+    left: 10px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+    display: flex;
+  }
+  .mem-list-meta {
+    font-size: 11px;
+    color: var(--text-disabled);
+    padding: 6px 4px 0;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .mem-list-body { flex: 1; overflow: auto; }
+  .mem-row {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  .mem-row:hover { background: rgba(255,255,255,0.03); }
+  .mem-row.active {
+    background: var(--primary-soft);
+    border-left-color: var(--primary);
+  }
+  .mem-row-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+  .mem-row-title-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mem-row-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .mem-row-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-disabled);
+  }
+  .mem-row-meta .mem-project-pill {
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.04);
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+
+  .mem-type-chip {
+    display: inline-block;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: var(--ui-font);
+  }
+  .mem-type-feedback  { color: #f0a868; background: rgba(240,168,104,0.12); border: 1px solid rgba(240,168,104,0.30); }
+  .mem-type-project   { color: #66bb6a; background: rgba(102,187,106,0.12); border: 1px solid rgba(102,187,106,0.30); }
+  .mem-type-reference { color: #7aa7ff; background: rgba(122,167,255,0.12); border: 1px solid rgba(122,167,255,0.30); }
+  .mem-type-user      { color: #b591f5; background: rgba(181,145,245,0.12); border: 1px solid rgba(181,145,245,0.30); }
+  .mem-type-index     { color: var(--text-secondary); background: rgba(255,255,255,0.05); border: 1px solid var(--border-strong); }
+  .mem-type-unknown   { color: var(--text-disabled); background: rgba(255,255,255,0.02); border: 1px dashed var(--border-strong); }
+
+  .mem-preview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-default);
+    overflow: hidden;
+    min-width: 0;
+  }
+  .mem-preview-header {
+    padding: 20px 32px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .mem-preview-header h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .mem-preview-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0 0 14px;
+  }
+  .mem-preview-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .mem-preview-chips .mem-mtime {
+    font-size: 11px;
+    color: var(--text-disabled);
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+  }
+  .mem-preview-body {
+    flex: 1;
+    overflow: auto;
+    padding: 24px 32px 48px;
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--text-primary);
+  }
+  .mem-preview-body > * { max-width: 820px; }
+  .mem-preview-body h1, .mem-preview-body h2, .mem-preview-body h3 {
+    color: var(--text-primary);
+    margin: 22px 0 10px;
+  }
+  .mem-preview-body h2 { font-size: 16px; }
+  .mem-preview-body h3 { font-size: 14px; }
+  .mem-preview-body p { margin: 0 0 14px; }
+  .mem-preview-body code {
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: var(--terminal-font);
+    font-size: 12px;
+  }
+  .mem-preview-body pre {
+    background: var(--bg-paper-2);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    overflow: auto;
+    font-family: var(--terminal-font);
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0 0 14px;
+  }
+  .mem-preview-body pre code { background: transparent; border: none; padding: 0; }
+  .mem-preview-body ul, .mem-preview-body ol { padding-left: 24px; margin: 0 0 14px; }
+  .mem-preview-body li { margin: 4px 0; }
+  .mem-preview-body strong { color: var(--text-primary); font-weight: 600; }
+  .mem-preview-body em { color: var(--text-secondary); }
+  .mem-preview-body a {
+    color: var(--primary);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--primary);
+  }
+  .mem-preview-body a:hover { border-bottom-style: solid; }
+  .mem-wikilink {
+    display: inline-block;
+    padding: 0 5px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.95em;
+    border: 1px solid rgba(122,167,255,0.25);
+    font-family: inherit;
+    vertical-align: baseline;
+    text-decoration: none;
+  }
+  .mem-wikilink::before { content: '⇄ '; font-size: 9px; opacity: 0.7; vertical-align: 1px; }
+  .mem-wikilink:hover { background: rgba(122,167,255,0.22); border-color: var(--primary); }
+  .mem-wikilink.unresolved {
+    color: var(--text-disabled);
+    background: rgba(255,255,255,0.04);
+    border-style: dashed;
+    font-style: italic;
+    cursor: not-allowed;
+  }
+  .mem-wikilink.unresolved::before { content: '? '; }
+
+  .mem-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 32px;
+  }
+  .mem-empty-inner {
+    text-align: center;
+    max-width: 320px;
+  }
+  .mem-empty-title {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
 </style>
 </head>
 <body>
@@ -2538,6 +2844,7 @@
   <button data-scene="wizard">First-run wizard</button>
   <button data-scene="resume-failed">Resume-failed panel</button>
   <button data-scene="settings">Settings module</button>
+  <button data-scene="memory">Memory inspector</button>
   <button data-scene="tt-projects">TimeTracker · Projects</button>
   <button data-scene="tt-worklogs">TimeTracker · Worklogs</button>
   <button data-scene="tt-grid">TimeTracker · Task grid</button>
@@ -2610,6 +2917,15 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </div>
+      <div class="rail-btn" title="Memory inspector" id="railMemory">
+        <!-- "psychology"-ish icon: brain outline -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9.5 4a3 3 0 0 0-3 3v.5a3 3 0 0 0-2 5.2A3 3 0 0 0 7 17.5V19a2.5 2.5 0 0 0 5 0V4.5A.5.5 0 0 0 11.5 4z"/>
+          <path d="M14.5 4a3 3 0 0 1 3 3v.5a3 3 0 0 1 2 5.2A3 3 0 0 1 17 17.5V19a2.5 2.5 0 0 1-5 0V4.5A.5.5 0 0 1 12.5 4z"/>
+          <path d="M9 10h.01"/>
+          <path d="M15 10h.01"/>
         </svg>
       </div>
     </div>
@@ -3221,6 +3537,44 @@
               </div>
             </div>
           </div>
+      </div>
+
+      <!-- ═══ Memory inspector module (NEW — Phase #30) ═══ -->
+      <div class="mem-pane" id="memoryView">
+
+        <!-- ── Left rail: projects ── -->
+        <div class="mem-projects">
+          <div class="mem-projects-header">
+            <h2>Projects</h2>
+            <button class="mem-refresh-btn" title="Refresh" onclick="memRefresh()">↻</button>
+          </div>
+          <div class="mem-projects-list" id="memProjectsList"><!-- populated by memRender() --></div>
+        </div>
+
+        <!-- ── Middle: memory list ── -->
+        <div class="mem-list">
+          <div class="mem-list-header">
+            <div class="mem-search-wrap">
+              <span class="mem-search-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+              </span>
+              <input
+                type="text"
+                class="mem-search"
+                id="memSearchInput"
+                placeholder="Search name, description, body…"
+                oninput="memOnSearch(this.value)" />
+            </div>
+            <div class="mem-list-meta" id="memListMeta">17 memories · sorted by recency</div>
+          </div>
+          <div class="mem-list-body" id="memList"><!-- populated by memRender() --></div>
+        </div>
+
+        <!-- ── Right: preview ── -->
+        <div class="mem-preview" id="memPreview"><!-- populated by memRender() --></div>
       </div>
 
       <!-- TimeTracker module -->
@@ -5068,6 +5422,7 @@
       show('settingsView', false);
       show('ttView', false);
       show('moduleDashboardView', false);
+      hideMemory();
       show('tabs', true, 'flex');
       hideOverlays();
       setRail('railInstances');
@@ -5080,6 +5435,7 @@
       show('settingsView', false);
       show('ttView', false);
       show('moduleDashboardView', false);
+      hideMemory();
       show('tabs', true, 'flex');
       hideOverlays();
       setRail('railInstances');
@@ -5092,6 +5448,7 @@
       show('settingsView', false);
       show('ttView', false);
       show('moduleDashboardView', true, 'flex');
+      hideMemory();
       show('tabs', false);
       hideOverlays();
       setRail('railDashboard');
@@ -5111,6 +5468,7 @@
       show('ttView', false);
       show('moduleDashboardView', false);
       show('resumeFailedView', true, 'flex');
+      hideMemory();
       hideOverlays();
       setRail('railInstances');
       setActiveTab('machinery');
@@ -5122,9 +5480,23 @@
       show('settingsView', true, 'block');
       show('ttView', false);
       show('moduleDashboardView', false);
+      hideMemory();
       show('tabs', true, 'flex');
       hideOverlays();
       setRail('railSettings');
+    },
+    memory: () => {
+      show('terminalView', false);
+      show('dashboardView', false);
+      show('resumeFailedView', false);
+      show('settingsView', false);
+      show('ttView', false);
+      show('moduleDashboardView', false);
+      show('tabs', false);
+      hideOverlays();
+      document.getElementById('memoryView').classList.add('active');
+      setRail('railMemory');
+      memRender();
     },
     'tt-projects': () => showTimeTracker('list', 'projects'),
     'tt-worklogs': () => showTimeTracker('list', 'worklogs'),
@@ -5175,6 +5547,7 @@
     show('resumeFailedView', false);
     show('settingsView', false);
     show('moduleDashboardView', false);
+    hideMemory();
     show('ttView', true, 'block');
     show('tabs', false);
     hideOverlays();
@@ -5213,6 +5586,535 @@
   }
   window.openDrawer = openDrawer;
   window.closeDrawers = closeDrawers;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Memory inspector scene — data + render
+  // ═══════════════════════════════════════════════════════════════════════
+
+  function hideMemory() {
+    document.getElementById('memoryView').classList.remove('active');
+  }
+
+  // Real memory content sampled from ~/.claude/projects/*/memory on 2026-05-28.
+  // body is markdown; descriptions are taken verbatim from frontmatter.
+  const memData = {
+    // Currently selected project slug ('*' means All Projects).
+    // selectedKey is "<projectSlug>::<name>" — name alone isn't globally
+    // unique (every project has a MEMORY.md), so the prototype tracks the
+    // pair the same way the real IPC layer will (projectSlug, fileName).
+    selectedProject: '-Users-jan-Pr-ce-Green-Code',
+    selectedKey: '-Users-jan-Pr-ce-Green-Code::project-net10-upgrade-recipe',
+    search: '',
+
+    projects: [
+      { slug: '-Users-jan-Pr-ce-Green-Code',                  friendlyName: 'Green Code',         decodedPath: '/Users/jan/Práce/Green Code',                  count: 17 },
+      { slug: '-Users-jan-Projects-fitness-platform',         friendlyName: 'fitness-platform',   decodedPath: '/Users/jan/Projects/fitness-platform',         count: 10 },
+      { slug: '-Users-jan-Projects-TimeTracker',              friendlyName: 'TimeTracker',        decodedPath: '/Users/jan/Projects/TimeTracker',              count: 3 },
+      { slug: '-Users-jan-Pr-ce-Green-Code-technology',       friendlyName: 'technology',         decodedPath: '/Users/jan/Práce/Green Code/technology',       count: 2 },
+      { slug: '-Users-jan-Pr-ce-Green-Code-capacity-planning',friendlyName: 'capacity-planning',  decodedPath: '/Users/jan/Práce/Green Code/capacity-planning',count: 2 },
+      { slug: '-Users-jan-Projects-Watchtower',               friendlyName: 'Watchtower',         decodedPath: '/Users/jan/Projects/Watchtower',               count: 2 },
+      { slug: '-Users-jan-Pr-ce-Fitness-Platform',            friendlyName: 'Fitness Platform',   decodedPath: '/Users/jan/Práce/Fitness Platform',            count: 1 },
+      { slug: '-Users-jan-Pr-ce-AleTrackApp',                 friendlyName: 'AleTrackApp',        decodedPath: '/Users/jan/Práce/AleTrackApp',                 count: 1 },
+    ],
+
+    memories: [
+      // ── Green Code (17 memories) ──
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'MEMORY.md',
+        name: 'MEMORY.md', type: 'index', mtimeLabel: '3 days ago',
+        description: 'Index of all Green Code memories — 16 entries linking to feedback/project/reference files.',
+        body: `- [PPS test mongo X.509 cert](ref_pps_test_mongo_cert.md) — use \`ppsapp_TEST.pem\` from the repo root for test mongo
+- [RfNC silent-skip pattern](feedback_silent_skip_rfnc.md) — \`RequestForNcProgramChangedProcessor\` swallows events when daily-plan lookup returns null
+- [PPS brokerlog retention + Source](reference_brokerlog_retention.md) — \`prod\`/\`cons\`/\`fail\` semantics
+- [Jira routing: epic prefix wins](feedback_jira_epic_prefix_wins.md) — when \`epic_summary\` prefix and \`[bracket]\` tag disagree, route by epic
+- [.NET 10 upgrade recipe](project_net10_upgrade_recipe.md) — keep internal Skoda/Fullsys/AWS at originals; bump only Microsoft.* + EF Core 9
+- [TimeTracker DB path (Watchtower)](reference_timetracker_db_path.md) — \`~/Library/Application Support/Watchtower/data.db\`
+- [Mongo LINQv3 GroupJoin: raw inner only](feedback_mongo_linqv3_groupjoin_raw_inner.md) — \`.AsQueryable().Where(...).GroupJoin(...)\` throws \`ExpressionNotSupportedException\``,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'project_net10_upgrade_recipe.md',
+        name: 'project-net10-upgrade-recipe', type: 'project', mtimeLabel: '6 days ago',
+        description: 'Recipe and traps for upgrading PPS modules from .NET 8 to .NET 10 — what to bump, what to keep, FastEndpoints 5→8 swagger surgery',
+        body: `FIE1933-19084 upgrade pattern, validated across machinery / capacity-planning / technology.
+
+**Rule:** only bump packages tied to .NET 10. Internal Skoda/Fullsys/AWS stay at originals — they target net8.0 and forward-run on net10.0; bumping across majors introduces unrelated DB-schema, AWS SDK, and DI-registration breakages.
+
+**Why:** Internal package upgrades carry hidden runtime requirements (new outbox \`processing_type\` column in Fullsys.Brokers.Aws 5+, new \`IReadAuditLogData\` DI in Skoda.Pps.SharedPackages.AspNet.WebApi 8.0.14, AWSSDK 4.x assembly diff). They are adoption decisions, not framework requirements.
+
+**How to apply:**
+
+- \`global.json\` → SDK \`10.0.100\`, TargetFramework \`net8.0\` → \`net10.0\` on every csproj
+- EF Core ecosystem pinned to **9.x** (Pomelo 10 doesn't exist in Artifactory yet)
+- **Add explicit \`Pomelo.EntityFrameworkCore.MySql 9.0.0\`** reference — without it, the resolver picks Pomelo 8.x via transitive, crashing at startup with \`TypeLoadException: get_LockReleaseBehavior\`
+- FastEndpoints projects: 5.20.1 → 8.1.0 (forces xunit.v3 + xunit.runner.visualstudio 3.x + coverlet.collector 10.x)
+- Internal Skoda/Fullsys/AWS/Serilog: **leave at current versions** — even latest patches within the same major can introduce schema changes
+
+**FastEndpoints 5 → 8 follow-on changes:**
+
+1. **Send.* migration** — instance \`SendXxxAsync(...)\` methods removed; use \`Send.OkAsync\`, \`Send.NoContentAsync\`, etc.
+2. **\`[FromQuery]\` collision** — FastEndpoints 8 ships its own \`[FromQueryAttribute]\` that collides with \`Microsoft.AspNetCore.Mvc.FromQueryAttribute\`.
+3. **NSwag operation processor migration** — FE 8 stops adding \`EndpointDefinition\` to \`ApiDescription.ActionDescriptor.EndpointMetadata\`. Lookup is now \`context.GetEndpointDefinition()\`.
+
+Related: [[feedback-mongo-linqv3-groupjoin-raw-inner]] · [[reference-brokerlog-retention]].`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'feedback_jira_epic_prefix_wins.md',
+        name: 'feedback-jira-epic-prefix-wins', type: 'feedback', mtimeLabel: '15 days ago',
+        description: "When a Jira ticket's epic_summary area prefix disagrees with the summary bracket tag, the epic prefix wins for routing — the [VYR]/[TEH]/etc. bracket can be a triage label that doesn't match where the code lives.",
+        body: `For Skoda Jira tickets routed by the \`jira-fetch\` skill: when the **epic_summary prefix** disagrees with the **summary bracket tag**, route by the **epic prefix**, not the bracket.
+
+Example incident — FIE1933-19774 (2026-05-13):
+- \`summary\` = "[VYR] Denní plány - Nedojde ke změně stavu operace…"
+- \`epic_summary\` = "TEH-Technologický postup"
+- I routed to \`manufactory\` based on \`[VYR]\`. The user corrected — the actual implementation is in \`technology\`.
+
+**Why:** The epic represents the actual feature domain the change belongs to (here: "Technologický postup" — technology / tech-postup module). The bracket can be a workflow label applied at a different layer.
+
+**How to apply:** In the \`jira-fetch\` skill's routing-table check, **signal #1 (epic_summary prefix) takes precedence**. If signal #1 and signal #2 disagree, do NOT fall back to "stop and ask" automatically — go with the epic. Only ask when both are absent or when there's a third conflicting signal.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'feedback_silent_skip_rfnc.md',
+        name: 'feedback-silent-skip-rfnc', type: 'feedback', mtimeLabel: '17 days ago',
+        description: 'RequestForNcProgramChangedProcessor in manufactory silently swallows events when GetDailyPlanAsync returns null — masks key-mismatch bugs as "no-op delivered"',
+        body: `When investigating "tech says finished but manufactory daily plan still shows released" cases, check this exact path: \`manufactory/src/Manufactory.Application/Features/RequestsForNcProgram/Events/RequestForNcProgramChanged/RequestForNcProgramChangedProcessor.cs:62-66\` — if the lookup returns null, it logs \`Information("DailyPlan not found for event {EventId}. Skipping")\` and returns \`EventResultProcessed()\`.
+
+**Why:** validated on prod 2026-05-11 against request \`2354/2026/TE/NC\`. The 9001 Finished event has a \`cons\` row in mfg brokerlog at 2026-04-13 08:36:24, the daily plan exists with exactly the lookup keys, yet \`WorkflowStep.Code=2121\` with \`DateCreated=DateTime.MinValue\` — confirming the entity was only ever populated by the partial-init path, never by the normal mapper.
+
+**How to apply:** when an RfNC inconsistency is reported, always (1) confirm mfg \`brokerlog.cons\` for the event before assuming delivery failure, (2) cross-check the daily plan keys against the event payload. The processor should escalate (not silently skip) when a \`cons\`-logged event finds no daily plan.
+
+Related: [[reference-brokerlog-retention]].`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'reference_brokerlog_retention.md',
+        name: 'reference-brokerlog-retention', type: 'reference', mtimeLabel: '17 days ago',
+        description: 'Tech MariaDB brokerlog and Manufactory Mongo brokerlog only retain ~7 months; Source CHAR(4) maps to Producer/Consumer/ConsumerFailure',
+        body: `\`brokerlog\` table/collection schema (Fullsys.Brokers.Aws):
+
+- \`Source CHAR(4)\`: \`prod\` = Producer (written AFTER successful SQS publish), \`cons\` = Consumer (written BEFORE SQS delete on successful RunAsync), \`fail\` = ConsumerFailure (DLQ transfer)
+- Retention observed in prod tech MariaDB: oldest row 2025-10-16, ~10k RfNC events. Older events are pruned.
+- A \`cons\` row proves the consumer's \`RunAsync\` returned without throwing — NOT that the business logic actually changed any state (silent-skip paths still log \`cons\`).
+
+**How to apply:** when reconciling "event sent but not applied," remember (a) absence in tech brokerlog ≠ never published if older than retention — check the entity table directly, (b) presence of \`cons\` in mfg brokerlog ≠ side-effect applied.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'reference_timetracker_db_path.md',
+        name: 'reference-timetracker-db-path', type: 'reference', mtimeLabel: '3 days ago',
+        description: 'TimeTracker (now Watchtower) DB lives at ~/Library/Application Support/Watchtower/data.db; log-time.sh was updated 2026-05-25 to match',
+        body: `The local time-tracking SQLite DB that backs \`.claude/private/log-time.sh\` lives at:
+
+\`\`\`
+~/Library/Application Support/Watchtower/data.db
+\`\`\`
+
+The app was renamed from TimeTracker → Watchtower; \`log-time.sh\` line 19 was updated on 2026-05-25 to point at the new path. If you ever see \`TimeTracker DB not found at ~/Library/Application Support/TimeTracker/data.db\`, the script has been reverted — patch line 19 back.
+
+Schema (epics / tasks / worklogs) is unchanged. Epic-prefix mapping is TEH→Technology, VYR→Manufactory, KP→Capacity Planning, STR→Machinery, KONTROLA→Quality Control.
+
+**Do not hardcode \`project_id\`.** Watchtower DB resets renumber projects (e.g. on 2026-05-28 "Green Code" became id=1; the script was pinned at \`project_id=2\` which is now "Fitness Platform"). \`log-time.sh\` now resolves the project ID at runtime via \`SELECT id FROM projects WHERE name='Green Code'\`.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'feedback_branch_from_remote_dev.md',
+        name: 'feedback-branch-from-remote-dev', type: 'feedback', mtimeLabel: '14 days ago',
+        description: 'Always branch off origin/dev-sprint, never local HEAD — local can drift when CI/coworkers push.',
+        body: `Always: \`git fetch origin && git checkout -b feature/... origin/dev-sprint\`. Never branch off the current working branch.
+
+**Why:** local \`dev-sprint\` can lag behind by hours or days. The mistake repeats every time the CI cycle is slow.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'feedback_ef_fk_check_over_nav.md',
+        name: 'feedback-ef-fk-check-over-nav', type: 'feedback', mtimeLabel: '9 days ago',
+        description: 'For nullable nav, use r.FkId == null not r.Nav == null in BOTH filters and projection ternaries; nav check can JOIN-drop rows.',
+        body: `For nullable navigation properties in EF Core: use \`r.FkId == null\` not \`r.Nav == null\` in BOTH filters and projection ternaries.
+
+**Why:** the nav-property check forces a JOIN that drops rows when the nav target doesn't exist, even if the FK is genuinely null.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'feedback_mongo_linqv3_groupjoin_raw_inner.md',
+        name: 'feedback-mongo-linqv3-groupjoin-raw-inner', type: 'feedback', mtimeLabel: '3 days ago',
+        description: '.AsQueryable().Where(...).GroupJoin(...) throws ExpressionNotSupportedException; keep the inner side a raw collection and push predicates into the projection.',
+        body: `Mongo LINQv3: \`collection.AsQueryable().Where(...).GroupJoin(otherSide, ...)\` throws \`ExpressionNotSupportedException\` at execution.
+
+**Fix:** keep the inner side as the raw \`IMongoCollection<T>\`, and push predicates into the projection's \`FirstOrDefault(p => ...)\`.
+
+Related: [[project-net10-upgrade-recipe]] (the upgrade surfaces this).`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'project_cbom_flat_plus_u_recursion.md',
+        name: 'project-cbom-flat-plus-u-recursion', type: 'project', mtimeLabel: '7 days ago',
+        description: 'construction BoMs pre-flatten U sub-trees and the sub-device\'s own cBoM re-models the same leaves; recursion across them produces duplicate (mfg_bom_pid, hier_path) keys.',
+        body: `Construction BoMs pre-flatten U sub-trees but the sub-device's own cBoM re-models the same leaves. Recursion across both produces duplicate \`(mfg_bom_pid, hier_path)\` keys.
+
+**How to apply:** when walking cBoMs recursively, dedupe on \`(mfg_bom_pid, hier_path)\` at the point of merge. Don't trust the materialized flat list to be canonical.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'project_kp_unprepared_delay_anchor.md',
+        name: 'project-kp-unprepared-delay-anchor', type: 'project', mtimeLabel: '6 days ago',
+        description: 'GetOperationStartDate returns DateTime.MinValue when a position is absent from PositionStartDates; raw startDate.AddDays(N) keeps it in first horizon. Use Max(shifted, firstHorizon.StartDate + N).',
+        body: `In KP unprepared-op delay handling: \`GetOperationStartDate\` returns \`DateTime.MinValue\` when a position is absent from \`PositionStartDates\`. Raw \`startDate.AddDays(N)\` then anchors the result inside the first horizon, masking the missing position.
+
+**Fix:** \`Max(shifted, firstHorizon.StartDate + N)\` enforces the delay is at least N days past the first horizon, never silently swallowed.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'reference_ado_pr_create_url.md',
+        name: 'reference-ado-pr-create-url', type: 'reference', mtimeLabel: '7 days ago',
+        description: 'When az CLI is unavailable, hand the user the pullrequestcreate?sourceRef=…&targetRef=… URL after push.',
+        body: `When the Azure DevOps \`az\` CLI is unavailable, hand the user the PR-create URL directly after push:
+
+\`\`\`
+https://dev.azure.com/<org>/<project>/_git/<repo>/pullrequestcreate?sourceRef=<branch>&targetRef=dev-sprint
+\`\`\`
+
+ADO renders the create-PR form pre-filled with the source/target refs.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'project_op_state_recalc_at_default_version.md',
+        name: 'project-op-state-recalc-at-default-version', type: 'project', mtimeLabel: '9 days ago',
+        description: 'UpsertOperationsAsync skips inner recalc when Version<=DefaultVersion; outer hook fires events via ReevaluateOperationStatesAsync on both delete and insert.',
+        body: `\`UpsertOperationsAsync\` skips the inner state recalc when \`Version <= DefaultVersion\`. The outer hook then fires events via \`ReevaluateOperationStatesAsync\` on both delete and insert (FIE1933-19619/19774/19817).
+
+This is intentional — the inner recalc is for editing-time consistency, the outer hook handles the cross-aggregate fan-out.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'project_tech_op_pieces_aggregation.md',
+        name: 'project-tech-op-pieces-aggregation', type: 'project', mtimeLabel: '9 days ago',
+        description: 'parent.AmountOfPieces stays at its own value after merge; only merge/unmerge handlers publish aggregated totals so far, other publishers still need fixing.',
+        body: `Tech op \`TotalTimeMinutes\` uses aggregated pieces. \`parent.AmountOfPieces\` stays at its own value after merge; only the merge/unmerge handlers publish aggregated totals so far. Other publishers still need to be updated.
+
+**How to apply:** when adding a new publisher in technology/Operations, ensure it aggregates child pieces if the operation is a merge parent.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'reference_op_state_decision_tree.md',
+        name: 'reference-op-state-decision-tree', type: 'reference', mtimeLabel: '9 days ago',
+        description: 'docs/rozhodovaci-strom.html + docs/validátor-stavů.html are the canonical spec for operation state transitions; load before debugging state bugs.',
+        body: `\`docs/rozhodovaci-strom.html\` (decision tree) and \`docs/validátor-stavů.html\` (state validator) are the canonical spec for operation state transitions in technology.
+
+**How to apply:** load both pages before debugging any op-state bug. The legend in the validator distinguishes "operator-visible" states from "system-internal" ones.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'reference_technology_internal_ek_carveout.md',
+        name: 'reference-technology-internal-ek-carveout', type: 'reference', mtimeLabel: '15 days ago',
+        description: 'definition (CC 4000 + prof 09672/96911/16164 + no EK request) shared by edit (19645) and delete (19619) paths via IsInternalExternalCooperationOperation.',
+        body: `Technology "internal EK carve-out" definition: \`CostCenter == 4000\` AND \`Profession ∈ {09672, 96911, 16164}\` AND no EK request linked.
+
+Shared by edit (FIE1933-19645) and delete (FIE1933-19619) paths via the \`IsInternalExternalCooperationOperation\` predicate.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code', fileName: 'ref_pps_test_mongo_cert.md',
+        name: 'ref-pps-test-mongo-cert', type: 'reference', mtimeLabel: '30 days ago',
+        description: 'use ppsapp_TEST.pem from the repo root for test mongo; the appsettings test slot has the prod cert pasted by mistake',
+        body: `For test mongo, use \`ppsapp_TEST.pem\` from the Green Code repo root. The \`appsettings.Development.Test.json\` slot has the prod cert pasted by mistake — connecting with the inline cert will hit prod.`,
+      },
+
+      // ── Watchtower (2 memories) ──
+      { projectSlug: '-Users-jan-Projects-Watchtower', fileName: 'MEMORY.md',
+        name: 'MEMORY.md', type: 'index', mtimeLabel: '4 days ago',
+        description: 'Index of Watchtower memories — 1 entry for the TimeTracker absorption decision.',
+        body: `- [TimeTracker absorption](timetracker-absorption.md) — TT app deleted, schema ported verbatim into Watchtower, refactor lands as a follow-up after a week of dogfooding.`,
+      },
+      { projectSlug: '-Users-jan-Projects-Watchtower', fileName: 'timetracker-absorption.md',
+        name: 'timetracker-absorption', type: 'project', mtimeLabel: '4 days ago',
+        description: 'TimeTracker is being absorbed wholesale into Watchtower as a module; old app + DB will be deleted after a one-shot migration. Schema port is intentionally verbatim first, refactor in a follow-up.',
+        body: `TimeTracker (separate Electron app at \`/Users/jan/Projects/TimeTracker\`) is being deleted. Watchtower absorbs all of its functionality (Projects, Epics, Tasks, Worklogs, Contracts/rates, Days off, Reports) as the second module in the rail, alongside Instances.
+
+Migration is one-shot: read TimeTracker's \`~/Library/Application Support/timetracker/data.db\`, insert into Watchtower's \`~/Library/Application Support/Watchtower/data.db\`, then nuke the old DB and uninstall TimeTracker.app. No ongoing integration, no sidecar, no shared package — Watchtower owns the data after migration.
+
+**Schema port is verbatim first, refactor later.** The first cut copies TimeTracker's tables and columns as-is. After Watchtower has been running on the data for a week, a follow-up refactor cleans up names (e.g. \`project_rates\` → \`contracts\`, drop \`is_billable\` since \`kind=work\` now implies it).
+
+**Why:** blending the absorption migration with a schema refactor doubles the risk surface. Verbatim port keeps the migration dumb and reversible-feeling; refactor lands after dogfooding when issues are visible.
+
+**How to apply:** when sketching/building TimeTracker-module features in Watchtower, use TimeTracker's existing field/table names verbatim. Don't pre-emptively rename or simplify. Related: [[watchtower-timetracker-module]].`,
+      },
+
+      // ── technology (2) ──
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code-technology', fileName: 'MEMORY.md',
+        name: 'MEMORY.md', type: 'index', mtimeLabel: '2 days ago',
+        description: 'Index — links to unit-tests-progress.',
+        body: `- [Unit-tests progress](unit-tests-progress.md) — coverage now at 78% on Operations + Routings; next batch is RfNC processors.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code-technology', fileName: 'unit-tests-progress.md',
+        name: 'unit-tests-progress', type: 'project', mtimeLabel: '2 days ago',
+        description: 'Coverage now at 78% on Operations + Routings; next batch is RfNC processors.',
+        body: `Coverage now at 78% on \`Operations\` + \`Routings\`. Next batch is the RfNC processors.
+
+**Why:** the operation state machine is the deepest code path; getting coverage up here surfaces silent-skip bugs before prod (see related Green-Code memory).`,
+      },
+
+      // ── capacity-planning (2) ──
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code-capacity-planning', fileName: 'MEMORY.md',
+        name: 'MEMORY.md', type: 'index', mtimeLabel: '8 days ago',
+        description: 'Index — algorithm rewrite plan.',
+        body: `- [Algorithm rewrite plan](algorithm-rewrite-plan.md) — KP unprepared-ops algorithm being rebuilt around horizon-anchored shifts.`,
+      },
+      { projectSlug: '-Users-jan-Pr-ce-Green-Code-capacity-planning', fileName: 'algorithm-rewrite-plan.md',
+        name: 'algorithm-rewrite-plan', type: 'project', mtimeLabel: '8 days ago',
+        description: 'KP unprepared-ops algorithm being rebuilt around horizon-anchored shifts.',
+        body: `KP unprepared-ops algorithm is being rebuilt around horizon-anchored shifts (see Green Code memory [[project-kp-unprepared-delay-anchor]]).
+
+Phase 1: replace raw \`AddDays\` with \`Max(shifted, horizon.Start + N)\`. Phase 2: split delay calculation from horizon-shift propagation.`,
+      },
+
+      // ── fitness-platform (3 sampled) ──
+      { projectSlug: '-Users-jan-Projects-fitness-platform', fileName: 'MEMORY.md',
+        name: 'MEMORY.md', type: 'index', mtimeLabel: '2 days ago',
+        description: 'Index of fitness-platform memories.',
+        body: `- [API auth flow](feedback_api_auth_flow.md)
+- [Stripe webhook idempotency](project_stripe_webhook_idempotency.md)
+- [iOS push token rotation](reference_ios_push_rotation.md)`,
+      },
+      { projectSlug: '-Users-jan-Projects-fitness-platform', fileName: 'feedback_api_auth_flow.md',
+        name: 'feedback-api-auth-flow', type: 'feedback', mtimeLabel: '5 days ago',
+        description: 'Auth code exchange must happen on the server; never expose the client secret to the SPA.',
+        body: `Auth code exchange must happen on the server; never expose the client secret to the SPA. The mobile client gets a short-lived bearer token; the SPA refreshes via httpOnly cookie.`,
+      },
+      { projectSlug: '-Users-jan-Projects-fitness-platform', fileName: 'project_stripe_webhook_idempotency.md',
+        name: 'project-stripe-webhook-idempotency', type: 'project', mtimeLabel: '2 days ago',
+        description: 'Stripe webhooks are at-least-once; idempotency key on event.id.',
+        body: `Stripe webhooks are at-least-once. We dedupe on \`event.id\` in the \`stripe_event\` table with a unique index. The handler is short — write the event, then enqueue a job that does the actual work in a transaction.
+
+**Why:** a retry mid-handler can otherwise double-apply a charge to the customer ledger.`,
+      },
+
+      // ── TimeTracker (1 sampled) ──
+      { projectSlug: '-Users-jan-Projects-TimeTracker', fileName: 'project_watchtower_sibling.md',
+        name: 'project-watchtower-sibling', type: 'project', mtimeLabel: '6 days ago',
+        description: 'TimeTracker app being deprecated; Watchtower absorbs everything as a second module.',
+        body: `TimeTracker is being deprecated. Watchtower absorbs everything as a second module in the rail. See companion memory in the Watchtower project: [[timetracker-absorption]].
+
+This memory exists so future TimeTracker sessions know not to add new features.`,
+      },
+
+      // ── Fitness Platform (1) ──
+      { projectSlug: '-Users-jan-Pr-ce-Fitness-Platform', fileName: 'MEMORY.md',
+        name: 'MEMORY.md', type: 'index', mtimeLabel: '12 days ago',
+        description: 'Empty index — placeholder.',
+        body: `<!-- no memories yet -->`,
+      },
+
+      // ── AleTrackApp (1) ──
+      { projectSlug: '-Users-jan-Pr-ce-AleTrackApp', fileName: 'refactor-pause-point.md',
+        name: 'refactor-pause-point', type: 'project', mtimeLabel: '20 days ago',
+        description: 'Refactor paused mid-PR pending product feedback on the new screen.',
+        body: `Refactor paused mid-PR (\`feat/redesign-tracking-screen\`) pending product feedback on the new screen. Resume after PM signoff. The branch is up-to-date with main as of 2026-05-08.`,
+      },
+    ],
+  };
+
+  function memCurrentList() {
+    const q = (memData.search || '').trim().toLowerCase();
+    const scope = memData.selectedProject === '*'
+      ? memData.memories.slice()
+      : memData.memories.filter((m) => m.projectSlug === memData.selectedProject);
+    if (!q) return scope;
+    return scope.filter((m) =>
+      (m.name + ' ' + m.description + ' ' + m.body).toLowerCase().includes(q)
+    );
+  }
+
+  function memTypeChip(type) {
+    return `<span class="mem-type-chip mem-type-${type}">${type}</span>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  // Resolve [[wikilink]] within the currently selected memory's project scope.
+  // Returns clickable button HTML if target exists; muted italic if not.
+  function memRenderWikilinks(html, projectScope) {
+    return html.replace(/\[\[([^\]]+)\]\]/g, (_match, name) => {
+      const target = memData.memories.find(
+        (m) => m.projectSlug === projectScope && m.name === name.trim()
+      );
+      if (target) {
+        return `<button type="button" class="mem-wikilink" onclick="memSelectMemoryByName('${target.projectSlug}','${target.name}')">${escapeHtml(name)}</button>`;
+      }
+      return `<span class="mem-wikilink unresolved" title="no memory named &quot;${escapeHtml(name)}&quot; in this project">${escapeHtml(name)}</span>`;
+    });
+  }
+
+  // Very small markdown→HTML for prototype purposes only. Handles the subset
+  // used by the seeded memories: # headings, **bold**, *em*, `code`, fenced ```
+  // blocks, - lists, paragraphs, [[wikilinks]] (pre-pass).
+  function memRenderMarkdown(src, projectScope) {
+    const lines = src.split('\n');
+    let out = '';
+    let i = 0;
+    let inList = false;
+    let inCode = false;
+    let codeBuf = '';
+    while (i < lines.length) {
+      const line = lines[i];
+      if (line.startsWith('```')) {
+        if (inCode) {
+          out += '<pre><code>' + escapeHtml(codeBuf.replace(/\n$/, '')) + '</code></pre>';
+          codeBuf = '';
+          inCode = false;
+        } else {
+          if (inList) { out += '</ul>'; inList = false; }
+          inCode = true;
+        }
+        i++;
+        continue;
+      }
+      if (inCode) { codeBuf += line + '\n'; i++; continue; }
+
+      if (/^### /.test(line)) {
+        if (inList) { out += '</ul>'; inList = false; }
+        out += '<h3>' + memInline(line.slice(4), projectScope) + '</h3>';
+      } else if (/^## /.test(line)) {
+        if (inList) { out += '</ul>'; inList = false; }
+        out += '<h2>' + memInline(line.slice(3), projectScope) + '</h2>';
+      } else if (/^# /.test(line)) {
+        if (inList) { out += '</ul>'; inList = false; }
+        out += '<h1>' + memInline(line.slice(2), projectScope) + '</h1>';
+      } else if (/^- /.test(line) || /^\* /.test(line)) {
+        if (!inList) { out += '<ul>'; inList = true; }
+        out += '<li>' + memInline(line.slice(2), projectScope) + '</li>';
+      } else if (line.trim() === '') {
+        if (inList) { out += '</ul>'; inList = false; }
+        out += '';
+      } else {
+        if (inList) { out += '</ul>'; inList = false; }
+        out += '<p>' + memInline(line, projectScope) + '</p>';
+      }
+      i++;
+    }
+    if (inList) out += '</ul>';
+    if (inCode) out += '<pre><code>' + escapeHtml(codeBuf) + '</code></pre>';
+    return out;
+  }
+
+  function memInline(text, projectScope) {
+    let html = escapeHtml(text);
+    // Inline code first (so ** inside `…` is not interpreted)
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // markdown link [label](url) — but skip our wikilink form which already
+    // contains brackets only on the left side; the regex requires (url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, url) =>
+      `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(label)}</a>`
+    );
+    // [[wikilinks]] — substitute placeholders containing escaped HTML already
+    html = memRenderWikilinks(html, projectScope);
+    return html;
+  }
+
+  function memRender() {
+    // ── Left rail: projects list ──
+    const totalMemories = memData.memories.length;
+    const projectsHtml = [
+      `<div class="mem-project all-projects ${memData.selectedProject === '*' ? 'active' : ''}" onclick="memSelectProject('*')">
+        <span class="mem-pname">All projects</span>
+        <span class="mem-count">${totalMemories}</span>
+      </div>`,
+      ...memData.projects.map((p) => `
+        <div class="mem-project ${memData.selectedProject === p.slug ? 'active' : ''}"
+             onclick="memSelectProject('${p.slug}')"
+             title="${escapeHtml(p.decodedPath)}">
+          <span class="mem-pname">${escapeHtml(p.friendlyName)}</span>
+          <span class="mem-count">${p.count}</span>
+        </div>
+      `)
+    ].join('');
+    document.getElementById('memProjectsList').innerHTML = projectsHtml;
+
+    // ── Middle: memory list ──
+    const list = memCurrentList();
+    const meta = (() => {
+      if (memData.selectedProject === '*' && !memData.search) return `${list.length} memories · all projects · by recency`;
+      if (memData.selectedProject === '*') return `${list.length} match${list.length === 1 ? '' : 'es'} across all projects`;
+      const proj = memData.projects.find((p) => p.slug === memData.selectedProject);
+      const projName = proj ? proj.friendlyName : '(unknown)';
+      if (memData.search) return `${list.length} match${list.length === 1 ? '' : 'es'} in ${escapeHtml(projName)}`;
+      return `${list.length} memories · sorted by recency`;
+    })();
+    document.getElementById('memListMeta').innerHTML = meta;
+
+    if (list.length === 0) {
+      document.getElementById('memList').innerHTML = `
+        <div class="mem-empty">
+          <div class="mem-empty-inner">
+            <div class="mem-empty-title">No matches</div>
+            <div>Try a different search term, or pick another project.</div>
+          </div>
+        </div>`;
+    } else {
+      document.getElementById('memList').innerHTML = list.map((m) => {
+        const key = m.projectSlug + '::' + m.name;
+        const projPill = memData.selectedProject === '*'
+          ? `<span class="mem-project-pill">${escapeHtml((memData.projects.find((p) => p.slug === m.projectSlug) || {}).friendlyName || '?')}</span>`
+          : '';
+        return `
+          <div class="mem-row ${memData.selectedKey === key ? 'active' : ''}"
+               onclick="memSelectMemoryByName('${m.projectSlug}','${m.name}')">
+            <div class="mem-row-title">
+              <span class="mem-row-title-text">${escapeHtml(m.name)}</span>
+              ${memTypeChip(m.type)}
+            </div>
+            <div class="mem-row-desc">${escapeHtml(m.description)}</div>
+            <div class="mem-row-meta">
+              ${projPill}
+              <span>${escapeHtml(m.mtimeLabel)}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ── Right: preview ──
+    const selected = memData.memories.find(
+      (m) => m.projectSlug + '::' + m.name === memData.selectedKey
+    ) || list[0];
+    const preview = document.getElementById('memPreview');
+    if (!selected) {
+      preview.innerHTML = `
+        <div class="mem-empty">
+          <div class="mem-empty-inner">
+            <div class="mem-empty-title">Pick a memory</div>
+            <div>Select a memory from the list to preview it here.</div>
+          </div>
+        </div>`;
+      return;
+    }
+    const scopeProj = memData.projects.find((p) => p.slug === selected.projectSlug);
+    const projChip = `<span class="mem-type-chip mem-type-index">${escapeHtml(scopeProj ? scopeProj.friendlyName : selected.projectSlug)}</span>`;
+    preview.innerHTML = `
+      <div class="mem-preview-header">
+        <h2>${escapeHtml(selected.name)}</h2>
+        <div class="mem-preview-desc">${escapeHtml(selected.description)}</div>
+        <div class="mem-preview-chips">
+          ${memTypeChip(selected.type)}
+          ${projChip}
+          <span class="mem-mtime">modified ${escapeHtml(selected.mtimeLabel)}</span>
+        </div>
+      </div>
+      <div class="mem-preview-body">
+        ${memRenderMarkdown(selected.body, selected.projectSlug)}
+      </div>
+    `;
+  }
+
+  function memSelectProject(slug) {
+    memData.selectedProject = slug;
+    // Default to the first memory in the new scope.
+    const list = memCurrentList();
+    memData.selectedKey = list.length ? list[0].projectSlug + '::' + list[0].name : null;
+    memRender();
+  }
+
+  function memSelectMemoryByName(projectSlug, name) {
+    if (memData.selectedProject !== '*' && memData.selectedProject !== projectSlug) {
+      // Crossing project boundaries via wikilink shouldn't happen by design
+      // (wikilinks are project-scoped), but if it does, switch project too.
+      memData.selectedProject = projectSlug;
+    }
+    memData.selectedKey = projectSlug + '::' + name;
+    memRender();
+  }
+
+  function memOnSearch(v) {
+    memData.search = v;
+    memRender();
+  }
+
+  function memRefresh() {
+    const btn = event && event.currentTarget;
+    if (btn) {
+      btn.disabled = true;
+      const orig = btn.textContent;
+      btn.textContent = '…';
+      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 500);
+    }
+  }
+
+  window.memSelectProject = memSelectProject;
+  window.memSelectMemoryByName = memSelectMemoryByName;
+  window.memOnSearch = memOnSearch;
+  window.memRefresh = memRefresh;
 
   // ── Launch a project: bridge from TimeTracker → Instances ──
   function launchProjectNew(name, path) {
@@ -5381,6 +6283,9 @@
   document.getElementById('railTimeTracker').addEventListener('click', () => setScene('tt-projects'));
   // Rail click — Dashboard rail icon → Dashboard module (default landing for new module)
   document.getElementById('railDashboard').addEventListener('click', () => setScene('module-dashboard'));
+  // Rail click — Settings + Memory
+  document.getElementById('railSettings').addEventListener('click', () => setScene('settings'));
+  document.getElementById('railMemory').addEventListener('click', () => setScene('memory'));
 
   // ── Task grid: build the per-task ⇄ per-day matrix ──
   const taskGridData = {

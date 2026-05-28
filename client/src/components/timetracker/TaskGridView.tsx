@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import {
   Alert,
   Box,
@@ -22,16 +28,16 @@ import AddIcon from '@mui/icons-material/Add';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import AdjustIcon from '@mui/icons-material/Adjust';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import dayjs from 'dayjs';
 import { useTaskGrid } from '../../state/useTaskGrid.js';
-import { TaskDrawer } from './TaskDrawer.js';
+import { TaskDetailDrawer } from './TaskDetailDrawer.js';
 import { WorklogDrawer } from './WorklogDrawer.js';
 import { WorklogCellPopover } from './WorklogCellPopover.js';
 import { JiraSyncDialog } from './JiraSyncDialog.js';
 import type {
-  EpicViewPayload,
   ProjectViewPayload,
   TaskGridTaskPayload,
   TaskViewPayload,
@@ -46,9 +52,19 @@ const MONTH_LABELS = [
 const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const KEY_COL_WIDTH = 200;
+const DEFAULT_TITLE_COL_WIDTH = 240;
+const MIN_TITLE_COL_WIDTH = 120;
+const MAX_TITLE_COL_WIDTH = 600;
 const LOGGED_COL_WIDTH = 90;
 const DAY_COL_WIDTH = 44;
 const TOTAL_ROW_HEIGHT = 32;
+
+const TITLE_COL_LEFT = KEY_COL_WIDTH;
+const TITLE_COL_WIDTH_STORAGE_KEY = 'watchtower:taskGrid:titleColWidth';
+type SortField = 'key' | 'title';
+type SortDir = 'asc' | 'desc';
+const SORT_FIELD_STORAGE_KEY = 'watchtower:taskGrid:sortField';
+const SORT_DIR_STORAGE_KEY = 'watchtower:taskGrid:sortDir';
 
 function throwIfLockedResponse(res: unknown): void {
   if (
@@ -91,6 +107,46 @@ export function TaskGridView({ projectId }: Props) {
    */
   const [displayMode, setDisplayMode] = useState<'tracked' | 'reported'>('reported');
   const [hideDone, setHideDone] = useState(false);
+  /** Case-insensitive substring filter on `taskNumber`. Empty = match all. */
+  const [taskNumberFilter, setTaskNumberFilter] = useState('');
+  // Sort + Title-column width persist across reloads — initialised lazily from
+  // localStorage so the toolbar starts in the user's last-used configuration.
+  const [sortField, setSortField] = useState<SortField>(() => {
+    const raw = readLocalStorage(SORT_FIELD_STORAGE_KEY);
+    return raw === 'title' ? 'title' : 'key';
+  });
+  const [sortDir, setSortDir] = useState<SortDir>(() => {
+    const raw = readLocalStorage(SORT_DIR_STORAGE_KEY);
+    return raw === 'desc' ? 'desc' : 'asc';
+  });
+  const [titleColWidth, setTitleColWidth] = useState<number>(() => {
+    const raw = readLocalStorage(TITLE_COL_WIDTH_STORAGE_KEY);
+    const v = raw == null ? NaN : Number(raw);
+    return Number.isFinite(v) && v >= MIN_TITLE_COL_WIDTH && v <= MAX_TITLE_COL_WIDTH
+      ? v
+      : DEFAULT_TITLE_COL_WIDTH;
+  });
+  // Day-column highlight — clicking a date column header toggles a tinted
+  // overlay across that column so wide grids stay readable when scanning a
+  // specific day. Reset on month change so the highlight doesn't carry over
+  // to a day that may not exist (e.g. day 31 jumping to February).
+  const [highlightedDay, setHighlightedDay] = useState<number | null>(null);
+  useEffect(() => {
+    setHighlightedDay(null);
+  }, [year, month]);
+
+  const toggleSort = (field: SortField) => {
+    if (field === sortField) {
+      const next: SortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      setSortDir(next);
+      writeLocalStorage(SORT_DIR_STORAGE_KEY, next);
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+      writeLocalStorage(SORT_FIELD_STORAGE_KEY, field);
+      writeLocalStorage(SORT_DIR_STORAGE_KEY, 'asc');
+    }
+  };
   const grid = useTaskGrid(
     year,
     month,
@@ -114,11 +170,15 @@ export function TaskGridView({ projectId }: Props) {
     });
   }, [projectId]);
 
-  // Task + worklog drawers — opened on cell / key click.
-  const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
-  const [taskDrawerTask, setTaskDrawerTask] = useState<TaskViewPayload | null>(null);
-  const [taskDrawerEpicId, setTaskDrawerEpicId] = useState<number | null>(null);
-  const [taskDrawerEpics, setTaskDrawerEpics] = useState<EpicViewPayload[]>([]);
+  // Task detail drawer — same component the project-detail page uses, so the
+  // full read+edit+worklog UI shows on a single key click.
+  const [taskDetailTask, setTaskDetailTask] = useState<TaskViewPayload | null>(null);
+  const [taskDetailContext, setTaskDetailContext] = useState<{
+    projectName: string;
+    projectColor: string;
+    epicName: string;
+    taskUrlTemplate: string | null;
+  } | null>(null);
 
   const [jiraSyncOpen, setJiraSyncOpen] = useState(false);
 
@@ -130,82 +190,48 @@ export function TaskGridView({ projectId }: Props) {
     null,
   );
 
-  // Cell-click popover. Always opens for every cell so multiple worklogs in
-  // one day are visible and individually addressable — the drawer is reached
-  // by picking a row (edit) or the "Add worklog" footer (create).
+  // Cell-click popover. Always opens for every cell so the user sees what's
+  // there even when empty — the popover owns its own list + mutations.
   const [cellPopoverAnchor, setCellPopoverAnchor] = useState<HTMLElement | null>(null);
   const [cellPopoverYmd, setCellPopoverYmd] = useState<string>('');
   const [cellPopoverTaskId, setCellPopoverTaskId] = useState<number | null>(null);
   const [cellPopoverProjectId, setCellPopoverProjectId] = useState<number | null>(null);
-  const [cellPopoverWorklogs, setCellPopoverWorklogs] = useState<WorklogViewPayload[]>([]);
 
   const openTaskDrawer = async (gridTask: TaskGridTaskPayload) => {
-    // Fetch the full task row + the project's epics so the drawer has its
-    // parent-epic select populated. The grid payload has only joined display
-    // fields, not the full task shape required by the drawer.
+    // Fetch the full task row — TaskDetailDrawer needs the TaskViewPayload
+    // shape, not the joined grid row. Project name/color/epic name are
+    // already on the grid payload so they don't need a round-trip.
     try {
-      const [tasksRes, epicsRes] = await Promise.all([
-        window.watchtower.invoke('tasks:listForEpic', { epicId: gridTask.epicId }),
-        window.watchtower.invoke('epics:list', { projectId: gridTask.projectId }),
-      ]);
+      const tasksRes = await window.watchtower.invoke('tasks:listForEpic', {
+        epicId: gridTask.epicId,
+      });
       const fullTask = tasksRes.tasks.find((t) => t.id === gridTask.taskId) ?? null;
-      setTaskDrawerTask(fullTask);
-      setTaskDrawerEpicId(gridTask.epicId);
-      setTaskDrawerEpics(epicsRes.epics);
-      setTaskDrawerOpen(true);
+      if (!fullTask) return;
+      setTaskDetailTask(fullTask);
+      setTaskDetailContext({
+        projectName: gridTask.projectName,
+        projectColor: gridTask.projectColor,
+        epicName: gridTask.epicName,
+        taskUrlTemplate: gridTask.projectTaskUrlTemplate,
+      });
     } catch {
       // best-effort — if loading fails, drop silently rather than open an
       // unusable drawer
     }
   };
 
-  const openCellPopover = async (taskId: number, day: number, anchor: HTMLElement) => {
+  const openCellPopover = (taskId: number, day: number, anchor: HTMLElement) => {
     const ymd = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const gridTask = grid.data?.tasks.find((t) => t.taskId === taskId);
     if (!gridTask) return;
-
     setCellPopoverTaskId(taskId);
     setCellPopoverProjectId(gridTask.projectId);
     setCellPopoverYmd(ymd);
     setCellPopoverAnchor(anchor);
-
-    try {
-      const res = await window.watchtower.invoke('worklogs:list', {
-        taskId,
-        from: ymd,
-        to: ymd,
-      });
-      setCellPopoverWorklogs(res.worklogs);
-    } catch {
-      // Fetch failure: still show the popover with an empty list — the user
-      // can at least hit "Add worklog" to log fresh time.
-      setCellPopoverWorklogs([]);
-    }
   };
 
   const closeCellPopover = () => {
     setCellPopoverAnchor(null);
-    // Leave the other state in place — Popover's exit transition reads it
-    // for one more frame; setting null on close + reset on next open is
-    // cleaner than racing the transition.
-  };
-
-  const editFromPopover = (worklog: WorklogViewPayload) => {
-    setWorklogDrawerEditing(worklog);
-    setWorklogDrawerProjectId(cellPopoverProjectId);
-    setWorklogDrawerTaskId(null);
-    setWorklogDrawerWorkDate(null);
-    setWorklogDrawerOpen(true);
-    closeCellPopover();
-  };
-
-  const addFromPopover = () => {
-    setWorklogDrawerEditing(null);
-    setWorklogDrawerProjectId(cellPopoverProjectId);
-    setWorklogDrawerTaskId(cellPopoverTaskId);
-    setWorklogDrawerWorkDate(cellPopoverYmd);
-    setWorklogDrawerOpen(true);
-    closeCellPopover();
   };
 
   const stepMonth = (delta: number) => {
@@ -336,6 +362,14 @@ export function TaskGridView({ projectId }: Props) {
           sx={{ '& .MuiFormControlLabel-label': { fontSize: 13 } }}
         />
 
+        <TextField
+          size="small"
+          placeholder="Filter by task number"
+          value={taskNumberFilter}
+          onChange={(e) => setTaskNumberFilter(e.target.value)}
+          sx={{ minWidth: 200 }}
+        />
+
         <Box sx={{ flex: 1 }} />
 
         <Button
@@ -388,34 +422,51 @@ export function TaskGridView({ projectId }: Props) {
             days={days}
             displayMode={displayMode}
             hideDone={hideDone}
+            taskNumberFilter={taskNumberFilter}
+            sortField={sortField}
+            sortDir={sortDir}
+            onToggleSort={toggleSort}
+            titleColWidth={titleColWidth}
+            onResizeTitleCol={setTitleColWidth}
+            highlightedDay={highlightedDay}
+            onToggleHighlightDay={(day) =>
+              setHighlightedDay((prev) => (prev === day ? null : day))
+            }
             onTaskKeyClick={openTaskDrawer}
             onCellClick={openCellPopover}
           />
         )}
       </Box>
 
-      <TaskDrawer
-        open={taskDrawerOpen}
-        task={taskDrawerTask}
-        defaultEpicId={taskDrawerEpicId ?? 0}
-        epics={taskDrawerEpics}
-        onClose={() => setTaskDrawerOpen(false)}
-        onSubmit={async (input) => {
-          if (taskDrawerTask) {
-            await window.watchtower.invoke('tasks:update', { id: taskDrawerTask.id, input });
-          } else {
-            await window.watchtower.invoke('tasks:create', input);
-          }
+      <TaskDetailDrawer
+        open={taskDetailTask !== null}
+        task={taskDetailTask}
+        projectName={taskDetailContext?.projectName ?? ''}
+        projectColor={taskDetailContext?.projectColor ?? '#888'}
+        epicName={taskDetailContext?.epicName ?? ''}
+        taskUrlTemplate={taskDetailContext?.taskUrlTemplate ?? null}
+        onClose={() => {
+          setTaskDetailTask(null);
+          setTaskDetailContext(null);
+        }}
+        onUpdate={async (input) => {
+          if (!taskDetailTask) return;
+          const res = await window.watchtower.invoke('tasks:update', {
+            id: taskDetailTask.id,
+            input,
+          });
+          // Refresh the grid + keep the drawer's local copy in sync with the
+          // returned row (status changes, edited title, etc.).
+          setTaskDetailTask(res.task);
           await grid.refresh();
         }}
-        onDelete={
-          taskDrawerTask
-            ? async () => {
-                await window.watchtower.invoke('tasks:delete', { id: taskDrawerTask.id });
-                await grid.refresh();
-              }
-            : undefined
-        }
+        onDelete={async () => {
+          if (!taskDetailTask) return;
+          await window.watchtower.invoke('tasks:delete', { id: taskDetailTask.id });
+          setTaskDetailTask(null);
+          setTaskDetailContext(null);
+          await grid.refresh();
+        }}
       />
 
       <WorklogDrawer
@@ -451,10 +502,12 @@ export function TaskGridView({ projectId }: Props) {
       <WorklogCellPopover
         anchor={cellPopoverAnchor}
         ymd={cellPopoverYmd}
-        worklogs={cellPopoverWorklogs}
+        taskId={cellPopoverTaskId}
+        projectId={cellPopoverProjectId}
         onClose={closeCellPopover}
-        onEdit={editFromPopover}
-        onAdd={addFromPopover}
+        onChanged={() => {
+          void grid.refresh();
+        }}
       />
 
       <JiraSyncDialog
@@ -479,6 +532,14 @@ function Grid({
   days,
   displayMode,
   hideDone,
+  taskNumberFilter,
+  sortField,
+  sortDir,
+  onToggleSort,
+  titleColWidth,
+  onResizeTitleCol,
+  highlightedDay,
+  onToggleHighlightDay,
   onTaskKeyClick,
   onCellClick,
 }: {
@@ -494,9 +555,18 @@ function Grid({
   }>;
   displayMode: 'tracked' | 'reported';
   hideDone: boolean;
+  taskNumberFilter: string;
+  sortField: SortField;
+  sortDir: SortDir;
+  onToggleSort(field: SortField): void;
+  titleColWidth: number;
+  onResizeTitleCol(width: number): void;
+  highlightedDay: number | null;
+  onToggleHighlightDay(day: number): void;
   onTaskKeyClick(task: TaskGridTaskPayload): void;
   onCellClick(taskId: number, day: number, anchor: HTMLElement): void;
 }) {
+  const loggedColLeft = KEY_COL_WIDTH + titleColWidth;
   const theme = useTheme();
   const paper = theme.palette.background.paper;
   const headerBg = alpha(paper, 0.9);
@@ -506,9 +576,15 @@ function Grid({
   const todayBg = alpha(theme.palette.error.main, 0.16);
   const todayText = theme.palette.error.main;
   const hoverCellBg = alpha(theme.palette.primary.main, 0.18);
+  const colHighlightBg = alpha(theme.palette.warning.main, 0.22);
   const divider = theme.palette.divider;
 
   const solidOver = (tint: string) => `linear-gradient(${tint}, ${tint}), ${paper}`;
+  // Layers an overlay tint on top of an existing background string. The base
+  // may itself be a layered gradient (sticky-row tints already are), so the
+  // overlay is just prepended as a new layer.
+  const overlay = (base: string, overlayTint: string) =>
+    `linear-gradient(${overlayTint}, ${overlayTint}), ${base}`;
   const totalSolidBg = solidOver(totalBg);
   const earningsSolidBg = solidOver(earningsBg);
   const weekendSolidBg = solidOver(weekendBg);
@@ -519,14 +595,31 @@ function Grid({
   // bottom and the total row sits above the stack.
   const earningsHeight = data.earningsByCurrency.length * TOTAL_ROW_HEIGHT;
 
-  // Apply the hide-done filter client-side so the toggle is instant. When done
-  // tasks are hidden, the daily totals also need to subtract their per-day
-  // contributions; the server's `dailyTotals*` payloads include every task
-  // returned in `data.tasks`.
-  const visibleTasks = hideDone ? data.tasks.filter((t) => t.status !== 'done') : data.tasks;
+  // Apply the hide-done + task-number filters client-side so the toggle and
+  // text input are instant. When tasks are filtered out the daily totals row
+  // needs to subtract their per-day contributions; the server's
+  // `dailyTotals*` payloads always include every task returned in `data.tasks`.
+  const filterQuery = taskNumberFilter.trim().toLowerCase();
+  const hasTaskFilter = filterQuery.length > 0;
+  const visibleTasks = data.tasks.filter((t) => {
+    if (hideDone && t.status === 'done') return false;
+    if (hasTaskFilter && !t.taskNumber.toLowerCase().includes(filterQuery)) return false;
+    return true;
+  });
+  const tasksFiltered = visibleTasks.length !== data.tasks.length;
+  // Client-side sort. Backend already returns natural-numeric ascending by
+  // taskNumber, so the default state matches without an extra pass — but we
+  // re-sort here unconditionally so toggling direction or switching to title
+  // is just a state update with no extra fetch.
+  visibleTasks.sort((a, b) => {
+    const av = sortField === 'key' ? a.taskNumber : a.taskTitle;
+    const bv = sortField === 'key' ? b.taskNumber : b.taskTitle;
+    const cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' });
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
   const daysTotalsField =
     displayMode === 'tracked' ? 'dailyTotalsTracked' : 'dailyTotalsReported';
-  const visibleDailyTotals: Record<number, number> = hideDone
+  const visibleDailyTotals: Record<number, number> = tasksFiltered
     ? visibleTasks.reduce<Record<number, number>>((acc, t) => {
         const map = displayMode === 'tracked' ? t.perDayTracked : t.perDayReported;
         for (const [d, m] of Object.entries(map)) acc[Number(d)] = (acc[Number(d)] ?? 0) + m;
@@ -561,13 +654,14 @@ function Grid({
             whiteSpace: 'nowrap',
           },
           '& thead th': { position: 'sticky', top: 0, zIndex: 3, background: headerBg },
-          '& thead th.col-key, & thead th.col-logged': { zIndex: 4 },
+          '& thead th.col-key, & thead th.col-title, & thead th.col-logged': { zIndex: 4 },
         }}
       >
         <thead>
           <tr>
             <th
               className="col-key"
+              onClick={() => onToggleSort('key')}
               style={{
                 position: 'sticky',
                 left: 0,
@@ -575,15 +669,44 @@ function Grid({
                 width: KEY_COL_WIDTH,
                 fontWeight: 600,
                 textAlign: 'left',
+                cursor: 'pointer',
+                userSelect: 'none',
               }}
+              title="Click to sort by task number"
             >
               Key
+              <SortIndicator active={sortField === 'key'} dir={sortDir} />
+            </th>
+            <th
+              className="col-title"
+              onClick={() => onToggleSort('title')}
+              style={{
+                position: 'sticky',
+                left: TITLE_COL_LEFT,
+                minWidth: titleColWidth,
+                width: titleColWidth,
+                fontWeight: 600,
+                textAlign: 'left',
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+              title="Click to sort by task title; drag right edge to resize"
+            >
+              Title
+              <SortIndicator active={sortField === 'title'} dir={sortDir} />
+              <ResizeHandle
+                width={titleColWidth}
+                min={MIN_TITLE_COL_WIDTH}
+                max={MAX_TITLE_COL_WIDTH}
+                onResize={onResizeTitleCol}
+                onPersist={(v) => writeLocalStorage(TITLE_COL_WIDTH_STORAGE_KEY, String(v))}
+              />
             </th>
             <th
               className="col-logged"
               style={{
                 position: 'sticky',
-                left: KEY_COL_WIDTH,
+                left: loggedColLeft,
                 minWidth: LOGGED_COL_WIDTH,
                 width: LOGGED_COL_WIDTH,
                 fontWeight: 600,
@@ -595,16 +718,31 @@ function Grid({
             </th>
             {days.map((d) => {
               const isNonWorking = d.isWeekend || d.isHoliday;
-              const cls = d.isToday
-                ? { background: todayBg, color: todayText }
-                : isNonWorking
-                  ? { background: weekendBg }
-                  : {};
+              const isHighlighted = highlightedDay === d.day;
+              // The header bg is a solid (the sticky thead sits over the
+              // scrolling rows beneath, so we want it opaque). Today/weekend
+              // tints are solids too; the highlight overlay is layered on
+              // top via `overlay()` when active.
+              let headerBgValue: string = headerBg;
+              if (d.isToday) headerBgValue = solidOver(todayBg);
+              else if (isNonWorking) headerBgValue = solidOver(weekendBg);
+              if (isHighlighted) headerBgValue = overlay(headerBgValue, colHighlightBg);
+              const cls = {
+                background: headerBgValue,
+                color: d.isToday ? todayText : undefined,
+              };
               return (
                 <th
                   key={d.day}
-                  title={d.holidayName ?? undefined}
+                  title={
+                    d.holidayName
+                      ? `${d.holidayName} — click to highlight column`
+                      : 'Click to highlight column'
+                  }
+                  onClick={() => onToggleHighlightDay(d.day)}
                   style={{
+                    cursor: 'pointer',
+                    userSelect: 'none',
                     minWidth: DAY_COL_WIDTH,
                     textAlign: 'center',
                     fontWeight: 500,
@@ -639,8 +777,12 @@ function Grid({
               weekendBg={weekendBg}
               todayBg={todayBg}
               hoverCellBg={hoverCellBg}
+              colHighlightBg={colHighlightBg}
+              highlightedDay={highlightedDay}
               theme={theme}
               divider={divider}
+              titleColWidth={titleColWidth}
+              loggedColLeft={loggedColLeft}
               onKeyClick={() => onTaskKeyClick(task)}
               onCellClick={onCellClick}
             />
@@ -649,10 +791,10 @@ function Grid({
           {/* Filler row — absorbs any leftover vertical space so the
               sticky-bottom totals/earnings rows pin against the container's
               bottom edge instead of floating mid-screen on tall viewports.
-              colSpan covers Key + Logged + every day column. */}
+              colSpan covers Key + Title + Logged + every day column. */}
           <tr aria-hidden>
             <td
-              colSpan={2 + days.length}
+              colSpan={3 + days.length}
               style={{
                 height: '100%',
                 padding: 0,
@@ -681,7 +823,18 @@ function Grid({
             <td
               style={{
                 position: 'sticky',
-                left: KEY_COL_WIDTH,
+                left: TITLE_COL_LEFT,
+                bottom: earningsHeight,
+                zIndex: 3,
+                background: totalSolidBg,
+                borderTop: `2px solid ${divider}`,
+                height: TOTAL_ROW_HEIGHT,
+              }}
+            />
+            <td
+              style={{
+                position: 'sticky',
+                left: loggedColLeft,
                 bottom: earningsHeight,
                 zIndex: 3,
                 fontWeight: 600,
@@ -691,7 +844,7 @@ function Grid({
                 borderTop: `2px solid ${divider}`,
                 fontVariantNumeric: 'tabular-nums',
               }}
-              title={`Capacity = ${fmtHoursTrim(data.monthCapacityMinutes)} h (Mon-Fri × 8h; Czech holidays land in Phase 19)`}
+              title={`Capacity = ${fmtHoursTrim(data.monthCapacityMinutes)} h (Mon-Fri × 8h minus Czech holidays and user days off)`}
             >
               {fmtHoursTrim(sumOf(visibleDailyTotals))}
               <Box
@@ -703,11 +856,13 @@ function Grid({
             </td>
             {days.map((d) => {
               const v = visibleDailyTotals[d.day] ?? 0;
-              const cellBg = d.isToday
+              const baseBg = d.isToday
                 ? todaySolidBg
                 : d.isWeekend || d.isHoliday
                   ? weekendSolidBg
                   : totalSolidBg;
+              const cellBg =
+                highlightedDay === d.day ? overlay(baseBg, colHighlightBg) : baseBg;
               return (
                 <td
                   key={d.day}
@@ -751,7 +906,17 @@ function Grid({
                 <td
                   style={{
                     position: 'sticky',
-                    left: KEY_COL_WIDTH,
+                    left: TITLE_COL_LEFT,
+                    bottom: rowBottom,
+                    zIndex: 3,
+                    background: earningsSolidBg,
+                    height: TOTAL_ROW_HEIGHT,
+                  }}
+                />
+                <td
+                  style={{
+                    position: 'sticky',
+                    left: loggedColLeft,
                     bottom: rowBottom,
                     zIndex: 3,
                     fontWeight: 600,
@@ -760,16 +925,25 @@ function Grid({
                     borderRight: `2px solid ${divider}`,
                     fontVariantNumeric: 'tabular-nums',
                   }}
+                  title={`Capacity target: ${formatAmount(row.expectedAmount, row.currency)} (workdays × MD rate)`}
                 >
                   {formatAmount(row.totalAmount, row.currency)}
+                  <Box
+                    component="span"
+                    sx={{ color: 'text.secondary', fontWeight: 400, ml: 0.5 }}
+                  >
+                    / {formatAmount(row.expectedAmount, row.currency)}
+                  </Box>
                 </td>
                 {days.map((d) => {
                   const v = row.perDay[d.day] ?? 0;
-                  const cellBg = d.isToday
+                  const baseBg = d.isToday
                     ? todaySolidBg
                     : d.isWeekend || d.isHoliday
                       ? weekendSolidBg
                       : earningsSolidBg;
+                  const cellBg =
+                    highlightedDay === d.day ? overlay(baseBg, colHighlightBg) : baseBg;
                   return (
                     <td
                       key={d.day}
@@ -806,8 +980,12 @@ function TaskRow({
   weekendBg,
   todayBg,
   hoverCellBg,
+  colHighlightBg,
+  highlightedDay,
   theme,
   divider,
+  titleColWidth,
+  loggedColLeft,
   onKeyClick,
   onCellClick,
 }: {
@@ -825,8 +1003,12 @@ function TaskRow({
   weekendBg: string;
   todayBg: string;
   hoverCellBg: string;
+  colHighlightBg: string;
+  highlightedDay: number | null;
   theme: Theme;
   divider: string;
+  titleColWidth: number;
+  loggedColLeft: number;
   onKeyClick(): void;
   onCellClick(taskId: number, day: number, anchor: HTMLElement): void;
 }) {
@@ -836,15 +1018,19 @@ function TaskRow({
   const StatusIcon =
     task.status === 'done'
       ? TaskAltIcon
-      : task.status === 'in_progress'
-        ? AdjustIcon
-        : RadioButtonUncheckedIcon;
+      : task.status === 'to_accept'
+        ? HourglassEmptyIcon
+        : task.status === 'in_progress'
+          ? AdjustIcon
+          : RadioButtonUncheckedIcon;
   const statusColor =
     task.status === 'done'
       ? theme.palette.success.main
-      : task.status === 'in_progress'
-        ? theme.palette.primary.main
-        : theme.palette.text.disabled;
+      : task.status === 'to_accept'
+        ? theme.palette.warning.main
+        : task.status === 'in_progress'
+          ? theme.palette.primary.main
+          : theme.palette.text.disabled;
 
   const overEstimate =
     task.estimatedMinutes != null &&
@@ -906,9 +1092,29 @@ function TaskRow({
         </Stack>
       </td>
       <td
+        onClick={onKeyClick}
         style={{
           position: 'sticky',
-          left: KEY_COL_WIDTH,
+          left: TITLE_COL_LEFT,
+          zIndex: 1,
+          minWidth: titleColWidth,
+          width: titleColWidth,
+          maxWidth: titleColWidth,
+          background: paper,
+          fontSize: 13,
+          color: theme.palette.text.primary,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          cursor: 'pointer',
+        }}
+        title={task.taskTitle}
+      >
+        {task.taskTitle}
+      </td>
+      <td
+        style={{
+          position: 'sticky',
+          left: loggedColLeft,
           zIndex: 1,
           minWidth: LOGGED_COL_WIDTH,
           width: LOGGED_COL_WIDTH,
@@ -942,6 +1148,16 @@ function TaskRow({
       {days.map((d) => {
         const v = perDay[d.day] ?? 0;
         const baseBg = d.isToday ? todayBg : d.isWeekend || d.isHoliday ? weekendBg : 'transparent';
+        const isHighlighted = highlightedDay === d.day;
+        // Highlight layer is composed on top of whatever the cell already
+        // had — empty cells become a flat tint, today/weekend stay visible
+        // through it. mouseenter/leave reset to the same composed value so
+        // the hover state doesn't strip the column tint.
+        const restBg = isHighlighted
+          ? baseBg === 'transparent'
+            ? colHighlightBg
+            : `linear-gradient(${colHighlightBg}, ${colHighlightBg}), ${baseBg}`
+          : baseBg;
         return (
           <td
             key={d.day}
@@ -952,7 +1168,7 @@ function TaskRow({
               cursor: 'pointer',
               fontVariantNumeric: 'tabular-nums',
               fontSize: 13,
-              background: baseBg,
+              background: restBg,
               color: v > 0 ? undefined : theme.palette.text.disabled,
               padding: '4px 2px',
             }}
@@ -960,7 +1176,7 @@ function TaskRow({
               e.currentTarget.style.background = hoverCellBg;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = baseBg as string;
+              e.currentTarget.style.background = restBg as string;
             }}
             title={
               v > 0
@@ -978,10 +1194,110 @@ function TaskRow({
   );
 }
 
+function SortIndicator({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return null;
+  return (
+    <Box
+      component="span"
+      sx={{
+        ml: 0.5,
+        fontSize: 11,
+        color: 'text.secondary',
+        fontWeight: 400,
+      }}
+      aria-hidden
+    >
+      {dir === 'asc' ? '▲' : '▼'}
+    </Box>
+  );
+}
+
+function ResizeHandle({
+  width,
+  min,
+  max,
+  onResize,
+  onPersist,
+}: {
+  width: number;
+  min: number;
+  max: number;
+  onResize(next: number): void;
+  onPersist(value: number): void;
+}) {
+  // Drag tracking lives in closure scope inside the pointerdown handler — no
+  // component state to keep this cheap on every mousemove. The handle stops
+  // propagation so the header's sort-toggle click never fires while resizing.
+  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = width;
+    let latest = startWidth;
+    const prevUserSelect = document.body.style.userSelect;
+    const prevCursor = document.body.style.cursor;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    const onMove = (ev: PointerEvent) => {
+      latest = Math.max(min, Math.min(max, startWidth + ev.clientX - startX));
+      onResize(latest);
+    };
+    const onUp = () => {
+      document.body.style.userSelect = prevUserSelect;
+      document.body.style.cursor = prevCursor;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      onPersist(latest);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  return (
+    <Box
+      role="separator"
+      aria-orientation="vertical"
+      onPointerDown={handlePointerDown}
+      onClick={(e) => e.stopPropagation()}
+      sx={{
+        position: 'absolute',
+        top: 0,
+        right: -3,
+        height: '100%',
+        width: 6,
+        cursor: 'col-resize',
+        zIndex: 5,
+        touchAction: 'none',
+        '&:hover': { background: (t) => alpha(t.palette.primary.main, 0.25) },
+      }}
+    />
+  );
+}
+
 function sumOf(record: Record<number, number>): number {
   let total = 0;
   for (const v of Object.values(record)) total += v;
   return total;
+}
+
+// localStorage is wrapped in try/catch to stay resilient against private-mode
+// or quota errors — neither is worth surfacing to the user; the grid still
+// works, just without persistence.
+function readLocalStorage(key: string): string | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalStorage(key: string, value: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
+  } catch {
+    // ignored — see readLocalStorage
+  }
 }
 
 // Touch unused warning for AddIcon — re-exporting for use as the empty-state

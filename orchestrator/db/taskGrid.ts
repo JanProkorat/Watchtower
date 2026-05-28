@@ -1,12 +1,12 @@
 import type { SqliteLike } from './migrations.js';
-import { countWorkdays, holidaysInRange, type PublicHoliday } from './workdays.js';
+import { holidaysInRange, workdayDates, type PublicHoliday } from './workdays.js';
 import { DaysOffRepo, type DayOffRow } from './repositories/daysOff.js';
 
 export interface TaskGridTask {
   taskId: number;
   taskNumber: string;
   taskTitle: string;
-  status: 'open' | 'in_progress' | 'done';
+  status: 'open' | 'in_progress' | 'to_accept' | 'done';
   estimatedMinutes: number | null;
   /** Sum of `worklogs.minutes` (actual time) for the task in the month. */
   totalTracked: number;
@@ -17,6 +17,8 @@ export interface TaskGridTask {
   projectId: number;
   projectName: string;
   projectColor: string;
+  /** Per-project task URL template (`{n}` substituted at link-build time). */
+  projectTaskUrlTemplate: string | null;
   isBillable: boolean;
   /** day-of-month → tracked minutes (raw `worklogs.minutes`). */
   perDayTracked: Record<number, number>;
@@ -29,6 +31,14 @@ export interface TaskGridEarningsRow {
   /** day-of-month (1..31) → rounded earnings amount on that day. */
   perDay: Record<number, number>;
   totalAmount: number;
+  /**
+   * Capacity-based target: for each workday in the month and each billable
+   * project that contributed worklogs in this currency, sum the MD value of
+   * the rate active on that workday (daily → rate_amount, hourly →
+   * rate_amount × hours_per_day). Mirrors what the user would have earned
+   * if every workday in the month had been a full MD on this stack.
+   */
+  expectedAmount: number;
 }
 
 export interface TaskGridResponse {
@@ -58,13 +68,14 @@ interface TaskMetaRow {
   task_id: number;
   task_number: string;
   task_title: string;
-  status: 'open' | 'in_progress' | 'done';
+  status: 'open' | 'in_progress' | 'to_accept' | 'done';
   estimated_minutes: number | null;
   epic_id: number;
   epic_name: string;
   project_id: number;
   project_name: string;
   project_color: string;
+  project_task_url_template: string | null;
   project_kind: 'work' | 'time_off';
 }
 
@@ -122,7 +133,8 @@ export class TaskGridService {
     const publicHolidays = holidaysInRange(from, to);
     const daysOff = new DaysOffRepo(this.db).listInRange(from, to);
     const daysOffSet = new Set(daysOff.map((d) => d.date));
-    const monthCapacityMinutes = countWorkdays(from, to, daysOffSet) * 8 * 60;
+    const workdays = workdayDates(from, to, daysOffSet);
+    const monthCapacityMinutes = workdays.length * 8 * 60;
 
     // 1. Fetch worklogs in the period scoped to the optional project.
     //    Both tracked + reported come back so the client can flip between
@@ -166,6 +178,7 @@ export class TaskGridService {
         t.status, t.estimated_minutes,
         e.id AS epic_id, e.name AS epic_name, e.display_order AS epic_display_order,
         p.id AS project_id, p.name AS project_name, p.color AS project_color,
+        p.task_url_template AS project_task_url_template,
         p.kind AS project_kind
       FROM tasks t
       JOIN epics e ON e.id = t.epic_id
@@ -208,16 +221,12 @@ export class TaskGridService {
       dailyTotalsReported[day] = (dailyTotalsReported[day] ?? 0) + w.reported_minutes;
     }
 
-    // 5. Build the task list in stable order (project name, epic display_order, task id).
+    // 5. Build the task list sorted by task number using natural-numeric
+    //    comparison so Jira-style keys like FIE1933-19000 come before
+    //    FIE1933-19100 (lexicographic sort would order them the other way).
     const orderedTasks: TaskGridTask[] = taskMeta
       .slice()
-      .sort((a, b) => {
-        const pn = a.project_name.localeCompare(b.project_name);
-        if (pn !== 0) return pn;
-        const eo = (a.epic_display_order ?? 0) - (b.epic_display_order ?? 0);
-        if (eo !== 0) return eo;
-        return a.task_id - b.task_id;
-      })
+      .sort((a, b) => a.task_number.localeCompare(b.task_number, undefined, { numeric: true }))
       .map((t) => {
         const bucket = perTask.get(t.task_id) ?? {
           perDayTracked: {},
@@ -238,6 +247,7 @@ export class TaskGridService {
           projectId: t.project_id,
           projectName: t.project_name,
           projectColor: t.project_color,
+          projectTaskUrlTemplate: t.project_task_url_template,
           isBillable: t.project_kind === 'work',
           perDayTracked: bucket.perDayTracked,
           perDayReported: bucket.perDayReported,
@@ -247,8 +257,9 @@ export class TaskGridService {
     // 6. Earnings by currency — only billable projects contribute, and the
     //    rate is picked per-worklog from the contract that contained the
     //    work_date. Worklogs in months that straddle a contract boundary
-    //    therefore split correctly across rates.
-    const earningsByCurrency = this.computeEarnings(worklogs, taskMeta);
+    //    therefore split correctly across rates. The expected-amount target
+    //    on each row is computed against the workday calendar passed here.
+    const earningsByCurrency = this.computeEarnings(worklogs, taskMeta, workdays);
 
     return {
       year,
@@ -267,6 +278,7 @@ export class TaskGridService {
   private computeEarnings(
     worklogs: WorklogPeriodRow[],
     taskMeta: TaskMetaRow[],
+    workdays: string[],
   ): TaskGridEarningsRow[] {
     // Project → kind lookup so non-work projects can be skipped.
     const billableByProject = new Map<number, boolean>();
@@ -311,8 +323,13 @@ export class TaskGridService {
 
     // Currency → day → rounded amount, plus total. Earnings always use
     // reported_minutes (the billed value) regardless of the client's
-    // display toggle.
-    const byCurrency = new Map<string, { perDay: Record<number, number>; total: number }>();
+    // display toggle. We also track which projects fed into each currency
+    // so the capacity-based expected total is summed across exactly that
+    // project set (and not, say, all rate-having projects globally).
+    const byCurrency = new Map<
+      string,
+      { perDay: Record<number, number>; total: number; projects: Set<number> }
+    >();
     for (const w of worklogs) {
       if (!billableByProject.get(w.project_id)) continue;
       const rate = findRateForDate(w.project_id, w.work_date);
@@ -325,12 +342,39 @@ export class TaskGridService {
           : (hours / rate.hours_per_day) * rate.rate_amount;
       const day = Number(w.work_date.slice(8, 10));
 
-      const bucket = byCurrency.get(rate.currency) ?? { perDay: {}, total: 0 };
+      const bucket = byCurrency.get(rate.currency) ?? {
+        perDay: {},
+        total: 0,
+        projects: new Set<number>(),
+      };
       // Sum as floats during accumulation, round at the end so per-day reads
       // stay consistent with the displayed total.
       bucket.perDay[day] = (bucket.perDay[day] ?? 0) + amount;
       bucket.total += amount;
+      bucket.projects.add(w.project_id);
       byCurrency.set(rate.currency, bucket);
+    }
+
+    // Expected (capacity-based) amount per currency: workdays × MD rate,
+    // summed across the projects that produced worklogs in this currency.
+    // Per-day rate lookup so a contract that changes mid-month still
+    // produces a faithful target. If a project's rate is missing on a
+    // workday or has a different currency on that workday, it does not
+    // contribute to *this* currency's expected — the MD lands in whichever
+    // currency the active rate carries.
+    const expectedByCurrency = new Map<string, number>();
+    for (const [currency, bucket] of byCurrency) {
+      for (const projectId of bucket.projects) {
+        for (const date of workdays) {
+          const rate = findRateForDate(projectId, date);
+          if (!rate || rate.currency !== currency) continue;
+          const md =
+            rate.rate_type === 'daily'
+              ? rate.rate_amount
+              : rate.rate_amount * rate.hours_per_day;
+          expectedByCurrency.set(currency, (expectedByCurrency.get(currency) ?? 0) + md);
+        }
+      }
     }
 
     const out: TaskGridEarningsRow[] = [];
@@ -343,6 +387,7 @@ export class TaskGridService {
         currency,
         perDay: perDayRounded,
         totalAmount: Math.round(bucket.total),
+        expectedAmount: Math.round(expectedByCurrency.get(currency) ?? 0),
       });
     }
     // Stable order: alphabetical by currency code (CZK before EUR before USD).

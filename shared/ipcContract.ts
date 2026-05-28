@@ -257,7 +257,7 @@ export interface TaskGridTaskPayload {
   taskId: number;
   taskNumber: string;
   taskTitle: string;
-  status: 'open' | 'in_progress' | 'done';
+  status: 'open' | 'in_progress' | 'to_accept' | 'done';
   estimatedMinutes: number | null;
   totalTracked: number;
   totalReported: number;
@@ -266,6 +266,8 @@ export interface TaskGridTaskPayload {
   projectId: number;
   projectName: string;
   projectColor: string;
+  /** Per-project task URL template (`{n}` substituted at link-build time). */
+  projectTaskUrlTemplate: string | null;
   isBillable: boolean;
   perDayTracked: Record<number, number>;
   perDayReported: Record<number, number>;
@@ -275,6 +277,8 @@ export interface TaskGridEarningsRowPayload {
   currency: string;
   perDay: Record<number, number>;
   totalAmount: number;
+  /** workdays × MD rate target — what the user would earn working every workday. */
+  expectedAmount: number;
 }
 
 export interface TaskGridResponsePayload {
@@ -401,7 +405,7 @@ export interface TaskInputPayload {
   number: string;
   title: string;
   description?: string | null;
-  status?: 'open' | 'in_progress' | 'done';
+  status?: 'open' | 'in_progress' | 'to_accept' | 'done';
   estimatedMinutes?: number | null;
 }
 
@@ -411,7 +415,7 @@ export interface TaskViewPayload {
   number: string;
   title: string;
   description: string | null;
-  status: 'open' | 'in_progress' | 'done';
+  status: 'open' | 'in_progress' | 'to_accept' | 'done';
   estimatedMinutes: number | null;
   createdAt: string;
   totalMinutes: number;
@@ -422,7 +426,7 @@ export interface TaskByNumberPayload {
   id: number;
   number: string;
   title: string;
-  status: 'open' | 'in_progress' | 'done';
+  status: 'open' | 'in_progress' | 'to_accept' | 'done';
   epicId: number;
   epicName: string;
   projectId: number;
@@ -443,6 +447,9 @@ export interface ProjectInputPayload {
   isDefault?: boolean;
   folderPath?: string | null;
   jiraGlobs?: string[];
+  jiraBoardUrl?: string | null;
+  /** URL template for opening a task in its tracker. `{n}` → task number. */
+  taskUrlTemplate?: string | null;
   description?: string | null;
 }
 
@@ -455,6 +462,9 @@ export interface ProjectViewPayload {
   isDefault: boolean;
   folderPath: string | null;
   jiraGlobs: string[];
+  jiraBoardUrl: string | null;
+  /** URL template for opening a task in its tracker. `{n}` → task number. */
+  taskUrlTemplate: string | null;
   description: string | null;
   createdAt: string;
   epicCount: number;
@@ -623,12 +633,14 @@ export interface BoardAuthPingPayload {
   baseUrl: string | null;
 }
 
-export type BoardColumn = 'todo' | 'doing' | 'done';
+export type BoardColumn = 'todo' | 'doing' | 'to_accept' | 'done';
 
 export interface BoardCardPayload {
   taskId: number;
   jiraKey: string;
   title: string;
+  /** Long-form description mirrored from Jira on every board sync. */
+  description: string | null;
   /** Raw Jira status (e.g. "In Review"); preserved for tooltips. */
   jiraStatus: string;
   /** Pre-computed column from the merged Jira→Watchtower mapping. */

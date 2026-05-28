@@ -2,14 +2,18 @@ import { useCallback, useState } from 'react';
 import type { ModuleId } from '../components/ModuleRail.js';
 
 const STORAGE_KEY = 'watchtower.activeModule';
-const VALID: ReadonlySet<ModuleId> = new Set(['dashboard', 'instances', 'timetracker', 'settings']);
+const VALID: ReadonlySet<ModuleId> = new Set(['dashboard', 'instances', 'billing', 'settings']);
 
 export const DEFAULT_ACTIVE_MODULE: ModuleId = 'dashboard';
 
 export function readActiveModule(): ModuleId {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    if (v && VALID.has(v as ModuleId)) return v as ModuleId;
+    if (!v) return DEFAULT_ACTIVE_MODULE;
+    // Legacy id from before the TimeTracker → Billing rename. Map silently
+    // so existing installs keep landing on the same module.
+    if (v === 'timetracker') return 'billing';
+    if (VALID.has(v as ModuleId)) return v as ModuleId;
   } catch {
     /* localStorage unavailable — fall through to default */
   }

@@ -120,14 +120,19 @@ describe('JiraSyncService', () => {
       expect(r.dryRun).toBe(true);
       expect(r.totalCandidates).toBe(4);
       expect(r.skippedNoJiraKey).toBe(1);
-      expect(r.skippedTaskNotOpen).toBe(1);
+      // Task status (open/in_progress/done) no longer gates worklog eligibility;
+      // the per-worklog jira_uploaded flag is the only filter.
+      expect(r.skippedTaskNotOpen).toBe(0);
       expect(r.skippedAlreadyPosted).toBe(0);
-      expect(r.attempted).toBe(2);
-      expect(r.entries.map((e) => e.taskNumber)).toEqual(['FIE1933-18887', 'FIE1933-18887']);
+      expect(r.attempted).toBe(3);
+      expect(r.entries.map((e) => e.taskNumber)).toEqual([
+        'FIE1933-18887',
+        'FIE1933-19000',
+        'FIE1933-18887',
+      ]);
       expect(r.entries[0].timeSpent).toBe('1h 30m');
-      expect(r.entries[1].timeSpent).toBe('1h');
       expect(r.entries[0].comment).toBe('Code review');
-      expect(r.entries[1].comment).toBe('Práce na úkolu');
+      expect(r.entries[2].comment).toBe('Práce na úkolu');
     });
 
     it('returns an error when not configured', () => {
@@ -151,6 +156,7 @@ describe('JiraSyncService', () => {
           fetch: {
             responses: [
               { status: 201, body: { id: 'w-100' } },
+              { status: 201, body: { id: 'w-200' } },
               { status: 201, body: { id: 'w-101' } },
             ],
             calls,
@@ -161,10 +167,10 @@ describe('JiraSyncService', () => {
       const r = await svc.sync({ from: '2026-05-01', to: '2026-05-31' });
 
       expect(r.dryRun).toBe(false);
-      expect(r.posted).toBe(2);
+      expect(r.posted).toBe(3);
       expect(r.failed).toBe(0);
       expect(r.neededBrowserRefresh).toBe(false);
-      expect(calls).toHaveLength(2);
+      expect(calls).toHaveLength(3);
       expect(calls[0].url).toBe('https://jira.test/rest/api/2/issue/FIE1933-18887/worklog');
       expect(calls[0].body.timeSpent).toBe('1h 30m');
       expect(calls[0].body.comment).toBe('Code review');
@@ -176,12 +182,65 @@ describe('JiraSyncService', () => {
       expect(posted).toHaveLength(2);
       expect(posted.map((w) => w.externalId).sort()).toEqual(['w-100', 'w-101']);
       expect(posted.every((w) => w.source === 'jira')).toBe(true);
+
+      // The 'done'-task worklog also reaches Jira now that task status no
+      // longer gates eligibility.
+      const doneRows = worklogs.list({ taskId: doneTaskId });
+      expect(doneRows.filter((w) => w.jiraUploaded)).toHaveLength(1);
+    });
+
+    it('marks the worklog uploaded even when Jira 2xx response has no parseable id', async () => {
+      const svc = new JiraSyncService(db, {
+        config: CONFIG,
+        deps: makeDeps({
+          cookies: ['session=abc'],
+          fetch: {
+            responses: [
+              // Jira responds 201 with no body / no id field — prevent the
+              // double-post that the previous code triggered on retry.
+              { status: 201, body: {} },
+              { status: 201, body: { id: 'w-101' } },
+              { status: 201, body: { id: 'w-200' } },
+            ],
+          },
+        }),
+      });
+
+      const r = await svc.sync({ from: '2026-05-01', to: '2026-05-31' });
+      expect(r.posted).toBe(3);
+      expect(r.failed).toBe(0);
+
+      // All worklogs are marked uploaded; the one with no parseable id has an
+      // empty external_id but jira_uploaded=1 so a second run won't re-post it.
+      const all = worklogs.list({ taskId: validTaskId });
+      expect(all.every((w) => w.jiraUploaded)).toBe(true);
+    });
+
+    it('accepts numeric worklog ids returned by Jira on-prem', async () => {
+      const svc = new JiraSyncService(db, {
+        config: CONFIG,
+        deps: makeDeps({
+          cookies: ['session=abc'],
+          fetch: {
+            responses: [
+              { status: 201, body: { id: 12345 } },
+              { status: 201, body: { id: 12346 } },
+              { status: 201, body: { id: 12347 } },
+            ],
+          },
+        }),
+      });
+
+      const r = await svc.sync({ from: '2026-05-01', to: '2026-05-31' });
+      expect(r.posted).toBe(3);
+      const posted = worklogs.list({ taskId: validTaskId }).filter((w) => w.jiraUploaded);
+      expect(posted.map((w) => w.externalId).sort()).toEqual(['12345', '12347']);
     });
 
     it('skips already-posted entries on a second run', async () => {
       // Add a third unposted worklog so the task does NOT auto-close after the
       // first sync — that way the re-run path goes through the "already
-      // posted" skip, not the "task not open" skip.
+      // posted" skip.
       worklogs.create({ taskId: validTaskId, workDate: '2026-05-24', minutes: 30 });
 
       const svc = new JiraSyncService(db, {
@@ -190,10 +249,11 @@ describe('JiraSyncService', () => {
           cookies: ['session=abc'],
           fetch: {
             responses: [
-              { status: 500, body: 'boom' }, // first worklog fails
-              { status: 201, body: { id: 'w-101' } }, // second succeeds
-              { status: 201, body: { id: 'w-102' } }, // third succeeds
-              // The 1 still-pending worklog from run #1 retried in run #2.
+              { status: 500, body: 'boom' }, // validTaskId@5-22 fails
+              { status: 201, body: { id: 'w-done' } }, // doneTaskId@5-22 succeeds
+              { status: 201, body: { id: 'w-101' } }, // validTaskId@5-23 succeeds
+              { status: 201, body: { id: 'w-102' } }, // validTaskId@5-24 succeeds
+              // Retry of the still-pending validTaskId@5-22 worklog in run #2.
               { status: 201, body: { id: 'w-100' } },
             ],
           },
@@ -201,23 +261,22 @@ describe('JiraSyncService', () => {
       });
 
       const first = await svc.sync({ from: '2026-05-01', to: '2026-05-31' });
-      expect(first.posted).toBe(2);
+      expect(first.posted).toBe(3);
       expect(first.failed).toBe(1);
-      expect(first.tasksMarkedDone).toBe(0); // one unposted still hanging
+      expect(first.tasksMarkedDone).toBe(0); // validTaskId still has unposted id=1
 
       const second = await svc.sync({ from: '2026-05-01', to: '2026-05-31' });
-      // 5 total - 1 no-jira-key - 1 done-task = 3 valid-task worklogs;
-      // 2 were posted in run #1 (skippedAlreadyPosted), 1 retried + posted.
-      expect(second.skippedAlreadyPosted).toBe(2);
+      // 5 total - 1 no-jira-key = 4 valid candidates;
+      // 3 were posted in run #1 (skippedAlreadyPosted), 1 retried + posted.
+      expect(second.skippedAlreadyPosted).toBe(3);
       expect(second.posted).toBe(1);
       expect(second.failed).toBe(0);
-      // The previously-failed entry retries successfully and reaches 'posted'.
       expect(second.entries.filter((e) => e.status === 'pending')).toHaveLength(0);
-      // After the final post the task has zero unposted worklogs → auto-close.
-      expect(second.tasksMarkedDone).toBe(1);
+      // Sync never marks tasks done — task lifecycle is user-driven.
+      expect(second.tasksMarkedDone).toBe(0);
     });
 
-    it('marks the task done when all its worklogs are now in Jira', async () => {
+    it('leaves the task status alone after posting all its worklogs', async () => {
       const svc = new JiraSyncService(db, {
         config: CONFIG,
         deps: makeDeps({
@@ -225,17 +284,19 @@ describe('JiraSyncService', () => {
           fetch: {
             responses: [
               { status: 201, body: { id: 'w-100' } },
+              { status: 201, body: { id: 'w-done' } },
               { status: 201, body: { id: 'w-101' } },
             ],
           },
         }),
       });
 
+      const taskBefore = tasks.get(validTaskId);
       const r = await svc.sync({ from: '2026-05-01', to: '2026-05-31' });
-      expect(r.tasksMarkedDone).toBe(1);
+      expect(r.tasksMarkedDone).toBe(0);
 
       const task = tasks.get(validTaskId);
-      expect(task?.status).toBe('done');
+      expect(task?.status).toBe(taskBefore?.status);
     });
 
     it('refreshes the cookie via Playwright when the first POST returns 401', async () => {
@@ -252,7 +313,8 @@ describe('JiraSyncService', () => {
             responses: [
               { status: 401 }, // first attempt fails auth
               { status: 201, body: { id: 'w-100' } }, // retry succeeds
-              { status: 201, body: { id: 'w-101' } }, // second worklog
+              { status: 201, body: { id: 'w-done' } }, // doneTask worklog
+              { status: 201, body: { id: 'w-101' } }, // last validTask worklog
             ],
             calls,
           },
@@ -262,9 +324,36 @@ describe('JiraSyncService', () => {
       const r = await svc.sync({ from: '2026-05-01', to: '2026-05-31' });
       expect(refreshed).toBe(1);
       expect(r.neededBrowserRefresh).toBe(true);
-      expect(r.posted).toBe(2);
+      expect(r.posted).toBe(3);
       expect(r.failed).toBe(0);
-      expect(calls).toHaveLength(3);
+      expect(calls).toHaveLength(4);
+    });
+
+    it('treats a 302 redirect (stale SSO cookie) as an auth failure and refreshes', async () => {
+      let refreshed = 0;
+      const svc = new JiraSyncService(db, {
+        config: CONFIG,
+        deps: makeDeps({
+          cookies: ['stale', 'fresh'],
+          refresh: async () => {
+            refreshed += 1;
+          },
+          fetch: {
+            responses: [
+              { status: 302 }, // Jira bounces to SSO login
+              { status: 201, body: { id: 'w-100' } },
+              { status: 201, body: { id: 'w-done' } },
+              { status: 201, body: { id: 'w-101' } },
+            ],
+          },
+        }),
+      });
+
+      const r = await svc.sync({ from: '2026-05-01', to: '2026-05-31' });
+      expect(refreshed).toBe(1);
+      expect(r.neededBrowserRefresh).toBe(true);
+      expect(r.posted).toBe(3);
+      expect(r.failed).toBe(0);
     });
 
     it('reports a per-entry failure on HTTP 500 and leaves the worklog unmarked', async () => {
@@ -275,6 +364,7 @@ describe('JiraSyncService', () => {
           fetch: {
             responses: [
               { status: 500, body: 'boom' },
+              { status: 201, body: { id: 'w-done' } },
               { status: 201, body: { id: 'w-101' } },
             ],
           },
@@ -282,7 +372,7 @@ describe('JiraSyncService', () => {
       });
 
       const r = await svc.sync({ from: '2026-05-01', to: '2026-05-31' });
-      expect(r.posted).toBe(1);
+      expect(r.posted).toBe(2);
       expect(r.failed).toBe(1);
       const failed = r.entries.find((e) => e.status === 'failed');
       expect(failed?.reason).toMatch(/HTTP 500/);

@@ -96,10 +96,19 @@ const cases: Case[] = [
     to: 'crashed',
   },
   {
-    name: 'working → finished on sessionEnd',
+    // Claude fires SessionEnd during /clear, /compact, auto-compaction and
+    // /resume — not only on true process exit — so the state machine must
+    // not treat it as terminal. ptyExit is the authoritative signal.
+    name: 'working stays on sessionEnd (mid-life rollover, not terminal)',
     from: 'working',
     event: { kind: 'sessionEnd' },
-    to: 'finished',
+    to: 'working',
+  },
+  {
+    name: 'waiting-input stays on sessionEnd (mid-life rollover, not terminal)',
+    from: 'waiting-input',
+    event: { kind: 'sessionEnd' },
+    to: 'waiting-input',
   },
   {
     name: 'waiting-input → working on tabFocused (cancels attention + timer)',

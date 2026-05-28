@@ -26,29 +26,32 @@ export const STATUS_TO_COLUMN: Record<string, BoardColumn> = {
   'To Do':       'todo',
   'In Progress': 'doing',
   'In Review':   'doing',
-  'In Test':     'done',
-  'To Accept':   'done',
+  'In Test':     'to_accept',
+  'To Accept':   'to_accept',
   'Done':        'done',
 };
 
 /**
  * Statuses we deliberately hide from the board even if Jira still surfaces
- * them on the underlying board. Kept separate from STATUS_TO_COLUMN so
- * legacy rows that synced before the board-API switch still get dropped.
+ * them on the underlying board. `Done` is hidden so finished work stops
+ * cluttering the board; the local task still gets `status='done'` so it
+ * remains locked from edits in TimeTracker.
  */
-export const HIDDEN_STATUSES: ReadonlySet<string> = new Set(['Waiting']);
+export const HIDDEN_STATUSES: ReadonlySet<string> = new Set(['Waiting', 'Done']);
 
 /** Merged column → local `tasks.status` enum. */
-export const COLUMN_TO_LOCAL_STATUS: Record<BoardColumn, 'open' | 'in_progress' | 'done'> = {
-  todo:  'open',
-  doing: 'in_progress',
-  done:  'done',
+export const COLUMN_TO_LOCAL_STATUS: Record<BoardColumn, 'open' | 'in_progress' | 'to_accept' | 'done'> = {
+  todo:      'open',
+  doing:     'in_progress',
+  to_accept: 'to_accept',
+  done:      'done',
 };
 
 interface SnapshotRow {
   task_id: number;
   jira_key: string;
   title: string;
+  description: string | null;
   jira_status: string;
   jira_estimate_secs: number | null;
   jira_component: string | null;
@@ -68,6 +71,7 @@ const SNAPSHOT_SQL = `
     t.id            AS task_id,
     t.number        AS jira_key,
     t.title         AS title,
+    t.description   AS description,
     t.jira_status   AS jira_status,
     t.jira_estimate_secs AS jira_estimate_secs,
     t.jira_component AS jira_component,
@@ -166,6 +170,7 @@ export class JiraBoardService {
         taskId: r.task_id,
         jiraKey: r.jira_key,
         title: r.title,
+        description: r.description,
         jiraStatus: r.jira_status,
         // Default unknown statuses to 'doing' — they're in flight by definition.
         column: STATUS_TO_COLUMN[r.jira_status] ?? 'doing',
@@ -283,7 +288,14 @@ export class JiraBoardService {
       }
     }
 
-    const searchFields = ['summary', 'status', 'timeoriginalestimate', 'labels', 'components'];
+    const searchFields = [
+      'summary',
+      'description',
+      'status',
+      'timeoriginalestimate',
+      'labels',
+      'components',
+    ];
     if (epicFieldId) searchFields.push(epicFieldId);
 
     // Paginate through the Agile board endpoint until isLast or the hard
@@ -410,15 +422,23 @@ export class JiraBoardService {
       }
       const targetEpicId = targetEpic.id;
 
+      const description = pickDescription(hit);
+
       if (existing) {
         // Re-route the existing task to the (possibly different) target epic
         // and (when a different project owned it before — e.g. a key matching
         // an old glob) move it into THIS project. Routing is stable, so
         // unconditional re-routing fixes mis-routed legacy rows too.
+        // Description is refreshed every pull so Jira stays the source of
+        // truth. Once a task is locally `done` (set manually or via the
+        // worklog-lock auto-transition), the board pull no longer overwrites
+        // its status — otherwise tasks parked in Jira's "To Accept" column
+        // would revert on every sync.
         const update: Parameters<typeof tasksRepo.update>[1] = {
           title: hit.fields.summary,
-          status: localStatus,
+          description,
         };
+        if (existing.status !== 'done') update.status = localStatus;
         if (targetEpicId !== existing.epicId) {
           update.epicId = targetEpicId;
         }
@@ -437,6 +457,7 @@ export class JiraBoardService {
         epicId: targetEpicId,
         number: hit.key,
         title: hit.fields.summary,
+        description,
         status: localStatus,
       });
       tasksRepo.updateJiraFields(newTask.id, {
@@ -618,6 +639,7 @@ interface JiraIssueHit {
   key: string;
   fields: {
     summary: string;
+    description?: string | null;
     status: { name: string };
     timeoriginalestimate: number | null;
     labels?: string[];
@@ -627,6 +649,13 @@ interface JiraIssueHit {
     // statically.
     [customField: string]: unknown;
   };
+}
+
+function pickDescription(hit: JiraIssueHit): string | null {
+  const raw = hit.fields.description;
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function pickComponent(hit: JiraIssueHit): string | null {

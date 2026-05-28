@@ -38,6 +38,7 @@ describe('ProjectsRepo', () => {
       expect(p.folderPath).toBeNull();
       expect(p.jiraGlobs).toEqual([]);
       expect(p.jiraBoardUrl).toBeNull();
+      expect(p.taskUrlTemplate).toBeNull();
       expect(p.description).toBeNull();
       expect(p.epicCount).toBe(0);
       expect(p.totalMinutes).toBe(0);
@@ -140,6 +141,18 @@ describe('ProjectsRepo', () => {
       const raw = db.prepare(`SELECT jira_board_url FROM projects WHERE id = ?`).get(p.id) as { jira_board_url: string | null };
       expect(raw.jira_board_url).toBeNull();
       expect(repo.get(p.id)?.jiraBoardUrl).toBeNull();
+    });
+
+    it('round-trips taskUrlTemplate, trimming whitespace and treating empty strings as NULL', () => {
+      const tpl = 'https://jira.skoda.vwgroup.com/browse/{n}';
+      const p = repo.create({ name: 'FIE', taskUrlTemplate: `  ${tpl}  ` });
+      expect(p.taskUrlTemplate).toBe(tpl);
+      expect(repo.get(p.id)?.taskUrlTemplate).toBe(tpl);
+
+      repo.update(p.id, { taskUrlTemplate: '   ' });
+      const raw = db.prepare(`SELECT task_url_template FROM projects WHERE id = ?`).get(p.id) as { task_url_template: string | null };
+      expect(raw.task_url_template).toBeNull();
+      expect(repo.get(p.id)?.taskUrlTemplate).toBeNull();
     });
   });
 

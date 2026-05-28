@@ -38,7 +38,11 @@ export function transition(state: InstanceStatus, event: StateEvent): Transition
       return { state, outputs: [] };
 
     case 'sessionEnd':
-      return { state: 'finished', outputs: [] };
+      // Claude fires SessionEnd during mid-life rollovers (/clear, /compact,
+      // auto-compaction, /resume), not only on true process exit — so it is
+      // not a reliable terminal signal. Treat as a no-op; the pty closing
+      // (ptyExit below) is the authoritative end of an instance.
+      return { state, outputs: [] };
 
     case 'ptyExit':
       return { state: event.code === 0 ? 'finished' : 'crashed', outputs: [] };

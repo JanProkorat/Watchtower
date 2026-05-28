@@ -30,6 +30,7 @@ import type {
 const COLUMNS: Array<{ id: BoardColumn; label: string }> = [
   { id: 'todo', label: 'To do' },
   { id: 'doing', label: 'Doing' },
+  { id: 'to_accept', label: 'To accept' },
   { id: 'done', label: 'Done' },
 ];
 
@@ -159,7 +160,12 @@ export function BoardTab({ active }: Props) {
   };
 
   const byCol = useMemo(() => {
-    const map: Record<BoardColumn, BoardCardPayload[]> = { todo: [], doing: [], done: [] };
+    const map: Record<BoardColumn, BoardCardPayload[]> = {
+      todo: [],
+      doing: [],
+      to_accept: [],
+      done: [],
+    };
     snapshot?.cards.forEach((c) => map[c.column].push(c));
     return map;
   }, [snapshot]);
@@ -306,7 +312,7 @@ export function BoardTab({ active }: Props) {
         sx={{
           flex: 1,
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: `repeat(${COLUMNS.length}, 1fr)`,
           gap: 2,
           minHeight: 0,
         }}
@@ -482,6 +488,7 @@ export function BoardTab({ active }: Props) {
         open={selectedCard !== null}
         card={selectedCard}
         jiraBaseUrl={auth?.baseUrl ?? null}
+        taskUrlTemplate={selectedProject?.taskUrlTemplate ?? null}
         onClose={() => setSelectedCard(null)}
         onOpenJira={openInBrowser}
         onRemove={(taskId) => {

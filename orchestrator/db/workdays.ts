@@ -140,6 +140,49 @@ export function countWorkdays(
   return count;
 }
 
+/**
+ * Returns every workday (Mon-Fri minus Czech holidays and any user-marked
+ * days off) inside [from, to] as YYYY-MM-DD strings, in ascending order.
+ * Same predicate as countWorkdays so the two stay in lockstep.
+ */
+export function workdayDates(
+  from: string,
+  to: string,
+  extraNonWorking?: ReadonlySet<string>,
+): string[] {
+  if (from > to) return [];
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  if (
+    fy === undefined ||
+    fm === undefined ||
+    fd === undefined ||
+    ty === undefined ||
+    tm === undefined ||
+    td === undefined
+  ) {
+    return [];
+  }
+  const start = new Date(fy, fm - 1, fd);
+  const end = new Date(ty, tm - 1, td);
+  let lastYear = -1;
+  let holidayMap: Map<string, string> = new Map();
+  const out: string[] = [];
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) continue;
+    if (d.getFullYear() !== lastYear) {
+      lastYear = d.getFullYear();
+      holidayMap = czechHolidays(lastYear);
+    }
+    const key = ymd(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    if (holidayMap.has(key)) continue;
+    if (extraNonWorking?.has(key)) continue;
+    out.push(key);
+  }
+  return out;
+}
+
 /** Returns the holidays whose date falls inside [from, to]. */
 export function holidaysInRange(from: string, to: string): PublicHoliday[] {
   if (from > to) return [];

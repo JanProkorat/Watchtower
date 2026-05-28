@@ -9,28 +9,34 @@ import {
 
 describe('parseTimeTrackerHash', () => {
   it('parses every tab without a project id', () => {
-    expect(parseTimeTrackerHash('#timetracker/projects')).toEqual({ tab: 'projects', projectId: null });
-    expect(parseTimeTrackerHash('#timetracker/worklogs')).toEqual({ tab: 'worklogs', projectId: null });
-    expect(parseTimeTrackerHash('#timetracker/grid')).toEqual({ tab: 'grid', projectId: null });
-    expect(parseTimeTrackerHash('#timetracker/timeoff')).toEqual({ tab: 'timeoff', projectId: null });
-    expect(parseTimeTrackerHash('#timetracker/reports')).toEqual({ tab: 'reports', projectId: null });
-    expect(parseTimeTrackerHash('#timetracker/board')).toEqual({ tab: 'board', projectId: null });
+    expect(parseTimeTrackerHash('#billing/projects')).toEqual({ tab: 'projects', projectId: null });
+    expect(parseTimeTrackerHash('#billing/worklogs')).toEqual({ tab: 'worklogs', projectId: null });
+    expect(parseTimeTrackerHash('#billing/grid')).toEqual({ tab: 'grid', projectId: null });
+    expect(parseTimeTrackerHash('#billing/timeoff')).toEqual({ tab: 'timeoff', projectId: null });
+    expect(parseTimeTrackerHash('#billing/reports')).toEqual({ tab: 'reports', projectId: null });
+    expect(parseTimeTrackerHash('#billing/board')).toEqual({ tab: 'board', projectId: null });
   });
 
   it('parses a selected project on the projects tab', () => {
-    expect(parseTimeTrackerHash('#timetracker/projects/42')).toEqual({
+    expect(parseTimeTrackerHash('#billing/projects/42')).toEqual({
       tab: 'projects',
       projectId: 42,
     });
-    expect(parseTimeTrackerHash('#timetracker/projects/1')).toEqual({
+    expect(parseTimeTrackerHash('#billing/projects/1')).toEqual({
       tab: 'projects',
       projectId: 1,
     });
   });
 
   it('tolerates a missing leading #', () => {
-    expect(parseTimeTrackerHash('timetracker/projects')).toEqual({ tab: 'projects', projectId: null });
-    expect(parseTimeTrackerHash('timetracker/projects/7')).toEqual({ tab: 'projects', projectId: 7 });
+    expect(parseTimeTrackerHash('billing/projects')).toEqual({ tab: 'projects', projectId: null });
+    expect(parseTimeTrackerHash('billing/projects/7')).toEqual({ tab: 'projects', projectId: 7 });
+  });
+
+  it('still accepts the legacy #timetracker/ prefix (rename back-compat)', () => {
+    expect(parseTimeTrackerHash('#timetracker/projects')).toEqual({ tab: 'projects', projectId: null });
+    expect(parseTimeTrackerHash('#timetracker/projects/42')).toEqual({ tab: 'projects', projectId: 42 });
+    expect(parseTimeTrackerHash('timetracker/worklogs')).toEqual({ tab: 'worklogs', projectId: null });
   });
 
   it('returns null for an unrelated hash', () => {
@@ -41,43 +47,43 @@ describe('parseTimeTrackerHash', () => {
   });
 
   it('returns null for unknown tabs', () => {
-    expect(parseTimeTrackerHash('#timetracker/dashboard')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/projects/extra/segment')).toBeNull();
+    expect(parseTimeTrackerHash('#billing/dashboard')).toBeNull();
+    expect(parseTimeTrackerHash('#billing/projects/extra/segment')).toBeNull();
   });
 
   it('returns null for non-positive / non-integer / malformed project ids', () => {
-    expect(parseTimeTrackerHash('#timetracker/projects/abc')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/projects/-1')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/projects/0')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/projects/1.5')).toBeNull();
+    expect(parseTimeTrackerHash('#billing/projects/abc')).toBeNull();
+    expect(parseTimeTrackerHash('#billing/projects/-1')).toBeNull();
+    expect(parseTimeTrackerHash('#billing/projects/0')).toBeNull();
+    expect(parseTimeTrackerHash('#billing/projects/1.5')).toBeNull();
   });
 
   it('does not accept project ids on tabs other than projects', () => {
-    expect(parseTimeTrackerHash('#timetracker/worklogs/42')).toBeNull();
-    expect(parseTimeTrackerHash('#timetracker/board/42')).toBeNull();
+    expect(parseTimeTrackerHash('#billing/worklogs/42')).toBeNull();
+    expect(parseTimeTrackerHash('#billing/board/42')).toBeNull();
   });
 });
 
 describe('timetrackerHash', () => {
   it('serialises every tab without a selection to a stable hash', () => {
-    expect(timetrackerHash({ tab: 'projects', projectId: null })).toBe('#timetracker/projects');
-    expect(timetrackerHash({ tab: 'worklogs', projectId: null })).toBe('#timetracker/worklogs');
-    expect(timetrackerHash({ tab: 'grid', projectId: null })).toBe('#timetracker/grid');
-    expect(timetrackerHash({ tab: 'timeoff', projectId: null })).toBe('#timetracker/timeoff');
-    expect(timetrackerHash({ tab: 'reports', projectId: null })).toBe('#timetracker/reports');
-    expect(timetrackerHash({ tab: 'board', projectId: null })).toBe('#timetracker/board');
+    expect(timetrackerHash({ tab: 'projects', projectId: null })).toBe('#billing/projects');
+    expect(timetrackerHash({ tab: 'worklogs', projectId: null })).toBe('#billing/worklogs');
+    expect(timetrackerHash({ tab: 'grid', projectId: null })).toBe('#billing/grid');
+    expect(timetrackerHash({ tab: 'timeoff', projectId: null })).toBe('#billing/timeoff');
+    expect(timetrackerHash({ tab: 'reports', projectId: null })).toBe('#billing/reports');
+    expect(timetrackerHash({ tab: 'board', projectId: null })).toBe('#billing/board');
   });
 
   it('serialises a selected project on the projects tab', () => {
-    expect(timetrackerHash({ tab: 'projects', projectId: 42 })).toBe('#timetracker/projects/42');
-    expect(timetrackerHash({ tab: 'projects', projectId: 1 })).toBe('#timetracker/projects/1');
+    expect(timetrackerHash({ tab: 'projects', projectId: 42 })).toBe('#billing/projects/42');
+    expect(timetrackerHash({ tab: 'projects', projectId: 1 })).toBe('#billing/projects/1');
   });
 
   it('ignores projectId on non-projects tabs (defensive normalisation)', () => {
     // The hook never sets projectId for non-projects tabs, but if a caller
     // builds the view by hand we still produce a clean hash.
     expect(timetrackerHash({ tab: 'worklogs', projectId: 99 } as TimeTrackerView)).toBe(
-      '#timetracker/worklogs',
+      '#billing/worklogs',
     );
   });
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -31,6 +31,13 @@ import type {
 
 interface Props {
   projectId: number;
+  /**
+   * Bumped by the parent after an edit-drawer save so this pane re-fetches
+   * its locally-cached project — necessary because the edit goes through
+   * `useProjects` (list-level) while the pane reads from `useProject`
+   * (per-id), and the two caches are independent.
+   */
+  refreshTick?: number;
   onEdit(project: ProjectViewPayload): void;
   onDeleted(): void;
   onActivateInstance(id: string): void;
@@ -67,12 +74,17 @@ function formatRate(c: ContractViewPayload): string {
  */
 export function ProjectDetailPane({
   projectId,
+  refreshTick = 0,
   onEdit,
   onDeleted,
   onActivateInstance,
   onOpenNewInstanceForCwd,
 }: Props) {
   const state = useProject(projectId);
+  useEffect(() => {
+    if (refreshTick > 0) void state.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTick]);
   const contracts = useContracts(projectId);
   const { showError } = useToast();
   const launcher = useInstanceLauncher({
@@ -267,6 +279,7 @@ export function ProjectDetailPane({
           embedded
           projectName={project.name}
           projectColor={project.color}
+          taskUrlTemplate={project.taskUrlTemplate}
         />
       </Stack>
 

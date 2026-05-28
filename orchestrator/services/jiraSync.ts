@@ -118,7 +118,7 @@ interface CandidateRow {
   task_id: number;
   task_number: string;
   task_title: string;
-  task_status: 'open' | 'in_progress' | 'done';
+  task_status: 'open' | 'in_progress' | 'to_accept' | 'done';
   description: string | null;
   work_date: string;
   minutes: number;
@@ -205,26 +205,20 @@ function buildEntry(row: CandidateRow): OrchJiraSyncEntry {
 }
 
 function markPosted(db: SqliteLike, worklogId: number, jiraId: string): void {
-  db.prepare(
-    `UPDATE worklogs
-       SET source = 'jira', external_id = ?, jira_uploaded = 1
-       WHERE id = ?`,
-  ).run(jiraId, worklogId);
-}
-
-function markTaskDoneIfAllPosted(db: SqliteLike, taskId: number): boolean {
-  const row = db
-    .prepare(
-      `SELECT COUNT(*) AS unposted
-         FROM worklogs
-         WHERE task_id = ? AND jira_uploaded = 0`,
-    )
-    .get(taskId) as { unposted: number };
-  if (row.unposted > 0) return false;
-  const r = db
-    .prepare(`UPDATE tasks SET status = 'done' WHERE id = ? AND status != 'done'`)
-    .run(taskId) as { changes: number };
-  return r.changes > 0;
+  if (jiraId) {
+    db.prepare(
+      `UPDATE worklogs
+         SET source = 'jira', external_id = ?, jira_uploaded = 1
+         WHERE id = ?`,
+    ).run(jiraId, worklogId);
+  } else {
+    // Jira accepted (2xx) but returned no usable id. Flip jira_uploaded so a
+    // re-sync doesn't duplicate, but leave source/external_id alone — writing
+    // ('jira', '') would collide with the (source, external_id) unique index.
+    db.prepare(
+      `UPDATE worklogs SET jira_uploaded = 1 WHERE id = ?`,
+    ).run(worklogId);
+  }
 }
 
 interface PostOutcome {
@@ -249,10 +243,20 @@ async function postOne(
       Accept: 'application/json',
     },
     body: JSON.stringify(body),
+    // When the SSO cookie is stale, Jira responds with a 302 to the login page
+    // which itself chains into more redirects. Stop fetch from following them
+    // so we can recognise the redirect as an auth failure and refresh.
+    redirect: 'manual',
   });
   if (res.status >= 200 && res.status < 300) {
     const data = (await res.json().catch(() => null)) as { id?: unknown } | null;
-    const id = data && typeof data.id === 'string' ? data.id : undefined;
+    // Jira on-prem occasionally returns the worklog id as a number; cloud
+    // returns a string. Accept either.
+    let id: string | undefined;
+    if (data && data.id != null) {
+      if (typeof data.id === 'string') id = data.id;
+      else if (typeof data.id === 'number') id = String(data.id);
+    }
     return { ok: true, status: res.status, worklogId: id };
   }
   const text = await res.text().catch(() => '');
@@ -264,7 +268,9 @@ async function postOne(
 }
 
 function isAuthFailure(status: number): boolean {
-  return status === 401 || status === 403 || status === 302 || status === 303;
+  // Any 3xx with redirect:'manual' means Jira bounced us to the SSO login —
+  // cookie expired. 401/403 are the explicit unauth cases.
+  return status === 401 || status === 403 || (status >= 300 && status < 400);
 }
 
 function emptyResult(dryRun: boolean): OrchJiraSyncResult {
@@ -322,10 +328,6 @@ export class JiraSyncService {
         result.skippedNoJiraKey += 1;
         continue;
       }
-      if (row.task_status !== 'open') {
-        result.skippedTaskNotOpen += 1;
-        continue;
-      }
       const alreadyPosted = row.jira_uploaded === 1;
       if (alreadyPosted && onlyUnposted) {
         result.skippedAlreadyPosted += 1;
@@ -363,10 +365,6 @@ export class JiraSyncService {
     for (const row of rows) {
       if (!JIRA_KEY_RE.test(row.task_number)) {
         result.skippedNoJiraKey += 1;
-        continue;
-      }
-      if (row.task_status !== 'open') {
-        result.skippedTaskNotOpen += 1;
         continue;
       }
       const alreadyPosted = row.jira_uploaded === 1;
@@ -435,16 +433,17 @@ export class JiraSyncService {
         }
       }
 
-      if (outcome.ok && outcome.worklogId) {
-        markPosted(this.db, row.id, outcome.worklogId);
+      if (outcome.ok) {
+        // Always flip jira_uploaded=1 on a 2xx response — even if Jira didn't
+        // return a usable id. Otherwise the next sync re-posts the same
+        // worklog and creates duplicates in Jira.
+        const jiraId = outcome.worklogId ?? '';
+        markPosted(this.db, row.id, jiraId);
         entry.status = 'posted';
-        entry.jiraWorklogId = outcome.worklogId;
-        entry.jiraWorklogUrl = `${this.cfg.baseUrl}/browse/${row.task_number}?focusedWorklogId=${outcome.worklogId}`;
-        result.posted += 1;
-      } else if (outcome.ok) {
-        // Jira accepted but didn't return an id we recognise — count it but
-        // don't fabricate an external_id (leaves the row syncable next run).
-        entry.status = 'posted';
+        if (jiraId) {
+          entry.jiraWorklogId = jiraId;
+          entry.jiraWorklogUrl = `${this.cfg.baseUrl}/browse/${row.task_number}?focusedWorklogId=${jiraId}`;
+        }
         result.posted += 1;
       } else {
         entry.status = 'failed';
@@ -454,17 +453,6 @@ export class JiraSyncService {
     }
 
     result.attempted = toPost.length;
-
-    // After all posts complete, mark tasks done if every worklog under them
-    // now has jira_uploaded=1. Only consider tasks we touched in this run.
-    const touchedTaskIds = new Set<number>();
-    for (const { row, entry } of toPost) {
-      if (entry.status === 'posted') touchedTaskIds.add(row.task_id);
-    }
-    for (const taskId of touchedTaskIds) {
-      if (markTaskDoneIfAllPosted(this.db, taskId)) result.tasksMarkedDone += 1;
-    }
-
     return result;
   }
 }

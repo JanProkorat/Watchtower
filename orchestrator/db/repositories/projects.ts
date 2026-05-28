@@ -12,6 +12,8 @@ export interface ProjectRow {
   folderPath: string | null;
   jiraGlobs: string[];
   jiraBoardUrl: string | null;
+  /** URL template for opening a task in its issue tracker. `{n}` → task number. */
+  taskUrlTemplate: string | null;
   description: string | null;
   createdAt: string;
   /** epic_count joined at list time — 0 until Phase 15 lands epics CRUD. */
@@ -28,6 +30,7 @@ export interface ProjectInput {
   folderPath?: string | null;
   jiraGlobs?: string[];
   jiraBoardUrl?: string | null;
+  taskUrlTemplate?: string | null;
   description?: string | null;
 }
 
@@ -48,6 +51,7 @@ type DbRow = {
   folder_path: string | null;
   jira_globs: string | null;
   jira_board_url: string | null;
+  task_url_template: string | null;
   description: string | null;
   created_at: string;
   epic_count: number;
@@ -62,6 +66,18 @@ type DbRow = {
  * blocking the save.
  */
 function normaliseBoardUrl(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Trim incoming task URL templates and treat empty / whitespace-only strings
+ * as "unset". The `{n}` placeholder is validated lazily at link build time
+ * (helper in client/src/util/format.ts) — pasting a malformed template still
+ * saves so the user can fix it in place.
+ */
+function normaliseTaskUrlTemplate(value: string | null | undefined): string | null {
   if (value === undefined || value === null) return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
@@ -89,6 +105,7 @@ function toRow(r: DbRow): ProjectRow {
     folderPath: r.folder_path,
     jiraGlobs: parseGlobs(r.jira_globs),
     jiraBoardUrl: r.jira_board_url,
+    taskUrlTemplate: r.task_url_template,
     description: r.description,
     createdAt: r.created_at,
     epicCount: r.epic_count,
@@ -108,7 +125,7 @@ const DEFAULTS = {
 const LIST_SQL = `
   SELECT
     p.id, p.name, p.color, p.archived, p.kind, p.is_default,
-    p.folder_path, p.jira_globs, p.jira_board_url, p.description, p.created_at,
+    p.folder_path, p.jira_globs, p.jira_board_url, p.task_url_template, p.description, p.created_at,
     (SELECT COUNT(*) FROM epics e WHERE e.project_id = p.id) AS epic_count,
     (SELECT COALESCE(SUM(w.minutes), 0)
        FROM worklogs w
@@ -163,14 +180,15 @@ export class ProjectsRepo {
     const isBillable = kind === 'work' ? 1 : 0;
     const globs = input.jiraGlobs ? JSON.stringify(input.jiraGlobs) : null;
     const boardUrl = normaliseBoardUrl(input.jiraBoardUrl);
+    const taskUrl = normaliseTaskUrlTemplate(input.taskUrlTemplate);
 
     this.db.exec('BEGIN IMMEDIATE');
     try {
       if (isDefault) this.clearDefault();
       const info = this.db
         .prepare(
-          `INSERT INTO projects (name, color, archived, is_billable, kind, is_default, folder_path, jira_globs, jira_board_url, description)
-           VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO projects (name, color, archived, is_billable, kind, is_default, folder_path, jira_globs, jira_board_url, task_url_template, description)
+           VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           input.name,
@@ -181,6 +199,7 @@ export class ProjectsRepo {
           input.folderPath ?? null,
           globs,
           boardUrl,
+          taskUrl,
           input.description ?? null,
         ) as { lastInsertRowid: number | bigint };
       this.db.exec('COMMIT');
@@ -212,6 +231,9 @@ export class ProjectsRepo {
     }
     if (input.jiraBoardUrl !== undefined) {
       push('jira_board_url', normaliseBoardUrl(input.jiraBoardUrl));
+    }
+    if (input.taskUrlTemplate !== undefined) {
+      push('task_url_template', normaliseTaskUrlTemplate(input.taskUrlTemplate));
     }
     if (input.description !== undefined) push('description', input.description);
 

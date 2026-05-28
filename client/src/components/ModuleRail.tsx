@@ -2,15 +2,31 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Box, ButtonBase, IconButton, Tooltip, Typography } from '@mui/material';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import TerminalIcon from '@mui/icons-material/Terminal';
-import TimerIcon from '@mui/icons-material/Timer';
+import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
+import BeachAccessOutlinedIcon from '@mui/icons-material/BeachAccessOutlined';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import ViewKanbanOutlinedIcon from '@mui/icons-material/ViewKanbanOutlined';
+import TuneIcon from '@mui/icons-material/Tune';
+import DataObjectIcon from '@mui/icons-material/DataObject';
+import WebhookIcon from '@mui/icons-material/Webhook';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import CableIcon from '@mui/icons-material/Cable';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import type { ThemeMode } from '../theme.js';
+import type { ListTab } from '../util/timetrackerUrl.js';
+import type { SettingsTab } from '../util/settingsUrl.js';
 
-export type ModuleId = 'dashboard' | 'instances' | 'timetracker' | 'settings';
+export type ModuleId = 'dashboard' | 'instances' | 'billing' | 'settings';
 
 interface RailItem {
   id: ModuleId;
@@ -22,13 +38,55 @@ interface RailItem {
 const ITEMS: RailItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <SpaceDashboardIcon fontSize="small" />, enabled: true },
   { id: 'instances', label: 'Instances', icon: <TerminalIcon fontSize="small" />, enabled: true },
-  { id: 'timetracker', label: 'TimeTracker', icon: <TimerIcon fontSize="small" />, enabled: true },
+  { id: 'billing', label: 'Billing', icon: <RequestQuoteIcon fontSize="small" />, enabled: true },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="small" />, enabled: true },
+];
+
+/** Sub-tab metadata for a module that exposes children under its rail entry. */
+interface SubTabMeta<T extends string> {
+  id: T;
+  label: string;
+  icon: ReactNode;
+}
+
+/**
+ * Billing sub-section: tabs that used to live as an in-page tab strip on the
+ * Billing module. Rendered indented under the Billing parent when the rail
+ * and the Billing section are both expanded.
+ */
+const BILLING_TABS: Array<SubTabMeta<ListTab>> = [
+  { id: 'projects', label: 'Projects', icon: <FolderOutlinedIcon fontSize="inherit" /> },
+  { id: 'worklogs', label: 'Worklogs', icon: <AccessTimeIcon fontSize="inherit" /> },
+  { id: 'grid', label: 'Task grid', icon: <TableChartOutlinedIcon fontSize="inherit" /> },
+  { id: 'timeoff', label: 'Time off', icon: <BeachAccessOutlinedIcon fontSize="inherit" /> },
+  { id: 'reports', label: 'Reports', icon: <BarChartIcon fontSize="inherit" /> },
+  { id: 'board', label: 'Board', icon: <ViewKanbanOutlinedIcon fontSize="inherit" /> },
+];
+
+/** Settings sub-section: same pattern as Billing, for the six settings tabs. */
+const SETTINGS_SUB_TABS: Array<SubTabMeta<SettingsTab>> = [
+  { id: 'general', label: 'General', icon: <TuneIcon fontSize="inherit" /> },
+  { id: 'json', label: 'settings.json', icon: <DataObjectIcon fontSize="inherit" /> },
+  { id: 'hooks', label: 'Hooks', icon: <WebhookIcon fontSize="inherit" /> },
+  { id: 'skills', label: 'Skills', icon: <AutoAwesomeIcon fontSize="inherit" /> },
+  { id: 'agents', label: 'Agents', icon: <SmartToyIcon fontSize="inherit" /> },
+  { id: 'mcp', label: 'MCP', icon: <CableIcon fontSize="inherit" /> },
 ];
 
 const COLLAPSED_WIDTH = 52;
 const EXPANDED_WIDTH = 232;
 const STORAGE_KEY = 'watchtower.moduleRail.expanded';
+const BILLING_STORAGE_KEY = 'watchtower.moduleRail.billingExpanded';
+const SETTINGS_STORAGE_KEY = 'watchtower.moduleRail.settingsExpanded';
+
+function readPersistedBool(key: string, fallback: boolean): boolean {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v === '1';
+  } catch {
+    return fallback;
+  }
+}
 
 function WatchtowerLogo({ size = 28 }: { size?: number }) {
   return (
@@ -48,28 +106,109 @@ function WatchtowerLogo({ size = 28 }: { size?: number }) {
 
 interface Props {
   active: ModuleId;
+  /** Selected sub-tab in the Billing module (highlights a rail child). */
+  billingTab: ListTab;
+  /** Selected sub-tab in the Settings module (highlights a rail child). */
+  settingsTab: SettingsTab;
   onSelect(id: ModuleId): void;
+  /** Switch to Billing and route to a specific sub-tab. */
+  onSelectBillingTab(tab: ListTab): void;
+  /** Switch to Settings and route to a specific sub-tab. */
+  onSelectSettingsTab(tab: SettingsTab): void;
   mode: ThemeMode;
   onToggleMode(): void;
 }
 
-export function ModuleRail({ active, onSelect, mode, onToggleMode }: Props) {
-  const [expanded, setExpanded] = useState<boolean>(() => {
-    try {
-      const v = localStorage.getItem(STORAGE_KEY);
-      return v === null ? true : v === '1';
-    } catch {
-      return true;
-    }
-  });
+/**
+ * Runtime descriptor for the expandable sub-section under a rail item. Shared
+ * shape so the render loop can treat Billing and Settings identically.
+ */
+interface SubSection {
+  tabs: Array<SubTabMeta<string>>;
+  expanded: boolean;
+  setExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+  activeTab: string;
+  onSelect(tab: string): void;
+  label: string;
+}
+
+export function ModuleRail({
+  active,
+  billingTab,
+  settingsTab,
+  onSelect,
+  onSelectBillingTab,
+  onSelectSettingsTab,
+  mode,
+  onToggleMode,
+}: Props) {
+  const [expanded, setExpanded] = useState<boolean>(() => readPersistedBool(STORAGE_KEY, true));
+  const [billingExpanded, setBillingExpanded] = useState<boolean>(() =>
+    readPersistedBool(BILLING_STORAGE_KEY, true),
+  );
+  const [settingsExpanded, setSettingsExpanded] = useState<boolean>(() =>
+    readPersistedBool(SETTINGS_STORAGE_KEY, true),
+  );
 
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, expanded ? '1' : '0');
     } catch {
-      // ignore — persistence is best-effort
+      /* best-effort */
     }
   }, [expanded]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(BILLING_STORAGE_KEY, billingExpanded ? '1' : '0');
+    } catch {
+      /* best-effort */
+    }
+  }, [billingExpanded]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, settingsExpanded ? '1' : '0');
+    } catch {
+      /* best-effort */
+    }
+  }, [settingsExpanded]);
+
+  const subSections: Partial<Record<ModuleId, SubSection>> = {
+    billing: {
+      tabs: BILLING_TABS as Array<SubTabMeta<string>>,
+      expanded: billingExpanded,
+      setExpanded: setBillingExpanded,
+      activeTab: billingTab,
+      onSelect: (t) => onSelectBillingTab(t as ListTab),
+      label: 'Billing',
+    },
+    settings: {
+      tabs: SETTINGS_SUB_TABS as Array<SubTabMeta<string>>,
+      expanded: settingsExpanded,
+      setExpanded: setSettingsExpanded,
+      activeTab: settingsTab,
+      onSelect: (t) => onSelectSettingsTab(t as SettingsTab),
+      label: 'Settings',
+    },
+  };
+
+  const handleParentClick = (id: ModuleId) => {
+    const sub = subSections[id];
+    if (!sub) {
+      onSelect(id);
+      return;
+    }
+    // When already on this module, the parent click toggles the sub-list
+    // (user's collapse/expand). When switching in from elsewhere, activate
+    // the module and force the sub-list open so the active child is visible.
+    if (active === id) {
+      sub.setExpanded((v) => !v);
+    } else {
+      onSelect(id);
+      sub.setExpanded(true);
+    }
+  };
 
   return (
     <Box
@@ -145,10 +284,11 @@ export function ModuleRail({ active, onSelect, mode, onToggleMode }: Props) {
 
       {ITEMS.map((item) => {
         const isActive = active === item.id && item.enabled;
+        const sub = subSections[item.id];
         const row = (
           <ButtonBase
             disabled={!item.enabled}
-            onClick={() => item.enabled && onSelect(item.id)}
+            onClick={() => item.enabled && handleParentClick(item.id)}
             sx={{
               width: expanded ? '100%' : 40,
               height: 40,
@@ -183,6 +323,8 @@ export function ModuleRail({ active, onSelect, mode, onToggleMode }: Props) {
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   color: 'inherit',
+                  flex: 1,
+                  textAlign: 'left',
                 }}
               >
                 {item.label}
@@ -191,15 +333,39 @@ export function ModuleRail({ active, onSelect, mode, onToggleMode }: Props) {
           </ButtonBase>
         );
 
-        if (expanded) {
-          return (
-            <Box key={item.id} sx={{ display: 'flex' }}>
-              {row}
-            </Box>
-          );
-        }
+        // Chevron lives outside the ButtonBase so clicking it doesn't also
+        // fire the row's onClick (which would switch modules). Only rendered
+        // for items that own a sub-section and when the rail is expanded.
+        const chevron = sub && expanded ? (
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              sub.setExpanded((v) => !v);
+            }}
+            aria-label={`${sub.expanded ? 'Collapse' : 'Expand'} ${sub.label}`}
+            sx={{
+              width: 28,
+              height: 28,
+              ml: 0.5,
+              color: 'text.secondary',
+              ':hover': { color: 'text.primary', backgroundColor: 'action.hover' },
+            }}
+          >
+            {sub.expanded ? (
+              <ExpandLessIcon fontSize="small" />
+            ) : (
+              <ExpandMoreIcon fontSize="small" />
+            )}
+          </IconButton>
+        ) : null;
 
-        return (
+        const parentRow = expanded ? (
+          <Box key={item.id} sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ flex: 1, display: 'flex' }}>{row}</Box>
+            {chevron}
+          </Box>
+        ) : (
           <Tooltip
             key={item.id}
             title={item.enabled ? item.label : `${item.label} (coming soon)`}
@@ -207,6 +373,64 @@ export function ModuleRail({ active, onSelect, mode, onToggleMode }: Props) {
           >
             <span style={{ display: 'flex', justifyContent: 'center' }}>{row}</span>
           </Tooltip>
+        );
+
+        if (!sub || !expanded || !sub.expanded) return parentRow;
+
+        return (
+          <Box key={item.id} sx={{ display: 'flex', flexDirection: 'column' }}>
+            {parentRow}
+            {sub.tabs.map((tab) => {
+              const subActive = active === item.id && sub.activeTab === tab.id;
+              return (
+                <ButtonBase
+                  key={tab.id}
+                  onClick={() => sub.onSelect(tab.id)}
+                  sx={{
+                    height: 32,
+                    pl: 4,
+                    pr: 1,
+                    borderRadius: 1,
+                    justifyContent: 'flex-start',
+                    gap: 1,
+                    color: subActive ? 'primary.main' : 'text.secondary',
+                    backgroundColor: subActive ? 'action.selected' : 'transparent',
+                    transition: 'background-color 120ms ease, color 120ms ease',
+                    ':hover': {
+                      backgroundColor: subActive ? 'action.selected' : 'action.hover',
+                      color: 'text.primary',
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 18,
+                      fontSize: 16,
+                      color: 'inherit',
+                    }}
+                  >
+                    {tab.icon}
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: subActive ? 600 : 400,
+                      color: 'inherit',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {tab.label}
+                  </Typography>
+                </ButtonBase>
+              );
+            })}
+          </Box>
         );
       })}
 

@@ -92,6 +92,16 @@ app.on('window-all-closed', () => {
   // intentionally no-op — orchestrator + tray keep the app alive
 });
 
+// macOS: dock-icon click (and "Show" from the dock menu) fires `activate`.
+// Without this handler the window stays hidden after a Cmd+H / red-close,
+// because window-all-closed is a no-op and nothing else re-shows it.
+app.on('activate', () => {
+  const win = createMainWindow();
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+});
+
 // Cmd+Q / "Quit" menu items / app.quit() all funnel through before-quit. If
 // any claude tab is currently running we want to confirm before tearing it
 // down. The respawn-on-launch path will bring everything back next time

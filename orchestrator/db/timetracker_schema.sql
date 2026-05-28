@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   number            TEXT    NOT NULL,
   title             TEXT    NOT NULL,
   status            TEXT    NOT NULL DEFAULT 'open'
-                      CHECK (status IN ('open','in_progress','done')),
+                      CHECK (status IN ('open','in_progress','to_accept','done')),
   estimated_minutes INTEGER,
   created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
 );

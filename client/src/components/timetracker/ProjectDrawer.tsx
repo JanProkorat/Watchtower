@@ -48,6 +48,7 @@ interface DraftState {
   folderPath: string;
   jiraGlobs: string[];
   jiraBoardUrl: string;
+  taskUrlTemplate: string;
   description: string;
 }
 
@@ -60,6 +61,7 @@ function emptyDraft(): DraftState {
     folderPath: '',
     jiraGlobs: [],
     jiraBoardUrl: '',
+    taskUrlTemplate: '',
     description: '',
   };
 }
@@ -74,6 +76,7 @@ function draftOf(project: ProjectViewPayload | null): DraftState {
     folderPath: project.folderPath ?? '',
     jiraGlobs: project.jiraGlobs.length > 0 ? project.jiraGlobs : [],
     jiraBoardUrl: project.jiraBoardUrl ?? '',
+    taskUrlTemplate: project.taskUrlTemplate ?? '',
     description: project.description ?? '',
   };
 }
@@ -240,6 +243,17 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
           />
 
           <TextField
+            label="Task URL template"
+            size="small"
+            value={draft.taskUrlTemplate}
+            onChange={(e) => setDraft({ ...draft, taskUrlTemplate: e.target.value })}
+            placeholder="https://jira.skoda.vwgroup.com/browse/{n}"
+            helperText="Used by the open-in-new icon next to task numbers. {n} is replaced by the task number. Leave empty to hide the icon."
+            fullWidth
+            sx={{ '& input': { fontFamily: 'Menlo, monospace', fontSize: 12 } }}
+          />
+
+          <TextField
             label="Description"
             size="small"
             value={draft.description}
@@ -357,6 +371,7 @@ function toInput(draft: DraftState): ProjectInputPayload {
     folderPath: draft.folderPath.trim() ? draft.folderPath.trim() : null,
     jiraGlobs: draft.jiraGlobs.filter((g) => g.trim() !== ''),
     jiraBoardUrl: draft.jiraBoardUrl.trim() ? draft.jiraBoardUrl.trim() : null,
+    taskUrlTemplate: draft.taskUrlTemplate.trim() ? draft.taskUrlTemplate.trim() : null,
     description: draft.description.trim() ? draft.description.trim() : null,
   };
 }

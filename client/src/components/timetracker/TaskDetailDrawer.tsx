@@ -60,9 +60,10 @@ interface Props {
   onOpenExternal?(url: string): void;
 }
 
-const STATUS_OPTIONS: { value: 'open' | 'in_progress' | 'done'; label: string }[] = [
+const STATUS_OPTIONS: { value: 'open' | 'in_progress' | 'to_accept' | 'done'; label: string }[] = [
   { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In progress' },
+  { value: 'to_accept', label: 'To accept' },
   { value: 'done', label: 'Done' },
 ];
 
@@ -125,7 +126,8 @@ export function TaskDetailDrawer({
   const handleOpenExternal = (e: React.MouseEvent) => {
     if (!externalUrl) return;
     e.preventDefault();
-    onOpenExternal?.(externalUrl);
+    if (onOpenExternal) onOpenExternal(externalUrl);
+    else void window.watchtower.invoke('openExternalUrl', { url: externalUrl });
   };
 
   const handleAddWorklog = async (values: {
@@ -188,7 +190,7 @@ export function TaskDetailDrawer({
     }
   };
 
-  const changeStatus = async (next: 'open' | 'in_progress' | 'done') => {
+  const changeStatus = async (next: 'open' | 'in_progress' | 'to_accept' | 'done') => {
     if (next === task.status) return;
     try {
       await onUpdate({ status: next });
@@ -345,7 +347,7 @@ export function TaskDetailDrawer({
               <Select
                 size="small"
                 value={task.status}
-                onChange={(e) => void changeStatus(e.target.value as 'open' | 'in_progress' | 'done')}
+                onChange={(e) => void changeStatus(e.target.value as 'open' | 'in_progress' | 'to_accept' | 'done')}
               >
                 {STATUS_OPTIONS.map((opt) => (
                   <MenuItem key={opt.value} value={opt.value}>

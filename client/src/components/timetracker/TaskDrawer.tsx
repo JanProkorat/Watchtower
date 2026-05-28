@@ -31,7 +31,7 @@ interface Draft {
   number: string;
   title: string;
   description: string;
-  status: 'open' | 'in_progress' | 'done';
+  status: 'open' | 'in_progress' | 'to_accept' | 'done';
   estimateHours: string;
 }
 
@@ -81,12 +81,11 @@ export function TaskDrawer({
   }, [open, task, defaultEpicId]);
 
   const isEdit = task !== null;
-  // A task that's been marked Done is treated as read-only — only the Status
-  // dropdown stays editable so the user can re-open the task to edit fields.
-  // The draft.status check (not task.status) means flipping Done → Doing in
-  // the dropdown immediately unlocks the rest of the form within this open
-  // session, without forcing a save round-trip.
-  const taskDone = isEdit && draft.status === 'done';
+  // Done tasks are fully read-only — including the Status field. Reopening
+  // is intentionally not possible from the client (Jira sync is the only
+  // way a task can move out of "done"), matching the orchestrator-side
+  // assertTaskNotDone() guard on tasks:update.
+  const taskDone = isEdit && task.status === 'done';
   const canSubmit =
     draft.title.trim().length > 0 && draft.number.trim().length > 0 && !submitting;
 
@@ -152,7 +151,7 @@ export function TaskDrawer({
           {error && <Alert severity="error">{error}</Alert>}
           {taskDone && (
             <Alert severity="info">
-              This task is marked Done — change status to reopen it for editing.
+              This task is marked Done and is locked. Move it back via Jira to edit it.
             </Alert>
           )}
 
@@ -215,13 +214,15 @@ export function TaskDrawer({
               onChange={(e) =>
                 setDraft({
                   ...draft,
-                  status: e.target.value as 'open' | 'in_progress' | 'done',
+                  status: e.target.value as 'open' | 'in_progress' | 'to_accept' | 'done',
                 })
               }
               sx={{ flex: 1 }}
+              disabled={taskDone}
             >
               <MenuItem value="open">To do</MenuItem>
               <MenuItem value="in_progress">Doing</MenuItem>
+              <MenuItem value="to_accept">To accept</MenuItem>
               <MenuItem value="done">Done</MenuItem>
             </TextField>
 
@@ -258,7 +259,7 @@ export function TaskDrawer({
                 onClose();
               }}
               disabled={submitting || taskDone}
-              title={taskDone ? 'Reopen the task to delete it.' : undefined}
+              title={taskDone ? 'Done tasks are locked.' : undefined}
             >
               Delete
             </Button>
@@ -267,7 +268,11 @@ export function TaskDrawer({
           <Button variant="text" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
-          <Button variant="contained" onClick={() => void submit()} disabled={!canSubmit}>
+          <Button
+            variant="contained"
+            onClick={() => void submit()}
+            disabled={!canSubmit || taskDone}
+          >
             {submitting ? 'Saving…' : isEdit ? 'Save' : 'Create'}
           </Button>
         </Box>

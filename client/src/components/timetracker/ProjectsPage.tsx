@@ -35,7 +35,17 @@ export function ProjectsPage({
 }: Props) {
   const projectsState = useProjects();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editing, setEditing] = useState<ProjectViewPayload | null>(null);
+  // Track the id, not a snapshot — that way the drawer always reads the
+  // latest payload from `projectsState.projects` (which refreshes on every
+  // mutation). Snapshots go stale after a save and the form re-seeds from
+  // pre-edit data on the next open.
+  const [editingId, setEditingId] = useState<number | null>(null);
+  // Bumped after each edit so ProjectDetailPane re-fetches its independently
+  // cached project payload — list-level + per-id caches don't share state.
+  const [refreshTick, setRefreshTick] = useState(0);
+  const editing = editingId === null
+    ? null
+    : projectsState.projects.find((p) => p.id === editingId) ?? null;
 
   // Auto-select once the list loads: prefer default, fall back to first.
   // We only nudge the selection when nothing is set or when the previously
@@ -66,12 +76,12 @@ export function ProjectsPage({
   ]);
 
   const openCreate = () => {
-    setEditing(null);
+    setEditingId(null);
     setDrawerOpen(true);
   };
 
   const openEdit = (project: ProjectViewPayload) => {
-    setEditing(project);
+    setEditingId(project.id);
     setDrawerOpen(true);
   };
 
@@ -92,6 +102,7 @@ export function ProjectsPage({
           <ProjectDetailPane
             key={selectedProjectId}
             projectId={selectedProjectId}
+            refreshTick={refreshTick}
             onEdit={openEdit}
             onDeleted={async () => {
               onSelectProject(null);
@@ -112,6 +123,7 @@ export function ProjectsPage({
         onSubmit={async (input) => {
           if (editing) {
             await projectsState.update(editing.id, input);
+            setRefreshTick((v) => v + 1);
           } else {
             const created = await projectsState.create(input);
             onSelectProject(created.id);

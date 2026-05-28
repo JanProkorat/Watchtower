@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import DOMPurify from 'dompurify';
 import {
   Alert,
   Box,
@@ -36,6 +37,7 @@ import type {
 } from '../../../../shared/ipcContract.js';
 import {
   CZ_DATE_FORMAT,
+  buildTaskUrl,
   formatDateCz,
   formatMinutes,
   parseMinutes,
@@ -44,7 +46,17 @@ import {
 interface Props {
   open: boolean;
   card: BoardCardPayload | null;
+  /**
+   * Jira host root (e.g. `https://jira.skoda.vwgroup.com`). Used to absolute-ise
+   * relative `src=` / `href=` references inside Jira description HTML. Open-in-
+   * tracker link comes from `taskUrlTemplate` instead.
+   */
   jiraBaseUrl: string | null;
+  /**
+   * Per-project URL template for the open-in-tracker link (`{n}` → task number).
+   * When null, the link icon is hidden.
+   */
+  taskUrlTemplate: string | null;
   onClose(): void;
   onOpenJira(url: string): void;
   onRemove(taskId: number): void;
@@ -54,6 +66,7 @@ export function BoardTaskDetailDrawer({
   open,
   card,
   jiraBaseUrl,
+  taskUrlTemplate,
   onClose,
   onOpenJira,
   onRemove,
@@ -91,6 +104,28 @@ export function BoardTaskDetailDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, card?.taskId]);
 
+  // Jira returns the description as HTML — sanitize with DOMPurify before
+  // dropping into the DOM. The default config strips <script>, on*=, javascript:
+  // URLs etc. while keeping the formatting tags Jira uses (b, i, ul, code, …).
+  // Jira embeds relative attachment paths (/secure/attachment/...) in img/src
+  // and a/href; rewrite them to absolute URLs against the Jira host so they
+  // resolve when the renderer fetches them. Memo runs unconditionally (above
+  // the early-return) so the hook order stays stable across `card` changes.
+  const rawDescription = card?.description ?? null;
+  const descriptionHtml = useMemo(() => {
+    if (!rawDescription) return '';
+    const absolutise = (raw: string): string => {
+      if (!jiraBaseUrl) return raw;
+      if (/^[a-z]+:\/\//i.test(raw) || raw.startsWith('//') || raw.startsWith('#')) return raw;
+      if (raw.startsWith('/')) return `${jiraBaseUrl}${raw}`;
+      return raw;
+    };
+    const rewritten = rawDescription
+      .replace(/(\ssrc=")([^"]+)(")/g, (_, p1, url, p3) => `${p1}${absolutise(url)}${p3}`)
+      .replace(/(\shref=")([^"]+)(")/g, (_, p1, url, p3) => `${p1}${absolutise(url)}${p3}`);
+    return DOMPurify.sanitize(rewritten, { USE_PROFILES: { html: true } });
+  }, [rawDescription, jiraBaseUrl]);
+
   if (!card) {
     return (
       <Drawer
@@ -114,7 +149,19 @@ export function BoardTaskDetailDrawer({
     card.loggedMinutes;
   const estimateMinutes =
     card.estimateSeconds != null ? Math.round(card.estimateSeconds / 60) : null;
-  const externalUrl = jiraBaseUrl ? `${jiraBaseUrl}/browse/${card.jiraKey}` : null;
+  const externalUrl = buildTaskUrl(taskUrlTemplate, card.jiraKey);
+
+  // Intercept link clicks inside the rendered description so they open in
+  // the system browser via the existing openExternalUrl IPC instead of
+  // navigating the Electron renderer (which would unload the whole app).
+  const handleDescriptionClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const anchor = (e.target as HTMLElement).closest('a');
+    if (!anchor) return;
+    const href = anchor.getAttribute('href');
+    if (!href || href.startsWith('#')) return;
+    e.preventDefault();
+    if (/^https:\/\//i.test(href)) onOpenJira(href);
+  };
 
   const handleAddWorklog = async (values: {
     work_date: string;
@@ -310,6 +357,56 @@ export function BoardTaskDetailDrawer({
                 className="tt-num"
               />
             </Stack>
+            {descriptionHtml && (
+              <Box
+                className="board-task-description"
+                onClick={handleDescriptionClick}
+                sx={{
+                  mt: 2,
+                  p: 1.5,
+                  bgcolor: 'background.default',
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  fontSize: 13,
+                  color: 'text.secondary',
+                  maxHeight: 320,
+                  overflowY: 'auto',
+                  // Tame Jira's HTML so it inherits the drawer's typography
+                  // instead of carrying over server-side defaults.
+                  '& p': { m: 0, mb: 1, '&:last-child': { mb: 0 } },
+                  '& a': { color: 'primary.main' },
+                  '& ul, & ol': { pl: 2.5, my: 1 },
+                  '& li': { mb: 0.25 },
+                  '& code': {
+                    fontFamily: 'ui-monospace, Menlo, monospace',
+                    fontSize: 12,
+                    bgcolor: 'action.hover',
+                    px: 0.5,
+                    borderRadius: 0.5,
+                  },
+                  '& pre': {
+                    fontFamily: 'ui-monospace, Menlo, monospace',
+                    fontSize: 12,
+                    bgcolor: 'action.hover',
+                    p: 1,
+                    borderRadius: 0.5,
+                    overflowX: 'auto',
+                  },
+                  '& img': { maxWidth: '100%' },
+                  '& blockquote': {
+                    borderLeft: 3,
+                    borderColor: 'divider',
+                    pl: 1.5,
+                    ml: 0,
+                    color: 'text.disabled',
+                  },
+                  '& table': { borderCollapse: 'collapse' },
+                  '& th, & td': { border: 1, borderColor: 'divider', px: 1, py: 0.5 },
+                }}
+                dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+              />
+            )}
           </Paper>
 
           {/* Add worklog form */}
