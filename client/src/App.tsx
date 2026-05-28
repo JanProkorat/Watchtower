@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -16,64 +16,45 @@ import {
 } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import 'dayjs/locale/cs';
 import { darkTheme, lightTheme } from './theme.js';
 import { useThemeMode } from './state/useThemeMode.js';
 import { useActiveModule } from './state/useActiveModule.js';
 import { ToastProvider } from './state/useToast.js';
 import { useInstances } from './state/useInstances.js';
-import { TabStrip, DASHBOARD_TAB } from './components/TabStrip.js';
-import { Terminal } from './components/Terminal.js';
-import { TerminalErrorBoundary } from './components/TerminalErrorBoundary.js';
+import { useProjects } from './state/useProjects.js';
+import { useTabs } from './state/useTabs.js';
+import { useWorkspaceLayout } from './state/useWorkspaceLayout.js';
+import { useFocusedInstance } from './state/useFocusedInstance.js';
+import { ensureTabMountedAndFocused } from './state/spawnIntoTab.js';
+import { TabStrip } from './components/TabStrip.js';
 import { NewInstanceModal } from './components/NewInstanceModal.js';
-import { ModuleRail, type ModuleId } from './components/ModuleRail.js';
-import { DashboardTab } from './components/DashboardTab.js';
+import { ModuleRail } from './components/ModuleRail.js';
 import { FirstRunWizard } from './components/FirstRunWizard.js';
 import { ModuleSettings } from './components/settings/ModuleSettings.js';
 import { ModuleTimeTracker } from './components/timetracker/ModuleTimeTracker.js';
 import { ModuleDashboard } from './components/dashboard/ModuleDashboard.js';
+import { SlotRegistryProvider } from './components/instances/SlotRegistry.js';
+import { TerminalPool } from './components/instances/TerminalPool.js';
+import { WorkspaceRoot } from './components/instances/WorkspaceRoot.js';
+import { routeSpawnToTab } from './layout/routeSpawnToTab.js';
+import {
+  collectTabIds,
+  findLeafById,
+  findLeafByTabId,
+} from './layout/workspaceTreeOps.js';
+import { pruneLayout } from './layout/pruneLayout.js';
+import { DASHBOARD_TAB_ID, type TabId } from '../../shared/layout.js';
 import type { WatchtowerBridge } from '../../shared/ipcContract.js';
-
-const TERMINAL_STATES = new Set(['finished', 'crashed', 'suspended']);
-function isTerminalState(status: string): boolean {
-  return TERMINAL_STATES.has(status);
-}
-
-function DeadInstancePane({
-  active,
-  status,
-  cwd,
-}: {
-  active: boolean;
-  status: string;
-  cwd: string;
-}) {
-  return (
-    <Box
-      sx={{
-        position: 'absolute',
-        inset: 0,
-        display: active ? 'flex' : 'none',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        gap: 1.5,
-        p: 6,
-        backgroundColor: 'background.default',
-      }}
-    >
-      <Typography variant="h6">Session is {status}</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-        {cwd}
-      </Typography>
-      <Typography variant="caption" color="text.disabled" sx={{ maxWidth: 540 }}>
-        The pty for this session ended (or never started under this orchestrator run).
-        Use <strong>+</strong> to spawn a fresh claude in the same directory. Suspend / resume
-        across restarts arrives in Phase 8.
-      </Typography>
-    </Box>
-  );
-}
 
 declare global {
   interface Window {
@@ -105,19 +86,61 @@ function LoadingScreen() {
 export function App() {
   const { mode, toggle: toggleThemeMode } = useThemeMode();
   const theme = useMemo(() => (mode === 'dark' ? darkTheme : lightTheme), [mode]);
-  const { instances, activeId, loaded, setActive, spawn, kill, remove, reorder } = useInstances();
+  const { instances, activeId, loaded, setActive, spawn, kill, remove } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
-  /** Set by the TimeTracker launch bridge to pre-fill the New-instance modal. */
   const [pendingNewCwd, setPendingNewCwd] = useState<string | undefined>(undefined);
   const [activeModule, setActiveModule] = useActiveModule();
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [openAdHocCwds, setOpenAdHocCwds] = useState<Set<string>>(new Set());
+  const [dragging, setDragging] = useState(false);
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
 
-  // Bridge handlers exposed to the TimeTracker module.
+  const { projects } = useProjects();
+  const {
+    loaded: layoutLoaded,
+    layout,
+    actions: layoutActions,
+  } = useWorkspaceLayout();
+  const tabs = useTabs(instances, projects, openAdHocCwds, layout.tabFocus);
+  useFocusedInstance(layout, tabs);
+
+  // Prune the layout once after both hydration and tab derivation are ready.
+  // Any leaves whose tabId no longer exists (deleted project, terminated
+  // instances on first load) are removed. Runtime mutations are guarded by
+  // the action set so no further prune is needed.
+  const pruneDoneRef = useRef(false);
+  useEffect(() => {
+    if (!layoutLoaded || pruneDoneRef.current) return;
+    const validTabIds = new Set(tabs.map((t) => t.id));
+    const pruned = pruneLayout(layout.root, validTabIds);
+    if (pruned !== layout.root) layoutActions.replaceTree(pruned);
+    pruneDoneRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutLoaded]);
+
+  const mountedTabIds = useMemo(
+    () => new Set<string>(collectTabIds(layout.root)),
+    [layout.root],
+  );
+  const focusedTab: TabId | null = useMemo(() => {
+    if (!layout.focusedLeafId) return null;
+    const node = findLeafById(layout.root, layout.focusedLeafId);
+    return node ? node.tabId : null;
+  }, [layout]);
+
   const switchToInstance = (id: string) => {
     setActiveModule('instances');
     setActive(id);
+    // Focus the tab + column that owns this instance.
+    const inst = instances.find((i) => i.id === id);
+    if (!inst) return;
+    const tabId = routeSpawnToTab(inst.cwd, projects);
+    ensureTabMountedAndFocused({ layout, actions: layoutActions }, tabId);
+    layoutActions.focusColumnInTab(tabId, id);
   };
   const switchToNewInstanceForCwd = (cwd: string) => {
     setActiveModule('instances');
@@ -125,13 +148,10 @@ export function App() {
     setNewOpen(true);
   };
   const switchToTimeTrackerProject = (projectId: number) => {
-    // Set the hash before flipping the module so useTimeTrackerView reads
-    // the right view on its initial mount.
     window.location.hash = `#timetracker/projects/${projectId}`;
     setActiveModule('timetracker');
   };
 
-  // Show the first-run wizard until the user explicitly finishes or skips it.
   useEffect(() => {
     if (!loaded) return;
     let cancelled = false;
@@ -143,33 +163,23 @@ export function App() {
     };
   }, [loaded]);
 
-  // Tell the orchestrator which tab the user is currently viewing so the
-  // notifier can suppress notifications for that instance.
-  useEffect(() => {
-    const id = activeId && activeId !== DASHBOARD_TAB ? activeId : null;
-    void window.watchtower.invoke('focusChanged', { instanceId: id });
-  }, [activeId]);
-
-  // Notification-click → main fires activateInstance → activate that tab.
   useEffect(() => {
     return window.watchtower.on('activateInstance', (p) => {
       setActive(p.instanceId);
     });
   }, [setActive]);
 
-  // Tray's "New instance…" → opens the same modal as the + button.
   useEffect(() => {
     return window.watchtower.on('triggerNewInstance', () => setNewOpen(true));
   }, []);
 
-  // Surface orchestrator crash + auto-restart status as a thin top banner.
-  const [orchDown, setOrchDown] = useState<null | { code: number | null; restarting: boolean }>(null);
+  const [orchDown, setOrchDown] = useState<null | { code: number | null; restarting: boolean }>(
+    null,
+  );
   useEffect(() => {
     return window.watchtower.on('orchestratorCrashed', (p) => {
       setOrchDown(p);
       if (p.restarting) {
-        // Auto-clear the banner shortly after the restart attempt — the
-        // renderer's next refresh will resync state when the child is back.
         setTimeout(() => setOrchDown(null), 3000);
       }
     });
@@ -186,9 +196,14 @@ export function App() {
 
   const doSpawn = async (cwd: string) => {
     try {
+      const tabId = routeSpawnToTab(cwd, projects);
+      if (tabId.startsWith('cwd:')) setOpenAdHocCwds((s) => new Set(s).add(cwd));
+      ensureTabMountedAndFocused({ layout, actions: layoutActions }, tabId);
       const res = await spawn(cwd);
       if (res.instanceId) {
+        layoutActions.focusColumnInTab(tabId, res.instanceId);
         setActiveModule('instances');
+        setActive(res.instanceId);
       } else {
         setSpawnError(res.error ?? 'spawn failed — no instance id returned');
       }
@@ -197,7 +212,37 @@ export function App() {
     }
   };
 
-  const onDashboard = activeId === null || activeId === DASHBOARD_TAB;
+  const handleDragStart = (_e: DragStartEvent) => setDragging(true);
+  const handleDragEnd = (e: DragEndEvent) => {
+    setDragging(false);
+    const activeId = String(e.active.id);
+    const overId = e.over ? String(e.over.id) : null;
+    if (!overId) return;
+
+    const leafZone = /^leaf:([^:]+):(centre|left|right|top|bottom)$/.exec(overId);
+    if (leafZone) {
+      const [, leafId, zone] = leafZone;
+      const tabId = activeId as TabId;
+      if (zone === 'centre') {
+        layoutActions.replaceLeafTab(leafId!, tabId);
+      } else {
+        const dir: 'row' | 'col' = zone === 'left' || zone === 'right' ? 'row' : 'col';
+        const position: 'before' | 'after' =
+          zone === 'left' || zone === 'top' ? 'before' : 'after';
+        layoutActions.splitLeafAt(leafId!, dir, position, tabId);
+      }
+      return;
+    }
+
+    if (activeId !== overId) {
+      const ids = tabs.map((t) => t.id);
+      const oldIdx = ids.indexOf(activeId as TabId);
+      const newIdx = ids.indexOf(overId as TabId);
+      if (oldIdx >= 0 && newIdx >= 0) {
+        layoutActions.setTabStripOrder(arrayMove(ids, oldIdx, newIdx) as TabId[]);
+      }
+    }
+  };
 
   if (!loaded) {
     return (
@@ -214,184 +259,183 @@ export function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="cs">
-      <ToastProvider>
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {orchDown && (
-        <Box
-          sx={{
-            backgroundColor: orchDown.restarting ? 'warning.dark' : 'error.dark',
-            color: 'common.white',
-            px: 2,
-            py: 0.75,
-            fontSize: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-          }}
-        >
-          <strong>
-            {orchDown.restarting
-              ? 'Orchestrator crashed — restarting…'
-              : 'Orchestrator crashed repeatedly.'}
-          </strong>
-          <span style={{ opacity: 0.85 }}>
-            {orchDown.restarting
-              ? 'Instances will reappear in a moment.'
-              : 'Manual restart needed (Cmd+Q + relaunch).'}
-          </span>
-        </Box>
-      )}
-      <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <ModuleRail
-          active={activeModule}
-          onSelect={setActiveModule}
-          mode={mode}
-          onToggleMode={toggleThemeMode}
-        />
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {activeModule === 'dashboard' && (
-          <ModuleDashboard
-            instances={instances}
-            onActivateInstance={switchToInstance}
-            onKillInstance={(id) => kill(id)}
-            onStartNewInstance={() => setNewOpen(true)}
-            onOpenProject={switchToTimeTrackerProject}
-          />
-        )}
-        {activeModule === 'settings' && <ModuleSettings active />}
-        {activeModule === 'timetracker' && (
-          <ModuleTimeTracker
-            active
-            onActivateInstance={switchToInstance}
-            onOpenNewInstanceForCwd={switchToNewInstanceForCwd}
-          />
-        )}
-        {/*
-         * Instances pane stays mounted across module switches so xterm
-         * buffers survive when the user clicks "Open" on a session from
-         * the dashboard. Hiding with display:none (not unmounting) keeps
-         * Terminal subscribed to ptyData; ResizeObserver re-fits on show.
-         */}
-        <Box
-          sx={{
-            display: activeModule === 'instances' ? 'flex' : 'none',
-            flex: 1,
-            flexDirection: 'column',
-            minHeight: 0,
-          }}
-        >
-        <TabStrip
-          instances={instances}
-          activeId={activeId}
-          onSelect={(id) => setActive(id === DASHBOARD_TAB ? null : id)}
-          onNew={() => setNewOpen(true)}
-          onRemove={handleRemove}
-          onReorder={(ids) => void reorder(ids)}
-          onSnooze={(id, ms) => {
-            void window.watchtower.invoke('snooze', {
-              instanceId: id,
-              untilMs: Date.now() + ms,
-            });
-          }}
-        />
-        <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {onDashboard ? (
-            <DashboardTab
-              instances={instances}
-              onOpen={(id) => setActive(id)}
-              onKill={(id) => void remove(id)}
-              onRemove={(id) => void remove(id)}
-              onNew={() => setNewOpen(true)}
-            />
-          ) : (
-            instances.map((i) =>
-              isTerminalState(i.status) ? (
-                <DeadInstancePane
-                  key={i.id}
-                  active={i.id === activeId}
-                  status={i.status}
-                  cwd={i.cwd}
-                />
-              ) : (
-                <TerminalErrorBoundary
-                  key={i.id}
-                  instanceId={i.id}
-                  cwd={i.cwd}
-                  active={i.id === activeId}
-                >
-                  <Terminal
-                    instanceId={i.id}
-                    active={i.id === activeId}
-                    status={i.status}
+        <ToastProvider>
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+            {orchDown && (
+              <Box
+                sx={{
+                  backgroundColor: orchDown.restarting ? 'warning.dark' : 'error.dark',
+                  color: 'common.white',
+                  px: 2,
+                  py: 0.75,
+                  fontSize: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                <strong>
+                  {orchDown.restarting
+                    ? 'Orchestrator crashed — restarting…'
+                    : 'Orchestrator crashed repeatedly.'}
+                </strong>
+                <span style={{ opacity: 0.85 }}>
+                  {orchDown.restarting
+                    ? 'Instances will reappear in a moment.'
+                    : 'Manual restart needed (Cmd+Q + relaunch).'}
+                </span>
+              </Box>
+            )}
+            <Box sx={{ display: 'flex', flex: 1, minHeight: 0 }}>
+              <ModuleRail
+                active={activeModule}
+                onSelect={setActiveModule}
+                mode={mode}
+                onToggleMode={toggleThemeMode}
+              />
+              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                {activeModule === 'dashboard' && (
+                  <ModuleDashboard
+                    instances={instances}
+                    onActivateInstance={switchToInstance}
+                    onKillInstance={(id) => kill(id)}
+                    onStartNewInstance={() => setNewOpen(true)}
+                    onOpenProject={switchToTimeTrackerProject}
                   />
-                </TerminalErrorBoundary>
-              ),
-            )
-          )}
-        </Box>
-        </Box>
-        </Box>
-      </Box>
-      </Box>
-      <NewInstanceModal
-        open={newOpen}
-        // Pre-fill only when an outside caller set pendingNewCwd (e.g. the
-        // TimeTracker launch bridge). The plain `+ New instance` button leaves
-        // it unset so the recent-list / empty default still applies.
-        defaultCwd={pendingNewCwd}
-        onClose={() => {
-          setNewOpen(false);
-          setPendingNewCwd(undefined);
-        }}
-        onSpawn={(cwd) => void doSpawn(cwd)}
-      />
-      <FirstRunWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />
-      <Dialog
-        open={Boolean(confirmClose)}
-        onClose={() => setConfirmClose(null)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Close this session?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Claude in{' '}
-            <Box component="code" sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-              {confirmClose?.cwd}
-            </Box>{' '}
-            is still running. Closing the tab kills the pty and forgets the
-            session. Use Cancel to keep it alive.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmClose(null)}>Cancel</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => {
-              if (confirmClose) void remove(confirmClose.id);
-              setConfirmClose(null);
+                )}
+                {activeModule === 'settings' && <ModuleSettings active />}
+                {activeModule === 'timetracker' && (
+                  <ModuleTimeTracker
+                    active
+                    onActivateInstance={switchToInstance}
+                    onOpenNewInstanceForCwd={switchToNewInstanceForCwd}
+                  />
+                )}
+                <Box
+                  sx={{
+                    display: activeModule === 'instances' ? 'flex' : 'none',
+                    flex: 1,
+                    flexDirection: 'column',
+                    minHeight: 0,
+                  }}
+                >
+                  <SlotRegistryProvider>
+                    <DndContext
+                      sensors={dndSensors}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <TabStrip
+                        tabs={tabs}
+                        instances={instances}
+                        mountedTabIds={mountedTabIds}
+                        focusedTabId={focusedTab}
+                        onSelect={(id) => {
+                          ensureTabMountedAndFocused(
+                            { layout, actions: layoutActions },
+                            id,
+                          );
+                          if (id === DASHBOARD_TAB_ID) setActive(null);
+                          else {
+                            // Focus the tab's active column instance, if any.
+                            const tab = tabs.find((t) => t.id === id);
+                            if (tab?.focusedInstanceId) setActive(tab.focusedInstanceId);
+                          }
+                        }}
+                        onContextSplit={(id, dir) => {
+                          if (!layout.focusedLeafId) return;
+                          layoutActions.splitLeafAt(
+                            layout.focusedLeafId,
+                            dir,
+                            'after',
+                            id,
+                          );
+                        }}
+                        onCloseInWorkspace={(id) => {
+                          const node = findLeafByTabId(layout.root, id);
+                          if (node) layoutActions.unmountLeafAt(node.id);
+                        }}
+                        onNew={() => setNewOpen(true)}
+                      />
+                      {layoutLoaded && (
+                        <WorkspaceRoot
+                          layout={layout}
+                          tabs={tabs}
+                          instances={instances}
+                          actions={layoutActions}
+                          dragInProgress={dragging}
+                          dashboardOnOpen={(id) => switchToInstance(id)}
+                          dashboardOnKill={(id) => void kill(id)}
+                          dashboardOnRemove={(id) => {
+                            const inst = instances.find((i) => i.id === id);
+                            handleRemove(id, inst ? !['finished', 'crashed', 'suspended'].includes(inst.status) : false);
+                          }}
+                          dashboardOnNew={() => setNewOpen(true)}
+                        />
+                      )}
+                      <TerminalPool instances={instances} />
+                    </DndContext>
+                  </SlotRegistryProvider>
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+          <NewInstanceModal
+            open={newOpen}
+            defaultCwd={pendingNewCwd}
+            onClose={() => {
+              setNewOpen(false);
+              setPendingNewCwd(undefined);
             }}
+            onSpawn={(cwd) => void doSpawn(cwd)}
+          />
+          <FirstRunWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />
+          <Dialog
+            open={Boolean(confirmClose)}
+            onClose={() => setConfirmClose(null)}
+            maxWidth="xs"
+            fullWidth
           >
-            Kill &amp; close
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Snackbar
-        open={Boolean(spawnError)}
-        autoHideDuration={10000}
-        onClose={() => setSpawnError(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity="error"
-          onClose={() => setSpawnError(null)}
-          sx={{ maxWidth: 720, fontFamily: 'Menlo, monospace', fontSize: 12 }}
-        >
-          spawn failed: {spawnError}
-        </Alert>
-      </Snackbar>
-      </ToastProvider>
+            <DialogTitle>Close this session?</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                Claude in{' '}
+                <Box component="code" sx={{ fontFamily: 'monospace', fontSize: 12 }}>
+                  {confirmClose?.cwd}
+                </Box>{' '}
+                is still running. Closing the tab kills the pty and forgets the
+                session. Use Cancel to keep it alive.
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmClose(null)}>Cancel</Button>
+              <Button
+                color="error"
+                variant="contained"
+                onClick={() => {
+                  if (confirmClose) void remove(confirmClose.id);
+                  setConfirmClose(null);
+                }}
+              >
+                Kill &amp; close
+              </Button>
+            </DialogActions>
+          </Dialog>
+          <Snackbar
+            open={Boolean(spawnError)}
+            autoHideDuration={10000}
+            onClose={() => setSpawnError(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          >
+            <Alert
+              severity="error"
+              onClose={() => setSpawnError(null)}
+              sx={{ maxWidth: 720, fontFamily: 'Menlo, monospace', fontSize: 12 }}
+            >
+              spawn failed: {spawnError}
+            </Alert>
+          </Snackbar>
+        </ToastProvider>
       </LocalizationProvider>
     </ThemeProvider>
   );
