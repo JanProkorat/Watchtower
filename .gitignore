@@ -34,3 +34,6 @@ shared/*.js.map
 .env
 .env.*
 !.env.example
+
+# Brainstorming visual companion (mockups during design sessions)
+.superpowers/
