@@ -9,6 +9,7 @@ interface Props {
   tabs: TabRecord[];
   instances: InstanceView[];
   actions: WorkspaceLayoutActions;
+  dragInProgress: boolean;
   dashboardOnOpen(id: string): void;
   dashboardOnKill(id: string): void;
   dashboardOnRemove(id: string): void;
@@ -20,6 +21,7 @@ export function WorkspaceRoot({
   tabs,
   instances,
   actions,
+  dragInProgress,
   dashboardOnOpen,
   dashboardOnKill,
   dashboardOnRemove,
@@ -32,6 +34,7 @@ export function WorkspaceRoot({
         tabs={tabs}
         focusedLeafId={layout.focusedLeafId}
         instances={instances}
+        dragInProgress={dragInProgress}
         onFocusColumn={actions.focusColumnInTab}
         onFocusLeaf={actions.focusLeaf}
         onResizeSplit={actions.setSplitSizes}

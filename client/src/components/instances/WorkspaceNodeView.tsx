@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { LeafView } from './LeafView.js';
+import { SplitDropZones } from './SplitDropZones.js';
 import type { TabRecord, WorkspaceNode } from '../../../../shared/layout.js';
 import type { InstanceView } from '../../state/useInstances.js';
 
@@ -10,6 +11,7 @@ interface Props {
   tabs: TabRecord[];
   focusedLeafId: string | null;
   instances: InstanceView[];
+  dragInProgress: boolean;
   onFocusColumn(tabId: string, instanceId: string): void;
   onFocusLeaf(leafId: string): void;
   onResizeSplit(splitId: string, sizes: number[]): void;
@@ -29,7 +31,13 @@ export function WorkspaceNodeView(props: Props) {
     return (
       <Box
         onMouseDown={() => onFocusLeaf(node.id)}
-        sx={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column' }}
+        sx={{
+          flex: 1,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+        }}
       >
         <LeafView
           tab={tab}
@@ -41,6 +49,7 @@ export function WorkspaceNodeView(props: Props) {
           dashboardOnRemove={props.dashboardOnRemove}
           dashboardOnNew={props.dashboardOnNew}
         />
+        <SplitDropZones leafId={node.id} visible={props.dragInProgress} />
       </Box>
     );
   }
