@@ -1,15 +1,22 @@
+import { Fragment } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ColumnSlot } from './ColumnSlot.js';
+import { SessionTabBar } from './SessionTabBar.js';
 import { DashboardTab } from '../DashboardTab.js';
 import type { TabRecord } from '../../../../shared/layout.js';
 import type { InstanceView } from '../../state/useInstances.js';
+import { tabAccent } from '../../util/tabAccent.js';
 
 interface Props {
   tab: TabRecord;
   focused: boolean;
   instances: InstanceView[];
   onFocusColumn(instanceId: string): void;
+  onCloseColumn(instanceId: string): void;
+  onHideSession(instanceId: string): void;
+  onUnhideSession(instanceId: string): void;
+  onAddSession(): void;
   dashboardOnOpen?(id: string): void;
   dashboardOnKill?(id: string): void;
   dashboardOnRemove?(id: string): void;
@@ -21,6 +28,10 @@ export function LeafView({
   focused,
   instances,
   onFocusColumn,
+  onCloseColumn,
+  onHideSession,
+  onUnhideSession,
+  onAddSession,
   dashboardOnOpen,
   dashboardOnKill,
   dashboardOnRemove,
@@ -49,39 +60,96 @@ export function LeafView({
     );
   }
 
+  const accent = tabAccent(tab.id, tab.color);
+  const sessionInfos = tab.columnOrder.map((id) => {
+    const inst = instances.find((i) => i.id === id);
+    return { id, status: inst?.status ?? 'unknown' };
+  });
+  const hiddenSessionInfos = tab.hiddenInstanceIds.map((id) => {
+    const inst = instances.find((i) => i.id === id);
+    return { id, status: inst?.status ?? 'unknown' };
+  });
+
+  // Empty (no visible columns) — still render the bar so the user can
+  // un-hide / add a new session. The column area shows a placeholder.
   if (tab.columnOrder.length === 0) {
     return (
-      <Box
-        sx={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'text.secondary',
-          fontSize: 13,
-        }}
-      >
-        <Typography variant="body2">No instances in {tab.label} yet</Typography>
+      <Box sx={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <SessionTabBar
+          sessions={sessionInfos}
+          hiddenSessions={hiddenSessionInfos}
+          focusedId={null}
+          accent={accent}
+          onSelect={onFocusColumn}
+          onClose={onCloseColumn}
+          onHide={onHideSession}
+          onUnhide={onUnhideSession}
+          onAddSession={onAddSession}
+        />
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'text.secondary',
+            fontSize: 13,
+          }}
+        >
+          <Typography variant="body2">
+            {hiddenSessionInfos.length > 0
+              ? `All ${hiddenSessionInfos.length} session${
+                  hiddenSessionInfos.length === 1 ? '' : 's'
+                } in ${tab.label} are hidden`
+              : `No instances in ${tab.label} yet`}
+          </Typography>
+        </Box>
       </Box>
     );
   }
 
+  const focusedId = tab.focusedInstanceId ?? tab.columnOrder[0]!;
+
   return (
-    <Box sx={{ flex: 1, height: '100%' }}>
-      <PanelGroup direction="horizontal" autoSaveId={`columns-${tab.id}`}>
-        {tab.columnOrder.map((instanceId, idx) => (
-          <Panel key={instanceId} defaultSize={100 / tab.columnOrder.length} minSize={10}>
-            <ColumnSlot
-              instanceId={instanceId}
-              focused={focused && tab.focusedInstanceId === instanceId}
-              onFocus={() => onFocusColumn(instanceId)}
-            />
-            {idx < tab.columnOrder.length - 1 && (
-              <PanelResizeHandle style={{ width: 4, background: 'rgba(255,255,255,0.06)' }} />
-            )}
-          </Panel>
-        ))}
-      </PanelGroup>
+    <Box sx={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <SessionTabBar
+        sessions={sessionInfos}
+        hiddenSessions={hiddenSessionInfos}
+        focusedId={focusedId}
+        accent={accent}
+        onSelect={onFocusColumn}
+        onClose={onCloseColumn}
+        onHide={onHideSession}
+        onUnhide={onUnhideSession}
+        onAddSession={onAddSession}
+      />
+      <Box sx={{ flex: 1, minHeight: 0 }}>
+        <PanelGroup direction="horizontal" autoSaveId={`columns-${tab.id}`}>
+          {tab.columnOrder.map((instanceId, idx) => (
+            <Fragment key={instanceId}>
+              {idx > 0 && (
+                <PanelResizeHandle
+                  style={{
+                    width: 6,
+                    background: 'rgba(255,255,255,0.08)',
+                    cursor: 'col-resize',
+                  }}
+                />
+              )}
+              <Panel defaultSize={100 / tab.columnOrder.length} minSize={10}>
+                <Box sx={{ position: 'relative', height: '100%' }}>
+                  <ColumnSlot
+                    instanceId={instanceId}
+                    focused={focused && tab.focusedInstanceId === instanceId}
+                    accent={accent}
+                    onFocus={() => onFocusColumn(instanceId)}
+                  />
+                </Box>
+              </Panel>
+            </Fragment>
+          ))}
+        </PanelGroup>
+      </Box>
     </Box>
   );
 }

@@ -15,6 +15,10 @@ interface Props {
   onFocusColumn(tabId: string, instanceId: string): void;
   onFocusLeaf(leafId: string): void;
   onResizeSplit(splitId: string, sizes: number[]): void;
+  onCloseColumn(instanceId: string): void;
+  onHideSession(instanceId: string): void;
+  onUnhideSession(instanceId: string): void;
+  onAddSession(tabId: string): void;
   dashboardOnOpen?(id: string): void;
   dashboardOnKill?(id: string): void;
   dashboardOnRemove?(id: string): void;
@@ -44,6 +48,10 @@ export function WorkspaceNodeView(props: Props) {
           focused={focusedLeafId === node.id}
           instances={instances}
           onFocusColumn={(instanceId) => onFocusColumn(tab.id, instanceId)}
+          onCloseColumn={props.onCloseColumn}
+          onHideSession={props.onHideSession}
+          onUnhideSession={props.onUnhideSession}
+          onAddSession={() => props.onAddSession(tab.id)}
           dashboardOnOpen={props.dashboardOnOpen}
           dashboardOnKill={props.dashboardOnKill}
           dashboardOnRemove={props.dashboardOnRemove}

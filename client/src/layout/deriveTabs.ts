@@ -8,6 +8,7 @@ export function deriveTabs(
   projects: ProjectViewPayload[],
   openAdHocCwds: Set<string>,
   tabFocus: Record<string, string | null>,
+  hiddenInstanceIds: Set<string> = new Set(),
 ): TabRecord[] {
   // Build cwd → projectId map for routing.
   const cwdToProjectId = new Map<string, number>();
@@ -15,20 +16,30 @@ export function deriveTabs(
     if (p.folderPath) cwdToProjectId.set(p.folderPath, p.id);
   }
 
-  // Group instances by tabId.
-  const groups = new Map<TabId, string[]>();
+  // Group instances by tabId. We keep visible columns and hidden ids in
+  // separate buckets so the UI can render a "show hidden" affordance.
+  const visible = new Map<TabId, string[]>();
+  const hidden = new Map<TabId, string[]>();
   for (const i of instances) {
     const projectId = cwdToProjectId.get(i.cwd);
     const tabId: TabId = projectId !== undefined ? projectTabId(projectId) : cwdTabId(i.cwd);
-    const list = groups.get(tabId) ?? [];
+    const bucket = hiddenInstanceIds.has(i.id) ? hidden : visible;
+    const list = bucket.get(tabId) ?? [];
     list.push(i.id);
-    groups.set(tabId, list);
+    bucket.set(tabId, list);
   }
 
-  // Always include project tabs the user has opened ad-hoc, even empty.
+  // Always include cwd tabs the user has opened ad-hoc, even empty.
   for (const cwd of openAdHocCwds) {
     const id = cwdTabId(cwd);
-    if (!groups.has(id)) groups.set(id, []);
+    if (!visible.has(id)) visible.set(id, []);
+  }
+
+  // Any tab id that has only-hidden instances should also be in `visible`
+  // (with an empty array) so it still appears in the strip — otherwise
+  // hiding the last visible session would make the tab vanish.
+  for (const id of hidden.keys()) {
+    if (!visible.has(id)) visible.set(id, []);
   }
 
   const records: TabRecord[] = [];
@@ -40,6 +51,7 @@ export function deriveTabs(
     label: 'Dashboard',
     color: null,
     columnOrder: [],
+    hiddenInstanceIds: [],
     focusedInstanceId: null,
   });
 
@@ -47,28 +59,32 @@ export function deriveTabs(
   const sortedProjects = [...projects].sort((a, b) => a.id - b.id);
   for (const p of sortedProjects) {
     const id = projectTabId(p.id);
-    const cols = groups.get(id);
+    const cols = visible.get(id);
     if (!cols) continue;
+    const hiddenCols = hidden.get(id) ?? [];
     records.push({
       id,
       kind: 'project',
       label: p.name,
       color: p.color,
       columnOrder: cols,
+      hiddenInstanceIds: hiddenCols,
       focusedInstanceId: pickFocused(tabFocus[id] ?? null, cols),
     });
-    groups.delete(id);
+    visible.delete(id);
   }
 
   // Remaining ad-hoc cwd tabs.
-  for (const [id, cols] of groups) {
+  for (const [id, cols] of visible) {
     if (id === DASHBOARD_TAB_ID) continue;
+    const hiddenCols = hidden.get(id) ?? [];
     records.push({
       id,
       kind: 'cwd',
       label: basenameOf(id.slice('cwd:'.length)),
       color: null,
       columnOrder: cols,
+      hiddenInstanceIds: hiddenCols,
       focusedInstanceId: pickFocused(tabFocus[id] ?? null, cols),
     });
   }

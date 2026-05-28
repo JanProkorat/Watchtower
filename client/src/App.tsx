@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -34,6 +34,7 @@ import { useInstances } from './state/useInstances.js';
 import { useProjects } from './state/useProjects.js';
 import { useTabs } from './state/useTabs.js';
 import { useWorkspaceLayout } from './state/useWorkspaceLayout.js';
+import { useHiddenInstances } from './state/useHiddenInstances.js';
 import { useFocusedInstance } from './state/useFocusedInstance.js';
 import { ensureTabMountedAndFocused } from './state/spawnIntoTab.js';
 import { TabStrip } from './components/TabStrip.js';
@@ -52,6 +53,7 @@ import {
   findLeafById,
   findLeafByTabId,
 } from './layout/workspaceTreeOps.js';
+import { parseTabId } from './layout/tabId.js';
 import { pruneLayout } from './layout/pruneLayout.js';
 import { DASHBOARD_TAB_ID, type TabId } from '../../shared/layout.js';
 import { useTimeTrackerView } from './state/useTimeTrackerView.js';
@@ -91,6 +93,11 @@ export function App() {
   const { instances, activeId, loaded, setActive, spawn, kill, remove } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
+  const [confirmTabClose, setConfirmTabClose] = useState<{
+    label: string;
+    ids: string[];
+    liveCount: number;
+  } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [pendingNewCwd, setPendingNewCwd] = useState<string | undefined>(undefined);
   const [activeModule, setActiveModule] = useActiveModule();
@@ -99,6 +106,12 @@ export function App() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [openAdHocCwds, setOpenAdHocCwds] = useState<Set<string>>(new Set());
   const [dragging, setDragging] = useState(false);
+  // Counter of in-flight spawns. The reactive prune below skips while >0
+  // because the spawn flow mounts the target tab's leaf synchronously, but
+  // the instance (which is what makes the tab show up in `tabs`) only
+  // exists after the IPC resolves — pruning in between would unmount the
+  // freshly-mounted leaf.
+  const [spawnInFlight, setSpawnInFlight] = useState(0);
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
@@ -109,22 +122,37 @@ export function App() {
     layout,
     actions: layoutActions,
   } = useWorkspaceLayout();
-  const tabs = useTabs(instances, projects, openAdHocCwds, layout.tabFocus);
+  const { hidden: hiddenInstances, hide: hideInstance, unhide: unhideInstance, pruneStale: pruneHiddenStale } =
+    useHiddenInstances();
+  const tabs = useTabs(instances, projects, openAdHocCwds, layout.tabFocus, hiddenInstances);
   useFocusedInstance(layout, tabs);
 
-  // Prune the layout once after both hydration and tab derivation are ready.
-  // Any leaves whose tabId no longer exists (deleted project, terminated
-  // instances on first load) are removed. Runtime mutations are guarded by
-  // the action set so no further prune is needed.
-  const pruneDoneRef = useRef(false);
+  // Drop hidden ids that no longer correspond to a live instance row —
+  // otherwise a long-dead instance would keep its hidden flag forever in
+  // settings and pile up.
   useEffect(() => {
-    if (!layoutLoaded || pruneDoneRef.current) return;
+    pruneHiddenStale(new Set(instances.map((i) => i.id)));
+  }, [instances, pruneHiddenStale]);
+
+  // Reactive prune: whenever a leaf's tabId no longer exists in the derived
+  // tab list (e.g. the user closed the last instance of a project), drop the
+  // leaf from the layout tree. Guarded by a `hasInvalid` check so we only
+  // call replaceTree when something actually needs cleaning — pruneRec
+  // always allocates a new split node, so reference equality alone would
+  // loop. Skipped while a spawn is in flight: the spawn synchronously
+  // mounts the target tab's leaf, but the instance that puts the tab in
+  // `tabs` only arrives after the IPC resolves.
+  useEffect(() => {
+    if (!layoutLoaded || spawnInFlight > 0) return;
     const validTabIds = new Set(tabs.map((t) => t.id));
+    const leafTabIds = collectTabIds(layout.root);
+    const hasInvalid = leafTabIds.some(
+      (tid) => tid !== DASHBOARD_TAB_ID && !validTabIds.has(tid),
+    );
+    if (!hasInvalid) return;
     const pruned = pruneLayout(layout.root, validTabIds);
-    if (pruned !== layout.root) layoutActions.replaceTree(pruned);
-    pruneDoneRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutLoaded]);
+    layoutActions.replaceTree(pruned);
+  }, [layoutLoaded, tabs, layout.root, layoutActions, spawnInFlight]);
 
   const mountedTabIds = useMemo(
     () => new Set<string>(collectTabIds(layout.root)),
@@ -139,6 +167,10 @@ export function App() {
   const switchToInstance = (id: string) => {
     setActiveModule('instances');
     setActive(id);
+    // Clicking Open on the dashboard implicitly un-hides — otherwise the
+    // session would stay filtered out of its tab's columnOrder and the
+    // user couldn't see the instance they just asked to open.
+    unhideInstance(id);
     // Focus the tab + column that owns this instance.
     const inst = instances.find((i) => i.id === id);
     if (!inst) return;
@@ -150,6 +182,14 @@ export function App() {
     setActiveModule('instances');
     setPendingNewCwd(cwd);
     setNewOpen(true);
+  };
+  const cwdForTab = (id: TabId): string | null => {
+    const parsed = parseTabId(id);
+    if (parsed.kind === 'project') {
+      return projects.find((p) => p.id === parsed.projectId)?.folderPath ?? null;
+    }
+    if (parsed.kind === 'cwd') return parsed.cwd;
+    return null;
   };
   const switchToTimeTrackerProject = (projectId: number) => {
     // Set the hash before flipping the module so useTimeTrackerView reads
@@ -200,21 +240,42 @@ export function App() {
     setConfirmClose({ id, cwd: inst?.cwd ?? id });
   };
 
+  const isLiveStatus = (status: string): boolean =>
+    !['finished', 'crashed', 'suspended'].includes(status);
+
+  const handleCloseTab = (tabId: TabId) => {
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab || tab.columnOrder.length === 0) return;
+    const ids = tab.columnOrder;
+    const liveCount = ids.reduce((acc, id) => {
+      const inst = instances.find((i) => i.id === id);
+      return acc + (inst && isLiveStatus(inst.status) ? 1 : 0);
+    }, 0);
+    if (liveCount === 0) {
+      for (const id of ids) void remove(id);
+      return;
+    }
+    setConfirmTabClose({ label: tab.label, ids, liveCount });
+  };
+
   const doSpawn = async (cwd: string) => {
+    setSpawnInFlight((n) => n + 1);
     try {
       const tabId = routeSpawnToTab(cwd, projects);
       if (tabId.startsWith('cwd:')) setOpenAdHocCwds((s) => new Set(s).add(cwd));
       ensureTabMountedAndFocused({ layout, actions: layoutActions }, tabId);
+      setActiveModule('instances');
       const res = await spawn(cwd);
       if (res.instanceId) {
         layoutActions.focusColumnInTab(tabId, res.instanceId);
-        setActiveModule('instances');
         setActive(res.instanceId);
       } else {
         setSpawnError(res.error ?? 'spawn failed — no instance id returned');
       }
     } catch (err) {
       setSpawnError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSpawnInFlight((n) => n - 1);
     }
   };
 
@@ -344,7 +405,6 @@ export function App() {
                     >
                       <TabStrip
                         tabs={tabs}
-                        instances={instances}
                         mountedTabIds={mountedTabIds}
                         focusedTabId={focusedTab}
                         onSelect={(id) => {
@@ -361,6 +421,15 @@ export function App() {
                         }}
                         onContextSplit={(id, dir) => {
                           if (!layout.focusedLeafId) return;
+                          // Don't duplicate a tab into a second leaf — the xterm
+                          // host can only attach to one slot, so the second leaf
+                          // steals the terminal and the first goes blank. If the
+                          // tab is already mounted, focus it instead.
+                          const existing = findLeafByTabId(layout.root, id);
+                          if (existing) {
+                            layoutActions.focusLeaf(existing.id);
+                            return;
+                          }
                           layoutActions.splitLeafAt(
                             layout.focusedLeafId,
                             dir,
@@ -368,7 +437,17 @@ export function App() {
                             id,
                           );
                         }}
+                        onContextNewInstance={(id) => {
+                          const cwd = cwdForTab(id);
+                          if (cwd) switchToNewInstanceForCwd(cwd);
+                        }}
+                        canSpawnInTab={(id) => cwdForTab(id) !== null}
+                        onCloseTab={handleCloseTab}
                         onCloseInWorkspace={(id) => {
+                          const node = findLeafByTabId(layout.root, id);
+                          if (node) layoutActions.unmountLeafAt(node.id);
+                        }}
+                        onHideTab={(id) => {
                           const node = findLeafByTabId(layout.root, id);
                           if (node) layoutActions.unmountLeafAt(node.id);
                         }}
@@ -381,6 +460,19 @@ export function App() {
                           instances={instances}
                           actions={layoutActions}
                           dragInProgress={dragging}
+                          onCloseColumn={(id) => {
+                            const inst = instances.find((i) => i.id === id);
+                            const isLive = inst
+                              ? !['finished', 'crashed', 'suspended'].includes(inst.status)
+                              : false;
+                            handleRemove(id, isLive);
+                          }}
+                          onHideSession={hideInstance}
+                          onUnhideSession={unhideInstance}
+                          onAddSession={(tabId) => {
+                            const cwd = cwdForTab(tabId as TabId);
+                            if (cwd) void doSpawn(cwd);
+                          }}
                           dashboardOnOpen={(id) => switchToInstance(id)}
                           dashboardOnKill={(id) => void kill(id)}
                           dashboardOnRemove={(id) => {
@@ -432,6 +524,36 @@ export function App() {
                 onClick={() => {
                   if (confirmClose) void remove(confirmClose.id);
                   setConfirmClose(null);
+                }}
+              >
+                Kill &amp; close
+              </Button>
+            </DialogActions>
+          </Dialog>
+          <Dialog
+            open={Boolean(confirmTabClose)}
+            onClose={() => setConfirmTabClose(null)}
+            maxWidth="xs"
+            fullWidth
+          >
+            <DialogTitle>Close {confirmTabClose?.label}?</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                {confirmTabClose?.liveCount === 1
+                  ? 'A Claude session in this tab is still running. Closing the tab kills the pty and forgets the session. Use Cancel to keep it alive.'
+                  : `${confirmTabClose?.liveCount ?? 0} Claude sessions in this tab are still running. Closing the tab kills the ptys and forgets the sessions. Use Cancel to keep them alive.`}
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmTabClose(null)}>Cancel</Button>
+              <Button
+                color="error"
+                variant="contained"
+                onClick={() => {
+                  if (confirmTabClose) {
+                    for (const id of confirmTabClose.ids) void remove(id);
+                  }
+                  setConfirmTabClose(null);
                 }}
               >
                 Kill &amp; close

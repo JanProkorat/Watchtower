@@ -9,9 +9,10 @@ export function useTabs(
   projects: ProjectViewPayload[],
   openAdHocCwds: Set<string>,
   tabFocus: Record<string, string | null>,
+  hiddenInstanceIds: Set<string>,
 ): TabRecord[] {
   return useMemo(
-    () => deriveTabs(instances, projects, openAdHocCwds, tabFocus),
-    [instances, projects, openAdHocCwds, tabFocus],
+    () => deriveTabs(instances, projects, openAdHocCwds, tabFocus, hiddenInstanceIds),
+    [instances, projects, openAdHocCwds, tabFocus, hiddenInstanceIds],
   );
 }

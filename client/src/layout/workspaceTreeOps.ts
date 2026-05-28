@@ -82,7 +82,26 @@ export function replaceLeafTab(
 
 export type SplitPosition = 'before' | 'after';
 
+function containsTabId(node: WorkspaceNode, tabId: TabId): boolean {
+  if (node.kind === 'leaf') return node.tabId === tabId;
+  return node.children.some((c) => containsTabId(c, tabId));
+}
+
 export function splitLeaf(
+  node: WorkspaceNode,
+  targetLeafId: NodeId,
+  dir: 'row' | 'col',
+  position: SplitPosition,
+  newTabId: TabId,
+): WorkspaceNode {
+  // Mounting the same tab in two leaves collides on the xterm slot
+  // registry (the host can only attach to one DOM node), so the second
+  // leaf would steal the terminal and leave the first blank. Refuse.
+  if (containsTabId(node, newTabId)) return node;
+  return splitLeafInner(node, targetLeafId, dir, position, newTabId);
+}
+
+function splitLeafInner(
   node: WorkspaceNode,
   targetLeafId: NodeId,
   dir: 'row' | 'col',
@@ -97,7 +116,9 @@ export function splitLeaf(
   }
   return {
     ...node,
-    children: node.children.map((c) => splitLeaf(c, targetLeafId, dir, position, newTabId)),
+    children: node.children.map((c) =>
+      splitLeafInner(c, targetLeafId, dir, position, newTabId),
+    ),
   };
 }
 

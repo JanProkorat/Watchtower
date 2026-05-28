@@ -37,3 +37,6 @@ shared/*.js.map
 
 # Brainstorming visual companion (mockups during design sessions)
 .superpowers/
+
+# Local Claude Code scratch (worktrees, transient state)
+.claude/

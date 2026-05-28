@@ -5,10 +5,11 @@ import { useSlotRegistration } from './SlotRegistry.js';
 interface Props {
   instanceId: string;
   focused: boolean;
+  accent?: string;
   onFocus(): void;
 }
 
-export function ColumnSlot({ instanceId, focused, onFocus }: Props) {
+export function ColumnSlot({ instanceId, focused, accent, onFocus }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const register = useSlotRegistration();
   useEffect(() => {
@@ -20,13 +21,10 @@ export function ColumnSlot({ instanceId, focused, onFocus }: Props) {
       ref={ref}
       onMouseDown={onFocus}
       sx={{
-        position: 'relative',
-        flex: 1,
-        height: '100%',
-        minWidth: 0,
+        position: 'absolute',
+        inset: 0,
         backgroundColor: '#0e0f12',
-        outline: focused ? '2px solid' : 'none',
-        outlineColor: 'primary.main',
+        outline: focused ? `2px solid ${accent ?? 'currentColor'}` : 'none',
         outlineOffset: -2,
       }}
     />

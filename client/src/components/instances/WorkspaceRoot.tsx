@@ -14,6 +14,10 @@ interface Props {
   dashboardOnKill(id: string): void;
   dashboardOnRemove(id: string): void;
   dashboardOnNew(): void;
+  onCloseColumn(instanceId: string): void;
+  onHideSession(instanceId: string): void;
+  onUnhideSession(instanceId: string): void;
+  onAddSession(tabId: string): void;
 }
 
 export function WorkspaceRoot({
@@ -26,6 +30,10 @@ export function WorkspaceRoot({
   dashboardOnKill,
   dashboardOnRemove,
   dashboardOnNew,
+  onCloseColumn,
+  onHideSession,
+  onUnhideSession,
+  onAddSession,
 }: Props) {
   return (
     <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -38,6 +46,10 @@ export function WorkspaceRoot({
         onFocusColumn={actions.focusColumnInTab}
         onFocusLeaf={actions.focusLeaf}
         onResizeSplit={actions.setSplitSizes}
+        onCloseColumn={onCloseColumn}
+        onHideSession={onHideSession}
+        onUnhideSession={onUnhideSession}
+        onAddSession={onAddSession}
         dashboardOnOpen={dashboardOnOpen}
         dashboardOnKill={dashboardOnKill}
         dashboardOnRemove={dashboardOnRemove}

@@ -1,49 +1,25 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { InstanceView } from '../state/useInstances.js';
 import type { TabId, TabRecord } from '../../../shared/layout.js';
 import { DASHBOARD_TAB_ID } from '../../../shared/layout.js';
+import { tabAccent } from '../util/tabAccent.js';
 
-const INSTANCE_PALETTE = [
-  '#7aa7ff',
-  '#f0a868',
-  '#66bb6a',
-  '#ce93d8',
-  '#4dd0e1',
-  '#ffd54f',
-  '#a1887f',
-  '#90caf9',
-  '#ef9a9a',
-  '#80cbc4',
-];
-
-function paletteColor(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
-  return INSTANCE_PALETTE[Math.abs(hash) % INSTANCE_PALETTE.length] ?? '#7aa7ff';
-}
-
-const ATTENTION_COLORS: Record<string, string> = {
-  'waiting-permission': '#ef5350',
-  'waiting-input': '#ffb74d',
-  'idle-notify': '#9e9e9e',
-  crashed: '#ef5350',
-  finished: '#66bb6a',
-  suspended: '#5a6068',
-};
-
-function dotColor(id: string, status: string, accent: string | undefined): string {
-  return ATTENTION_COLORS[status] ?? accent ?? paletteColor(id);
+// Outer tab dot is locked to the project's accent color (or a hash-based
+// palette pick for ad-hoc cwd tabs). Per-session attention status is
+// surfaced inside the leaf via SessionTabBar's per-tab notification dot.
+function dotColor(id: string, accent: string | undefined): string {
+  return tabAccent(id, accent);
 }
 
 interface TabButtonProps {
   id: string;
   label: string;
-  status: string; // 'dashboard' for the pinned tab
+  isDashboard: boolean;
   active: boolean;
   draggable: boolean;
   accent?: string;
@@ -52,13 +28,14 @@ interface TabButtonProps {
   dragListeners?: React.HTMLAttributes<HTMLElement>;
   dragStyle?: CSSProperties;
   onClick(): void;
+  onHide?(): void;
   onClose?(): void;
 }
 
 function TabButton({
   id,
   label,
-  status,
+  isDashboard,
   active,
   draggable,
   accent,
@@ -67,6 +44,7 @@ function TabButton({
   dragListeners,
   dragStyle,
   onClick,
+  onHide,
   onClose,
 }: TabButtonProps) {
   return (
@@ -100,42 +78,71 @@ function TabButton({
         flexShrink: 0,
       }}
     >
-      {status !== 'dashboard' && (
+      {!isDashboard && (
         <Box
           sx={{
             width: 8,
             height: 8,
             borderRadius: '50%',
-            backgroundColor: dotColor(id, status, accent),
+            backgroundColor: dotColor(id, accent),
             flexShrink: 0,
           }}
         />
       )}
       <span>{label}</span>
+      {onHide && (
+        <Tooltip title="Hide from workspace (keep instances running)" placement="bottom">
+          <Box
+            component="span"
+            role="button"
+            aria-label={`hide ${label}`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onHide();
+            }}
+            sx={{
+              ml: 0.5,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 18,
+              height: 18,
+              borderRadius: '4px',
+              color: 'text.disabled',
+              ':hover': { backgroundColor: 'action.hover', color: 'text.primary' },
+            }}
+          >
+            <VisibilityOffIcon sx={{ fontSize: 14 }} />
+          </Box>
+        </Tooltip>
+      )}
       {onClose && (
-        <Box
-          component="span"
-          role="button"
-          aria-label={`close ${label}`}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          sx={{
-            ml: 0.5,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 18,
-            height: 18,
-            borderRadius: '4px',
-            color: 'text.disabled',
-            ':hover': { backgroundColor: 'action.hover', color: 'text.primary' },
-          }}
-        >
-          <CloseIcon sx={{ fontSize: 14 }} />
-        </Box>
+        <Tooltip title="Close tab (kill all sessions)" placement="bottom">
+          <Box
+            component="span"
+            role="button"
+            aria-label={`close ${label}`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            sx={{
+              ml: 0.25,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 18,
+              height: 18,
+              borderRadius: '4px',
+              color: 'text.disabled',
+              ':hover': { backgroundColor: 'action.hover', color: 'text.primary' },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 14 }} />
+          </Box>
+        </Tooltip>
       )}
     </Box>
   );
@@ -170,57 +177,33 @@ function SortableTab(props: SortableTabProps) {
 
 interface Props {
   tabs: TabRecord[];
-  instances: InstanceView[];
   mountedTabIds: Set<string>;
   focusedTabId: TabId | null;
   onSelect(id: TabId): void;
   onContextSplit(id: TabId, dir: 'row' | 'col'): void;
+  onContextNewInstance(id: TabId): void;
+  canSpawnInTab(id: TabId): boolean;
+  onCloseTab(id: TabId): void;
   onCloseInWorkspace(id: TabId): void;
+  onHideTab(id: TabId): void;
   onNew(): void;
-}
-
-const ATTENTION_RANK: Record<string, number> = {
-  'waiting-permission': 4,
-  crashed: 4,
-  'waiting-input': 3,
-  'idle-notify': 2,
-  // everything else: 0
-};
-
-function worstStatusInTab(tab: TabRecord, instances: InstanceView[]): string {
-  if (tab.kind === 'dashboard') return 'dashboard';
-  let pick: string | null = null;
-  let pickRank = -1;
-  for (const id of tab.columnOrder) {
-    const inst = instances.find((i) => i.id === id);
-    if (!inst) continue;
-    const rank = ATTENTION_RANK[inst.status] ?? 0;
-    if (rank > pickRank) {
-      pick = inst.status;
-      pickRank = rank;
-    }
-  }
-  return pick ?? 'working';
 }
 
 export function TabStrip({
   tabs,
-  instances,
   mountedTabIds,
   focusedTabId,
   onSelect,
   onContextSplit,
+  onContextNewInstance,
+  canSpawnInTab,
+  onCloseTab,
   onCloseInWorkspace,
+  onHideTab,
   onNew,
 }: Props) {
   const ids = tabs.map((t) => t.id);
   const [ctxMenu, setCtxMenu] = useState<{ id: TabId; x: number; y: number } | null>(null);
-
-  const aggregateStatus = useMemo(() => {
-    const map = new Map<TabId, string>();
-    for (const t of tabs) map.set(t.id, worstStatusInTab(t, instances));
-    return map;
-  }, [tabs, instances]);
 
   return (
     <Box
@@ -249,13 +232,18 @@ export function TabStrip({
               <SortableTab
                 id={t.id}
                 label={t.label}
-                status={aggregateStatus.get(t.id) ?? 'working'}
+                isDashboard={t.id === DASHBOARD_TAB_ID}
                 accent={t.color ?? undefined}
                 mounted={mountedTabIds.has(t.id)}
                 active={focusedTabId === t.id}
                 onClick={() => onSelect(t.id)}
+                onHide={
+                  t.id === DASHBOARD_TAB_ID || !mountedTabIds.has(t.id)
+                    ? undefined
+                    : () => onHideTab(t.id)
+                }
                 onClose={
-                  t.id === DASHBOARD_TAB_ID ? undefined : () => onCloseInWorkspace(t.id)
+                  t.id === DASHBOARD_TAB_ID ? undefined : () => onCloseTab(t.id)
                 }
               />
             </Box>
@@ -286,8 +274,19 @@ export function TabStrip({
         >
           Open here
         </MenuItem>
+        {ctxMenu && canSpawnInTab(ctxMenu.id) && (
+          <MenuItem
+            onClick={() => {
+              if (ctxMenu) onContextNewInstance(ctxMenu.id);
+              setCtxMenu(null);
+            }}
+          >
+            New instance here
+          </MenuItem>
+        )}
         <Divider />
         <MenuItem
+          disabled={ctxMenu ? mountedTabIds.has(ctxMenu.id) : false}
           onClick={() => {
             if (ctxMenu) onContextSplit(ctxMenu.id, 'row');
             setCtxMenu(null);
@@ -296,6 +295,7 @@ export function TabStrip({
           Split right
         </MenuItem>
         <MenuItem
+          disabled={ctxMenu ? mountedTabIds.has(ctxMenu.id) : false}
           onClick={() => {
             if (ctxMenu) onContextSplit(ctxMenu.id, 'col');
             setCtxMenu(null);

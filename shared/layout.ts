@@ -15,7 +15,8 @@ export interface TabRecord {
   kind: TabKind;
   label: string;
   color: string | null;
-  columnOrder: string[]; // instance IDs, left → right
+  columnOrder: string[]; // instance IDs, left → right (hidden ones excluded)
+  hiddenInstanceIds: string[]; // instances belonging to this tab the user hid
   focusedInstanceId: string | null;
 }
 
@@ -49,4 +50,5 @@ export const SETTINGS_KEYS = {
   focusedLeafId: 'layout.focusedLeafId',
   tabFocus: 'layout.tabFocus',
   tabStripOrder: 'layout.tabStripOrder',
+  hiddenInstanceIds: 'layout.hiddenInstanceIds',
 } as const;

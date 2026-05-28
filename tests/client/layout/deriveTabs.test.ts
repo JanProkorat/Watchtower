@@ -61,4 +61,42 @@ describe('deriveTabs', () => {
     );
     expect(tabs.find((t) => t.id === 'project:1')?.focusedInstanceId).toBe('i2');
   });
+
+  it('filters hidden instance ids out of columnOrder and surfaces them in hiddenInstanceIds', () => {
+    const tabs = deriveTabs(
+      [inst('i1', '/a'), inst('i2', '/a'), inst('i3', '/a')],
+      [proj(1, '/a')],
+      new Set(),
+      {},
+      new Set(['i2']),
+    );
+    const t = tabs.find((x) => x.id === 'project:1')!;
+    expect(t.columnOrder).toEqual(['i1', 'i3']);
+    expect(t.hiddenInstanceIds).toEqual(['i2']);
+  });
+
+  it('keeps a tab in the strip even when every session is hidden', () => {
+    const tabs = deriveTabs(
+      [inst('i1', '/a')],
+      [proj(1, '/a')],
+      new Set(),
+      {},
+      new Set(['i1']),
+    );
+    const t = tabs.find((x) => x.id === 'project:1');
+    expect(t).toBeDefined();
+    expect(t?.columnOrder).toEqual([]);
+    expect(t?.hiddenInstanceIds).toEqual(['i1']);
+  });
+
+  it('falls back focusedInstanceId to first visible (not hidden) column', () => {
+    const tabs = deriveTabs(
+      [inst('i1', '/a'), inst('i2', '/a')],
+      [proj(1, '/a')],
+      new Set(),
+      { 'project:1': 'i1' }, // saved focus is on hidden i1 → should fall through
+      new Set(['i1']),
+    );
+    expect(tabs.find((t) => t.id === 'project:1')?.focusedInstanceId).toBe('i2');
+  });
 });

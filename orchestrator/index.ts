@@ -445,9 +445,16 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       notifier?.snooze(req.payload.instanceId, req.payload.untilMs);
       return { ok: true };
 
-    case 'focusChanged':
-      notifier?.setFocused(req.payload.instanceId);
+    case 'focusChanged': {
+      const focusedId = req.payload.instanceId;
+      notifier?.setFocused(focusedId);
+      // Treat the user landing on an instance's tab as an explicit
+      // acknowledgement — the state machine's tabFocused transition emits
+      // clearAttention, which drops the row from the badge count and
+      // updates the dock + tray.
+      if (focusedId) applyTransition(focusedId, { kind: 'tabFocused' });
       return { ok: true };
+    }
 
     case 'projects:list': {
       const filter = req.payload as ProjectListFilter;

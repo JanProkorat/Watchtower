@@ -50,6 +50,21 @@ describe('workspaceTreeOps', () => {
     expect(next.children.map((c) => (c.kind === 'leaf' ? c.tabId : 'x'))).toEqual(['project:9', 'project:1']);
   });
 
+  it('splitLeaf refuses to duplicate an already-mounted tab', () => {
+    // Mounting the same tab in two leaves collides on the slot registry
+    // (xterm host can only attach to one DOM node) and leaves one pane
+    // blank. The function should refuse and return the tree unchanged.
+    const root = L('a', 'project:1');
+    const next = splitLeaf(root, 'a', 'row', 'after', 'project:1');
+    expect(next).toBe(root);
+  });
+
+  it('splitLeaf refuses to duplicate when the tab lives in a sibling leaf', () => {
+    const root = split('r', 'row', [L('a', 'project:1'), L('b', 'project:2')]);
+    const next = splitLeaf(root, 'b', 'col', 'after', 'project:1');
+    expect(next).toBe(root);
+  });
+
   it('replaceLeafTab swaps tabId without restructuring', () => {
     const root = split('r', 'row', [L('a', 'project:1'), L('b', 'project:2')]);
     const next = replaceLeafTab(root, 'a', 'project:9' as never);
