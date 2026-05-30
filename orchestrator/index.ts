@@ -316,7 +316,14 @@ function ackSlackReply(channel: string, ts: string, delivered: boolean): void {
 
 async function startSlackListener(): Promise<void> {
   const cfg = readSlackConfig(new SettingsRepo(handle!.db));
-  if (!slackListener || !cfg.enabled || !cfg.appToken || !cfg.botToken || !cfg.dmUserId) return;
+  if (!slackListener) return;
+  // When the feature is disabled or its tokens are incomplete, tear the
+  // socket down so a previously-connected listener doesn't linger (and so
+  // `connected` reported by slack:getConfig reflects reality).
+  if (!cfg.enabled || !cfg.appToken || !cfg.botToken || !cfg.dmUserId) {
+    await slackListener.stop();
+    return;
+  }
   try {
     const channel = slackDmChannel ?? (await new WebApiSlackClient(cfg.botToken).openDm(cfg.dmUserId));
     setSlackDmChannel(channel);
