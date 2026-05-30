@@ -20,6 +20,7 @@ import WebhookIcon from '@mui/icons-material/Webhook';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CableIcon from '@mui/icons-material/Cable';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import type { ThemeMode } from '../theme.js';
@@ -71,6 +72,7 @@ const SETTINGS_SUB_TABS: Array<SubTabMeta<SettingsTab>> = [
   { id: 'skills', label: 'Skills', icon: <AutoAwesomeIcon fontSize="inherit" /> },
   { id: 'agents', label: 'Agents', icon: <SmartToyIcon fontSize="inherit" /> },
   { id: 'mcp', label: 'MCP', icon: <CableIcon fontSize="inherit" /> },
+  { id: 'slack', label: 'Slack', icon: <NotificationsActiveIcon fontSize="inherit" /> },
 ];
 
 const COLLAPSED_WIDTH = 52;

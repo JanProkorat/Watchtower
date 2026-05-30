@@ -3,12 +3,15 @@ import path from 'node:path';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createMainWindow, getMainWindow, toggleMainWindow } from './window.js';
+import type { TokenUsagePayload } from '../shared/tokenUsageFormat.js';
+import { formatTokenCount, formatRemaining, formatPercent } from '../shared/tokenUsageFormat.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let tray: Tray | null = null;
 let badgeCount = 0;
 let entries: TrayInstanceEntry[] = [];
+let tokenUsage: TokenUsagePayload | null = null;
 
 let onSelectInstance: ((id: string) => void) | null = null;
 let onSnoozeAll: ((ms: number) => void) | null = null;
@@ -49,6 +52,51 @@ function loadTrayIcon(): NativeImage {
   return nativeImage.createEmpty();
 }
 
+/**
+ * Disabled info rows summarizing the active 5-hour token block, or a single
+ * row explaining why there's nothing to show. Returns [] only when we have no
+ * snapshot yet (keeps the menu from flickering an empty section on first open).
+ */
+function tokenUsageMenuItems(): MenuItemConstructorOptions[] {
+  if (!tokenUsage) return [];
+  if (!tokenUsage.available) {
+    return [
+      { label: 'Spotřeba tokenů nedostupná', enabled: false },
+      { type: 'separator' },
+    ];
+  }
+  const block = tokenUsage.block;
+  if (!block) {
+    return [
+      { label: 'Tokeny: žádný aktivní 5h blok', enabled: false },
+      { type: 'separator' },
+    ];
+  }
+  const remaining = formatRemaining(block.endTime, Date.now());
+  const pct = block.currentPercentUsed;
+  const headline =
+    remaining != null
+      ? `Tokeny: reset za ${remaining}${pct != null ? ` · ${formatPercent(pct)}` : ''}`
+      : `Tokeny: ${formatPercent(pct)}`;
+  const items: MenuItemConstructorOptions[] = [{ label: headline, enabled: false }];
+  if (block.limit != null) {
+    items.push({
+      label: `   ${formatTokenCount(block.totalTokens)} / ${formatTokenCount(block.limit)} tokenů`,
+      enabled: false,
+    });
+  } else {
+    items.push({ label: `   ${formatTokenCount(block.totalTokens)} tokenů`, enabled: false });
+  }
+  if (block.burnRateTokensPerMinute != null) {
+    const burn = `   ${formatTokenCount(block.burnRateTokensPerMinute)}/min`;
+    const proj =
+      block.projectedPercentUsed != null ? ` · odhad ${formatPercent(block.projectedPercentUsed)}` : '';
+    items.push({ label: burn + proj, enabled: false });
+  }
+  items.push({ type: 'separator' });
+  return items;
+}
+
 function rebuildMenu(): void {
   if (!tray) return;
   const liveCount = entries.length;
@@ -58,6 +106,7 @@ function rebuildMenu(): void {
       enabled: false,
     },
     { type: 'separator' },
+    ...tokenUsageMenuItems(),
     ...entries.map<MenuItemConstructorOptions>((e) => ({
       label: `${e.label} — ${e.status}`,
       click: () => onSelectInstance?.(e.id),
@@ -113,6 +162,11 @@ export function setTrayBadge(count: number): void {
 
 export function setTrayEntries(next: TrayInstanceEntry[]): void {
   entries = next;
+  rebuildMenu();
+}
+
+export function setTrayTokenUsage(next: TokenUsagePayload): void {
+  tokenUsage = next;
   rebuildMenu();
 }
 

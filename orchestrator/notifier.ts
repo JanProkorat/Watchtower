@@ -19,6 +19,8 @@ export interface NotifierEmitters {
 export class Notifier {
   /** id of the instance whose tab is currently focused, or null. */
   private focused: string | null = null;
+  /** Whether the app window itself is focused. */
+  private windowFocused = true;
   /** instanceId | '*' → snoozedUntil epoch ms. */
   private snoozedUntil = new Map<string, number>();
   /** instanceIds currently in an attention state. */
@@ -30,8 +32,22 @@ export class Notifier {
     this.focused = instanceId;
   }
 
+  setWindowFocused(focused: boolean): void {
+    this.windowFocused = focused;
+  }
+
+  /** id of the focused instance, or null — used to acknowledge it on window refocus. */
+  focusedId(): string | null {
+    return this.focused;
+  }
+
+  /**
+   * An instance is "focused" for notification purposes only when the window
+   * is focused AND its tab is the active one. When the window is blurred the
+   * user is looking elsewhere, so even the active instance should ping.
+   */
   isFocused(instanceId: string): boolean {
-    return this.focused === instanceId;
+    return this.windowFocused && this.focused === instanceId;
   }
 
   snooze(scope: string | '*', untilMs: number): void {
@@ -46,7 +62,7 @@ export class Notifier {
     now: number,
   ): void {
     const ctx: RuleContext = {
-      focused: this.focused === instanceId,
+      focused: this.isFocused(instanceId),
       snoozedUntil: Math.max(this.snoozedUntil.get(instanceId) ?? 0, this.snoozedUntil.get('*') ?? 0),
     };
     const action = decide(prev, next, ctx, now);

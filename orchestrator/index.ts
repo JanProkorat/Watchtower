@@ -39,6 +39,10 @@ import { DashboardOverviewService } from './db/dashboardOverview.js';
 import { transition } from './stateMachine.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
+import { SlackEscalator } from './slackEscalator.js';
+import { SlackListener } from './slackListener.js';
+import { WebApiSlackClient, type SlackClient } from './services/slackClient.js';
+import { readSlackConfig, writeSlackConfig } from './services/slackConfig.js';
 import {
   previewHookInstall,
   ensureHooksInstalled,
@@ -49,6 +53,8 @@ import { listSkills } from './services/claudeSkills.js';
 import { listAgents } from './services/claudeAgents.js';
 import { JiraSyncService } from './services/jiraSync.js';
 import { JiraBoardService } from './services/jiraBoard.js';
+import { fetchTokenUsage } from './services/tokenUsage.js';
+import type { TokenUsagePayload } from '../shared/tokenUsageFormat.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
 
@@ -71,8 +77,41 @@ let handle: BootstrapHandle | null = null;
 const pty = new PtyManager();
 let notifier: Notifier | null = null;
 let quietTimers: QuietTimers | null = null;
+let slackEscalator: SlackEscalator | null = null;
+let slackListener: SlackListener | null = null;
+/** threadTs <-> instanceId, populated when we post; read by the reply listener. */
+const slackThreadToInstance = new Map<string, string>();
+const slackInstanceToThread = new Map<string, string>();
+/** DM channel id resolved lazily from the configured user id. */
+let slackDmChannel: string | null = null;
 
 const DEFAULT_QUIET_MS = 90_000;
+
+// Latest ccusage snapshot, refreshed on a timer (see startTokenUsagePolling).
+// `tokens:usage` returns this cached value so the renderer/tray never block on
+// a ccusage invocation; the push keeps both surfaces live.
+const TOKEN_USAGE_POLL_MS = 5 * 60_000;
+let latestTokenUsage: TokenUsagePayload | null = null;
+
+async function refreshTokenUsage(): Promise<TokenUsagePayload> {
+  const payload = await fetchTokenUsage();
+  if (!payload.available) {
+    // Surface the real reason in the orchestrator log (piped to main's stderr)
+    // so a misconfigured PATH / missing ccusage is diagnosable, not silent.
+    console.error('[tokenUsage] unavailable:', payload.error);
+  }
+  latestTokenUsage = payload;
+  api?.push({ kind: 'tokenUsage', payload });
+  return payload;
+}
+
+function startTokenUsagePolling(): void {
+  void refreshTokenUsage();
+  const timer = setInterval(() => void refreshTokenUsage(), TOKEN_USAGE_POLL_MS);
+  // utilityProcess is long-lived; unref so the timer never keeps it alive on
+  // its own during shutdown.
+  timer.unref?.();
+}
 
 function supportDir(): string {
   const dir = path.join(homedir(), 'Library', 'Application Support', 'Watchtower');
@@ -223,6 +262,77 @@ function statusOf(id: string): InstanceStatus {
   return repo().get(id)?.status ?? 'crashed';
 }
 
+function slackTextFor(cwd: string, kind: 'waiting-permission' | 'idle-notify' | 'crashed'): string {
+  const name = cwd.split('/').filter(Boolean).pop() || cwd;
+  if (kind === 'waiting-permission') return `🔐 *${name}* needs a permission decision.`;
+  if (kind === 'crashed') return `💥 *${name}* crashed / exited unexpectedly.`;
+  return `⏳ *${name}* finished and is waiting for your input.`;
+}
+
+function setSlackDmChannel(channel: string | null): void {
+  slackDmChannel = channel;
+  slackListener?.setDmChannel(channel);
+}
+
+function forgetSlackThread(instanceId: string): void {
+  const ts = slackInstanceToThread.get(instanceId);
+  if (ts) slackThreadToInstance.delete(ts);
+  slackInstanceToThread.delete(instanceId);
+}
+
+async function postSlack(instanceId: string, cwd: string, kind: 'waiting-permission' | 'idle-notify' | 'crashed'): Promise<void> {
+  const cfg = readSlackConfig(new SettingsRepo(handle!.db));
+  if (!cfg.enabled || !cfg.botToken || !cfg.dmUserId) return;
+  try {
+    const client: SlackClient = new WebApiSlackClient(cfg.botToken);
+    if (!slackDmChannel) setSlackDmChannel(await client.openDm(cfg.dmUserId));
+    const res = await client.postMessage(slackDmChannel!, slackTextFor(cwd, kind));
+    slackThreadToInstance.set(res.ts, instanceId);
+    slackInstanceToThread.set(instanceId, res.ts);
+  } catch (err) {
+    console.error('[slack] post failed', err);
+  }
+}
+
+function deliverSlackReply(instanceId: string, text: string): boolean {
+  const session = pty.get(instanceId);
+  if (!session) return false;
+  session.write(text + '\r');
+  // Treat a Slack reply as engagement so attention state clears + badge updates.
+  applyTransition(instanceId, { kind: 'userPromptSubmit' });
+  return true;
+}
+
+function ackSlackReply(channel: string, ts: string, delivered: boolean): void {
+  const cfg = readSlackConfig(new SettingsRepo(handle!.db));
+  if (!cfg.botToken) return;
+  const text = delivered
+    ? '✅ Reply sent to the session.'
+    : '⚠️ That session is no longer running — your reply was not delivered.';
+  void new WebApiSlackClient(cfg.botToken)
+    .updateMessage(channel, ts, text)
+    .catch((err) => console.error('[slack] ack update failed', err));
+}
+
+async function startSlackListener(): Promise<void> {
+  const cfg = readSlackConfig(new SettingsRepo(handle!.db));
+  if (!slackListener) return;
+  // When the feature is disabled or its tokens are incomplete, tear the
+  // socket down so a previously-connected listener doesn't linger (and so
+  // `connected` reported by slack:getConfig reflects reality).
+  if (!cfg.enabled || !cfg.appToken || !cfg.botToken || !cfg.dmUserId) {
+    await slackListener.stop();
+    return;
+  }
+  try {
+    const channel = slackDmChannel ?? (await new WebApiSlackClient(cfg.botToken).openDm(cfg.dmUserId));
+    setSlackDmChannel(channel);
+    await slackListener.start(cfg.appToken);
+  } catch (err) {
+    console.error('[slack] listener start failed', err);
+  }
+}
+
 function applyTransition(instanceId: string, event: StateEvent): void {
   const inst = repo().get(instanceId);
   if (!inst) return;
@@ -232,6 +342,8 @@ function applyTransition(instanceId: string, event: StateEvent): void {
     repo().updateStatus(instanceId, result.state, Date.now());
     api?.push({ kind: 'stateChanged', payload: { instanceId, status: result.state } });
     if (notifier) notifier.apply(instanceId, inst.cwd, prevStatus, result.state, Date.now());
+    if (slackEscalator) slackEscalator.apply(instanceId, inst.cwd, prevStatus, result.state);
+    if (result.state === 'crashed' || result.state === 'finished') forgetSlackThread(instanceId);
   }
   for (const out of result.outputs) {
     if (out.kind === 'storeClaudeSessionId') {
@@ -242,6 +354,8 @@ function applyTransition(instanceId: string, event: StateEvent): void {
       quietTimers?.clear(instanceId);
     } else if (out.kind === 'clearAttention') {
       notifier?.clearAttention(instanceId);
+      slackEscalator?.clear(instanceId);
+      forgetSlackThread(instanceId);
     }
   }
 }
@@ -391,6 +505,9 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       new HookEventsRepo(handle!.db).deleteForInstance(req.payload.instanceId);
       new NotificationsRepo(handle!.db).deleteForInstance(req.payload.instanceId);
       repo().delete(req.payload.instanceId);
+      // Clean up Slack thread maps and any pending escalation timer.
+      forgetSlackThread(req.payload.instanceId);
+      slackEscalator?.clear(req.payload.instanceId);
       return { ok: true };
     }
 
@@ -426,6 +543,48 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
         if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
           tasksRepo().markToAcceptDoneOnOrBefore(v);
         }
+      }
+      return { ok: true };
+    }
+
+    case 'slack:getConfig': {
+      const config = readSlackConfig(new SettingsRepo(handle!.db));
+      return { config, connected: slackListener?.isConnected() ?? false };
+    }
+
+    case 'slack:setConfig': {
+      writeSlackConfig(new SettingsRepo(handle!.db), req.payload.config);
+      setSlackDmChannel(null); // force DM re-resolution on next post; also clears listener's copy
+      void startSlackListener();
+      return { ok: true };
+    }
+
+    case 'slack:test': {
+      const cfg = readSlackConfig(new SettingsRepo(handle!.db));
+      if (!cfg.botToken || !cfg.dmUserId) return { ok: false, error: 'Bot token and DM user id are required.' };
+      try {
+        const client = new WebApiSlackClient(cfg.botToken);
+        const auth = await client.testAuth();
+        if (!auth.ok) return { ok: false, error: auth.error ?? 'auth.test failed' };
+        const channel = await client.openDm(cfg.dmUserId);
+        await client.postMessage(channel, '✅ Watchtower Slack test message.');
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+
+    case 'windowFocusChanged': {
+      const { focused } = req.payload;
+      slackEscalator?.setWindowFocused(focused);
+      notifier?.setWindowFocused(focused);
+      if (focused) {
+        // Returning to the window acknowledges the instance the user is now
+        // looking at — same as landing on its tab. The tabFocused transition
+        // emits clearAttention, dropping its dot + badge and cancelling any
+        // Slack escalation. Background tabs stay flagged until actually visited.
+        const activeId = notifier?.focusedId() ?? null;
+        if (activeId) applyTransition(activeId, { kind: 'tabFocused' });
       }
       return { ok: true };
     }
@@ -744,6 +903,11 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       new TasksRepo(handle!.db).clearJiraStatus(req.payload.taskId);
       return { snapshot: new JiraBoardService(handle!.db).getSnapshot(req.payload.projectId) };
     }
+
+    case 'tokens:usage':
+      // Return the cached snapshot immediately; refresh in the background if we
+      // don't have one yet (first call before the poll timer has fired).
+      return latestTokenUsage ?? (await refreshTokenUsage());
   }
 }
 
@@ -845,10 +1009,33 @@ function respawnIncompleteRowsOnBoot(): void {
     quietTimers = new QuietTimers(quietMs, (instanceId) => {
       applyTransition(instanceId, { kind: 'quietTimerFired' });
     });
+    slackEscalator = new SlackEscalator(
+      () => readSlackConfig(new SettingsRepo(handle!.db)),
+      { post: (id, cwd, kind) => void postSlack(id, cwd, kind) },
+    );
+    slackListener = new SlackListener({
+      dmChannelId: null,
+      resolveInstance: (threadTs) => slackThreadToInstance.get(threadTs) ?? null,
+      deliver: deliverSlackReply,
+      ack: ackSlackReply,
+    });
+    void startSlackListener();
 
     // Respawn after api is ready so the resumed pty's first output/exit can
     // push through to the renderer immediately.
     respawnIncompleteRowsOnBoot();
+    // Begin polling ccusage for the 5h-block token usage and pushing it to the
+    // renderer dashboard + tray.
+    startTokenUsagePolling();
     void statusOf; // referenced for future use; quiet TS unused warning
   },
 );
+
+// No existing SIGTERM/SIGINT handler existed — adding a minimal shutdown hook
+// so pending escalation timers are cleared and the Socket Mode WebSocket is
+// closed gracefully when the utility process exits.
+process.on('exit', () => {
+  slackEscalator?.clearAll();
+  void slackListener?.stop();
+});
+process.on('SIGTERM', () => { void slackListener?.stop(); });
