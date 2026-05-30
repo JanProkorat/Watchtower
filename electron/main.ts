@@ -55,8 +55,6 @@ app.whenReady().then(() => {
     pushToRenderer('orchestratorCrashed', info);
   });
   const win = createMainWindow();
-  win.on('focus', () => void orch.invoke('windowFocusChanged', { focused: true }));
-  win.on('blur', () => void orch.invoke('windowFocusChanged', { focused: false }));
   win.webContents.once('did-finish-load', () => {
     pushToRenderer('hello', { version: app.getVersion() });
   });

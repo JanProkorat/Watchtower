@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getOrchestrator } from './orchestratorHost.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,6 +38,12 @@ export function createMainWindow(): BrowserWindow {
   }
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+  mainWindow.on('focus', () => {
+    try { void getOrchestrator().invoke('windowFocusChanged', { focused: true }); } catch { /* orch not ready */ }
+  });
+  mainWindow.on('blur', () => {
+    try { void getOrchestrator().invoke('windowFocusChanged', { focused: false }); } catch { /* orch not ready */ }
   });
   return mainWindow;
 }

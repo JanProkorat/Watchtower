@@ -267,6 +267,12 @@ function slackTextFor(cwd: string, kind: 'waiting-permission' | 'idle-notify' | 
   return `⏳ *${name}* finished and is waiting for your input.`;
 }
 
+function forgetSlackThread(instanceId: string): void {
+  const ts = slackInstanceToThread.get(instanceId);
+  if (ts) slackThreadToInstance.delete(ts);
+  slackInstanceToThread.delete(instanceId);
+}
+
 async function postSlack(instanceId: string, cwd: string, kind: 'waiting-permission' | 'idle-notify' | 'crashed'): Promise<void> {
   const cfg = readSlackConfig(new SettingsRepo(handle!.db));
   if (!cfg.enabled || !cfg.botToken || !cfg.dmUserId) return;
@@ -291,6 +297,7 @@ function applyTransition(instanceId: string, event: StateEvent): void {
     api?.push({ kind: 'stateChanged', payload: { instanceId, status: result.state } });
     if (notifier) notifier.apply(instanceId, inst.cwd, prevStatus, result.state, Date.now());
     if (slackEscalator) slackEscalator.apply(instanceId, inst.cwd, prevStatus, result.state);
+    if (result.state === 'crashed' || result.state === 'finished') forgetSlackThread(instanceId);
   }
   for (const out of result.outputs) {
     if (out.kind === 'storeClaudeSessionId') {
@@ -302,8 +309,7 @@ function applyTransition(instanceId: string, event: StateEvent): void {
     } else if (out.kind === 'clearAttention') {
       notifier?.clearAttention(instanceId);
       slackEscalator?.clear(instanceId);
-      const ts = slackInstanceToThread.get(instanceId);
-      if (ts) { slackThreadToInstance.delete(ts); slackInstanceToThread.delete(instanceId); }
+      forgetSlackThread(instanceId);
     }
   }
 }
@@ -453,6 +459,9 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       new HookEventsRepo(handle!.db).deleteForInstance(req.payload.instanceId);
       new NotificationsRepo(handle!.db).deleteForInstance(req.payload.instanceId);
       repo().delete(req.payload.instanceId);
+      // Clean up Slack thread maps and any pending escalation timer.
+      forgetSlackThread(req.payload.instanceId);
+      slackEscalator?.clear(req.payload.instanceId);
       return { ok: true };
     }
 
