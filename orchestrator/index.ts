@@ -417,6 +417,9 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
         console.log(
           `[orchestrator] resume exited fast for ${opts.id} (code ${code} in ${lifespan}ms) — spawning fresh`,
         );
+        // Start the fresh process with a clean snapshot buffer (the failed
+        // resume's brief output shouldn't carry into the new session's screen).
+        terminalSnapshots.dispose(opts.id);
         spawnPtyForInstance({
           id: opts.id,
           cwd: opts.cwd,
@@ -429,10 +432,12 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
       const r = repo();
       const inst = r.get(opts.id);
       if (inst) {
-        const result = transition(inst.status, { kind: 'ptyExit', code });
-        r.updateStatus(opts.id, result.state, Date.now());
+        // Record termination metadata, then run the FULL transition via
+        // applyTransition so the notifier + Slack escalator fan-out fires for
+        // finished/crashed exits. (A bare transition()+updateStatus() here would
+        // update the row but never notify — leaving the crash trigger dead.)
         r.setTermination(opts.id, code === 0 ? 'session-end' : 'crash', code);
-        api?.push({ kind: 'stateChanged', payload: { instanceId: opts.id, status: result.state } });
+        applyTransition(opts.id, { kind: 'ptyExit', code });
       }
     },
   });
