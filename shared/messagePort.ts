@@ -1,3 +1,5 @@
+import type { SlackConfig } from './slackConfig.js';
+
 export type OrchRequest =
   | { id: string; kind: 'ping'; payload: { now: number } }
   | { id: string; kind: 'spawnInstance'; payload: { cwd: string; args?: string[] } }
@@ -9,6 +11,10 @@ export type OrchRequest =
   | { id: string; kind: 'listInstances'; payload: Record<string, never> }
   | { id: string; kind: 'getSetting'; payload: { key: string } }
   | { id: string; kind: 'setSetting'; payload: { key: string; value: string } }
+  | { id: string; kind: 'slack:getConfig'; payload: Record<string, never> }
+  | { id: string; kind: 'slack:setConfig'; payload: { config: SlackConfig } }
+  | { id: string; kind: 'slack:test'; payload: Record<string, never> }
+  | { id: string; kind: 'windowFocusChanged'; payload: { focused: boolean } }
   | { id: string; kind: 'previewHookInstall'; payload: Record<string, never> }
   | { id: string; kind: 'installHooks'; payload: Record<string, never> }
   | { id: string; kind: 'uninstallHooks'; payload: Record<string, never> }
@@ -64,7 +70,8 @@ export type OrchRequest =
   | { id: string; kind: 'board:authPing'; payload: Record<string, never> }
   | { id: string; kind: 'board:get'; payload: { projectId: number } }
   | { id: string; kind: 'board:sync'; payload: { projectId: number } }
-  | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } };
+  | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
+  | { id: string; kind: 'tokens:usage'; payload: Record<string, never> };
 
 export interface OrchRunningInstance {
   id: string;
@@ -431,6 +438,10 @@ export type OrchResponse =
     }
   | { kind: 'getSetting'; payload: { value: string | null } }
   | { kind: 'setSetting'; payload: { ok: true } }
+  | { kind: 'slack:getConfig'; payload: { config: SlackConfig; connected: boolean } }
+  | { kind: 'slack:setConfig'; payload: { ok: true } }
+  | { kind: 'slack:test'; payload: { ok: boolean; error?: string } }
+  | { kind: 'windowFocusChanged'; payload: { ok: true } }
   | {
       kind: 'previewHookInstall';
       payload: {
@@ -504,7 +515,8 @@ export type OrchResponse =
   | {
       kind: 'board:remove';
       payload: { snapshot: import('./ipcContract.js').BoardSnapshotPayload };
-    };
+    }
+  | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
@@ -515,7 +527,8 @@ export type OrchPush =
       payload: { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
     }
   | { kind: 'clearAttention'; payload: { instanceId: string } }
-  | { kind: 'badge'; payload: { count: number } };
+  | { kind: 'badge'; payload: { count: number } }
+  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
 
 type AnyPort = {
   postMessage(data: unknown): void;

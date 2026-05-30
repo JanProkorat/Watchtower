@@ -1,3 +1,5 @@
+import type { SlackConfig } from './slackConfig.js';
+
 export type IpcRequest =
   | { kind: 'ping'; payload: { now: number } }
   | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[] } }
@@ -10,6 +12,9 @@ export type IpcRequest =
   | { kind: 'chooseDirectory'; payload: { defaultPath?: string } }
   | { kind: 'getSetting'; payload: { key: string } }
   | { kind: 'setSetting'; payload: { key: string; value: string } }
+  | { kind: 'slack:getConfig'; payload: Record<string, never> }
+  | { kind: 'slack:setConfig'; payload: { config: SlackConfig } }
+  | { kind: 'slack:test'; payload: Record<string, never> }
   | { kind: 'previewHookInstall'; payload: Record<string, never> }
   | { kind: 'installHooks'; payload: Record<string, never> }
   | { kind: 'uninstallHooks'; payload: Record<string, never> }
@@ -69,6 +74,7 @@ export type IpcRequest =
   | { kind: 'board:sync'; payload: { projectId: number } }
   | { kind: 'board:signIn'; payload: Record<string, never> }
   | { kind: 'board:remove'; payload: { taskId: number; projectId: number } }
+  | { kind: 'tokens:usage'; payload: Record<string, never> }
   | { kind: 'openExternalUrl'; payload: { url: string } };
 
 export interface RunningInstancePayload {
@@ -488,6 +494,9 @@ export type IpcResponse =
   | { kind: 'chooseDirectory'; payload: { path: string | null } }
   | { kind: 'getSetting'; payload: { value: string | null } }
   | { kind: 'setSetting'; payload: { ok: true } }
+  | { kind: 'slack:getConfig'; payload: { config: SlackConfig; connected: boolean } }
+  | { kind: 'slack:setConfig'; payload: { ok: true } }
+  | { kind: 'slack:test'; payload: { ok: boolean; error?: string } }
   | {
       kind: 'previewHookInstall';
       payload: {
@@ -556,6 +565,7 @@ export type IpcResponse =
   | { kind: 'board:sync'; payload: { snapshot: BoardSnapshotPayload; result: BoardSyncResultPayload } }
   | { kind: 'board:signIn'; payload: { ok: boolean; error?: string } }
   | { kind: 'board:remove'; payload: { snapshot: BoardSnapshotPayload } }
+  | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } };
 
 export interface AgentRowPayload {
@@ -709,6 +719,7 @@ export type IpcPush =
   | { kind: 'badge'; payload: { count: number } }
   | { kind: 'activateInstance'; payload: { instanceId: string } }
   | { kind: 'triggerNewInstance'; payload: Record<string, never> }
+  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | {
       kind: 'orchestratorCrashed';
       payload: { code: number | null; restarting: boolean };
