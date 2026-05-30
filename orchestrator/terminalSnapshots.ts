@@ -1,5 +1,7 @@
 import './xtermHeadlessShim.js'; // MUST precede the @xterm/headless import
-import { Terminal } from '@xterm/headless';
+import pkg from '@xterm/headless';
+const { Terminal } = pkg;
+type Terminal = InstanceType<typeof Terminal>;
 
 const DEFAULT_COLS = 120;
 const DEFAULT_ROWS = 30;
