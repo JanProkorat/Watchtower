@@ -11,10 +11,8 @@ import {
   focusInstanceTab,
   refreshTrayFromOrchestrator,
   setTrayBadge,
-  setTrayTokenUsage,
   startTray,
 } from './tray.js';
-import type { TokenUsagePayload } from '../shared/tokenUsageFormat.js';
 
 const LIVE_STATUSES = new Set([
   'spawning',
@@ -77,9 +75,6 @@ app.whenReady().then(() => {
   orch.onPush((msg) => {
     if (msg.kind === 'badge') {
       setTrayBadge((msg.payload as { count: number }).count);
-    }
-    if (msg.kind === 'tokenUsage') {
-      setTrayTokenUsage(msg.payload as TokenUsagePayload);
     }
     if (msg.kind === 'stateChanged' || msg.kind === 'ptyExit') {
       void refreshTrayFromOrchestrator((kind, payload) =>
