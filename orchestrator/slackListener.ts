@@ -9,6 +9,7 @@ import { routeReply, type InboundMessage, type ReplyDeps } from './slackReply.js
 export class SlackListener {
   private client: SocketModeClient | null = null;
   private connected = false;
+  private startChain: Promise<void> | null = null;
 
   constructor(private deps: ReplyDeps) {}
 
@@ -21,6 +22,13 @@ export class SlackListener {
   }
 
   async start(appToken: string): Promise<void> {
+    this.startChain = (this.startChain ?? Promise.resolve())
+      .catch(() => { /* ignore prior failure, proceed */ })
+      .then(() => this.doStart(appToken));
+    return this.startChain;
+  }
+
+  private async doStart(appToken: string): Promise<void> {
     await this.stop();
     if (!appToken) return;
     const client = new SocketModeClient({ appToken });

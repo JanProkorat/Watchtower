@@ -269,6 +269,11 @@ function slackTextFor(cwd: string, kind: 'waiting-permission' | 'idle-notify' | 
   return `⏳ *${name}* finished and is waiting for your input.`;
 }
 
+function setSlackDmChannel(channel: string | null): void {
+  slackDmChannel = channel;
+  slackListener?.setDmChannel(channel);
+}
+
 function forgetSlackThread(instanceId: string): void {
   const ts = slackInstanceToThread.get(instanceId);
   if (ts) slackThreadToInstance.delete(ts);
@@ -280,8 +285,8 @@ async function postSlack(instanceId: string, cwd: string, kind: 'waiting-permiss
   if (!cfg.enabled || !cfg.botToken || !cfg.dmUserId) return;
   try {
     const client: SlackClient = new WebApiSlackClient(cfg.botToken);
-    if (!slackDmChannel) slackDmChannel = await client.openDm(cfg.dmUserId);
-    const res = await client.postMessage(slackDmChannel, slackTextFor(cwd, kind));
+    if (!slackDmChannel) setSlackDmChannel(await client.openDm(cfg.dmUserId));
+    const res = await client.postMessage(slackDmChannel!, slackTextFor(cwd, kind));
     slackThreadToInstance.set(res.ts, instanceId);
     slackInstanceToThread.set(instanceId, res.ts);
   } catch (err) {
@@ -289,19 +294,23 @@ async function postSlack(instanceId: string, cwd: string, kind: 'waiting-permiss
   }
 }
 
-function deliverSlackReply(instanceId: string, text: string): void {
+function deliverSlackReply(instanceId: string, text: string): boolean {
   const session = pty.get(instanceId);
-  if (!session) return;
+  if (!session) return false;
   session.write(text + '\r');
   // Treat a Slack reply as engagement so attention state clears + badge updates.
   applyTransition(instanceId, { kind: 'userPromptSubmit' });
+  return true;
 }
 
-function ackSlackReply(channel: string, ts: string): void {
+function ackSlackReply(channel: string, ts: string, delivered: boolean): void {
   const cfg = readSlackConfig(new SettingsRepo(handle!.db));
   if (!cfg.botToken) return;
+  const text = delivered
+    ? '✅ Reply sent to the session.'
+    : '⚠️ That session is no longer running — your reply was not delivered.';
   void new WebApiSlackClient(cfg.botToken)
-    .updateMessage(channel, ts, '✅ Reply sent to the session.')
+    .updateMessage(channel, ts, text)
     .catch((err) => console.error('[slack] ack update failed', err));
 }
 
@@ -309,8 +318,8 @@ async function startSlackListener(): Promise<void> {
   const cfg = readSlackConfig(new SettingsRepo(handle!.db));
   if (!slackListener || !cfg.enabled || !cfg.appToken || !cfg.botToken || !cfg.dmUserId) return;
   try {
-    if (!slackDmChannel) slackDmChannel = await new WebApiSlackClient(cfg.botToken).openDm(cfg.dmUserId);
-    slackListener.setDmChannel(slackDmChannel);
+    const channel = slackDmChannel ?? (await new WebApiSlackClient(cfg.botToken).openDm(cfg.dmUserId));
+    setSlackDmChannel(channel);
     await slackListener.start(cfg.appToken);
   } catch (err) {
     console.error('[slack] listener start failed', err);
@@ -538,7 +547,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
 
     case 'slack:setConfig': {
       writeSlackConfig(new SettingsRepo(handle!.db), req.payload.config);
-      slackDmChannel = null; // force DM re-resolution on next post
+      setSlackDmChannel(null); // force DM re-resolution on next post; also clears listener's copy
       void startSlackListener();
       return { ok: true };
     }
@@ -1012,3 +1021,4 @@ process.on('exit', () => {
   slackEscalator?.clearAll();
   void slackListener?.stop();
 });
+process.on('SIGTERM', () => { void slackListener?.stop(); });

@@ -5,7 +5,7 @@ function deps(over: Partial<Parameters<typeof routeReply>[1]> = {}) {
   return {
     dmChannelId: 'D1',
     resolveInstance: (ts: string) => (ts === 'T1' ? 'inst-1' : null),
-    deliver: vi.fn(),
+    deliver: vi.fn(() => true),
     ack: vi.fn(),
     ...over,
   };
@@ -18,7 +18,7 @@ describe('routeReply', () => {
     const d = deps();
     expect(routeReply(base, d)).toBe(true);
     expect(d.deliver).toHaveBeenCalledWith('inst-1', 'yes');
-    expect(d.ack).toHaveBeenCalledWith('D1', 'T1');
+    expect(d.ack).toHaveBeenCalledWith('D1', 'T1', true);
   });
   it('ignores messages from other channels', () => {
     const d = deps();
@@ -40,5 +40,17 @@ describe('routeReply', () => {
     const d = deps({ resolveInstance: (ts) => (ts === 'M1' ? 'inst-1' : null) });
     expect(routeReply({ channel: 'D1', text: 'hi', ts: 'M1' }, d)).toBe(true);
     expect(d.deliver).toHaveBeenCalledWith('inst-1', 'hi');
+  });
+
+  it('ignores whitespace-only text', () => {
+    const d = deps();
+    expect(routeReply({ ...base, text: '   ' }, d)).toBe(false);
+    expect(d.deliver).not.toHaveBeenCalled();
+  });
+
+  it('still acks (with delivered=false) when the instance pty is gone', () => {
+    const d = deps({ deliver: vi.fn(() => false) });
+    expect(routeReply(base, d)).toBe(true);
+    expect(d.ack).toHaveBeenCalledWith('D1', 'T1', false);
   });
 });
