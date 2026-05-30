@@ -74,6 +74,7 @@ export type IpcRequest =
   | { kind: 'board:sync'; payload: { projectId: number } }
   | { kind: 'board:signIn'; payload: Record<string, never> }
   | { kind: 'board:remove'; payload: { taskId: number; projectId: number } }
+  | { kind: 'tokens:usage'; payload: Record<string, never> }
   | { kind: 'openExternalUrl'; payload: { url: string } };
 
 export interface RunningInstancePayload {
@@ -564,6 +565,7 @@ export type IpcResponse =
   | { kind: 'board:sync'; payload: { snapshot: BoardSnapshotPayload; result: BoardSyncResultPayload } }
   | { kind: 'board:signIn'; payload: { ok: boolean; error?: string } }
   | { kind: 'board:remove'; payload: { snapshot: BoardSnapshotPayload } }
+  | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } };
 
 export interface AgentRowPayload {
@@ -717,6 +719,7 @@ export type IpcPush =
   | { kind: 'badge'; payload: { count: number } }
   | { kind: 'activateInstance'; payload: { instanceId: string } }
   | { kind: 'triggerNewInstance'; payload: Record<string, never> }
+  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | {
       kind: 'orchestratorCrashed';
       payload: { code: number | null; restarting: boolean };

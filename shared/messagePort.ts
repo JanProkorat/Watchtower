@@ -71,6 +71,7 @@ export type OrchRequest =
   | { id: string; kind: 'board:get'; payload: { projectId: number } }
   | { id: string; kind: 'board:sync'; payload: { projectId: number } }
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
+  | { id: string; kind: 'tokens:usage'; payload: Record<string, never> };
 
 export interface OrchRunningInstance {
   id: string;
@@ -515,6 +516,7 @@ export type OrchResponse =
       kind: 'board:remove';
       payload: { snapshot: import('./ipcContract.js').BoardSnapshotPayload };
     }
+  | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
@@ -526,6 +528,7 @@ export type OrchPush =
     }
   | { kind: 'clearAttention'; payload: { instanceId: string } }
   | { kind: 'badge'; payload: { count: number } }
+  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
 
 type AnyPort = {
   postMessage(data: unknown): void;

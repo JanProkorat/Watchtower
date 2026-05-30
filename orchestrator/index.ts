@@ -53,6 +53,8 @@ import { listSkills } from './services/claudeSkills.js';
 import { listAgents } from './services/claudeAgents.js';
 import { JiraSyncService } from './services/jiraSync.js';
 import { JiraBoardService } from './services/jiraBoard.js';
+import { fetchTokenUsage } from './services/tokenUsage.js';
+import type { TokenUsagePayload } from '../shared/tokenUsageFormat.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
 
@@ -84,6 +86,32 @@ const slackInstanceToThread = new Map<string, string>();
 let slackDmChannel: string | null = null;
 
 const DEFAULT_QUIET_MS = 90_000;
+
+// Latest ccusage snapshot, refreshed on a timer (see startTokenUsagePolling).
+// `tokens:usage` returns this cached value so the renderer/tray never block on
+// a ccusage invocation; the push keeps both surfaces live.
+const TOKEN_USAGE_POLL_MS = 5 * 60_000;
+let latestTokenUsage: TokenUsagePayload | null = null;
+
+async function refreshTokenUsage(): Promise<TokenUsagePayload> {
+  const payload = await fetchTokenUsage();
+  if (!payload.available) {
+    // Surface the real reason in the orchestrator log (piped to main's stderr)
+    // so a misconfigured PATH / missing ccusage is diagnosable, not silent.
+    console.error('[tokenUsage] unavailable:', payload.error);
+  }
+  latestTokenUsage = payload;
+  api?.push({ kind: 'tokenUsage', payload });
+  return payload;
+}
+
+function startTokenUsagePolling(): void {
+  void refreshTokenUsage();
+  const timer = setInterval(() => void refreshTokenUsage(), TOKEN_USAGE_POLL_MS);
+  // utilityProcess is long-lived; unref so the timer never keeps it alive on
+  // its own during shutdown.
+  timer.unref?.();
+}
 
 function supportDir(): string {
   const dir = path.join(homedir(), 'Library', 'Application Support', 'Watchtower');
@@ -875,6 +903,11 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       new TasksRepo(handle!.db).clearJiraStatus(req.payload.taskId);
       return { snapshot: new JiraBoardService(handle!.db).getSnapshot(req.payload.projectId) };
     }
+
+    case 'tokens:usage':
+      // Return the cached snapshot immediately; refresh in the background if we
+      // don't have one yet (first call before the poll timer has fired).
+      return latestTokenUsage ?? (await refreshTokenUsage());
   }
 }
 
@@ -991,6 +1024,9 @@ function respawnIncompleteRowsOnBoot(): void {
     // Respawn after api is ready so the resumed pty's first output/exit can
     // push through to the renderer immediately.
     respawnIncompleteRowsOnBoot();
+    // Begin polling ccusage for the 5h-block token usage and pushing it to the
+    // renderer dashboard + tray.
+    startTokenUsagePolling();
     void statusOf; // referenced for future use; quiet TS unused warning
   },
 );

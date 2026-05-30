@@ -3,6 +3,7 @@ import { Alert, Box, Skeleton, Stack } from '@mui/material';
 import dayjs from 'dayjs';
 import { useDashboardOverview } from '../../state/useDashboardOverview.js';
 import { useProjects } from '../../state/useProjects.js';
+import { useTokenUsage } from '../../state/useTokenUsage.js';
 import { useToast } from '../../state/useToast.js';
 import type { InstanceView } from '../../state/useInstances.js';
 import { DashboardHeader } from './DashboardHeader.js';
@@ -12,6 +13,7 @@ import { SessionsCard } from './SessionsCard.js';
 import { LastThirtyDays } from './LastThirtyDays.js';
 import { TopProjectsCard } from './TopProjectsCard.js';
 import { ActiveContractsCard } from './ActiveContractsCard.js';
+import { TokenUsageCard } from './TokenUsageCard.js';
 
 const FILTER_KEY = 'watchtower.dashboard.projectId';
 
@@ -59,6 +61,7 @@ export function ModuleDashboard({
   const [projectId, setProjectId] = useState<number | null>(readPersistedProject);
   const [defaultSeeded, setDefaultSeeded] = useState(false);
   const projectsState = useProjects();
+  const tokenUsage = useTokenUsage();
   const { showError } = useToast();
 
   // Refresh today's date if the page outlives midnight.
@@ -141,6 +144,7 @@ export function ModuleDashboard({
       )}
 
       <Stack spacing={2}>
+        <TokenUsageCard usage={tokenUsage} />
         {overview.loading && !overview.data ? (
           <>
             <Skeleton variant="rounded" height={120} />
