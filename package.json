@@ -74,6 +74,7 @@
   "build": {
     "appId": "cz.greencode.watchtower",
     "productName": "Watchtower",
+    "afterPack": "scripts/adhoc-sign.mjs",
     "directories": {
       "buildResources": "build-resources",
       "output": "release"
