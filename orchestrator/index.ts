@@ -547,7 +547,17 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
     }
 
     case 'windowFocusChanged': {
-      slackEscalator?.setWindowFocused(req.payload.focused);
+      const { focused } = req.payload;
+      slackEscalator?.setWindowFocused(focused);
+      notifier?.setWindowFocused(focused);
+      if (focused) {
+        // Returning to the window acknowledges the instance the user is now
+        // looking at — same as landing on its tab. The tabFocused transition
+        // emits clearAttention, dropping its dot + badge and cancelling any
+        // Slack escalation. Background tabs stay flagged until actually visited.
+        const activeId = notifier?.focusedId() ?? null;
+        if (activeId) applyTransition(activeId, { kind: 'tabFocused' });
+      }
       return { ok: true };
     }
 
