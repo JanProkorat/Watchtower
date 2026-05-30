@@ -8,6 +8,9 @@ export interface SlackEscalatorEmitters {
   post(instanceId: string, cwd: string, kind: SlackEscalationKind): void;
 }
 
+// NOTE: assumes the two attention states are never entered directly from one
+// another (the state machine only reaches idle-notify from waiting-input), so
+// a single armed timer per instance can't carry the wrong kind.
 const ATTENTION: ReadonlyArray<InstanceStatus> = ['waiting-permission', 'idle-notify'];
 
 /**

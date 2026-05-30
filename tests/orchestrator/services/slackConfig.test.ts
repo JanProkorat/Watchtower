@@ -40,4 +40,10 @@ describe('slackConfig read/write', () => {
     repo.set('slack_escalate_ms', 'not-a-number');
     expect(readSlackConfig(repo).escalateMs).toBe(DEFAULT_SLACK_CONFIG.escalateMs);
   });
+
+  it('falls back to default triggers when the stored JSON is malformed', async () => {
+    const repo = new SettingsRepo(fakeDb());
+    repo.set('slack_triggers', '{not valid json');
+    expect(readSlackConfig(repo).triggers).toEqual(DEFAULT_SLACK_CONFIG.triggers);
+  });
 });
