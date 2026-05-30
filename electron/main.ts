@@ -11,8 +11,10 @@ import {
   focusInstanceTab,
   refreshTrayFromOrchestrator,
   setTrayBadge,
+  setTrayTokenUsage,
   startTray,
 } from './tray.js';
+import type { TokenUsagePayload } from '../shared/tokenUsageFormat.js';
 
 const LIVE_STATUSES = new Set([
   'spawning',
@@ -53,6 +55,8 @@ app.whenReady().then(() => {
     pushToRenderer('orchestratorCrashed', info);
   });
   const win = createMainWindow();
+  win.on('focus', () => void orch.invoke('windowFocusChanged', { focused: true }));
+  win.on('blur', () => void orch.invoke('windowFocusChanged', { focused: false }));
   win.webContents.once('did-finish-load', () => {
     pushToRenderer('hello', { version: app.getVersion() });
   });
@@ -75,6 +79,9 @@ app.whenReady().then(() => {
   orch.onPush((msg) => {
     if (msg.kind === 'badge') {
       setTrayBadge((msg.payload as { count: number }).count);
+    }
+    if (msg.kind === 'tokenUsage') {
+      setTrayTokenUsage(msg.payload as TokenUsagePayload);
     }
     if (msg.kind === 'stateChanged' || msg.kind === 'ptyExit') {
       void refreshTrayFromOrchestrator((kind, payload) =>
