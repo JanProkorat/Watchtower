@@ -34,7 +34,6 @@ export function useSlackConfig(): SlackConfigState {
   const save = useCallback(
     async (next: SlackConfig) => {
       await window.watchtower.invoke('slack:setConfig', { config: next });
-      setConfig(next);
       await refresh();
     },
     [refresh],

@@ -3,13 +3,15 @@ import {
   Box, Stack, Typography, TextField, Switch, FormControlLabel, Button, Alert, Divider, Chip,
 } from '@mui/material';
 import { useSlackConfig } from '../../state/useSlackConfig.js';
+import { useToast, toastMessage } from '../../state/useToast.js';
 import type { SlackConfig } from '../../../../shared/slackConfig.js';
 
 export function SlackTab() {
   const { config, connected, loading, error, save, sendTest } = useSlackConfig();
+  const { showError } = useToast();
   const [draft, setDraft] = useState<SlackConfig | null>(null);
   const [saving, setSaving] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   const value = draft ?? config;
   const patch = (p: Partial<SlackConfig>) => setDraft({ ...value, ...p });
@@ -20,6 +22,8 @@ export function SlackTab() {
     try {
       await save(value);
       setDraft(null);
+    } catch (err) {
+      showError(toastMessage(err));
     } finally {
       setSaving(false);
     }
@@ -27,8 +31,12 @@ export function SlackTab() {
 
   const onTest = async () => {
     setTestResult(null);
-    const res = await sendTest();
-    setTestResult(res.ok ? '✅ Sent — check your Slack DM.' : `❌ ${res.error ?? 'failed'}`);
+    try {
+      const res = await sendTest();
+      setTestResult(res.ok ? { ok: true, text: 'Sent — check your Slack DM.' } : { ok: false, text: res.error ?? 'failed' });
+    } catch (err) {
+      setTestResult({ ok: false, text: err instanceof Error ? err.message : String(err) });
+    }
   };
 
   if (loading) return <Box sx={{ p: 3 }}><Typography>Loading…</Typography></Box>;
@@ -85,7 +93,7 @@ export function SlackTab() {
           label="Crashes / exits"
         />
 
-        {testResult && <Alert severity={testResult.startsWith('✅') ? 'success' : 'error'}>{testResult}</Alert>}
+        {testResult && <Alert severity={testResult.ok ? 'success' : 'error'}>{testResult.text}</Alert>}
 
         <Stack direction="row" spacing={1}>
           <Button variant="contained" onClick={onSave} disabled={saving || draft === null}>Save</Button>
