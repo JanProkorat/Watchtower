@@ -40,6 +40,7 @@ import { transition } from './stateMachine.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
 import { SlackEscalator } from './slackEscalator.js';
+import { SlackListener } from './slackListener.js';
 import { WebApiSlackClient, type SlackClient } from './services/slackClient.js';
 import { readSlackConfig, writeSlackConfig } from './services/slackConfig.js';
 import {
@@ -77,6 +78,7 @@ const pty = new PtyManager();
 let notifier: Notifier | null = null;
 let quietTimers: QuietTimers | null = null;
 let slackEscalator: SlackEscalator | null = null;
+let slackListener: SlackListener | null = null;
 /** threadTs <-> instanceId, populated when we post; read by the reply listener. */
 const slackThreadToInstance = new Map<string, string>();
 const slackInstanceToThread = new Map<string, string>();
@@ -284,6 +286,34 @@ async function postSlack(instanceId: string, cwd: string, kind: 'waiting-permiss
     slackInstanceToThread.set(instanceId, res.ts);
   } catch (err) {
     console.error('[slack] post failed', err);
+  }
+}
+
+function deliverSlackReply(instanceId: string, text: string): void {
+  const session = pty.get(instanceId);
+  if (!session) return;
+  session.write(text + '\r');
+  // Treat a Slack reply as engagement so attention state clears + badge updates.
+  applyTransition(instanceId, { kind: 'userPromptSubmit' });
+}
+
+function ackSlackReply(channel: string, ts: string): void {
+  const cfg = readSlackConfig(new SettingsRepo(handle!.db));
+  if (!cfg.botToken) return;
+  void new WebApiSlackClient(cfg.botToken)
+    .updateMessage(channel, ts, '✅ Reply sent to the session.')
+    .catch((err) => console.error('[slack] ack update failed', err));
+}
+
+async function startSlackListener(): Promise<void> {
+  const cfg = readSlackConfig(new SettingsRepo(handle!.db));
+  if (!slackListener || !cfg.enabled || !cfg.appToken || !cfg.botToken || !cfg.dmUserId) return;
+  try {
+    if (!slackDmChannel) slackDmChannel = await new WebApiSlackClient(cfg.botToken).openDm(cfg.dmUserId);
+    slackListener.setDmChannel(slackDmChannel);
+    await slackListener.start(cfg.appToken);
+  } catch (err) {
+    console.error('[slack] listener start failed', err);
   }
 }
 
@@ -503,12 +533,13 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
 
     case 'slack:getConfig': {
       const config = readSlackConfig(new SettingsRepo(handle!.db));
-      return { config, connected: config.enabled && Boolean(config.botToken) };
+      return { config, connected: slackListener?.isConnected() ?? false };
     }
 
     case 'slack:setConfig': {
       writeSlackConfig(new SettingsRepo(handle!.db), req.payload.config);
       slackDmChannel = null; // force DM re-resolution on next post
+      void startSlackListener();
       return { ok: true };
     }
 
@@ -956,6 +987,13 @@ function respawnIncompleteRowsOnBoot(): void {
       () => readSlackConfig(new SettingsRepo(handle!.db)),
       { post: (id, cwd, kind) => void postSlack(id, cwd, kind) },
     );
+    slackListener = new SlackListener({
+      dmChannelId: null,
+      resolveInstance: (threadTs) => slackThreadToInstance.get(threadTs) ?? null,
+      deliver: deliverSlackReply,
+      ack: ackSlackReply,
+    });
+    void startSlackListener();
 
     // Respawn after api is ready so the resumed pty's first output/exit can
     // push through to the renderer immediately.
@@ -966,3 +1004,11 @@ function respawnIncompleteRowsOnBoot(): void {
     void statusOf; // referenced for future use; quiet TS unused warning
   },
 );
+
+// No existing SIGTERM/SIGINT handler existed — adding a minimal shutdown hook
+// so pending escalation timers are cleared and the Socket Mode WebSocket is
+// closed gracefully when the utility process exits.
+process.on('exit', () => {
+  slackEscalator?.clearAll();
+  void slackListener?.stop();
+});
