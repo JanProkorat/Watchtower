@@ -37,6 +37,7 @@ import { czechHolidays } from './db/workdays.js';
 import { ReportsService } from './db/reports.js';
 import { DashboardOverviewService } from './db/dashboardOverview.js';
 import { transition } from './stateMachine.js';
+import { hookCwdMatches, resolveResumeTarget } from './sessionResume.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
 import { SlackEscalator } from './slackEscalator.js';
@@ -956,11 +957,17 @@ function respawnIncompleteRowsOnBoot(): void {
     try {
       r.updateStatus(row.id, 'spawning', Date.now());
       r.setTermination(row.id, null, null);
+      // Prefer the stored session id, but if it's unresumable here (e.g. a row
+      // contaminated by a nested-claude SessionStart before the cwd gate landed,
+      // holding an id that lives under a different project dir) fall back to the
+      // row's own --session-id session, or a fresh spawn. Avoids the hard
+      // "No session found with ID …" error on reopen.
+      const resumeSessionId = resolveResumeTarget(row) ?? undefined;
       spawnPtyForInstance({
         id: row.id,
         cwd: row.cwd,
         extraArgs: [],
-        resumeSessionId: row.claudeSessionId,
+        resumeSessionId,
       });
       respawned++;
     } catch (err) {
@@ -985,6 +992,14 @@ function respawnIncompleteRowsOnBoot(): void {
       supportDir: supportDir(),
       portRange: [7421, 7430],
       onHookEvent: async (eventName, body, instanceId) => {
+        // Drop hook events fired by a NESTED `claude` (memory summarizer, skills,
+        // sub-agents) that inherited this instance's WATCHTOWER_INSTANCE_ID but
+        // runs from a different cwd. Routing them here would corrupt the managed
+        // instance's state and clobber its claude_session_id with an id from a
+        // foreign project dir, breaking `claude --resume` on next boot.
+        const cwd = repo().get(instanceId)?.cwd;
+        const hookCwd = (body as { cwd?: unknown } | undefined)?.cwd;
+        if (!hookCwdMatches(cwd, hookCwd)) return;
         const stateEvent = mapHookEventToStateEvent(eventName, body);
         if (stateEvent) applyTransition(instanceId, stateEvent);
       },

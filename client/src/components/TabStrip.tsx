@@ -16,6 +16,17 @@ function dotColor(id: string, accent: string | undefined): string {
   return tabAccent(id, accent);
 }
 
+// The strip doubles as the frameless macOS title bar (window.ts sets
+// titleBarStyle: 'hiddenInset'), so the empty regions must drag the window
+// while the tabs and buttons stay clickable. -webkit-app-region inherits in
+// Electron: the container is `drag`, interactive children opt out via `no-drag`.
+// WebkitAppRegion isn't in React's CSSProperties typings, hence the cast.
+const DRAG_REGION = { WebkitAppRegion: 'drag' } as unknown as CSSProperties;
+const NO_DRAG_REGION = { WebkitAppRegion: 'no-drag' } as unknown as CSSProperties;
+
+// Clears the traffic-light buttons that hiddenInset keeps at the top-left.
+const TRAFFIC_LIGHT_INSET = '78px';
+
 interface TabButtonProps {
   id: string;
   label: string;
@@ -51,7 +62,7 @@ function TabButton({
     <Box
       ref={dragRef}
       onClick={onClick}
-      style={dragStyle}
+      style={{ ...(dragStyle ?? {}), ...NO_DRAG_REGION }}
       {...(dragListeners ?? {})}
       role="tab"
       aria-selected={active}
@@ -207,9 +218,12 @@ export function TabStrip({
 
   return (
     <Box
+      style={DRAG_REGION}
       sx={{
         display: 'flex',
         alignItems: 'stretch',
+        minHeight: 40,
+        pl: TRAFFIC_LIGHT_INSET,
         borderBottom: 1,
         borderColor: 'divider',
         backgroundColor: 'background.paper',
@@ -255,6 +269,7 @@ export function TabStrip({
         <IconButton
           onClick={onNew}
           size="small"
+          style={NO_DRAG_REGION}
           sx={{ mr: 1, color: 'text.secondary', ':hover': { color: 'primary.main' } }}
         >
           <AddIcon fontSize="small" />

@@ -55,6 +55,8 @@ import {
 } from './layout/workspaceTreeOps.js';
 import { parseTabId } from './layout/tabId.js';
 import { pruneLayout } from './layout/pruneLayout.js';
+import { pruneAdHocCwds } from './layout/pruneAdHocCwds.js';
+import { selectGlobalTab } from './layout/selectGlobalTab.js';
 import { DASHBOARD_TAB_ID, type TabId } from '../../shared/layout.js';
 import { useTimeTrackerView } from './state/useTimeTrackerView.js';
 import { useSettingsView } from './state/useSettingsView.js';
@@ -153,6 +155,16 @@ export function App() {
     const pruned = pruneLayout(layout.root, validTabIds);
     layoutActions.replaceTree(pruned);
   }, [layoutLoaded, tabs, layout.root, layoutActions, spawnInFlight]);
+
+  // Self-clean openAdHocCwds: a project-less folder's tab is force-shown by
+  // deriveTabs while its cwd is in this set, so closing the tab's last session
+  // must also drop the cwd or the empty tab lingers. Guarded by spawnInFlight
+  // for the same reason as the layout prune above — a spawn adds the cwd
+  // before its instance row exists, so pruning mid-spawn kills the new tab.
+  useEffect(() => {
+    if (spawnInFlight > 0) return;
+    setOpenAdHocCwds((prev) => pruneAdHocCwds(prev, instances));
+  }, [instances, spawnInFlight]);
 
   const mountedTabIds = useMemo(
     () => new Set<string>(collectTabIds(layout.root)),
@@ -328,6 +340,61 @@ export function App() {
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="cs">
         <ToastProvider>
           <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+            <DndContext
+              sensors={dndSensors}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <TabStrip
+                tabs={tabs}
+                mountedTabIds={mountedTabIds}
+                // Only highlight the focused tab while the Instances module is
+                // showing — on other pages the workspace isn't visible, so no
+                // tab should read as selected.
+                focusedTabId={activeModule === 'instances' ? focusedTab : null}
+                onSelect={(id) =>
+                  selectGlobalTab(id, {
+                    setActiveModule,
+                    ensureMounted: (tid) =>
+                      ensureTabMountedAndFocused({ layout, actions: layoutActions }, tid),
+                    setActive,
+                    focusedInstanceIdForTab: (tid) =>
+                      tabs.find((t) => t.id === tid)?.focusedInstanceId ?? null,
+                  })
+                }
+                onContextSplit={(id, dir) => {
+                  // Splitting only makes sense inside the workspace, so a split
+                  // triggered from the global bar (possibly while another module
+                  // is showing) first brings the Instances module forward.
+                  setActiveModule('instances');
+                  if (!layout.focusedLeafId) return;
+                  // Don't duplicate a tab into a second leaf — the xterm host can
+                  // only attach to one slot, so the second leaf steals the
+                  // terminal and the first goes blank. If the tab is already
+                  // mounted, focus it instead.
+                  const existing = findLeafByTabId(layout.root, id);
+                  if (existing) {
+                    layoutActions.focusLeaf(existing.id);
+                    return;
+                  }
+                  layoutActions.splitLeafAt(layout.focusedLeafId, dir, 'after', id);
+                }}
+                onContextNewInstance={(id) => {
+                  const cwd = cwdForTab(id);
+                  if (cwd) switchToNewInstanceForCwd(cwd);
+                }}
+                canSpawnInTab={(id) => cwdForTab(id) !== null}
+                onCloseTab={handleCloseTab}
+                onCloseInWorkspace={(id) => {
+                  const node = findLeafByTabId(layout.root, id);
+                  if (node) layoutActions.unmountLeafAt(node.id);
+                }}
+                onHideTab={(id) => {
+                  const node = findLeafByTabId(layout.root, id);
+                  if (node) layoutActions.unmountLeafAt(node.id);
+                }}
+                onNew={() => setNewOpen(true)}
+              />
             {orchDown && (
               <Box
                 sx={{
@@ -398,61 +465,6 @@ export function App() {
                   }}
                 >
                   <SlotRegistryProvider>
-                    <DndContext
-                      sensors={dndSensors}
-                      onDragStart={handleDragStart}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <TabStrip
-                        tabs={tabs}
-                        mountedTabIds={mountedTabIds}
-                        focusedTabId={focusedTab}
-                        onSelect={(id) => {
-                          ensureTabMountedAndFocused(
-                            { layout, actions: layoutActions },
-                            id,
-                          );
-                          if (id === DASHBOARD_TAB_ID) setActive(null);
-                          else {
-                            // Focus the tab's active column instance, if any.
-                            const tab = tabs.find((t) => t.id === id);
-                            if (tab?.focusedInstanceId) setActive(tab.focusedInstanceId);
-                          }
-                        }}
-                        onContextSplit={(id, dir) => {
-                          if (!layout.focusedLeafId) return;
-                          // Don't duplicate a tab into a second leaf — the xterm
-                          // host can only attach to one slot, so the second leaf
-                          // steals the terminal and the first goes blank. If the
-                          // tab is already mounted, focus it instead.
-                          const existing = findLeafByTabId(layout.root, id);
-                          if (existing) {
-                            layoutActions.focusLeaf(existing.id);
-                            return;
-                          }
-                          layoutActions.splitLeafAt(
-                            layout.focusedLeafId,
-                            dir,
-                            'after',
-                            id,
-                          );
-                        }}
-                        onContextNewInstance={(id) => {
-                          const cwd = cwdForTab(id);
-                          if (cwd) switchToNewInstanceForCwd(cwd);
-                        }}
-                        canSpawnInTab={(id) => cwdForTab(id) !== null}
-                        onCloseTab={handleCloseTab}
-                        onCloseInWorkspace={(id) => {
-                          const node = findLeafByTabId(layout.root, id);
-                          if (node) layoutActions.unmountLeafAt(node.id);
-                        }}
-                        onHideTab={(id) => {
-                          const node = findLeafByTabId(layout.root, id);
-                          if (node) layoutActions.unmountLeafAt(node.id);
-                        }}
-                        onNew={() => setNewOpen(true)}
-                      />
                       {layoutLoaded && (
                         <WorkspaceRoot
                           layout={layout}
@@ -483,11 +495,11 @@ export function App() {
                         />
                       )}
                       <TerminalPool instances={instances} />
-                    </DndContext>
                   </SlotRegistryProvider>
                 </Box>
               </Box>
             </Box>
+            </DndContext>
           </Box>
           <NewInstanceModal
             open={newOpen}

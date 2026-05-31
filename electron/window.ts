@@ -22,6 +22,12 @@ export function createMainWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     title: 'Watchtower',
+    // Drop the native title bar but keep the traffic lights inset top-left;
+    // the renderer draws the global instance tab bar in the reclaimed strip.
+    // trafficLightPosition vertically centres the controls inside that ~40px
+    // bar (default y sits too high once the bar replaces the OS title bar).
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 12, y: 14 },
     backgroundColor: '#0e0f12',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
