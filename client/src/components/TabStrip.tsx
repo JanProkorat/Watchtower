@@ -189,6 +189,12 @@ function SortableTab(props: SortableTabProps) {
 interface Props {
   tabs: TabRecord[];
   mountedTabIds: Set<string>;
+  /**
+   * Whether the workspace (Instances module) is the visible view. When false,
+   * no tab is selected and the per-tab "mounted in workspace" accent underline
+   * is hidden — the workspace isn't on screen, so those markers would be noise.
+   */
+  workspaceActive: boolean;
   focusedTabId: TabId | null;
   onSelect(id: TabId): void;
   onContextSplit(id: TabId, dir: 'row' | 'col'): void;
@@ -203,6 +209,7 @@ interface Props {
 export function TabStrip({
   tabs,
   mountedTabIds,
+  workspaceActive,
   focusedTabId,
   onSelect,
   onContextSplit,
@@ -248,7 +255,7 @@ export function TabStrip({
                 label={t.label}
                 isDashboard={t.id === DASHBOARD_TAB_ID}
                 accent={t.color ?? undefined}
-                mounted={mountedTabIds.has(t.id)}
+                mounted={workspaceActive && mountedTabIds.has(t.id)}
                 active={focusedTabId === t.id}
                 onClick={() => onSelect(t.id)}
                 onHide={

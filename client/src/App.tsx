@@ -348,6 +348,7 @@ export function App() {
               <TabStrip
                 tabs={tabs}
                 mountedTabIds={mountedTabIds}
+                workspaceActive={activeModule === 'instances'}
                 // Only highlight the focused tab while the Instances module is
                 // showing — on other pages the workspace isn't visible, so no
                 // tab should read as selected.
