@@ -41,6 +41,8 @@ import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
 import { SlackEscalator } from './slackEscalator.js';
 import { SlackListener } from './slackListener.js';
+import { TerminalSnapshots } from './terminalSnapshots.js';
+import { formatEscalationMessage } from './escalationMessage.js';
 import { WebApiSlackClient, type SlackClient } from './services/slackClient.js';
 import { readSlackConfig, writeSlackConfig } from './services/slackConfig.js';
 import {
@@ -75,6 +77,7 @@ process.on('uncaughtException', (err) => {
 let api: PortApi | null = null;
 let handle: BootstrapHandle | null = null;
 const pty = new PtyManager();
+const terminalSnapshots = new TerminalSnapshots();
 let notifier: Notifier | null = null;
 let quietTimers: QuietTimers | null = null;
 let slackEscalator: SlackEscalator | null = null;
@@ -262,13 +265,6 @@ function statusOf(id: string): InstanceStatus {
   return repo().get(id)?.status ?? 'crashed';
 }
 
-function slackTextFor(cwd: string, kind: 'waiting-permission' | 'idle-notify' | 'crashed'): string {
-  const name = cwd.split('/').filter(Boolean).pop() || cwd;
-  if (kind === 'waiting-permission') return `🔐 *${name}* needs a permission decision.`;
-  if (kind === 'crashed') return `💥 *${name}* crashed / exited unexpectedly.`;
-  return `⏳ *${name}* finished and is waiting for your input.`;
-}
-
 function setSlackDmChannel(channel: string | null): void {
   slackDmChannel = channel;
   slackListener?.setDmChannel(channel);
@@ -286,7 +282,10 @@ async function postSlack(instanceId: string, cwd: string, kind: 'waiting-permiss
   try {
     const client: SlackClient = new WebApiSlackClient(cfg.botToken);
     if (!slackDmChannel) setSlackDmChannel(await client.openDm(cfg.dmUserId));
-    const res = await client.postMessage(slackDmChannel!, slackTextFor(cwd, kind));
+    const name = cwd.split('/').filter(Boolean).pop() || cwd;
+    await terminalSnapshots.flush(instanceId);
+    const text = formatEscalationMessage(name, kind, terminalSnapshots.snapshot(instanceId));
+    const res = await client.postMessage(slackDmChannel!, text);
     slackThreadToInstance.set(res.ts, instanceId);
     slackInstanceToThread.set(instanceId, res.ts);
   } catch (err) {
@@ -400,6 +399,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
     cwd: opts.cwd,
     env: { ...(process.env as Record<string, string>), WATCHTOWER_INSTANCE_ID: opts.id },
     onData: (chunk) => {
+      terminalSnapshots.feed(opts.id, chunk);
       api?.push({ kind: 'ptyData', payload: { instanceId: opts.id, chunk } });
       applyTransition(opts.id, { kind: 'ptyData' });
     },
@@ -417,6 +417,9 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
         console.log(
           `[orchestrator] resume exited fast for ${opts.id} (code ${code} in ${lifespan}ms) — spawning fresh`,
         );
+        // Start the fresh process with a clean snapshot buffer (the failed
+        // resume's brief output shouldn't carry into the new session's screen).
+        terminalSnapshots.dispose(opts.id);
         spawnPtyForInstance({
           id: opts.id,
           cwd: opts.cwd,
@@ -429,10 +432,12 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
       const r = repo();
       const inst = r.get(opts.id);
       if (inst) {
-        const result = transition(inst.status, { kind: 'ptyExit', code });
-        r.updateStatus(opts.id, result.state, Date.now());
+        // Record termination metadata, then run the FULL transition via
+        // applyTransition so the notifier + Slack escalator fan-out fires for
+        // finished/crashed exits. (A bare transition()+updateStatus() here would
+        // update the row but never notify — leaving the crash trigger dead.)
         r.setTermination(opts.id, code === 0 ? 'session-end' : 'crash', code);
-        api?.push({ kind: 'stateChanged', payload: { instanceId: opts.id, status: result.state } });
+        applyTransition(opts.id, { kind: 'ptyExit', code });
       }
     },
   });
@@ -486,10 +491,12 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
 
     case 'ptyResize':
       pty.get(req.payload.instanceId)?.resize(req.payload.cols, req.payload.rows);
+      terminalSnapshots.resize(req.payload.instanceId, req.payload.cols, req.payload.rows);
       return { ok: true };
 
     case 'killInstance':
       pty.get(req.payload.instanceId)?.kill();
+      terminalSnapshots.dispose(req.payload.instanceId);
       return { ok: true };
 
     case 'removeInstance': {
@@ -508,6 +515,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       // Clean up Slack thread maps and any pending escalation timer.
       forgetSlackThread(req.payload.instanceId);
       slackEscalator?.clear(req.payload.instanceId);
+      terminalSnapshots.dispose(req.payload.instanceId);
       return { ok: true };
     }
 
