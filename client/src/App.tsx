@@ -38,6 +38,7 @@ import { useHiddenInstances } from './state/useHiddenInstances.js';
 import { useFocusedInstance } from './state/useFocusedInstance.js';
 import { ensureTabMountedAndFocused } from './state/spawnIntoTab.js';
 import { TabStrip } from './components/TabStrip.js';
+import { tabsNeedingAttention } from './util/tabAttention.js';
 import { NewInstanceModal } from './components/NewInstanceModal.js';
 import { ModuleRail } from './components/ModuleRail.js';
 import { FirstRunWizard } from './components/FirstRunWizard.js';
@@ -170,6 +171,12 @@ export function App() {
     () => new Set<string>(collectTabIds(layout.root)),
     [layout.root],
   );
+  // Tabs with a session blocked on the user (permission / waiting-input /
+  // crashed) surface a ⚠️ in the strip in place of the accent dot.
+  const attentionTabIds = useMemo(() => {
+    const statusById = new Map(instances.map((i) => [i.id, i.status]));
+    return tabsNeedingAttention(tabs, statusById);
+  }, [tabs, instances]);
   const focusedTab: TabId | null = useMemo(() => {
     if (!layout.focusedLeafId) return null;
     const node = findLeafById(layout.root, layout.focusedLeafId);
@@ -348,6 +355,7 @@ export function App() {
               <TabStrip
                 tabs={tabs}
                 mountedTabIds={mountedTabIds}
+                attentionTabIds={attentionTabIds}
                 workspaceActive={activeModule === 'instances'}
                 // Only highlight the focused tab while the Instances module is
                 // showing — on other pages the workspace isn't visible, so no

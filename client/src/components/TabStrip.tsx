@@ -3,6 +3,7 @@ import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { TabId, TabRecord } from '../../../shared/layout.js';
@@ -35,6 +36,8 @@ interface TabButtonProps {
   draggable: boolean;
   accent?: string;
   mounted?: boolean;
+  /** A session under this tab is blocked on the user — show ⚠️ instead of the dot. */
+  attention?: boolean;
   dragRef?: (node: HTMLElement | null) => void;
   dragListeners?: React.HTMLAttributes<HTMLElement>;
   dragStyle?: CSSProperties;
@@ -51,6 +54,7 @@ function TabButton({
   draggable,
   accent,
   mounted,
+  attention,
   dragRef,
   dragListeners,
   dragStyle,
@@ -89,17 +93,31 @@ function TabButton({
         flexShrink: 0,
       }}
     >
-      {!isDashboard && (
-        <Box
-          sx={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            backgroundColor: dotColor(id, accent),
-            flexShrink: 0,
-          }}
-        />
-      )}
+      {!isDashboard &&
+        (attention ? (
+          <Tooltip title="A session here needs your attention" placement="bottom">
+            <WarningRoundedIcon
+              aria-label={`${label} needs your attention`}
+              sx={{
+                fontSize: 20,
+                // Explicit yellow (theme `warning.main` is amber); a touch
+                // deeper in light mode so it stays legible on the white strip.
+                color: (theme) => (theme.palette.mode === 'dark' ? '#facc15' : '#eab308'),
+                flexShrink: 0,
+              }}
+            />
+          </Tooltip>
+        ) : (
+          <Box
+            sx={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: dotColor(id, accent),
+              flexShrink: 0,
+            }}
+          />
+        ))}
       <span>{label}</span>
       {onHide && (
         <Tooltip title="Hide from workspace (keep instances running)" placement="bottom">
@@ -195,6 +213,8 @@ interface Props {
    * is hidden — the workspace isn't on screen, so those markers would be noise.
    */
   workspaceActive: boolean;
+  /** Tab ids with at least one session blocked on the user (renders ⚠️). */
+  attentionTabIds: Set<string>;
   focusedTabId: TabId | null;
   onSelect(id: TabId): void;
   onContextSplit(id: TabId, dir: 'row' | 'col'): void;
@@ -210,6 +230,7 @@ export function TabStrip({
   tabs,
   mountedTabIds,
   workspaceActive,
+  attentionTabIds,
   focusedTabId,
   onSelect,
   onContextSplit,
@@ -256,6 +277,7 @@ export function TabStrip({
                 isDashboard={t.id === DASHBOARD_TAB_ID}
                 accent={t.color ?? undefined}
                 mounted={workspaceActive && mountedTabIds.has(t.id)}
+                attention={attentionTabIds.has(t.id)}
                 active={focusedTabId === t.id}
                 onClick={() => onSelect(t.id)}
                 onHide={
