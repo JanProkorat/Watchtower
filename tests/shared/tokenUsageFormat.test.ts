@@ -4,6 +4,8 @@ import {
   formatRemaining,
   minutesRemaining,
   formatPercent,
+  usageSeverity,
+  usageBar,
 } from '../../shared/tokenUsageFormat.js';
 
 describe('formatTokenCount', () => {
@@ -63,5 +65,46 @@ describe('formatPercent', () => {
   it('returns an em dash for null / non-finite', () => {
     expect(formatPercent(null)).toBe('—');
     expect(formatPercent(Number.POSITIVE_INFINITY)).toBe('—');
+  });
+});
+
+describe('usageSeverity', () => {
+  it('is ok below 70%, warn from 70–90%, crit at/above 90%', () => {
+    expect(usageSeverity(0)).toBe('ok');
+    expect(usageSeverity(69.9)).toBe('ok');
+    expect(usageSeverity(70)).toBe('warn');
+    expect(usageSeverity(89.9)).toBe('warn');
+    expect(usageSeverity(90)).toBe('crit');
+    expect(usageSeverity(150)).toBe('crit');
+  });
+
+  it('treats null / non-finite as ok (nothing to warn about)', () => {
+    expect(usageSeverity(null)).toBe('ok');
+    expect(usageSeverity(Number.NaN)).toBe('ok');
+  });
+});
+
+describe('usageBar', () => {
+  it('renders an empty string when there is no percentage', () => {
+    expect(usageBar(null)).toBe('');
+    expect(usageBar(Number.NaN)).toBe('');
+  });
+
+  it('fills green segments proportionally below the warn threshold', () => {
+    expect(usageBar(56.4)).toBe('🟩🟩🟩🟩🟩🟩⬜⬜⬜⬜');
+    expect(usageBar(0)).toBe('⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜');
+  });
+
+  it('uses amber fill in the warn band and red in the crit band', () => {
+    expect(usageBar(75)).toBe('🟨🟨🟨🟨🟨🟨🟨🟨⬜⬜');
+    expect(usageBar(95)).toBe('🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥');
+  });
+
+  it('clamps over-100% usage to a full bar', () => {
+    expect(usageBar(150)).toBe('🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥');
+  });
+
+  it('honors a custom segment count', () => {
+    expect(usageBar(50, 4)).toBe('🟩🟩⬜⬜');
   });
 });

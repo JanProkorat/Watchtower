@@ -100,3 +100,35 @@ export function formatPercent(pct: number | null): string {
   if (pct == null || !Number.isFinite(pct)) return '—';
   return formatDecimal(pct, 1) + ' %';
 }
+
+/** Usage severity band: ok < 70% ≤ warn < 90% ≤ crit. */
+export type UsageSeverity = 'ok' | 'warn' | 'crit';
+
+export function usageSeverity(pct: number | null): UsageSeverity {
+  if (pct == null || !Number.isFinite(pct)) return 'ok';
+  if (pct >= 90) return 'crit';
+  if (pct >= 70) return 'warn';
+  return 'ok';
+}
+
+const SEVERITY_FILL: Record<UsageSeverity, string> = { ok: '🟩', warn: '🟨', crit: '🟥' };
+const SEVERITY_DOT: Record<UsageSeverity, string> = { ok: '🟢', warn: '🟡', crit: '🔴' };
+const BAR_EMPTY = '⬜';
+
+/** Colored severity dot (🟢/🟡/🔴) for a usage percentage. */
+export function usageDot(pct: number | null): string {
+  return SEVERITY_DOT[usageSeverity(pct)];
+}
+
+/**
+ * A `segments`-wide progress bar of colored emoji squares — the filled squares
+ * take the usage severity color (green/amber/red), the rest are empty (⬜).
+ * Returns '' when there is no percentage to show. Native macOS menus can't
+ * style text, so emoji squares are how we get a colored bar there.
+ */
+export function usageBar(pct: number | null, segments = 10): string {
+  if (pct == null || !Number.isFinite(pct)) return '';
+  const clamped = Math.max(0, Math.min(100, pct));
+  const filled = Math.round((clamped / 100) * segments);
+  return SEVERITY_FILL[usageSeverity(pct)].repeat(filled) + BAR_EMPTY.repeat(segments - filled);
+}

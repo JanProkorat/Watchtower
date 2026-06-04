@@ -2,9 +2,9 @@ import { Tray, Menu, nativeImage, app, type MenuItemConstructorOptions, type Nat
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { createMainWindow, getMainWindow, toggleMainWindow } from './window.js';
+import { createMainWindow, getMainWindow } from './window.js';
 import type { TokenUsagePayload } from '../shared/tokenUsageFormat.js';
-import { formatTokenCount, formatRemaining, formatPercent } from '../shared/tokenUsageFormat.js';
+import { formatTokenCount, formatRemaining, formatPercent, usageBar } from '../shared/tokenUsageFormat.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -61,38 +61,44 @@ function tokenUsageMenuItems(): MenuItemConstructorOptions[] {
   if (!tokenUsage) return [];
   if (!tokenUsage.available) {
     return [
-      { label: 'Spotřeba tokenů nedostupná', enabled: false },
+      { label: '⚪️  Spotřeba tokenů nedostupná', enabled: false },
       { type: 'separator' },
     ];
   }
   const block = tokenUsage.block;
   if (!block) {
     return [
-      { label: 'Tokeny: žádný aktivní 5h blok', enabled: false },
+      { label: '⚪️  Tokeny: žádný aktivní 5h blok', enabled: false },
       { type: 'separator' },
     ];
   }
   const remaining = formatRemaining(block.endTime, Date.now());
   const pct = block.currentPercentUsed;
-  const headline =
-    remaining != null
-      ? `Tokeny: reset za ${remaining}${pct != null ? ` · ${formatPercent(pct)}` : ''}`
-      : `Tokeny: ${formatPercent(pct)}`;
-  const items: MenuItemConstructorOptions[] = [{ label: headline, enabled: false }];
-  if (block.limit != null) {
-    items.push({
-      label: `   ${formatTokenCount(block.totalTokens)} / ${formatTokenCount(block.limit)} tokenů`,
-      enabled: false,
-    });
-  } else {
-    items.push({ label: `   ${formatTokenCount(block.totalTokens)} tokenů`, enabled: false });
-  }
+  const items: MenuItemConstructorOptions[] = [];
+
+  // Headline: "Tokeny · 56,4 % · reset za 0 min".
+  const head = ['Tokeny'];
+  if (pct != null) head.push(formatPercent(pct));
+  if (remaining != null) head.push(`reset za ${remaining}`);
+  items.push({ label: head.join('  ·  '), enabled: false });
+
+  // Colored emoji progress bar (green/amber/red by usage) — only with a %.
+  if (pct != null) items.push({ label: usageBar(pct), enabled: false });
+
+  // Detail: usage / limit · burn rate · projected end-of-block %.
+  const detail = [
+    block.limit != null
+      ? `${formatTokenCount(block.totalTokens)} / ${formatTokenCount(block.limit)}`
+      : `${formatTokenCount(block.totalTokens)} tokenů`,
+  ];
   if (block.burnRateTokensPerMinute != null) {
-    const burn = `   ${formatTokenCount(block.burnRateTokensPerMinute)}/min`;
-    const proj =
-      block.projectedPercentUsed != null ? ` · odhad ${formatPercent(block.projectedPercentUsed)}` : '';
-    items.push({ label: burn + proj, enabled: false });
+    detail.push(`${formatTokenCount(block.burnRateTokensPerMinute)}/min`);
   }
+  if (block.projectedPercentUsed != null) {
+    detail.push(`odhad ${formatPercent(block.projectedPercentUsed)}`);
+  }
+  items.push({ label: detail.join('  ·  '), enabled: false });
+
   items.push({ type: 'separator' });
   return items;
 }
@@ -102,7 +108,8 @@ function rebuildMenu(): void {
   const liveCount = entries.length;
   const items: MenuItemConstructorOptions[] = [
     {
-      label: `${liveCount} running · ${badgeCount} waiting`,
+      // Red dot when sessions are waiting on the user, green when all clear.
+      label: `${badgeCount > 0 ? '🔴' : '🟢'}  ${liveCount} running · ${badgeCount} waiting`,
       enabled: false,
     },
     { type: 'separator' },
@@ -144,7 +151,9 @@ export function startTray(opts: StartTrayOptions): void {
   onNewInstance = opts.onNewInstance;
   tray = new Tray(loadTrayIcon());
   tray.setToolTip('Watchtower');
-  tray.on('click', () => toggleMainWindow());
+  // No `click` handler: with a context menu set, a macOS left-click already
+  // opens the menu — toggling the window here would also pop the whole app
+  // open on every menu open. Use the "Show Watchtower" item to surface it.
   rebuildMenu();
 }
 
