@@ -1,14 +1,20 @@
-import { WebClient } from '@slack/web-api';
+import { WebClient, type KnownBlock } from '@slack/web-api';
 
 export interface SlackPostResult {
   channel: string;
   ts: string;
 }
 
+export interface PostMessageOpts {
+  threadTs?: string;
+  /** Block Kit blocks (structurally `SlackBlock[]`). When present, `text` is the notification fallback. */
+  blocks?: unknown[];
+}
+
 export interface SlackClient {
   /** Open (or fetch) the DM channel with the configured user; returns channel id. */
   openDm(userId: string): Promise<string>;
-  postMessage(channel: string, text: string, threadTs?: string): Promise<SlackPostResult>;
+  postMessage(channel: string, text: string, opts?: PostMessageOpts): Promise<SlackPostResult>;
   updateMessage(channel: string, ts: string, text: string): Promise<void>;
   /** auth.test — confirms the bot token is valid. */
   testAuth(): Promise<{ ok: boolean; userId?: string; error?: string }>;
@@ -27,8 +33,13 @@ export class WebApiSlackClient implements SlackClient {
     return channel;
   }
 
-  async postMessage(channel: string, text: string, threadTs?: string): Promise<SlackPostResult> {
-    const res = await this.web.chat.postMessage({ channel, text, thread_ts: threadTs });
+  async postMessage(channel: string, text: string, opts?: PostMessageOpts): Promise<SlackPostResult> {
+    const res = await this.web.chat.postMessage({
+      channel,
+      text,
+      thread_ts: opts?.threadTs,
+      blocks: opts?.blocks as KnownBlock[] | undefined,
+    });
     if (!res.ok || !res.ts) throw new Error(`chat.postMessage failed: ${res.error ?? 'unknown'}`);
     return { channel, ts: res.ts };
   }

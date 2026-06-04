@@ -285,8 +285,8 @@ async function postSlack(instanceId: string, cwd: string, kind: 'waiting-permiss
     if (!slackDmChannel) setSlackDmChannel(await client.openDm(cfg.dmUserId));
     const name = cwd.split('/').filter(Boolean).pop() || cwd;
     await terminalSnapshots.flush(instanceId);
-    const text = formatEscalationMessage(name, kind, terminalSnapshots.snapshot(instanceId));
-    const res = await client.postMessage(slackDmChannel!, text);
+    const { text, blocks } = formatEscalationMessage(name, kind, terminalSnapshots.snapshot(instanceId));
+    const res = await client.postMessage(slackDmChannel!, text, { blocks });
     slackThreadToInstance.set(res.ts, instanceId);
     slackInstanceToThread.set(instanceId, res.ts);
   } catch (err) {
