@@ -27,11 +27,13 @@ import type {
   ProjectViewPayload,
 } from '../../../../shared/ipcContract.js';
 
+// The board intentionally omits a "Done" column — completed tasks still
+// classify as `done` and bucket in `byCol` below (so card grouping never hits
+// an undefined column), they're just not rendered.
 const COLUMNS: Array<{ id: BoardColumn; label: string }> = [
   { id: 'todo', label: 'To do' },
   { id: 'doing', label: 'Doing' },
   { id: 'to_accept', label: 'To accept' },
-  { id: 'done', label: 'Done' },
 ];
 
 const SELECTED_PROJECT_STORAGE_KEY = 'watchtower:board:selectedProjectId';
