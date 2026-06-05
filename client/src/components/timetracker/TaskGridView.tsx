@@ -467,6 +467,9 @@ export function TaskGridView({ projectId }: Props) {
           setTaskDetailContext(null);
           await grid.refresh();
         }}
+        onWorklogsChanged={() => {
+          void grid.refresh();
+        }}
       />
 
       <WorklogDrawer

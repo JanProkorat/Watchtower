@@ -58,6 +58,8 @@ interface Props {
   onUpdate(input: Partial<TaskInputPayload>): Promise<void>;
   onDelete?(): Promise<void> | void;
   onOpenExternal?(url: string): void;
+  /** Called after any worklog create / update / delete so the grid refreshes. */
+  onWorklogsChanged?(): void;
 }
 
 const STATUS_OPTIONS: { value: 'open' | 'in_progress' | 'to_accept' | 'done'; label: string }[] = [
@@ -78,6 +80,7 @@ export function TaskDetailDrawer({
   onUpdate,
   onDelete,
   onOpenExternal,
+  onWorklogsChanged,
 }: Props) {
   const [worklogs, setWorklogs] = useState<WorklogViewPayload[]>([]);
   const [loading, setLoading] = useState(false);
@@ -151,6 +154,7 @@ export function TaskDetailDrawer({
         return;
       }
       await reload();
+      onWorklogsChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -168,6 +172,7 @@ export function TaskDetailDrawer({
         return;
       }
       await reload();
+      onWorklogsChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -185,6 +190,7 @@ export function TaskDetailDrawer({
         return;
       }
       await reload();
+      onWorklogsChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }

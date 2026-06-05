@@ -9,6 +9,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs, { type Dayjs } from 'dayjs';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/EditOutlined';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
@@ -18,6 +20,7 @@ import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import {
+  CZ_DATE_FORMAT,
   effectiveMinutes,
   formatEarnings,
   formatMinutes,
@@ -66,6 +69,7 @@ export function WorklogCellPopover({
 
   // Inline edit state.
   const [editId, setEditId] = useState<number | null>(null);
+  const [editDate, setEditDate] = useState<Dayjs>(dayjs(ymd));
   const [editMinutes, setEditMinutes] = useState('');
   const [editReported, setEditReported] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -163,6 +167,7 @@ export function WorklogCellPopover({
 
   const startEdit = (entry: WorklogViewPayload) => {
     setEditId(entry.id);
+    setEditDate(dayjs(entry.workDate));
     setEditMinutes(formatMinutes(entry.minutes));
     setEditReported(
       entry.reportedMinutes == null ? '' : formatMinutes(entry.reportedMinutes),
@@ -172,6 +177,7 @@ export function WorklogCellPopover({
 
   const commitEdit = async () => {
     if (editId == null) return;
+    if (!editDate.isValid()) return;
     const minutes = parseMinutes(editMinutes);
     if (!Number.isFinite(minutes) || minutes <= 0) return;
     const reportedTrimmed = editReported.trim();
@@ -184,6 +190,7 @@ export function WorklogCellPopover({
     await window.watchtower.invoke('worklogs:update', {
       id: editId,
       input: {
+        workDate: editDate.format('YYYY-MM-DD'),
         minutes,
         reportedMinutes,
         description: editDescription.trim() === '' ? null : editDescription.trim(),
@@ -320,6 +327,27 @@ export function WorklogCellPopover({
                 <Box key={entry.id}>
                   {isEditing ? (
                     <Stack spacing={1}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <DatePicker
+                          value={editDate}
+                          onChange={(v) => v && setEditDate(v)}
+                          format={CZ_DATE_FORMAT}
+                          slotProps={{
+                            textField: { size: 'small', sx: { width: 150 } },
+                          }}
+                        />
+                        <Box sx={{ flexGrow: 1 }} />
+                        <Tooltip title="Save">
+                          <IconButton size="small" onClick={commitEdit}>
+                            <CheckIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Cancel">
+                          <IconButton size="small" onClick={() => setEditId(null)}>
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
                       <Stack direction="row" spacing={1}>
                         <TextField
                           size="small"
@@ -337,17 +365,6 @@ export function WorklogCellPopover({
                           onChange={(e) => setEditReported(e.target.value)}
                           sx={{ width: 110 }}
                         />
-                        <Box sx={{ flexGrow: 1 }} />
-                        <Tooltip title="Save">
-                          <IconButton size="small" onClick={commitEdit}>
-                            <CheckIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Cancel">
-                          <IconButton size="small" onClick={() => setEditId(null)}>
-                            <CloseIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
                       </Stack>
                       <TextField
                         size="small"
