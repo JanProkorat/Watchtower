@@ -118,7 +118,12 @@ function startTokenUsagePolling(): void {
 }
 
 function supportDir(): string {
-  const dir = path.join(homedir(), 'Library', 'Application Support', 'Watchtower');
+  // WATCHTOWER_SUPPORT_DIR lets a dev run point at an isolated copy of the
+  // app-support dir (data.db, hook-token, listener.json) so it never touches
+  // the production database. Set by the `dev:electron` npm script.
+  const dir =
+    process.env.WATCHTOWER_SUPPORT_DIR ??
+    path.join(homedir(), 'Library', 'Application Support', 'Watchtower');
   mkdirSync(dir, { recursive: true });
   return dir;
 }
