@@ -47,7 +47,13 @@ export function WorkspaceNodeView(props: Props) {
           tab={tab}
           focused={focusedLeafId === node.id}
           instances={instances}
-          onFocusColumn={(instanceId) => onFocusColumn(tab.id, instanceId)}
+          onFocusColumn={(instanceId) => {
+            // Focusing a session must also focus its leaf — `focusedLeafId`
+            // gates which instance the renderer reports via `focusChanged`,
+            // and the orchestrator clears that instance's attention on focus.
+            onFocusLeaf(node.id);
+            onFocusColumn(tab.id, instanceId);
+          }}
           onCloseColumn={props.onCloseColumn}
           onHideSession={props.onHideSession}
           onUnhideSession={props.onUnhideSession}

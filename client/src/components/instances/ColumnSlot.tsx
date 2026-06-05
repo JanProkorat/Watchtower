@@ -16,10 +16,24 @@ export function ColumnSlot({ instanceId, focused, accent, onFocus }: Props) {
     return register(instanceId, ref.current);
   }, [instanceId, register]);
 
+  // The xterm terminal is reparented into this slot via raw `appendChild`, so
+  // it lives outside React's fiber tree — a React `onMouseDown` here never sees
+  // clicks that land on the terminal. Listen natively in the capture phase so a
+  // click anywhere in the slot (terminal included) focuses the session, even if
+  // xterm stops propagation on the way back up.
+  const onFocusRef = useRef(onFocus);
+  onFocusRef.current = onFocus;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handler = () => onFocusRef.current();
+    el.addEventListener('mousedown', handler, { capture: true });
+    return () => el.removeEventListener('mousedown', handler, { capture: true });
+  }, []);
+
   return (
     <Box
       ref={ref}
-      onMouseDown={onFocus}
       sx={{
         position: 'absolute',
         inset: 0,
