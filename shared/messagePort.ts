@@ -2,7 +2,8 @@ import type { SlackConfig } from './slackConfig.js';
 
 export type OrchRequest =
   | { id: string; kind: 'ping'; payload: { now: number } }
-  | { id: string; kind: 'spawnInstance'; payload: { cwd: string; args?: string[] } }
+  | { id: string; kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind } }
+  | { id: string; kind: 'restartInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { id: string; kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
   | { id: string; kind: 'killInstance'; payload: { instanceId: string } }
@@ -429,11 +430,18 @@ export type OrchResponse =
   | { kind: 'ptyResize'; payload: { ok: true } }
   | { kind: 'killInstance'; payload: { ok: true } }
   | { kind: 'removeInstance'; payload: { ok: true } }
+  | { kind: 'restartInstance'; payload: { ok: boolean } }
   | { kind: 'reorderInstances'; payload: { ok: true } }
   | {
       kind: 'listInstances';
       payload: {
-        instances: Array<{ id: string; cwd: string; status: string; lastActivityAt: number }>;
+        instances: Array<{
+          id: string;
+          cwd: string;
+          status: string;
+          lastActivityAt: number;
+          kind: import('./stateModel.js').InstanceKind;
+        }>;
       };
     }
   | { kind: 'getSetting'; payload: { value: string | null } }

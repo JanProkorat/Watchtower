@@ -2,11 +2,12 @@ import type { SlackConfig } from './slackConfig.js';
 
 export type IpcRequest =
   | { kind: 'ping'; payload: { now: number } }
-  | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[] } }
+  | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind } }
   | { kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
   | { kind: 'killInstance'; payload: { instanceId: string } }
   | { kind: 'removeInstance'; payload: { instanceId: string } }
+  | { kind: 'restartInstance'; payload: { instanceId: string } }
   | { kind: 'reorderInstances'; payload: { orderedIds: string[] } }
   | { kind: 'listInstances'; payload: Record<string, never> }
   | { kind: 'chooseDirectory'; payload: { defaultPath?: string } }
@@ -484,11 +485,18 @@ export type IpcResponse =
   | { kind: 'ptyResize'; payload: { ok: true } }
   | { kind: 'killInstance'; payload: { ok: true } }
   | { kind: 'removeInstance'; payload: { ok: true } }
+  | { kind: 'restartInstance'; payload: { ok: boolean } }
   | { kind: 'reorderInstances'; payload: { ok: true } }
   | {
       kind: 'listInstances';
       payload: {
-        instances: Array<{ id: string; cwd: string; status: string; lastActivityAt: number }>;
+        instances: Array<{
+          id: string;
+          cwd: string;
+          status: string;
+          lastActivityAt: number;
+          kind: import('./stateModel.js').InstanceKind;
+        }>;
       };
     }
   | { kind: 'chooseDirectory'; payload: { path: string | null } }
