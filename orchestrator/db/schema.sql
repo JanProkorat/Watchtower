@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS instances (
   termination_reason TEXT,
   resumed_from_instance_id TEXT REFERENCES instances(id),
   jira_key_hint TEXT,
-  args_json TEXT
+  args_json TEXT,
+  kind TEXT NOT NULL DEFAULT 'claude'
 );
 CREATE INDEX IF NOT EXISTS idx_instances_status ON instances(status);
 

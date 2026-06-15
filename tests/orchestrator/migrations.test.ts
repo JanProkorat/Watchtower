@@ -40,7 +40,7 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(10);
+    expect(version.v).toBe(11);
   });
 
   it('v2 adds the display_order column with spawned_at as default', () => {
@@ -84,5 +84,21 @@ describe('migrations', () => {
       db.prepare(`PRAGMA table_info(epics)`).all() as Array<{ name: string }>
     ).map((c) => c.name);
     expect(cols).toContain('shortcut');
+  });
+
+  it('v11 adds the kind column to instances defaulting to claude', () => {
+    runMigrations(db as unknown as SqliteLike);
+    const cols = (
+      db.prepare(`PRAGMA table_info(instances)`).all() as Array<{ name: string; dflt_value: string | null }>
+    );
+    const kind = cols.find((c) => c.name === 'kind');
+    expect(kind).toBeTruthy();
+    // Existing rows backfill to 'claude' via the column default.
+    db.prepare(
+      `INSERT INTO instances (id, cwd, status, spawned_at, last_activity_at)
+       VALUES ('row1', '/tmp', 'working', 1, 1)`,
+    ).run();
+    const row = db.prepare(`SELECT kind FROM instances WHERE id='row1'`).get() as { kind: string };
+    expect(row.kind).toBe('claude');
   });
 });

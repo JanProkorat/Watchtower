@@ -187,6 +187,20 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       db.exec(`ALTER TABLE projects ADD COLUMN task_url_template TEXT`);
     },
   },
+  {
+    version: 11,
+    up: (db) => {
+      const cols = db.prepare(`PRAGMA table_info(instances)`).all() as Array<{ name: string }>;
+      if (cols.some((c) => c.name === 'kind')) return; // fresh install already has it
+      // Plain-terminal support: instances are now either a managed `claude`
+      // session ('claude') or a plain interactive shell ('shell'). Existing
+      // rows backfill to 'claude' via the default. See
+      // docs/superpowers/specs/2026-06-15-plain-terminal-instances-design.md.
+      db.exec(
+        `ALTER TABLE instances ADD COLUMN kind TEXT NOT NULL DEFAULT 'claude'`,
+      );
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {
