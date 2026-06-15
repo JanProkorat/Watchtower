@@ -15,6 +15,7 @@ interface Props {
   dashboardOnRemove(id: string): void;
   dashboardOnNew(): void;
   onCloseColumn(instanceId: string): void;
+  onRestartColumn?(instanceId: string): void;
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(tabId: string): void;
@@ -31,6 +32,7 @@ export function WorkspaceRoot({
   dashboardOnRemove,
   dashboardOnNew,
   onCloseColumn,
+  onRestartColumn,
   onHideSession,
   onUnhideSession,
   onAddSession,
@@ -47,6 +49,7 @@ export function WorkspaceRoot({
         onFocusLeaf={actions.focusLeaf}
         onResizeSplit={actions.setSplitSizes}
         onCloseColumn={onCloseColumn}
+        onRestartColumn={onRestartColumn}
         onHideSession={onHideSession}
         onUnhideSession={onUnhideSession}
         onAddSession={onAddSession}

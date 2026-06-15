@@ -16,6 +16,7 @@ interface Props {
   onFocusLeaf(leafId: string): void;
   onResizeSplit(splitId: string, sizes: number[]): void;
   onCloseColumn(instanceId: string): void;
+  onRestartColumn?(instanceId: string): void;
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(tabId: string): void;
@@ -55,6 +56,7 @@ export function WorkspaceNodeView(props: Props) {
             onFocusColumn(tab.id, instanceId);
           }}
           onCloseColumn={props.onCloseColumn}
+          onRestartColumn={props.onRestartColumn}
           onHideSession={props.onHideSession}
           onUnhideSession={props.onUnhideSession}
           onAddSession={() => props.onAddSession(tab.id)}

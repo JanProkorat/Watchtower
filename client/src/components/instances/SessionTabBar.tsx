@@ -2,6 +2,8 @@ import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { Box, IconButton, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import TerminalIcon from '@mui/icons-material/Terminal';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { tabFlex } from '../../util/tabFlex.js';
 
@@ -17,6 +19,7 @@ const MUTED_DOT = 'rgba(255,255,255,0.18)';
 export interface SessionInfo {
   id: string;
   status: string;
+  kind: 'claude' | 'shell';
 }
 
 interface Props {
@@ -28,6 +31,7 @@ interface Props {
   columnSizes?: number[];
   onSelect(id: string): void;
   onClose(id: string): void;
+  onRestart?(id: string): void;
   onHide(id: string): void;
   onUnhide(id: string): void;
   onAddSession(): void;
@@ -41,6 +45,7 @@ export function SessionTabBar({
   columnSizes,
   onSelect,
   onClose,
+  onRestart,
   onHide,
   onUnhide,
   onAddSession,
@@ -91,16 +96,23 @@ export function SessionTabBar({
               fontSize: 12,
             }}
           >
-            <Box
-              aria-label={attentionColor ? `${s.status} — needs attention` : s.status}
-              sx={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                backgroundColor: attentionColor ?? MUTED_DOT,
-                flexShrink: 0,
-              }}
-            />
+            {s.kind === 'shell' ? (
+              <TerminalIcon
+                aria-label="terminal"
+                sx={{ fontSize: 14, flexShrink: 0, opacity: s.status === 'crashed' ? 0.5 : 0.8 }}
+              />
+            ) : (
+              <Box
+                aria-label={attentionColor ? `${s.status} — needs attention` : s.status}
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: attentionColor ?? MUTED_DOT,
+                  flexShrink: 0,
+                }}
+              />
+            )}
             <Box
               sx={{
                 flex: 1,
@@ -111,6 +123,27 @@ export function SessionTabBar({
             >
               Session {idx + 1}
             </Box>
+            {s.kind === 'shell' && s.status === 'crashed' && onRestart && (
+              <Tooltip title="Restart terminal" placement="bottom-end">
+                <IconButton
+                  size="small"
+                  aria-label="restart terminal"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRestart(s.id);
+                  }}
+                  sx={{
+                    width: 20,
+                    height: 20,
+                    color: 'text.disabled',
+                    ':hover': { color: 'text.primary' },
+                  }}
+                >
+                  <RefreshIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title="Hide session (keep running)" placement="bottom-end">
               <IconButton
                 aria-label={`hide session ${idx + 1}`}

@@ -14,6 +14,7 @@ interface Props {
   instances: InstanceView[];
   onFocusColumn(instanceId: string): void;
   onCloseColumn(instanceId: string): void;
+  onRestartColumn?(instanceId: string): void;
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(): void;
@@ -29,6 +30,7 @@ export function LeafView({
   instances,
   onFocusColumn,
   onCloseColumn,
+  onRestartColumn,
   onHideSession,
   onUnhideSession,
   onAddSession,
@@ -67,11 +69,11 @@ export function LeafView({
   const accent = tabAccent(tab.id, tab.color);
   const sessionInfos = tab.columnOrder.map((id) => {
     const inst = instances.find((i) => i.id === id);
-    return { id, status: inst?.status ?? 'unknown' };
+    return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? 'claude' as const };
   });
   const hiddenSessionInfos = tab.hiddenInstanceIds.map((id) => {
     const inst = instances.find((i) => i.id === id);
-    return { id, status: inst?.status ?? 'unknown' };
+    return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? 'claude' as const };
   });
 
   // Empty (no visible columns) — still render the bar so the user can
@@ -86,6 +88,7 @@ export function LeafView({
           accent={accent}
           onSelect={onFocusColumn}
           onClose={onCloseColumn}
+          onRestart={onRestartColumn}
           onHide={onHideSession}
           onUnhide={onUnhideSession}
           onAddSession={onAddSession}
@@ -124,6 +127,7 @@ export function LeafView({
         columnSizes={columnSizes}
         onSelect={onFocusColumn}
         onClose={onCloseColumn}
+        onRestart={onRestartColumn}
         onHide={onHideSession}
         onUnhide={onUnhideSession}
         onAddSession={onAddSession}

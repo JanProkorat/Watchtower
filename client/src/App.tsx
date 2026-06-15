@@ -488,6 +488,7 @@ export function App() {
                               : false;
                             handleRemove(id, isLive);
                           }}
+                          onRestartColumn={(id) => void window.watchtower.invoke('restartInstance', { instanceId: id })}
                           onHideSession={hideInstance}
                           onUnhideSession={unhideInstance}
                           onAddSession={(tabId) => {

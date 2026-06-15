@@ -5,6 +5,7 @@ export interface InstanceView {
   cwd: string;
   status: string;
   lastActivityAt: number;
+  kind: 'claude' | 'shell';
 }
 
 const ACTIVE_ID_KEY = 'watchtower.activeId';
