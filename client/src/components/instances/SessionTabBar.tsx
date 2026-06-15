@@ -3,6 +3,7 @@ import { Box, IconButton, Menu, MenuItem, Tooltip, Typography } from '@mui/mater
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { tabFlex } from '../../util/tabFlex.js';
 
 const ATTENTION_DOT: Record<string, string> = {
   'waiting-permission': '#ef5350',
@@ -23,6 +24,8 @@ interface Props {
   hiddenSessions: SessionInfo[];
   focusedId: string | null;
   accent: string;
+  /** Live panel percentages from the pane PanelGroup, so tabs track resizing. */
+  columnSizes?: number[];
   onSelect(id: string): void;
   onClose(id: string): void;
   onHide(id: string): void;
@@ -35,6 +38,7 @@ export function SessionTabBar({
   hiddenSessions,
   focusedId,
   accent,
+  columnSizes,
   onSelect,
   onClose,
   onHide,
@@ -65,7 +69,7 @@ export function SessionTabBar({
             aria-selected={active}
             onClick={() => onSelect(s.id)}
             sx={{
-              flex: 1,
+              flex: tabFlex(columnSizes, idx),
               minWidth: 100,
               display: 'flex',
               alignItems: 'center',

@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ColumnSlot } from './ColumnSlot.js';
@@ -37,6 +37,10 @@ export function LeafView({
   dashboardOnRemove,
   dashboardOnNew,
 }: Props) {
+  // Live pane percentages from the column PanelGroup, so the session tabs above
+  // can track the resize handle instead of staying at fixed equal widths.
+  const [columnSizes, setColumnSizes] = useState<number[]>([]);
+
   if (tab.kind === 'dashboard') {
     return (
       <Box
@@ -117,6 +121,7 @@ export function LeafView({
         hiddenSessions={hiddenSessionInfos}
         focusedId={focusedId}
         accent={accent}
+        columnSizes={columnSizes}
         onSelect={onFocusColumn}
         onClose={onCloseColumn}
         onHide={onHideSession}
@@ -124,7 +129,11 @@ export function LeafView({
         onAddSession={onAddSession}
       />
       <Box sx={{ flex: 1, minHeight: 0 }}>
-        <PanelGroup direction="horizontal" autoSaveId={`columns-${tab.id}`}>
+        <PanelGroup
+          direction="horizontal"
+          autoSaveId={`columns-${tab.id}`}
+          onLayout={setColumnSizes}
+        >
           {tab.columnOrder.map((instanceId, idx) => (
             <Fragment key={instanceId}>
               {idx > 0 && (
