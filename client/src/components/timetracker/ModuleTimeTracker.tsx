@@ -12,6 +12,8 @@ interface Props {
   onActivateInstance(id: string): void;
   /** Switch to Instances and open the New-instance modal pre-filled. */
   onOpenNewInstanceForCwd(cwd: string): void;
+  /** Switch to Instances and spawn a plain shell in the given folder. */
+  onOpenTerminalForCwd?(cwd: string): void;
 }
 
 /**
@@ -24,6 +26,7 @@ export function ModuleTimeTracker({
   onSelectProject,
   onActivateInstance,
   onOpenNewInstanceForCwd,
+  onOpenTerminalForCwd,
 }: Props) {
   // Small top padding applied uniformly to every Billing sub-page so the
   // content doesn't crowd against the chrome at the top of the renderer.
@@ -35,6 +38,7 @@ export function ModuleTimeTracker({
           onSelectProject={onSelectProject}
           onActivateInstance={onActivateInstance}
           onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
+          onOpenTerminalForCwd={onOpenTerminalForCwd}
         />
       ) : (
         <ListMode

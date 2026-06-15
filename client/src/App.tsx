@@ -202,6 +202,10 @@ export function App() {
     setPendingNewCwd(cwd);
     setNewOpen(true);
   };
+  const spawnTerminalForCwd = (cwd: string) => {
+    setActiveModule('instances');
+    void doSpawn(cwd, 'shell');
+  };
   const cwdForTab = (id: TabId): string | null => {
     const parsed = parseTabId(id);
     if (parsed.kind === 'project') {
@@ -463,6 +467,7 @@ export function App() {
                     onSelectProject={billingView.selectProject}
                     onActivateInstance={switchToInstance}
                     onOpenNewInstanceForCwd={switchToNewInstanceForCwd}
+                    onOpenTerminalForCwd={spawnTerminalForCwd}
                   />
                 )}
                 <Box

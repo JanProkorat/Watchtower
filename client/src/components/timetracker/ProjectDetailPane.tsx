@@ -42,6 +42,7 @@ interface Props {
   onDeleted(): void;
   onActivateInstance(id: string): void;
   onOpenNewInstanceForCwd(cwd: string): void;
+  onOpenTerminalForCwd?(cwd: string): void;
 }
 
 function fmtHoursTotal(minutes: number): string {
@@ -79,6 +80,7 @@ export function ProjectDetailPane({
   onDeleted,
   onActivateInstance,
   onOpenNewInstanceForCwd,
+  onOpenTerminalForCwd,
 }: Props) {
   const state = useProject(projectId);
   useEffect(() => {
@@ -305,6 +307,17 @@ export function ProjectDetailPane({
           >
             <TerminalIcon fontSize="small" sx={{ mr: 1.5, color: 'text.secondary' }} />
             Open in Instances
+          </MenuItem>
+        )}
+        {onOpenTerminalForCwd && project.folderPath && (
+          <MenuItem
+            onClick={() => {
+              setMenuAnchor(null);
+              onOpenTerminalForCwd(project.folderPath!);
+            }}
+          >
+            <TerminalIcon fontSize="small" sx={{ mr: 1.5, color: 'text.secondary' }} />
+            Open terminal
           </MenuItem>
         )}
         {openInVSCode && (

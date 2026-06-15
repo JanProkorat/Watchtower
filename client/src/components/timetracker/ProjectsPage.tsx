@@ -11,6 +11,7 @@ interface Props {
   onSelectProject(projectId: number | null): void;
   onActivateInstance(id: string): void;
   onOpenNewInstanceForCwd(cwd: string): void;
+  onOpenTerminalForCwd?(cwd: string): void;
 }
 
 /**
@@ -32,6 +33,7 @@ export function ProjectsPage({
   onSelectProject,
   onActivateInstance,
   onOpenNewInstanceForCwd,
+  onOpenTerminalForCwd,
 }: Props) {
   const projectsState = useProjects();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -110,6 +112,7 @@ export function ProjectsPage({
             }}
             onActivateInstance={onActivateInstance}
             onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
+            onOpenTerminalForCwd={onOpenTerminalForCwd}
           />
         ) : (
           <EmptyDetail hasProjects={projectsState.projects.length > 0} />
