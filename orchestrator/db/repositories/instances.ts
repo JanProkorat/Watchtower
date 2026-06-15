@@ -1,5 +1,5 @@
 import type { SqliteLike } from '../migrations.js';
-import type { InstanceRow, InstanceStatus, TerminationReason } from '../../../shared/stateModel.js';
+import type { InstanceRow, InstanceKind, InstanceStatus, TerminationReason } from '../../../shared/stateModel.js';
 import { LIVE_STATUSES } from '../../../shared/stateModel.js';
 
 type DbInstanceRow = {
@@ -14,6 +14,7 @@ type DbInstanceRow = {
   resumed_from_instance_id: string | null;
   jira_key_hint: string | null;
   args_json: string | null;
+  kind: InstanceKind;
 };
 
 function toRow(r: DbInstanceRow): InstanceRow {
@@ -29,6 +30,7 @@ function toRow(r: DbInstanceRow): InstanceRow {
     resumedFromInstanceId: r.resumed_from_instance_id,
     jiraKeyHint: r.jira_key_hint,
     argsJson: r.args_json,
+    kind: r.kind,
   };
 }
 
@@ -44,8 +46,8 @@ export class InstancesRepo {
     const displayOrder = (maxRow.m ?? 0) + 1000;
     this.db
       .prepare(
-        `INSERT INTO instances (id, cwd, status, claude_session_id, spawned_at, last_activity_at, exit_code, termination_reason, resumed_from_instance_id, jira_key_hint, args_json, display_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO instances (id, cwd, status, claude_session_id, spawned_at, last_activity_at, exit_code, termination_reason, resumed_from_instance_id, jira_key_hint, args_json, kind, display_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         row.id,
@@ -59,6 +61,7 @@ export class InstancesRepo {
         row.resumedFromInstanceId,
         row.jiraKeyHint,
         row.argsJson,
+        row.kind,
         displayOrder,
       );
   }

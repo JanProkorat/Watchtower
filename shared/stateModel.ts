@@ -25,6 +25,8 @@ export type TerminationReason =
   | 'resume-failed'
   | 'no-session-id';
 
+export type InstanceKind = 'claude' | 'shell';
+
 export interface InstanceRow {
   id: string;
   cwd: string;
@@ -37,4 +39,5 @@ export interface InstanceRow {
   resumedFromInstanceId: string | null;
   jiraKeyHint: string | null;
   argsJson: string | null;
+  kind: InstanceKind;
 }

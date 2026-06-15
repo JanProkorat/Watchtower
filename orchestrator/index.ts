@@ -475,6 +475,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           resumedFromInstanceId: null,
           jiraKeyHint: null,
           argsJson: req.payload.args ? JSON.stringify(req.payload.args) : null,
+          kind: 'claude', // stopgap until Task 5 refines this to use instanceKind from payload
         });
         spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [] });
         return { instanceId: id };

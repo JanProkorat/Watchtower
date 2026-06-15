@@ -23,6 +23,7 @@ function makeRow(overrides: Partial<InstanceRow> = {}): InstanceRow {
     resumedFromInstanceId: null,
     jiraKeyHint: null,
     argsJson: null,
+    kind: 'claude',
     ...overrides,
   };
 }
