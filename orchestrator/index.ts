@@ -60,7 +60,7 @@ import { fetchTokenUsage } from './services/tokenUsage.js';
 import type { TokenUsagePayload } from '../shared/tokenUsageFormat.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
-import { buildPtySpawnConfig } from './shellPolicy.js';
+import { buildPtySpawnConfig, planBootAction } from './shellPolicy.js';
 import type { InstanceKind } from './shellPolicy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -345,18 +345,19 @@ function applyTransition(instanceId: string, event: StateEvent): void {
   if (!inst) return;
   const prevStatus = inst.status;
   const result = transition(prevStatus, event);
+  const isShell = inst.kind === 'shell';
   if (result.state !== prevStatus) {
     repo().updateStatus(instanceId, result.state, Date.now());
     api?.push({ kind: 'stateChanged', payload: { instanceId, status: result.state } });
     if (notifier) notifier.apply(instanceId, inst.cwd, prevStatus, result.state, Date.now());
-    if (slackEscalator) slackEscalator.apply(instanceId, inst.cwd, prevStatus, result.state);
-    if (result.state === 'crashed' || result.state === 'finished') forgetSlackThread(instanceId);
+    if (!isShell && slackEscalator) slackEscalator.apply(instanceId, inst.cwd, prevStatus, result.state);
+    if (!isShell && (result.state === 'crashed' || result.state === 'finished')) forgetSlackThread(instanceId);
   }
   for (const out of result.outputs) {
     if (out.kind === 'storeClaudeSessionId') {
       repo().setClaudeSessionId(instanceId, out.sessionId);
     } else if (out.kind === 'startQuietTimer') {
-      quietTimers?.start(instanceId);
+      if (!isShell) quietTimers?.start(instanceId);
     } else if (out.kind === 'clearQuietTimer') {
       quietTimers?.clear(instanceId);
     } else if (out.kind === 'clearAttention') {
@@ -978,9 +979,9 @@ function respawnIncompleteRowsOnBoot(): void {
   let respawned = 0;
   let crashed = 0;
   for (const row of allRows) {
-    if (row.status === 'finished') continue;
-    if (row.terminationReason === 'user-kill') continue;
-    if (!row.claudeSessionId) {
+    const action = planBootAction(row);
+    if (action === 'leave') continue;
+    if (action === 'crash') {
       if (row.status !== 'crashed') {
         r.updateStatus(row.id, 'crashed', Date.now());
         r.setTermination(row.id, 'crash', null);
@@ -988,6 +989,22 @@ function respawnIncompleteRowsOnBoot(): void {
       crashed++;
       continue;
     }
+    if (action === 'respawn-shell') {
+      try {
+        r.updateStatus(row.id, 'working', Date.now());
+        r.setTermination(row.id, null, null);
+        terminalSnapshots.dispose(row.id); // stale scrollback from the dead pty
+        spawnPtyForInstance({ id: row.id, cwd: row.cwd, extraArgs: [], kind: 'shell' });
+        respawned++;
+      } catch (err) {
+        console.error('[orchestrator] shell respawn failed for', row.id, err);
+        r.updateStatus(row.id, 'crashed', Date.now());
+        r.setTermination(row.id, 'crash', null);
+        crashed++;
+      }
+      continue;
+    }
+    // action === 'resume' (claude)
     try {
       r.updateStatus(row.id, 'spawning', Date.now());
       r.setTermination(row.id, null, null);
@@ -997,13 +1014,7 @@ function respawnIncompleteRowsOnBoot(): void {
       // row's own --session-id session, or a fresh spawn. Avoids the hard
       // "No session found with ID …" error on reopen.
       const resumeSessionId = resolveResumeTarget(row) ?? undefined;
-      spawnPtyForInstance({
-        id: row.id,
-        cwd: row.cwd,
-        extraArgs: [],
-        kind: 'claude',
-        resumeSessionId,
-      });
+      spawnPtyForInstance({ id: row.id, cwd: row.cwd, extraArgs: [], kind: 'claude', resumeSessionId });
       respawned++;
     } catch (err) {
       console.error('[orchestrator] respawn failed for', row.id, err);
@@ -1032,9 +1043,11 @@ function respawnIncompleteRowsOnBoot(): void {
         // runs from a different cwd. Routing them here would corrupt the managed
         // instance's state and clobber its claude_session_id with an id from a
         // foreign project dir, breaking `claude --resume` on next boot.
-        const cwd = repo().get(instanceId)?.cwd;
+        const row = repo().get(instanceId);
+        if (!row) return;
+        if (row.kind === 'shell') return; // shells post no hooks; ignore any that arrive
         const hookCwd = (body as { cwd?: unknown } | undefined)?.cwd;
-        if (!hookCwdMatches(cwd, hookCwd)) return;
+        if (!hookCwdMatches(row.cwd, hookCwd)) return;
         const stateEvent = mapHookEventToStateEvent(eventName, body);
         if (stateEvent) applyTransition(instanceId, stateEvent);
       },
