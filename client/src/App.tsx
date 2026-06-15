@@ -535,7 +535,7 @@ export function App() {
             <DialogTitle>Close this session?</DialogTitle>
             <DialogContent>
               <DialogContentText>
-                Claude in{' '}
+                The session in{' '}
                 <Box component="code" sx={{ fontFamily: 'monospace', fontSize: 12 }}>
                   {confirmClose?.cwd}
                 </Box>{' '}
@@ -567,8 +567,8 @@ export function App() {
             <DialogContent>
               <DialogContentText>
                 {confirmTabClose?.liveCount === 1
-                  ? 'A Claude session in this tab is still running. Closing the tab kills the pty and forgets the session. Use Cancel to keep it alive.'
-                  : `${confirmTabClose?.liveCount ?? 0} Claude sessions in this tab are still running. Closing the tab kills the ptys and forgets the sessions. Use Cancel to keep them alive.`}
+                  ? 'A session in this tab is still running. Closing the tab kills the pty and forgets the session. Use Cancel to keep it alive.'
+                  : `${confirmTabClose?.liveCount ?? 0} sessions in this tab are still running. Closing the tab kills the ptys and forgets the sessions. Use Cancel to keep them alive.`}
               </DialogContentText>
             </DialogContent>
             <DialogActions>

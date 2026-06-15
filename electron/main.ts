@@ -143,7 +143,7 @@ app.on('before-quit', async (event) => {
     defaultId: 0,
     cancelId: 1,
     title: 'Quit Watchtower',
-    message: `${live.length} Claude Code session${live.length === 1 ? ' is' : 's are'} still running.`,
+    message: `${live.length} session${live.length === 1 ? ' is' : 's are'} still running.`,
     detail: `${lines}\n\nThey will be respawned on next launch.`,
   });
   if (result.response === 0) {
