@@ -537,12 +537,25 @@ type AnyPort = {
   start?: () => void;
 };
 
-type ResponseEnvelope = { id: string; kind: OrchResponse['kind']; payload: unknown; _response: true };
+type ResponseEnvelope = {
+  id: string;
+  kind: OrchResponse['kind'];
+  payload: unknown;
+  _response: true;
+  // Present when the request handler threw. Carries the message so the caller
+  // can reject its invoke() promise instead of hanging forever (a thrown
+  // handler used to neither resolve nor reject — the renderer's Save button
+  // would simply do nothing).
+  _error?: { message: string };
+};
 type RequestEnvelope = OrchRequest;
 type Envelope = ResponseEnvelope | RequestEnvelope | OrchPush;
 
 export class PortApi {
-  private pending = new Map<string, (value: unknown) => void>();
+  private pending = new Map<
+    string,
+    { resolve: (value: unknown) => void; reject: (reason: unknown) => void }
+  >();
   private requestHandler: ((req: OrchRequest) => Promise<unknown>) | null = null;
   // onPush is event-emitter-style: every call to .onPush() registers an
   // additional subscriber. Previously this was a single-handler setter, which
@@ -564,8 +577,8 @@ export class PortApi {
     payload: Extract<OrchRequest, { kind: T }>['payload'],
   ): Promise<Extract<OrchResponse, { kind: T }>['payload']> {
     const id = randomId();
-    return new Promise((resolve) => {
-      this.pending.set(id, resolve as (value: unknown) => void);
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
       this.port.postMessage({ id, kind, payload } as OrchRequest);
     });
   }
@@ -590,10 +603,11 @@ export class PortApi {
     if (typeof msg !== 'object' || msg === null) return;
 
     if ('_response' in msg && msg._response) {
-      const resolver = this.pending.get(msg.id);
-      if (resolver) {
+      const pending = this.pending.get(msg.id);
+      if (pending) {
         this.pending.delete(msg.id);
-        resolver(msg.payload);
+        if (msg._error) pending.reject(new Error(msg._error.message));
+        else pending.resolve(msg.payload);
       }
       return;
     }
@@ -601,13 +615,27 @@ export class PortApi {
     if ('id' in msg && 'kind' in msg && !('_response' in msg)) {
       if (!this.requestHandler) return;
       const req = msg as OrchRequest;
-      const payload = await this.requestHandler(req);
-      const response: ResponseEnvelope = {
-        id: req.id,
-        kind: req.kind as OrchResponse['kind'],
-        payload,
-        _response: true,
-      };
+      let response: ResponseEnvelope;
+      try {
+        const payload = await this.requestHandler(req);
+        response = {
+          id: req.id,
+          kind: req.kind as OrchResponse['kind'],
+          payload,
+          _response: true,
+        };
+      } catch (err) {
+        // A throwing handler (e.g. assertTaskNotDone / WorklogLockedError) must
+        // still produce a response, otherwise the caller's invoke() promise
+        // hangs forever. Forward the message so the renderer can surface it.
+        response = {
+          id: req.id,
+          kind: req.kind as OrchResponse['kind'],
+          payload: undefined,
+          _response: true,
+          _error: { message: err instanceof Error ? err.message : String(err) },
+        };
+      }
       this.port.postMessage(response);
       return;
     }

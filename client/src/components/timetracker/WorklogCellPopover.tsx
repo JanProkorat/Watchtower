@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
   Divider,
   IconButton,
@@ -74,6 +75,10 @@ export function WorklogCellPopover({
   const [editReported, setEditReported] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
+  // Surfaces a failed mutation (e.g. the worklog's task is Done, or the day
+  // became locked) inline instead of silently swallowing the rejection.
+  const [actionError, setActionError] = useState<string | null>(null);
+
   // Inline add state.
   const [isAdding, setIsAdding] = useState(false);
   const [addMinutes, setAddMinutes] = useState('');
@@ -90,6 +95,7 @@ export function WorklogCellPopover({
       setAddDescription('');
       setWorklogs([]);
       setRate(null);
+      setActionError(null);
     }
   }, [open]);
 
@@ -165,6 +171,20 @@ export function WorklogCellPopover({
     }
   };
 
+  // Runs a worklog mutation, surfacing any rejection (locked day, Done task)
+  // as an inline alert. Returns true on success so callers can clear edit
+  // state only when the write actually landed.
+  const runMutation = async (fn: () => Promise<void>): Promise<boolean> => {
+    setActionError(null);
+    try {
+      await fn();
+      return true;
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  };
+
   const startEdit = (entry: WorklogViewPayload) => {
     setEditId(entry.id);
     setEditDate(dayjs(entry.workDate));
@@ -187,15 +207,18 @@ export function WorklogCellPopover({
       if (!Number.isFinite(parsed) || parsed <= 0) return;
       reportedMinutes = parsed;
     }
-    await window.watchtower.invoke('worklogs:update', {
-      id: editId,
-      input: {
-        workDate: editDate.format('YYYY-MM-DD'),
-        minutes,
-        reportedMinutes,
-        description: editDescription.trim() === '' ? null : editDescription.trim(),
-      },
+    const ok = await runMutation(async () => {
+      await window.watchtower.invoke('worklogs:update', {
+        id: editId,
+        input: {
+          workDate: editDate.format('YYYY-MM-DD'),
+          minutes,
+          reportedMinutes,
+          description: editDescription.trim() === '' ? null : editDescription.trim(),
+        },
+      });
     });
+    if (!ok) return;
     setEditId(null);
     await reload();
     onChanged();
@@ -203,17 +226,23 @@ export function WorklogCellPopover({
 
   const toggleJiraUploaded = async (entry: WorklogViewPayload) => {
     if (dayLocked) return;
-    await window.watchtower.invoke('worklogs:update', {
-      id: entry.id,
-      input: { jiraUploaded: !entry.jiraUploaded },
+    const ok = await runMutation(async () => {
+      await window.watchtower.invoke('worklogs:update', {
+        id: entry.id,
+        input: { jiraUploaded: !entry.jiraUploaded },
+      });
     });
+    if (!ok) return;
     await reload();
     onChanged();
   };
 
   const deleteEntry = async (entry: WorklogViewPayload) => {
     if (dayLocked) return;
-    await window.watchtower.invoke('worklogs:delete', { id: entry.id });
+    const ok = await runMutation(async () => {
+      await window.watchtower.invoke('worklogs:delete', { id: entry.id });
+    });
+    if (!ok) return;
     await reload();
     onChanged();
   };
@@ -239,13 +268,16 @@ export function WorklogCellPopover({
 
   const commitAdd = async () => {
     if (!addValid || taskId == null) return;
-    await window.watchtower.invoke('worklogs:create', {
-      taskId,
-      workDate: ymd,
-      minutes: addMinutesParsed,
-      reportedMinutes: addReportedParsed,
-      description: addDescription.trim() === '' ? null : addDescription.trim(),
+    const ok = await runMutation(async () => {
+      await window.watchtower.invoke('worklogs:create', {
+        taskId,
+        workDate: ymd,
+        minutes: addMinutesParsed,
+        reportedMinutes: addReportedParsed,
+        description: addDescription.trim() === '' ? null : addDescription.trim(),
+      });
     });
+    if (!ok) return;
     setIsAdding(false);
     setAddMinutes('');
     setAddReported('');
@@ -551,6 +583,12 @@ export function WorklogCellPopover({
               />
             </Stack>
           </>
+        )}
+
+        {actionError && (
+          <Alert severity="error" onClose={() => setActionError(null)} sx={{ fontSize: 12, py: 0 }}>
+            {actionError}
+          </Alert>
         )}
 
         {dayLocked && (
