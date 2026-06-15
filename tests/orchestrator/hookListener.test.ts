@@ -1,5 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { startHookListener, type HookListenerHandle } from '../../orchestrator/hookListener.js';
+
+// Binds a real HTTP listener on a real port and makes real round-trips. Under
+// heavy parallel-suite CPU contention this can exceed vitest's default 5s
+// timeout; give it headroom so transient slowness isn't a false failure.
+vi.setConfig({ testTimeout: 30_000 });
 
 describe('hookListener', () => {
   let handle: HookListenerHandle;

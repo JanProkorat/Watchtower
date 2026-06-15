@@ -1,5 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { tmpdir } from 'node:os';
+
+// Spins up a real orchestrator (DB migrations + HTTP listener on a real port).
+// Under heavy parallel-suite CPU contention this can exceed vitest's default
+// 5s timeout; give it headroom so a transient slow boot isn't a false failure.
+vi.setConfig({ testTimeout: 30_000 });
 import { mkdtempSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';

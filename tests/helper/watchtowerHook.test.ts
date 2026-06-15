@@ -1,5 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { spawn } from 'node:child_process';
+
+// Each case cold-starts `npx tsx <helper>` (npx resolution + tsx/esbuild
+// compile). Under heavy CPU contention (the full suite runs 55 files in
+// parallel) that cold start can exceed vitest's default 5s timeout, producing
+// a rare false failure. Give these process-spawn tests generous headroom — a
+// genuine hang still fails, just slower.
+vi.setConfig({ testTimeout: 30_000 });
 import { tmpdir } from 'node:os';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
