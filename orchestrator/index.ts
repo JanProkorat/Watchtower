@@ -60,6 +60,8 @@ import { fetchTokenUsage } from './services/tokenUsage.js';
 import type { TokenUsagePayload } from '../shared/tokenUsageFormat.js';
 import type { StateEvent } from '../shared/events.js';
 import type { InstanceStatus } from '../shared/stateModel.js';
+import { buildPtySpawnConfig } from './shellPolicy.js';
+import type { InstanceKind } from './shellPolicy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -383,33 +385,68 @@ function mapHookEventToStateEvent(name: string, body: unknown): StateEvent | nul
   }
 }
 
+/** Kill the pty (if any), delete the row + child rows, and clear Slack/timer state. */
+function disposeInstanceRow(id: string): void {
+  try {
+    pty.get(id)?.kill();
+  } catch {
+    /* pty already dead */
+  }
+  new HookEventsRepo(handle!.db).deleteForInstance(id);
+  new NotificationsRepo(handle!.db).deleteForInstance(id);
+  repo().delete(id);
+  forgetSlackThread(id);
+  slackEscalator?.clear(id);
+  terminalSnapshots.dispose(id);
+}
+
 interface PtySpawnArgs {
   id: string;
   cwd: string;
   extraArgs: string[];
-  /** If present, spawn via `claude --resume <id>` instead of `--session-id <id>`. */
+  kind: InstanceKind;
+  /** Claude only: spawn via `claude --resume <id>` instead of `--session-id <id>`. */
   resumeSessionId?: string;
 }
 
 const RESUME_FAIL_FAST_MS = 2000;
 
 function spawnPtyForInstance(opts: PtySpawnArgs): void {
-  const cmdArgs = opts.resumeSessionId
-    ? ['--resume', opts.resumeSessionId, ...opts.extraArgs]
-    : ['--session-id', opts.id, ...opts.extraArgs];
+  const cfg = buildPtySpawnConfig({
+    kind: opts.kind,
+    id: opts.id,
+    extraArgs: opts.extraArgs,
+    resumeSessionId: opts.resumeSessionId,
+  });
   const spawnedAt = Date.now();
   pty.spawn({
     id: opts.id,
-    command: 'claude',
-    args: cmdArgs,
+    command: cfg.command,
+    args: cfg.args,
     cwd: opts.cwd,
-    env: { ...(process.env as Record<string, string>), WATCHTOWER_INSTANCE_ID: opts.id },
+    env: cfg.env,
     onData: (chunk) => {
       terminalSnapshots.feed(opts.id, chunk);
       api?.push({ kind: 'ptyData', payload: { instanceId: opts.id, chunk } });
       applyTransition(opts.id, { kind: 'ptyData' });
     },
     onExit: (code) => {
+      if (opts.kind === 'shell') {
+        api?.push({ kind: 'ptyExit', payload: { instanceId: opts.id, code } });
+        if (code === 0) {
+          // Clean exit (user typed `exit`) → drop the row; the renderer's
+          // deriveTabs prune removes the now-orphaned column automatically.
+          disposeInstanceRow(opts.id);
+        } else {
+          const r = repo();
+          if (r.get(opts.id)) {
+            r.setTermination(opts.id, 'crash', code);
+            r.updateStatus(opts.id, 'crashed', Date.now());
+          }
+        }
+        api?.push({ kind: 'stateChanged', payload: { instanceId: opts.id, status: code === 0 ? 'finished' : 'crashed' } });
+        return;
+      }
       const lifespan = Date.now() - spawnedAt;
       // If --resume exits fast, the session probably never had any persisted
       // content (e.g. the user closed the app right after launching claude,
@@ -430,6 +467,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
           id: opts.id,
           cwd: opts.cwd,
           extraArgs: opts.extraArgs,
+          kind: 'claude',
           // no resumeSessionId — break the recursion guard, full fresh spawn
         });
         return;
@@ -457,6 +495,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
     case 'spawnInstance': {
       const id = randomUUID();
       const now = Date.now();
+      const instanceKind: InstanceKind = req.payload.instanceKind ?? 'claude';
       const expandedCwd = req.payload.cwd.startsWith('~/')
         ? path.join(homedir(), req.payload.cwd.slice(2))
         : req.payload.cwd === '~'
@@ -466,8 +505,11 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
         repo().insert({
           id,
           cwd: expandedCwd,
-          status: 'spawning',
-          claudeSessionId: id, // --session-id <uuid> => Claude session id matches row id
+          // Shells have no SessionStart handshake, so they start live ('working')
+          // and never show the spinner. Claude starts 'spawning' until the hook.
+          status: instanceKind === 'shell' ? 'working' : 'spawning',
+          // Claude: --session-id <uuid> => session id matches row id. Shells: none.
+          claudeSessionId: instanceKind === 'shell' ? null : id,
           spawnedAt: now,
           lastActivityAt: now,
           exitCode: null,
@@ -475,9 +517,9 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           resumedFromInstanceId: null,
           jiraKeyHint: null,
           argsJson: req.payload.args ? JSON.stringify(req.payload.args) : null,
-          kind: 'claude', // stopgap until Task 5 refines this to use instanceKind from payload
+          kind: instanceKind,
         });
-        spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [] });
+        spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [], kind: instanceKind });
         return { instanceId: id };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -507,22 +549,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       return { ok: true };
 
     case 'removeInstance': {
-      // Kill the pty if it's still alive — best-effort, no grace period because
-      // the row gets deleted right after either way.
-      try {
-        pty.get(req.payload.instanceId)?.kill();
-      } catch {
-        /* pty already dead */
-      }
-      // Cascade: hook_events + notifications reference instances.id but the
-      // schema doesn't have ON DELETE CASCADE, so we clean child rows first.
-      new HookEventsRepo(handle!.db).deleteForInstance(req.payload.instanceId);
-      new NotificationsRepo(handle!.db).deleteForInstance(req.payload.instanceId);
-      repo().delete(req.payload.instanceId);
-      // Clean up Slack thread maps and any pending escalation timer.
-      forgetSlackThread(req.payload.instanceId);
-      slackEscalator?.clear(req.payload.instanceId);
-      terminalSnapshots.dispose(req.payload.instanceId);
+      disposeInstanceRow(req.payload.instanceId);
       return { ok: true };
     }
 
@@ -538,6 +565,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           cwd: r.cwd,
           status: r.status,
           lastActivityAt: r.lastActivityAt,
+          kind: r.kind,
         })),
       };
     }
@@ -973,6 +1001,7 @@ function respawnIncompleteRowsOnBoot(): void {
         id: row.id,
         cwd: row.cwd,
         extraArgs: [],
+        kind: 'claude',
         resumeSessionId,
       });
       respawned++;
