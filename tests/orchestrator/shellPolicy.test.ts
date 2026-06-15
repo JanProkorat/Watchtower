@@ -31,6 +31,13 @@ describe('buildPtySpawnConfig', () => {
     expect(buildPtySpawnConfig({ kind: 'shell', id: 's', extraArgs: [], env: {} }).command).toBe('/bin/zsh');
     expect(buildPtySpawnConfig({ kind: 'shell', id: 's', extraArgs: [], env: { SHELL: '  ' } }).command).toBe('/bin/zsh');
   });
+
+  it('does NOT mutate the caller-supplied env (regression guard: must never corrupt process.env)', () => {
+    const e = { SHELL: '/bin/zsh', WATCHTOWER_INSTANCE_ID: 'keep-me' };
+    buildPtySpawnConfig({ kind: 'shell', id: 's', extraArgs: [], env: e });
+    // The shell branch deletes WATCHTOWER_INSTANCE_ID from its OWN copy only.
+    expect(e.WATCHTOWER_INSTANCE_ID).toBe('keep-me');
+  });
 });
 
 describe('planBootAction', () => {
