@@ -277,14 +277,14 @@ export function App() {
     setConfirmTabClose({ label: tab.label, ids, liveCount });
   };
 
-  const doSpawn = async (cwd: string) => {
+  const doSpawn = async (cwd: string, kind: 'claude' | 'shell' = 'claude') => {
     setSpawnInFlight((n) => n + 1);
     try {
       const tabId = routeSpawnToTab(cwd, projects);
       if (tabId.startsWith('cwd:')) setOpenAdHocCwds((s) => new Set(s).add(cwd));
       ensureTabMountedAndFocused({ layout, actions: layoutActions }, tabId);
       setActiveModule('instances');
-      const res = await spawn(cwd);
+      const res = await spawn(cwd, undefined, kind);
       if (res.instanceId) {
         layoutActions.focusColumnInTab(tabId, res.instanceId);
         setActive(res.instanceId);
@@ -518,7 +518,7 @@ export function App() {
               setNewOpen(false);
               setPendingNewCwd(undefined);
             }}
-            onSpawn={(cwd) => void doSpawn(cwd)}
+            onSpawn={(cwd, kind) => void doSpawn(cwd, kind)}
           />
           <FirstRunWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />
           <Dialog

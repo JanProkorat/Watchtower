@@ -32,7 +32,7 @@ export function useInstances(): {
   activeId: string | null;
   loaded: boolean;
   setActive(id: string | null): void;
-  spawn(cwd: string, args?: string[]): Promise<string>;
+  spawn(cwd: string, args?: string[], kind?: 'claude' | 'shell'): Promise<{ instanceId: string | null; error?: string }>;
   kill(instanceId: string): Promise<void>;
   refresh(): Promise<void>;
 } {
@@ -77,8 +77,8 @@ export function useInstances(): {
   }, [refresh]);
 
   const spawn = useCallback(
-    async (cwd: string, args?: string[]) => {
-      const res = await window.watchtower.invoke('spawnInstance', { cwd, args });
+    async (cwd: string, args?: string[], kind: 'claude' | 'shell' = 'claude') => {
+      const res = await window.watchtower.invoke('spawnInstance', { cwd, args, instanceKind: kind });
       if (res.instanceId) {
         // Refresh the instance list BEFORE activating the new tab — otherwise
         // MUI's Tabs validator runs against stale children and warns:

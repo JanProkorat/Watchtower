@@ -13,6 +13,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 const RECENT_KEY = 'watchtower.recent-cwds';
 const MAX_RECENT = 8;
@@ -41,12 +43,13 @@ interface Props {
   open: boolean;
   defaultCwd?: string;
   onClose(): void;
-  onSpawn(cwd: string): void;
+  onSpawn(cwd: string, kind: 'claude' | 'shell'): void;
 }
 
 export function NewInstanceModal({ open, defaultCwd, onClose, onSpawn }: Props) {
   const [cwd, setCwd] = useState('');
   const [recent, setRecent] = useState<string[]>([]);
+  const [kind, setKind] = useState<'claude' | 'shell'>('claude');
 
   useEffect(() => {
     if (!open) return;
@@ -69,7 +72,7 @@ export function NewInstanceModal({ open, defaultCwd, onClose, onSpawn }: Props) 
     const trimmed = cwd.trim();
     if (!trimmed) return;
     pushRecent(trimmed);
-    onSpawn(trimmed);
+    onSpawn(trimmed, kind);
     onClose();
   };
 
@@ -78,6 +81,16 @@ export function NewInstanceModal({ open, defaultCwd, onClose, onSpawn }: Props) 
       <DialogTitle>New Claude Code instance</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={kind}
+            onChange={(_e, v) => { if (v) setKind(v); }}
+            sx={{ mb: 1 }}
+          >
+            <ToggleButton value="claude">Claude session</ToggleButton>
+            <ToggleButton value="shell">Terminal</ToggleButton>
+          </ToggleButtonGroup>
           <Stack direction="row" spacing={1} alignItems="flex-start">
             <TextField
               autoFocus
