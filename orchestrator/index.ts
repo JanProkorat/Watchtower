@@ -554,6 +554,25 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       return { ok: true };
     }
 
+    case 'restartInstance': {
+      const row = repo().get(req.payload.instanceId);
+      if (!row) return { ok: false };
+      // Re-spawn a fresh process into the SAME row id. Shells re-run the login
+      // shell; claude rows resume via the row's session id.
+      terminalSnapshots.dispose(row.id);
+      repo().updateStatus(row.id, row.kind === 'shell' ? 'working' : 'spawning', Date.now());
+      repo().setTermination(row.id, null, null);
+      spawnPtyForInstance({
+        id: row.id,
+        cwd: row.cwd,
+        extraArgs: [],
+        kind: row.kind,
+        resumeSessionId: row.kind === 'claude' ? (resolveResumeTarget(row) ?? undefined) : undefined,
+      });
+      api?.push({ kind: 'stateChanged', payload: { instanceId: row.id, status: row.kind === 'shell' ? 'working' : 'spawning' } });
+      return { ok: true };
+    }
+
     case 'reorderInstances':
       repo().reorder(req.payload.orderedIds);
       return { ok: true };
