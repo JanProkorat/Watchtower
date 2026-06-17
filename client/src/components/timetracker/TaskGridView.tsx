@@ -51,6 +51,13 @@ const MONTH_LABELS = [
 
 const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+const DAY_OFF_LABEL: Record<'vacation' | 'sick' | 'other' | 'holiday', string> = {
+  vacation: 'Vacation',
+  sick: 'Sick',
+  other: 'Day off',
+  holiday: 'Public holiday',
+};
+
 const KEY_COL_WIDTH = 200;
 const DEFAULT_TITLE_COL_WIDTH = 240;
 const MIN_TITLE_COL_WIDTH = 120;
@@ -253,6 +260,15 @@ export function TaskGridView({ projectId }: Props) {
     const holidayByYmd = new Map(
       (grid.data?.publicHolidays ?? []).map((h) => [h.date, h.name] as const),
     );
+    // User-marked days off (vacation / sick / other). These tint the column the
+    // same as a weekend so non-working days read at a glance. A note, if any,
+    // is folded into the label shown in tooltips.
+    const dayOffByYmd = new Map(
+      (grid.data?.daysOff ?? []).map((o) => {
+        const base = DAY_OFF_LABEL[o.kind];
+        return [o.date, o.note ? `${base} — ${o.note}` : base] as const;
+      }),
+    );
     const result: Array<{
       day: number;
       ymd: string;
@@ -261,12 +277,15 @@ export function TaskGridView({ projectId }: Props) {
       isToday: boolean;
       isHoliday: boolean;
       holidayName: string | null;
+      isDayOff: boolean;
+      dayOffName: string | null;
     }> = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const dt = new Date(year, month - 1, d);
       const dow = dt.getDay();
       const ymd = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const holidayName = holidayByYmd.get(ymd) ?? null;
+      const dayOffName = dayOffByYmd.get(ymd) ?? null;
       result.push({
         day: d,
         ymd,
@@ -275,11 +294,13 @@ export function TaskGridView({ projectId }: Props) {
         isToday: ymd === todayYmd,
         isHoliday: holidayName != null,
         holidayName,
+        isDayOff: dayOffName != null,
+        dayOffName,
       });
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, grid.data?.daysInMonth, grid.data?.publicHolidays]);
+  }, [year, month, grid.data?.daysInMonth, grid.data?.publicHolidays, grid.data?.daysOff]);
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -555,6 +576,8 @@ function Grid({
     isToday: boolean;
     isHoliday: boolean;
     holidayName: string | null;
+    isDayOff: boolean;
+    dayOffName: string | null;
   }>;
   displayMode: 'tracked' | 'reported';
   hideDone: boolean;
@@ -720,7 +743,7 @@ function Grid({
               Logged
             </th>
             {days.map((d) => {
-              const isNonWorking = d.isWeekend || d.isHoliday;
+              const isNonWorking = d.isWeekend || d.isHoliday || d.isDayOff;
               const isHighlighted = highlightedDay === d.day;
               // The header bg is a solid (the sticky thead sits over the
               // scrolling rows beneath, so we want it opaque). Today/weekend
@@ -738,8 +761,8 @@ function Grid({
                 <th
                   key={d.day}
                   title={
-                    d.holidayName
-                      ? `${d.holidayName} — click to highlight column`
+                    (d.holidayName ?? d.dayOffName)
+                      ? `${d.holidayName ?? d.dayOffName} — click to highlight column`
                       : 'Click to highlight column'
                   }
                   onClick={() => onToggleHighlightDay(d.day)}
@@ -861,7 +884,7 @@ function Grid({
               const v = visibleDailyTotals[d.day] ?? 0;
               const baseBg = d.isToday
                 ? todaySolidBg
-                : d.isWeekend || d.isHoliday
+                : d.isWeekend || d.isHoliday || d.isDayOff
                   ? weekendSolidBg
                   : totalSolidBg;
               const cellBg =
@@ -942,7 +965,7 @@ function Grid({
                   const v = row.perDay[d.day] ?? 0;
                   const baseBg = d.isToday
                     ? todaySolidBg
-                    : d.isWeekend || d.isHoliday
+                    : d.isWeekend || d.isHoliday || d.isDayOff
                       ? weekendSolidBg
                       : earningsSolidBg;
                   const cellBg =
@@ -1001,6 +1024,8 @@ function TaskRow({
     isToday: boolean;
     isHoliday: boolean;
     holidayName: string | null;
+    isDayOff: boolean;
+    dayOffName: string | null;
   }>;
   displayMode: 'tracked' | 'reported';
   weekendBg: string;
@@ -1150,7 +1175,11 @@ function TaskRow({
       </td>
       {days.map((d) => {
         const v = perDay[d.day] ?? 0;
-        const baseBg = d.isToday ? todayBg : d.isWeekend || d.isHoliday ? weekendBg : 'transparent';
+        const baseBg = d.isToday
+          ? todayBg
+          : d.isWeekend || d.isHoliday || d.isDayOff
+            ? weekendBg
+            : 'transparent';
         const isHighlighted = highlightedDay === d.day;
         // Highlight layer is composed on top of whatever the cell already
         // had — empty cells become a flat tint, today/weekend stay visible
@@ -1183,9 +1212,13 @@ function TaskRow({
             }}
             title={
               v > 0
-                ? `${fmtHoursTrim(v)} h on ${d.ymd}${d.holidayName ? ` (${d.holidayName})` : ''}`
-                : d.holidayName
-                  ? `${d.holidayName} · click to log work anyway`
+                ? `${fmtHoursTrim(v)} h on ${d.ymd}${
+                    (d.holidayName ?? d.dayOffName)
+                      ? ` (${d.holidayName ?? d.dayOffName})`
+                      : ''
+                  }`
+                : (d.holidayName ?? d.dayOffName)
+                  ? `${d.holidayName ?? d.dayOffName} · click to log work anyway`
                   : `Log work on ${d.ymd}`
             }
           >

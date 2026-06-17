@@ -298,7 +298,7 @@ export function WorklogCellPopover({
       onClose={onClose}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       transformOrigin={{ vertical: 'top', horizontal: 'center' }}
-      slotProps={{ paper: { sx: { p: 2, maxWidth: 460, minWidth: 320 } } }}
+      slotProps={{ paper: { sx: { p: 2, maxWidth: 540, minWidth: 480 } } }}
     >
       <Stack spacing={1.5}>
         <Stack
@@ -368,6 +368,22 @@ export function WorklogCellPopover({
                             textField: { size: 'small', sx: { width: 150 } },
                           }}
                         />
+                        <TextField
+                          size="small"
+                          label="Tracked"
+                          value={editMinutes}
+                          onChange={(e) => setEditMinutes(e.target.value)}
+                          sx={{ width: 100 }}
+                          autoFocus
+                        />
+                        <TextField
+                          size="small"
+                          label="Reported"
+                          placeholder="—"
+                          value={editReported}
+                          onChange={(e) => setEditReported(e.target.value)}
+                          sx={{ width: 100 }}
+                        />
                         <Box sx={{ flexGrow: 1 }} />
                         <Tooltip title="Save">
                           <IconButton size="small" onClick={commitEdit}>
@@ -379,24 +395,6 @@ export function WorklogCellPopover({
                             <CloseIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                      </Stack>
-                      <Stack direction="row" spacing={1}>
-                        <TextField
-                          size="small"
-                          label="Tracked"
-                          value={editMinutes}
-                          onChange={(e) => setEditMinutes(e.target.value)}
-                          sx={{ width: 110 }}
-                          autoFocus
-                        />
-                        <TextField
-                          size="small"
-                          label="Reported"
-                          placeholder="—"
-                          value={editReported}
-                          onChange={(e) => setEditReported(e.target.value)}
-                          sx={{ width: 110 }}
-                        />
                       </Stack>
                       <TextField
                         size="small"
