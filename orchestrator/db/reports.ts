@@ -4,6 +4,8 @@ import {
   PROJECT_RATE_PERIODS_CTE,
   RATE_PERIOD_JOIN,
   SUM_EARNED,
+  SUM_MDS,
+  mdPerRow,
   effectiveMinutes,
 } from './reportsSql.js';
 import { ContractStatusService, type ContractStatus } from './contractStatus.js';
@@ -13,6 +15,8 @@ export type Granularity = 'day' | 'week' | 'month';
 export interface TrendRow {
   bucket: string;
   minutes: number;
+  /** Man-days for the bucket, using each worklog's contract hours_per_day. */
+  mds: number;
   earnedByCurrency: Record<string, number>;
 }
 
@@ -23,6 +27,8 @@ export interface ByProjectRow {
   isBillable: number;
   currency: string | null;
   minutes: number;
+  /** Man-days for the project, using its contract hours_per_day. */
+  mds: number;
   earnedAmount: number | null;
 }
 
@@ -32,6 +38,7 @@ export interface EarningsByProjectRow {
   project_color: string;
   currency: string | null;
   minutes: number;
+  mds: number;
   earned_amount: number | null;
 }
 
@@ -39,6 +46,10 @@ export interface EarningsResponse {
   billableMinutes: number;
   unbillableMinutes: number;
   timeOffMinutes: number;
+  /** Billable minutes expressed as man-days (per-project hours_per_day). */
+  billableMds: number;
+  /** Unbillable minutes expressed as man-days (per-project hours_per_day). */
+  unbillableMds: number;
   totalEarned: Record<string, number>;
   avgEffectiveHourlyRate: Record<string, number>;
   byProject: EarningsByProjectRow[];
@@ -47,6 +58,8 @@ export interface EarningsResponse {
 export interface HeatmapRow {
   date: string;
   minutes: number;
+  /** Man-days for the day, using each worklog's contract hours_per_day. */
+  mds: number;
 }
 
 export interface ContractsReportRow {
@@ -84,19 +97,23 @@ export class ReportsService {
   trend(from: string, to: string, granularity: Granularity, projectId?: number): TrendRow[] {
     const bucketExpr = BUCKET_EXPR[granularity];
     const totalsParams: unknown[] = [from, to];
-    let totalsSql = `SELECT ${bucketExpr} AS bucket,
-                            SUM(${EFFECTIVE_MINUTES}) AS minutes
-                       FROM worklogs w`;
-    if (projectId !== undefined) {
-      totalsSql += `
+    // Joined through to projects + rate periods so MD can use each worklog's
+    // contract hours_per_day (falling back to 8h). The joins never drop rows —
+    // every worklog has a task → epic → project, and the rate join is a LEFT.
+    let totalsSql = `WITH ${PROJECT_RATE_PERIODS_CTE}
+                     SELECT ${bucketExpr} AS bucket,
+                            SUM(${EFFECTIVE_MINUTES}) AS minutes,
+                            ${SUM_MDS} AS mds
+                       FROM worklogs w
                        JOIN tasks t    ON t.id = w.task_id
                        JOIN epics e    ON e.id = t.epic_id
-                      WHERE w.work_date BETWEEN ? AND ?
+                       JOIN projects p ON p.id = e.project_id
+                       ${RATE_PERIOD_JOIN}
+                      WHERE w.work_date BETWEEN ? AND ?`;
+    if (projectId !== undefined) {
+      totalsSql += `
                         AND e.project_id = ?`;
       totalsParams.push(projectId);
-    } else {
-      totalsSql += `
-                      WHERE w.work_date BETWEEN ? AND ?`;
     }
     totalsSql += `
                       GROUP BY bucket
@@ -105,6 +122,7 @@ export class ReportsService {
     const totals = this.db.prepare(totalsSql).all(...totalsParams) as Array<{
       bucket: string;
       minutes: number;
+      mds: number;
     }>;
 
     const earningsParams: unknown[] = [from, to];
@@ -144,6 +162,7 @@ export class ReportsService {
     return totals.map((r) => ({
       bucket: r.bucket,
       minutes: r.minutes,
+      mds: r.mds ?? 0,
       earnedByCurrency: earnedByBucket.get(r.bucket) ?? {},
     }));
   }
@@ -168,6 +187,7 @@ export class ReportsService {
                   ORDER BY pr.effective_from DESC
                   LIMIT 1)      AS currency,
                 COALESCE(SUM(${EFFECTIVE_MINUTES}), 0) AS minutes,
+                COALESCE(${SUM_MDS}, 0) AS mds,
                 CASE
                   WHEN p.is_billable = 1 THEN ${SUM_EARNED}
                   ELSE NULL
@@ -189,6 +209,7 @@ export class ReportsService {
         is_billable: number;
         currency: string | null;
         minutes: number;
+        mds: number;
         earned_amount: number | null;
       }>;
 
@@ -199,6 +220,7 @@ export class ReportsService {
       isBillable: r.is_billable,
       currency: r.currency,
       minutes: r.minutes,
+      mds: r.mds,
       earnedAmount: r.earned_amount,
     }));
   }
@@ -210,20 +232,26 @@ export class ReportsService {
 
     const totals = this.db
       .prepare(
-        `SELECT
+        `WITH ${PROJECT_RATE_PERIODS_CTE}
+         SELECT
             SUM(CASE WHEN p.kind = 'work' AND p.is_billable = 1 THEN ${EFFECTIVE_MINUTES} ELSE 0 END) AS billable_minutes,
             SUM(CASE WHEN p.kind = 'work' AND p.is_billable = 0 THEN ${EFFECTIVE_MINUTES} ELSE 0 END) AS unbillable_minutes,
-            SUM(CASE WHEN p.kind = 'time_off' THEN ${EFFECTIVE_MINUTES} ELSE 0 END) AS time_off_minutes
+            SUM(CASE WHEN p.kind = 'time_off' THEN ${EFFECTIVE_MINUTES} ELSE 0 END) AS time_off_minutes,
+            SUM(CASE WHEN p.kind = 'work' AND p.is_billable = 1 THEN ${mdPerRow('rp')} ELSE 0 END) AS billable_mds,
+            SUM(CASE WHEN p.kind = 'work' AND p.is_billable = 0 THEN ${mdPerRow('rp')} ELSE 0 END) AS unbillable_mds
            FROM worklogs w
            JOIN tasks t    ON t.id = w.task_id
            JOIN epics e    ON e.id = t.epic_id
            JOIN projects p ON p.id = e.project_id
+           ${RATE_PERIOD_JOIN}
           WHERE w.work_date BETWEEN ? AND ?${projectFilter}`,
       )
       .get(...totalsParams) as {
         billable_minutes: number | null;
         unbillable_minutes: number | null;
         time_off_minutes: number | null;
+        billable_mds: number | null;
+        unbillable_mds: number | null;
       };
 
     const earnedParams: unknown[] = [from, to];
@@ -256,6 +284,7 @@ export class ReportsService {
                 p.color        AS project_color,
                 MAX(rp.currency) AS currency,
                 SUM(${EFFECTIVE_MINUTES}) AS minutes,
+                ${SUM_MDS} AS mds,
                 ${SUM_EARNED} AS earned_amount
            FROM worklogs w
            JOIN tasks t    ON t.id = w.task_id
@@ -283,6 +312,8 @@ export class ReportsService {
       billableMinutes: totals.billable_minutes ?? 0,
       unbillableMinutes: totals.unbillable_minutes ?? 0,
       timeOffMinutes: totals.time_off_minutes ?? 0,
+      billableMds: totals.billable_mds ?? 0,
+      unbillableMds: totals.unbillable_mds ?? 0,
       totalEarned: total_earned,
       avgEffectiveHourlyRate: avg_effective_hourly_rate,
       byProject,
@@ -291,19 +322,23 @@ export class ReportsService {
 
   heatmap(from: string, to: string, projectId?: number): HeatmapRow[] {
     const params: unknown[] = [from, to];
-    let sql = `SELECT w.work_date AS date,
-                      SUM(${EFFECTIVE_MINUTES}) AS minutes
-                 FROM worklogs w`;
+    // Always join projects + rate periods so per-day MD uses each worklog's
+    // contract hours_per_day (8h fallback). The rate join is a LEFT, so days
+    // without a matching rate period still appear.
+    let sql = `WITH ${PROJECT_RATE_PERIODS_CTE}
+               SELECT w.work_date AS date,
+                      SUM(${EFFECTIVE_MINUTES}) AS minutes,
+                      ${SUM_MDS} AS mds
+                 FROM worklogs w
+                 JOIN tasks t    ON t.id = w.task_id
+                 JOIN epics e    ON e.id = t.epic_id
+                 JOIN projects p ON p.id = e.project_id
+                 ${RATE_PERIOD_JOIN}
+                WHERE w.work_date BETWEEN ? AND ?`;
     if (projectId !== undefined) {
       sql += `
-                 JOIN tasks t ON t.id = w.task_id
-                 JOIN epics e ON e.id = t.epic_id
-                WHERE w.work_date BETWEEN ? AND ?
                   AND e.project_id = ?`;
       params.push(projectId);
-    } else {
-      sql += `
-                WHERE w.work_date BETWEEN ? AND ?`;
     }
     sql += `
                 GROUP BY w.work_date

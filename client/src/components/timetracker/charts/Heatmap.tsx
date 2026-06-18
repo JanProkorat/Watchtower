@@ -2,11 +2,13 @@ import { useMemo } from 'react';
 import { Box, Stack, Tooltip, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import dayjs from 'dayjs';
-import { formatDateCz, formatHours } from '../../../util/format';
+import { formatDateCz, formatHours, formatMd } from '../../../util/format';
 
 export interface HeatmapDatum {
   date: string;
   minutes: number;
+  /** Optional — the Reports heatmap supplies it; the Dashboard one omits it. */
+  mds?: number;
 }
 
 export interface HeatmapStats {
@@ -14,7 +16,8 @@ export interface HeatmapStats {
   longest_streak: number;
   active_days: number;
   weekly_avg_minutes: number;
-  busiest_dow: { day: string; minutes: number } | null;
+  weekly_avg_mds: number;
+  busiest_dow: { day: string; minutes: number; mds: number } | null;
 }
 
 interface Props {
@@ -59,21 +62,26 @@ export function computeHeatmapStats(data: HeatmapDatum[]): HeatmapStats {
   }
 
   const totalMinutes = data.reduce((acc, d) => acc + d.minutes, 0);
+  const totalMds = data.reduce((acc, d) => acc + (d.mds ?? 0), 0);
   const weeks = Math.max(1, dayjs(sortedDates[sortedDates.length - 1] ?? today).diff(
     dayjs(sortedDates[0] ?? today),
     'week'
   ) + 1);
   const weeklyAvg = totalMinutes / weeks;
+  const weeklyAvgMds = totalMds / weeks;
 
-  const byDow = new Map<number, number>();
+  const byDow = new Map<number, { minutes: number; mds: number }>();
   for (const d of data) {
     const dow = dayjs(d.date).day();
-    byDow.set(dow, (byDow.get(dow) ?? 0) + d.minutes);
+    const acc = byDow.get(dow) ?? { minutes: 0, mds: 0 };
+    acc.minutes += d.minutes;
+    acc.mds += d.mds ?? 0;
+    byDow.set(dow, acc);
   }
-  let busiest: { day: string; minutes: number } | null = null;
-  for (const [dow, minutes] of byDow.entries()) {
-    if (!busiest || minutes > busiest.minutes) {
-      busiest = { day: DOW_LABELS[dow]!, minutes };
+  let busiest: { day: string; minutes: number; mds: number } | null = null;
+  for (const [dow, agg] of byDow.entries()) {
+    if (!busiest || agg.minutes > busiest.minutes) {
+      busiest = { day: DOW_LABELS[dow]!, minutes: agg.minutes, mds: agg.mds };
     }
   }
 
@@ -82,6 +90,7 @@ export function computeHeatmapStats(data: HeatmapDatum[]): HeatmapStats {
     longest_streak: longest,
     active_days: sortedDates.length,
     weekly_avg_minutes: weeklyAvg,
+    weekly_avg_mds: weeklyAvgMds,
     busiest_dow: busiest,
   };
 }
@@ -95,7 +104,10 @@ export default function Heatmap({
   showStats = true,
 }: Props) {
   const theme = useTheme();
-  const map = useMemo(() => new Map(data.map((d) => [d.date, d.minutes])), [data]);
+  const map = useMemo(
+    () => new Map(data.map((d) => [d.date, { minutes: d.minutes, mds: d.mds }])),
+    [data],
+  );
 
   const { weeks, maxMinutes } = useMemo(() => {
     const start = dayjs(from);
@@ -107,16 +119,18 @@ export default function Heatmap({
     const totalWeeks = Math.ceil(totalDays / 7);
 
     let max = 0;
-    const w: { date: string; minutes: number; inRange: boolean }[][] = [];
+    const w: { date: string; minutes: number; mds?: number; inRange: boolean }[][] = [];
     for (let weekIdx = 0; weekIdx < totalWeeks; weekIdx++) {
-      const col: { date: string; minutes: number; inRange: boolean }[] = [];
+      const col: { date: string; minutes: number; mds?: number; inRange: boolean }[] = [];
       for (let dow = 0; dow < 7; dow++) {
         const d = gridStart.add(weekIdx * 7 + dow, 'day');
         const dStr = d.format('YYYY-MM-DD');
         const inRange = !d.isBefore(start) && !d.isAfter(end);
-        const minutes = map.get(dStr) ?? 0;
+        const cell = map.get(dStr);
+        const minutes = cell?.minutes ?? 0;
+        const mds = cell?.mds;
         if (inRange && minutes > max) max = minutes;
-        col.push({ date: dStr, minutes, inRange });
+        col.push({ date: dStr, minutes, mds, inRange });
       }
       w.push(col);
     }
@@ -169,7 +183,9 @@ export default function Heatmap({
                   key={`${x}-${y}`}
                   title={
                     cell.minutes > 0
-                      ? `${formatDateCz(cell.date)} · ${formatHours(cell.minutes, 2)} h`
+                      ? `${formatDateCz(cell.date)} · ${formatHours(cell.minutes, 2)} h${
+                          cell.mds != null ? ` · ${formatMd(cell.mds)} MD` : ''
+                        }`
                       : `${formatDateCz(cell.date)} · no time`
                   }
                   placement="top"
@@ -199,12 +215,15 @@ export default function Heatmap({
           <Stat label="Current streak" value={`${stats.current_streak}d`} />
           <Stat label="Longest streak" value={`${stats.longest_streak}d`} />
           <Stat label="Active days" value={`${stats.active_days}`} />
-          <Stat label="Weekly avg" value={`${formatHours(stats.weekly_avg_minutes, 1)}h`} />
+          <Stat
+            label="Weekly avg"
+            value={`${formatHours(stats.weekly_avg_minutes, 1)}h · ${formatMd(stats.weekly_avg_mds)} MD`}
+          />
           <Stat
             label="Busiest day"
             value={
               stats.busiest_dow
-                ? `${stats.busiest_dow.day} (${formatHours(stats.busiest_dow.minutes, 1)}h)`
+                ? `${stats.busiest_dow.day} (${formatHours(stats.busiest_dow.minutes, 1)}h · ${formatMd(stats.busiest_dow.mds)} MD)`
                 : '—'
             }
           />

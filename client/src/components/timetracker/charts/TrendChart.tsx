@@ -11,11 +11,12 @@ import {
 import dayjs from 'dayjs';
 import { useChartColors } from './chartTheme';
 import ChartTooltip from './ChartTooltip';
-import { formatDateCz, formatHours, formatMonthCz } from '../../../util/format';
+import { formatDateCz, formatHours, formatMd, formatMonthCz } from '../../../util/format';
 
 export interface TrendDatum {
   bucket: string;
   minutes: number;
+  mds: number;
   earned_by_currency: Record<string, number>;
 }
 
@@ -84,6 +85,7 @@ export default function TrendChart({ data, granularity, rateChanges }: Props) {
             const d = payload[0]!.payload as TrendDatum;
             const rows: { label: string; value: string }[] = [
               { label: 'Hours', value: formatHours(d.minutes, 2) },
+              { label: 'MD', value: formatMd(d.mds) },
             ];
             for (const [cur, amt] of Object.entries(d.earned_by_currency)) {
               rows.push({ label: cur, value: amt.toFixed(2) });

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box,
-  Button,
   Chip,
   IconButton,
   Paper,
@@ -14,19 +13,13 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import EventRepeatIcon from '@mui/icons-material/EventRepeat';
 import TodayIcon from '@mui/icons-material/Today';
 import DragHandleIcon from '@mui/icons-material/DragHandle';
 import dayjs, { type Dayjs } from 'dayjs';
 import 'dayjs/locale/cs';
 import type { DashboardSprintDayPayload } from '../../../../shared/ipcContract.js';
 import { formatDateLongCz, formatMinutes } from '../../util/format.js';
-import { useToast, toastMessage } from '../../state/useToast.js';
 import { SprintDayCell } from './SprintDayCell.js';
-
-const WATCHTOWER_DB_PATH =
-  '/Users/jan/Library/Application Support/Watchtower/data.db';
 
 const DAY_HEIGHT_DEFAULT = 330;
 const DAY_HEIGHT_MIN = 140;
@@ -69,13 +62,9 @@ export function SprintStrip({
   onAnchorChange,
 }: SprintStripProps) {
   const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null);
-  const [syncAnchor, setSyncAnchor] = useState<HTMLElement | null>(null);
-  const [syncFrom, setSyncFrom] = useState<Dayjs | null>(null);
-  const [syncTo, setSyncTo] = useState<Dayjs | null>(null);
   const [dayHeight, setDayHeight] = useState<number>(loadDayHeight);
   const dragStateRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const todayRef = useRef<HTMLDivElement | null>(null);
-  const { showError, showSuccess } = useToast();
 
   useEffect(() => {
     try {
@@ -121,52 +110,6 @@ export function SprintStrip({
     }
   }, []);
 
-  const openSyncPopover = (anchor: HTMLElement) => {
-    const sprintStart = dayjs(sprint.fromDate).startOf('day');
-    const sprintEnd = dayjs(sprint.toDate).startOf('day');
-    const today = dayjs(todayDate).startOf('day');
-    // Default: full sprint start → min(today, sprint end). Matches TT.
-    const toDefault = today.isAfter(sprintEnd)
-      ? sprintEnd
-      : today.isBefore(sprintStart)
-        ? sprintStart
-        : today;
-    setSyncFrom(sprintStart);
-    setSyncTo(toDefault);
-    setSyncAnchor(anchor);
-  };
-
-  const sprintStart = dayjs(sprint.fromDate).startOf('day');
-  const sprintEnd = dayjs(sprint.toDate).endOf('day');
-  const fromValid = !!syncFrom && syncFrom.isValid();
-  const toValid = !!syncTo && syncTo.isValid();
-  const rangeValid =
-    fromValid &&
-    toValid &&
-    !syncFrom!.startOf('day').isAfter(syncTo!.startOf('day')) &&
-    !syncFrom!.isBefore(sprintStart) &&
-    !syncTo!.isAfter(sprintEnd);
-
-  // The button does NOT spawn `claude -p` — that hangs on M365 MCP init
-  // in the orchestrator's subprocess in this user's env (see the abandoned
-  // attempts in git history). Instead we build the slash command the user
-  // would type and copy it to the clipboard; they paste it into their
-  // Claude Code chat (where MCP is already authenticated) and it runs
-  // there, writing worklogs directly into Watchtower's DB.
-  const submitSync = async () => {
-    if (!rangeValid || !syncFrom || !syncTo) return;
-    const command =
-      `/sync-meetings ${syncFrom.format('YYYY-MM-DD')} ${syncTo.format('YYYY-MM-DD')} ` +
-      `"${WATCHTOWER_DB_PATH}"`;
-    try {
-      await navigator.clipboard.writeText(command);
-      setSyncAnchor(null);
-      showSuccess('Příkaz zkopírován do schránky. Vložte ho do Claude Code chatu pro spuštění.');
-    } catch (err) {
-      showError(`Nepodařilo se zkopírovat příkaz: ${toastMessage(err)}`);
-    }
-  };
-
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
@@ -186,11 +129,6 @@ export function SprintStrip({
         </Box>
 
         <Stack direction="row" spacing={0.5}>
-          <Tooltip title="Sync meetings">
-            <IconButton size="small" onClick={(e) => openSyncPopover(e.currentTarget)}>
-              <EventRepeatIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
           <Tooltip title="Jump to today">
             <IconButton size="small" onClick={() => onAnchorChange(todayDate)}>
               <TodayIcon fontSize="small" />
@@ -248,56 +186,6 @@ export function SprintStrip({
               setPickerAnchor(null);
             }}
           />
-        </Box>
-      </Popover>
-
-      <Popover
-        open={Boolean(syncAnchor)}
-        anchorEl={syncAnchor}
-        onClose={() => setSyncAnchor(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-      >
-        <Box sx={{ p: 2, minWidth: 380 }}>
-          <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Sync meetings</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Pick a range within the current sprint ({formatDateLongCz(sprint.fromDate)} —{' '}
-            {formatDateLongCz(sprint.toDate)}).
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-            Klik vám zkopíruje <code>/sync-meetings</code> příkaz do schránky.
-            Vložte ho do svého Claude Code chatu a stiskněte Enter — Watchtower
-            si nové worklogy vyzvedne přímo z DB.
-          </Typography>
-          <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
-            <DatePicker
-              label="From"
-              value={syncFrom}
-              onChange={(v) => setSyncFrom(v)}
-              minDate={sprintStart}
-              maxDate={sprintEnd}
-              slotProps={{ textField: { size: 'small', fullWidth: true } }}
-            />
-            <DatePicker
-              label="To"
-              value={syncTo}
-              onChange={(v) => setSyncTo(v)}
-              minDate={sprintStart}
-              maxDate={sprintEnd}
-              slotProps={{ textField: { size: 'small', fullWidth: true } }}
-            />
-          </Stack>
-          <Stack direction="row" spacing={1} justifyContent="flex-end">
-            <Button onClick={() => setSyncAnchor(null)}>Cancel</Button>
-            <Button
-              variant="contained"
-              startIcon={<ContentCopyIcon />}
-              disabled={!rangeValid}
-              onClick={() => void submitSync()}
-            >
-              Copy command
-            </Button>
-          </Stack>
         </Box>
       </Popover>
 

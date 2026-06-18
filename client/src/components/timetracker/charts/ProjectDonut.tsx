@@ -1,13 +1,14 @@
 import { Box, Stack, Typography } from '@mui/material';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import ChartTooltip from './ChartTooltip';
-import { formatHours } from '../../../util/format';
+import { formatHours, formatMd } from '../../../util/format';
 
 export interface ProjectSlice {
   project_id: number;
   project_name: string;
   project_color: string;
   minutes: number;
+  mds: number;
 }
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
 
 export default function ProjectDonut({ data }: Props) {
   const total = data.reduce((acc, d) => acc + d.minutes, 0);
+  const totalMds = data.reduce((acc, d) => acc + d.mds, 0);
 
   if (data.length === 0 || total === 0) {
     return (
@@ -54,6 +56,7 @@ export default function ProjectDonut({ data }: Props) {
                     title={d.project_name}
                     rows={[
                       { label: 'Hours', value: formatHours(d.minutes, 2), color: d.project_color },
+                      { label: 'MD', value: formatMd(d.mds) },
                       {
                         label: 'Share',
                         value: `${((d.minutes / total) * 100).toFixed(1)}%`,
@@ -81,6 +84,9 @@ export default function ProjectDonut({ data }: Props) {
           </Typography>
           <Typography variant="caption" color="text.secondary">
             total hours
+          </Typography>
+          <Typography variant="caption" color="text.secondary" className="tt-num" sx={{ mt: 0.5 }}>
+            {formatMd(totalMds)} MD
           </Typography>
         </Box>
       </Box>
@@ -114,7 +120,15 @@ export default function ProjectDonut({ data }: Props) {
                 variant="caption"
                 color="text.secondary"
                 className="tt-num"
-                sx={{ width: 48, textAlign: 'right' }}
+                sx={{ width: 56, textAlign: 'right' }}
+              >
+                {formatMd(d.mds)} MD
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                className="tt-num"
+                sx={{ width: 40, textAlign: 'right' }}
               >
                 {pct.toFixed(0)}%
               </Typography>

@@ -144,6 +144,7 @@ export function ReportsTab() {
       state.trend.map((t) => ({
         bucket: t.bucket,
         minutes: t.minutes,
+        mds: t.mds,
         earned_by_currency: t.earnedByCurrency,
       })),
     [state.trend],
@@ -156,6 +157,7 @@ export function ReportsTab() {
         project_name: p.projectName,
         project_color: p.projectColor,
         minutes: p.minutes,
+        mds: p.mds,
       })),
     [state.byProject],
   );
@@ -164,6 +166,8 @@ export function ReportsTab() {
     () => ({
       billable_minutes: state.earnings?.billableMinutes ?? 0,
       unbillable_minutes: state.earnings?.unbillableMinutes ?? 0,
+      billable_mds: state.earnings?.billableMds ?? 0,
+      unbillable_mds: state.earnings?.unbillableMds ?? 0,
       total_earned: state.earnings?.totalEarned ?? {},
       avg_effective_hourly_rate: state.earnings?.avgEffectiveHourlyRate ?? {},
       // Chart requires non-null currency + earned_amount. The server's
@@ -180,6 +184,7 @@ export function ReportsTab() {
                   currency: p.currency,
                   earned_amount: p.earned_amount,
                   minutes: p.minutes,
+                  mds: p.mds,
                 },
               ]
             : [],
@@ -277,7 +282,7 @@ export function ReportsTab() {
           <Grid item xs={12}>
             <ChartCard
               title="Time trend"
-              subtitle={`Hours logged per ${granularity}`}
+              subtitle={`Hours logged per ${granularity} (hover for MD)`}
               height={300}
             >
               {state.loading && state.trend.length === 0 ? (

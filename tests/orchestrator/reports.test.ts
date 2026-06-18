@@ -78,9 +78,43 @@ describe('ReportsService', () => {
       });
       const rows = reports.trend('2026-01-01', '2026-12-31', 'month');
       expect(rows).toEqual([
-        { bucket: '2026-04', minutes: 60, earnedByCurrency: {} },
-        { bucket: '2026-05', minutes: 120, earnedByCurrency: {} },
+        { bucket: '2026-04', minutes: 60, mds: 60 / 60 / 8, earnedByCurrency: {} },
+        { bucket: '2026-05', minutes: 120, mds: 120 / 60 / 8, earnedByCurrency: {} },
       ]);
+    });
+
+    it('computes MD per bucket using the project hours_per_day divisor', () => {
+      const project = projects.create({ name: 'Six', kind: 'work' });
+      const epic = epics.create({ projectId: project.id, name: 'E' });
+      const task = tasks.create({ epicId: epic.id, number: 'S-1', title: 'S' });
+      // 6h working day → 360 logged minutes is exactly 1 MD.
+      rates.create({
+        projectId: project.id,
+        effectiveFrom: '2026-05-01',
+        rateType: 'daily',
+        rateAmount: 4000,
+        currency: 'CZK',
+        hoursPerDay: 6,
+      });
+      worklogs.create({ taskId: task.id, workDate: '2026-05-04', minutes: 360 });
+      const rows = reports.trend('2026-05-01', '2026-05-31', 'day', project.id);
+      expect(rows[0]?.minutes).toBe(360);
+      expect(rows[0]?.mds).toBeCloseTo(1, 9);
+    });
+
+    it('uses reported_minutes for MD when present', () => {
+      const project = projects.create({ name: 'Rep', kind: 'work' });
+      const epic = epics.create({ projectId: project.id, name: 'E' });
+      const task = tasks.create({ epicId: epic.id, number: 'R-1', title: 'R' });
+      worklogs.create({
+        taskId: task.id,
+        workDate: '2026-05-04',
+        minutes: 60,
+        reportedMinutes: 480, // billed a full 8h day
+      });
+      const rows = reports.trend('2026-05-01', '2026-05-31', 'day', project.id);
+      expect(rows[0]?.minutes).toBe(480);
+      expect(rows[0]?.mds).toBeCloseTo(1, 9); // 480 / 60 / 8
     });
 
     it('attaches earnings per bucket per currency when a contract is in place', () => {
@@ -116,15 +150,15 @@ describe('ReportsService', () => {
 
       // Without filter: both projects contribute.
       const all = reports.heatmap('2026-05-01', '2026-05-31');
-      expect(all).toEqual([{ date: '2026-05-05', minutes: 180 }]);
+      expect(all).toEqual([{ date: '2026-05-05', minutes: 180, mds: 180 / 60 / 8 }]);
 
       // With filter on project A: only A's worklogs land in the heatmap.
       const onlyA = reports.heatmap('2026-05-01', '2026-05-31', a.id);
-      expect(onlyA).toEqual([{ date: '2026-05-05', minutes: 60 }]);
+      expect(onlyA).toEqual([{ date: '2026-05-05', minutes: 60, mds: 60 / 60 / 8 }]);
 
       const trendA = reports.trend('2026-05-01', '2026-05-31', 'day', a.id);
       expect(trendA).toEqual([
-        { bucket: '2026-05-05', minutes: 60, earnedByCurrency: {} },
+        { bucket: '2026-05-05', minutes: 60, mds: 60 / 60 / 8, earnedByCurrency: {} },
       ]);
 
       const byProjA = reports.byProject('2026-05-01', '2026-05-31', a.id);
@@ -148,6 +182,9 @@ describe('ReportsService', () => {
       expect(rows.map((r) => r.projectName)).toEqual(['B', 'A']);
       expect(rows[0]?.minutes).toBe(120);
       expect(rows[1]?.minutes).toBe(60);
+      // No rate set → 8h/day divisor.
+      expect(rows[0]?.mds).toBeCloseTo(120 / 60 / 8, 9);
+      expect(rows[1]?.mds).toBeCloseTo(60 / 60 / 8, 9);
     });
 
     it('excludes projects with no worklogs in the range', () => {
@@ -178,6 +215,9 @@ describe('ReportsService', () => {
       expect(res.billableMinutes).toBe(60);
       expect(res.timeOffMinutes).toBe(60);
       expect(res.unbillableMinutes).toBe(0);
+      // MD mirrors the minute split; no rate → 8h/day divisor.
+      expect(res.billableMds).toBeCloseTo(60 / 60 / 8, 9);
+      expect(res.unbillableMds).toBe(0);
     });
   });
 
@@ -191,8 +231,8 @@ describe('ReportsService', () => {
       });
       const rows = reports.heatmap('2026-05-01', '2026-05-31');
       expect(rows).toEqual([
-        { date: '2026-05-04', minutes: 60 },
-        { date: '2026-05-05', minutes: 30 },
+        { date: '2026-05-04', minutes: 60, mds: 60 / 60 / 8 },
+        { date: '2026-05-05', minutes: 30, mds: 30 / 60 / 8 },
       ]);
     });
   });

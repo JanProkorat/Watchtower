@@ -83,6 +83,17 @@ export function formatHours(minutes: number, fractionDigits = 1): string {
 }
 
 /**
+ * Formats an already-computed man-day value. Drops a trailing `.0` for whole
+ * numbers (1 → "1", 1.5 → "1.5"). Mirrors the helper in ContractStatusCard so
+ * MD figures read consistently across the reports surface.
+ */
+export function formatMd(md: number | null | undefined, fractionDigits = 1): string {
+  if (md == null) return '—';
+  if (Math.abs(md - Math.round(md)) < 1e-9) return String(Math.round(md));
+  return md.toFixed(fractionDigits);
+}
+
+/**
  * Hours formatter that drops trailing `.00` for whole numbers but keeps the
  * full precision otherwise (e.g. 60 → "1", 30 → "0.50", 75 → "1.25").
  */

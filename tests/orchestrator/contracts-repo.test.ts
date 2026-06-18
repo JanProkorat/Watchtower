@@ -263,6 +263,26 @@ describe('ContractStatusService', () => {
     expect(status?.mdsUsed).toBe(round2(180 / 60 / 8));
   });
 
+  it('uses reported_minutes (billable basis) when present, falling back to tracked', () => {
+    const project = projects.create({ name: 'P', kind: 'work' });
+    const epic = epics.create({ projectId: project.id, name: 'E' });
+    const task = tasks.create({ epicId: epic.id, number: 'X', title: 'X' });
+    // Tracked 60 but billed 90 — contract MD must follow the billed value, the
+    // same EFFECTIVE_MINUTES basis the trend/earnings charts use.
+    worklogs.create({ taskId: task.id, workDate: '2026-01-05', minutes: 60, reportedMinutes: 90 });
+    // No reported value — tracked minutes are the fallback.
+    worklogs.create({ taskId: task.id, workDate: '2026-01-06', minutes: 120 });
+    rates.create({
+      projectId: project.id,
+      effectiveFrom: '2026-01-01',
+      endDate: '2026-06-30',
+      ...STANDARD_INPUT,
+    });
+    const status = service.forProject(project.id, '2026-06-30');
+    expect(status?.minutesLogged).toBe(210); // 90 (reported) + 120 (tracked)
+    expect(status?.mdsUsed).toBe(round2(210 / 60 / 8));
+  });
+
   it('skips non-work projects from MD usage', () => {
     const projectId = seedProjectWithWorklogs({
       minutesByDate: { '2026-01-15': 120 },

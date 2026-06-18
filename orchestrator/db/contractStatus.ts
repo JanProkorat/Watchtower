@@ -1,4 +1,5 @@
 import type { SqliteLike } from './migrations.js';
+import { effectiveMinutes } from './reportsSql.js';
 import { ProjectRatesRepo, type ProjectRateRow } from './repositories/projectRates.js';
 import { countWorkdays } from './workdays.js';
 import { DaysOffRepo } from './repositories/daysOff.js';
@@ -10,7 +11,10 @@ export interface ContractStatus {
   endDate: string | null;
   hoursPerDay: number;
   mdLimit: number | null;
-  /** Total billable minutes logged inside the contract period (so far). */
+  /**
+   * Total billable minutes logged inside the contract period (so far), using
+   * the EFFECTIVE_MINUTES basis (reported_minutes when set, else tracked).
+   */
   minutesLogged: number;
   /** minutesLogged ÷ 60 ÷ hoursPerDay, rounded to 2dp. */
   mdsUsed: number;
@@ -60,12 +64,14 @@ export class ContractStatusService {
     const periodEnd = rate.endDate ?? today; // for "elapsed" we cap at today
     const effectiveTo = rate.endDate ?? null;
 
-    // Only billable worklogs (project.kind = 'work') count toward MD usage —
-    // mirrors how TT's reports computed earnings. Joined through tasks → epics
-    // → projects so the project filter applies to every worklog.
+    // Only billable worklogs (project.kind = 'work') count toward MD usage.
+    // Uses EFFECTIVE_MINUTES (reported wins, tracked is the fallback) so the
+    // contract MD figure shares the billable basis of the trend/earnings
+    // charts — what's actually invoiced against the md_limit. Joined through
+    // tasks → epics → projects so the project filter applies to every worklog.
     const row = this.db
       .prepare(
-        `SELECT COALESCE(SUM(w.minutes), 0) AS minutes
+        `SELECT COALESCE(SUM(${effectiveMinutes('w')}), 0) AS minutes
            FROM worklogs w
            JOIN tasks t  ON t.id = w.task_id
            JOIN epics e  ON e.id = t.epic_id

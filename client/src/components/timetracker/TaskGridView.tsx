@@ -13,6 +13,7 @@ import {
   FormControlLabel,
   IconButton,
   MenuItem,
+  Popover,
   Stack,
   TextField,
   ToggleButton,
@@ -20,6 +21,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useTheme, alpha, type Theme } from '@mui/material/styles';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -31,7 +33,12 @@ import AdjustIcon from '@mui/icons-material/Adjust';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import dayjs from 'dayjs';
+import EventRepeatIcon from '@mui/icons-material/EventRepeat';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import dayjs, { type Dayjs } from 'dayjs';
+import 'dayjs/locale/cs';
+import { useToast, toastMessage } from '../../state/useToast.js';
+import { formatDateLongCz } from '../../util/format.js';
 import { useTaskGrid } from '../../state/useTaskGrid.js';
 import { TaskDetailDrawer } from './TaskDetailDrawer.js';
 import { WorklogDrawer } from './WorklogDrawer.js';
@@ -43,6 +50,9 @@ import type {
   TaskViewPayload,
   WorklogViewPayload,
 } from '../../../../shared/ipcContract.js';
+
+const WATCHTOWER_DB_PATH =
+  '/Users/jan/Library/Application Support/Watchtower/data.db';
 
 const MONTH_LABELS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -188,6 +198,58 @@ export function TaskGridView({ projectId }: Props) {
   } | null>(null);
 
   const [jiraSyncOpen, setJiraSyncOpen] = useState(false);
+
+  // Sync-meetings — copies a `/sync-meetings` slash command to the clipboard
+  // for the user to paste into their Claude Code chat (where the M365 MCP is
+  // already authenticated). The button does NOT spawn `claude -p` itself —
+  // that hangs on MCP init in the orchestrator's subprocess in this user's
+  // env (see the abandoned attempts in git history). The range defaults to the
+  // grid's displayed month.
+  const { showError, showSuccess } = useToast();
+  const [syncMeetingsAnchor, setSyncMeetingsAnchor] = useState<HTMLElement | null>(null);
+  const [syncMeetingsFrom, setSyncMeetingsFrom] = useState<Dayjs | null>(null);
+  const [syncMeetingsTo, setSyncMeetingsTo] = useState<Dayjs | null>(null);
+
+  const openSyncMeetings = (anchor: HTMLElement) => {
+    const monthStart = dayjs(new Date(year, month - 1, 1)).startOf('day');
+    const monthEnd = dayjs(new Date(year, month, 0)).startOf('day');
+    const todayStart = dayjs(today).startOf('day');
+    // Default: month start → min(today, month end), clamped into the month so
+    // a future month still yields a valid same-month range.
+    const toDefault = todayStart.isAfter(monthEnd)
+      ? monthEnd
+      : todayStart.isBefore(monthStart)
+        ? monthStart
+        : todayStart;
+    setSyncMeetingsFrom(monthStart);
+    setSyncMeetingsTo(toDefault);
+    setSyncMeetingsAnchor(anchor);
+  };
+
+  const monthStart = dayjs(new Date(year, month - 1, 1)).startOf('day');
+  const monthEnd = dayjs(new Date(year, month, 0)).endOf('day');
+  const syncRangeValid =
+    !!syncMeetingsFrom &&
+    syncMeetingsFrom.isValid() &&
+    !!syncMeetingsTo &&
+    syncMeetingsTo.isValid() &&
+    !syncMeetingsFrom.startOf('day').isAfter(syncMeetingsTo.startOf('day')) &&
+    !syncMeetingsFrom.isBefore(monthStart) &&
+    !syncMeetingsTo.isAfter(monthEnd);
+
+  const submitSyncMeetings = async () => {
+    if (!syncRangeValid || !syncMeetingsFrom || !syncMeetingsTo) return;
+    const command =
+      `/sync-meetings ${syncMeetingsFrom.format('YYYY-MM-DD')} ${syncMeetingsTo.format('YYYY-MM-DD')} ` +
+      `"${WATCHTOWER_DB_PATH}"`;
+    try {
+      await navigator.clipboard.writeText(command);
+      setSyncMeetingsAnchor(null);
+      showSuccess('Příkaz zkopírován do schránky. Vložte ho do Claude Code chatu pro spuštění.');
+    } catch (err) {
+      showError(`Nepodařilo se zkopírovat příkaz: ${toastMessage(err)}`);
+    }
+  };
 
   const [worklogDrawerOpen, setWorklogDrawerOpen] = useState(false);
   const [worklogDrawerProjectId, setWorklogDrawerProjectId] = useState<number | null>(null);
@@ -396,6 +458,15 @@ export function TaskGridView({ projectId }: Props) {
         <Button
           size="small"
           variant="outlined"
+          startIcon={<EventRepeatIcon fontSize="small" />}
+          onClick={(e) => openSyncMeetings(e.currentTarget)}
+        >
+          Sync meetings
+        </Button>
+
+        <Button
+          size="small"
+          variant="outlined"
           startIcon={<CloudUploadIcon fontSize="small" />}
           onClick={() => setJiraSyncOpen(true)}
         >
@@ -533,6 +604,57 @@ export function TaskGridView({ projectId }: Props) {
           void grid.refresh();
         }}
       />
+
+      <Popover
+        open={Boolean(syncMeetingsAnchor)}
+        anchorEl={syncMeetingsAnchor}
+        onClose={() => setSyncMeetingsAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+      >
+        <Box sx={{ p: 2, minWidth: 380 }}>
+          <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Sync meetings</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Pick a range within {MONTH_LABELS[month - 1]} {year} (
+            {formatDateLongCz(monthStart.format('YYYY-MM-DD'))} —{' '}
+            {formatDateLongCz(monthEnd.format('YYYY-MM-DD'))}).
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+            Klik vám zkopíruje <code>/sync-meetings</code> příkaz do schránky.
+            Vložte ho do svého Claude Code chatu a stiskněte Enter — Watchtower
+            si nové worklogy vyzvedne přímo z DB.
+          </Typography>
+          <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
+            <DatePicker
+              label="From"
+              value={syncMeetingsFrom}
+              onChange={(v) => setSyncMeetingsFrom(v)}
+              minDate={monthStart}
+              maxDate={monthEnd}
+              slotProps={{ textField: { size: 'small', fullWidth: true } }}
+            />
+            <DatePicker
+              label="To"
+              value={syncMeetingsTo}
+              onChange={(v) => setSyncMeetingsTo(v)}
+              minDate={monthStart}
+              maxDate={monthEnd}
+              slotProps={{ textField: { size: 'small', fullWidth: true } }}
+            />
+          </Stack>
+          <Stack direction="row" spacing={1} justifyContent="flex-end">
+            <Button onClick={() => setSyncMeetingsAnchor(null)}>Cancel</Button>
+            <Button
+              variant="contained"
+              startIcon={<ContentCopyIcon />}
+              disabled={!syncRangeValid}
+              onClick={() => void submitSyncMeetings()}
+            >
+              Copy command
+            </Button>
+          </Stack>
+        </Box>
+      </Popover>
 
       <JiraSyncDialog
         open={jiraSyncOpen}

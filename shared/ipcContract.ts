@@ -89,6 +89,7 @@ export interface RunningInstancePayload {
 export interface TrendDatumPayload {
   bucket: string;
   minutes: number;
+  mds: number;
   earnedByCurrency: Record<string, number>;
 }
 
@@ -99,6 +100,7 @@ export interface ByProjectDatumPayload {
   isBillable: number;
   currency: string | null;
   minutes: number;
+  mds: number;
   earnedAmount: number | null;
 }
 
@@ -108,6 +110,7 @@ export interface EarningsByProjectPayload {
   project_color: string;
   currency: string | null;
   minutes: number;
+  mds: number;
   earned_amount: number | null;
 }
 
@@ -115,6 +118,8 @@ export interface EarningsResponsePayload {
   billableMinutes: number;
   unbillableMinutes: number;
   timeOffMinutes: number;
+  billableMds: number;
+  unbillableMds: number;
   totalEarned: Record<string, number>;
   avgEffectiveHourlyRate: Record<string, number>;
   byProject: EarningsByProjectPayload[];
@@ -123,6 +128,7 @@ export interface EarningsResponsePayload {
 export interface HeatmapDatumPayload {
   date: string;
   minutes: number;
+  mds: number;
 }
 
 export interface DashboardOverviewRequestPayload {

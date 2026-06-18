@@ -18,6 +18,18 @@ export function effectiveMinutes(alias: string = 'w'): string {
 
 export const EFFECTIVE_MINUTES = effectiveMinutes('w');
 
+/**
+ * Per-row man-day value: effective minutes converted to MD using the rate
+ * period's `hours_per_day` (resolved via `RATE_PERIOD_JOIN`), falling back to
+ * the conventional 8h day when a worklog has no matching rate period. Wrap in
+ * `SUM(...)` to aggregate; `SUM_MDS` is the ready-made aggregate form.
+ */
+export function mdPerRow(rateAlias: string = 'rp'): string {
+  return `${EFFECTIVE_MINUTES} / 60.0 / COALESCE(${rateAlias}.hours_per_day, 8.0)`;
+}
+
+export const SUM_MDS = `SUM(${mdPerRow('rp')})`;
+
 export const PROJECT_RATE_PERIODS_CTE = `
   project_rate_periods AS (
     SELECT pr.id,

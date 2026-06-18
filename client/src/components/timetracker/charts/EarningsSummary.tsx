@@ -10,11 +10,13 @@ import {
 } from 'recharts';
 import ChartTooltip from './ChartTooltip';
 import { useChartColors } from './chartTheme';
-import { formatEarnings, formatHours } from '../../../util/format';
+import { formatEarnings, formatHours, formatMd } from '../../../util/format';
 
 export interface EarningsData {
   billable_minutes: number;
   unbillable_minutes: number;
+  billable_mds: number;
+  unbillable_mds: number;
   total_earned: Record<string, number>;
   avg_effective_hourly_rate: Record<string, number>;
   by_project: {
@@ -24,6 +26,7 @@ export interface EarningsData {
     currency: string;
     earned_amount: number;
     minutes: number;
+    mds: number;
   }[];
 }
 
@@ -95,14 +98,18 @@ export default function EarningsSummary({ data }: Props) {
           <MetricTile
             label="Billable hours"
             value={formatHours(totalBillable, 1)}
-            helper={`${billablePct.toFixed(0)}% of total`}
+            helper={`${formatMd(data.billable_mds)} MD · ${billablePct.toFixed(0)}% of total`}
           />
         </Grid>
         <Grid item xs={6} sm={3}>
           <MetricTile
             label="Unbillable hours"
             value={formatHours(totalUnbillable, 1)}
-            helper={totalAll > 0 ? `${(100 - billablePct).toFixed(0)}% of total` : undefined}
+            helper={
+              totalAll > 0
+                ? `${formatMd(data.unbillable_mds)} MD · ${(100 - billablePct).toFixed(0)}% of total`
+                : undefined
+            }
           />
         </Grid>
         <Grid item xs={6} sm={3}>
@@ -154,6 +161,7 @@ export default function EarningsSummary({ data }: Props) {
                           color: d.project_color,
                         },
                         { label: 'Hours', value: formatHours(d.minutes, 2) },
+                        { label: 'MD', value: formatMd(d.mds) },
                       ]}
                     />
                   );

@@ -56,6 +56,7 @@ import {
 } from './layout/workspaceTreeOps.js';
 import { parseTabId } from './layout/tabId.js';
 import { pruneLayout } from './layout/pruneLayout.js';
+import { leafToCollapseOnHide } from './layout/hiddenPaneCollapse.js';
 import { pruneAdHocCwds } from './layout/pruneAdHocCwds.js';
 import { selectGlobalTab } from './layout/selectGlobalTab.js';
 import { DASHBOARD_TAB_ID, type TabId } from '../../shared/layout.js';
@@ -281,6 +282,18 @@ export function App() {
     setConfirmTabClose({ label: tab.label, ids, liveCount });
   };
 
+  // Hiding the last visible session in a pane should collapse the pane so
+  // sibling panes reclaim the space — not leave a dead "all hidden" placeholder.
+  // The tab stays in the strip (deriveTabs keeps hidden-only tabs); clicking it
+  // again re-mounts and un-hides its sessions (see the TabStrip onSelect).
+  const handleHideSession = (id: string) => {
+    const owningTab = tabs.find((t) => t.columnOrder.includes(id));
+    hideInstance(id);
+    if (!owningTab || owningTab.columnOrder.length !== 1) return;
+    const leafId = leafToCollapseOnHide(layout.root, owningTab.id);
+    if (leafId) layoutActions.unmountLeafAt(leafId);
+  };
+
   const doSpawn = async (cwd: string, kind: 'claude' | 'shell' = 'claude') => {
     setSpawnInFlight((n) => n + 1);
     try {
@@ -365,7 +378,21 @@ export function App() {
                 // showing — on other pages the workspace isn't visible, so no
                 // tab should read as selected.
                 focusedTabId={activeModule === 'instances' ? focusedTab : null}
-                onSelect={(id) =>
+                onSelect={(id) => {
+                  // A tab collapsed by hiding all its sessions still shows in
+                  // the strip. Clicking it should bring the window back with
+                  // content, so un-hide its sessions before mounting — but only
+                  // when the tab is actually collapsed (not currently mounted),
+                  // so the sole-pane "N hidden" tray keeps working untouched.
+                  const clicked = tabs.find((tab) => tab.id === id);
+                  if (
+                    clicked &&
+                    clicked.columnOrder.length === 0 &&
+                    clicked.hiddenInstanceIds.length > 0 &&
+                    !findLeafByTabId(layout.root, id)
+                  ) {
+                    for (const hid of clicked.hiddenInstanceIds) unhideInstance(hid);
+                  }
                   selectGlobalTab(id, {
                     setActiveModule,
                     ensureMounted: (tid) =>
@@ -373,8 +400,8 @@ export function App() {
                     setActive,
                     focusedInstanceIdForTab: (tid) =>
                       tabs.find((t) => t.id === tid)?.focusedInstanceId ?? null,
-                  })
-                }
+                  });
+                }}
                 onContextSplit={(id, dir) => {
                   // Splitting only makes sense inside the workspace, so a split
                   // triggered from the global bar (possibly while another module
@@ -494,7 +521,7 @@ export function App() {
                             handleRemove(id, isLive);
                           }}
                           onRestartColumn={(id) => void window.watchtower.invoke('restartInstance', { instanceId: id })}
-                          onHideSession={hideInstance}
+                          onHideSession={handleHideSession}
                           onUnhideSession={unhideInstance}
                           onAddSession={(tabId) => {
                             const cwd = cwdForTab(tabId as TabId);
