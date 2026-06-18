@@ -63,6 +63,7 @@ export type IpcRequest =
   | { kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } }
   | { kind: 'dashboard:overview'; payload: DashboardOverviewRequestPayload }
   | { kind: 'instances:findByCwd'; payload: { cwd: string } }
+  | { kind: 'instances:setTask'; payload: { instanceId: string; taskId: number | null } }
   | { kind: 'openInVSCode'; payload: { path: string } }
   | { kind: 'claudeSettings:read'; payload: { scope: 'global' | 'project'; projectPath?: string } }
   | { kind: 'claudeSettings:write'; payload: { scope: 'global' | 'project'; projectPath?: string; content: string } }
@@ -84,6 +85,7 @@ export interface RunningInstancePayload {
   status: string;
   lastActivityAt: number;
   jiraKeyHint: string | null;
+  taskId: number | null;
 }
 
 export interface TrendDatumPayload {
@@ -502,6 +504,7 @@ export type IpcResponse =
           status: string;
           lastActivityAt: number;
           kind: import('./stateModel.js').InstanceKind;
+          taskId: number | null;
         }>;
       };
     }
@@ -567,6 +570,7 @@ export type IpcResponse =
   | { kind: 'reports:rateChanges'; payload: { rateChanges: RateChangeMarkerPayload[] } }
   | { kind: 'dashboard:overview'; payload: DashboardOverviewResponsePayload }
   | { kind: 'instances:findByCwd'; payload: { instances: RunningInstancePayload[] } }
+  | { kind: 'instances:setTask'; payload: { ok: true } }
   | { kind: 'openInVSCode'; payload: { ok: boolean; error?: string } }
   | { kind: 'claudeSettings:read'; payload: ClaudeSettingsReadPayload }
   | { kind: 'claudeSettings:write'; payload: { ok: boolean; backupPath?: string; error?: string } }

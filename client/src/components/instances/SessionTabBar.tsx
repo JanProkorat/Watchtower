@@ -1,11 +1,12 @@
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { Box, IconButton, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
+import { Box, Divider, IconButton, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { tabFlex } from '../../util/tabFlex.js';
+import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
 
 const ATTENTION_DOT: Record<string, string> = {
   'waiting-permission': '#ef5350',
@@ -20,6 +21,9 @@ export interface SessionInfo {
   id: string;
   status: string;
   kind: 'claude' | 'shell';
+  taskId: number | null;
+  /** Working directory of the instance — used to preselect the project in the picker. */
+  cwd: string;
 }
 
 interface Props {
@@ -35,6 +39,7 @@ interface Props {
   onHide(id: string): void;
   onUnhide(id: string): void;
   onAddSession(): void;
+  onSetTask?(instanceId: string, taskId: number | null): void;
 }
 
 export function SessionTabBar({
@@ -49,8 +54,24 @@ export function SessionTabBar({
   onHide,
   onUnhide,
   onAddSession,
+  onSetTask,
 }: Props) {
   const [hiddenAnchor, setHiddenAnchor] = useState<HTMLElement | null>(null);
+
+  // Context menu (right-click on a session tab).
+  const [ctxAnchor, setCtxAnchor] = useState<HTMLElement | null>(null);
+  const [ctxSession, setCtxSession] = useState<SessionInfo | null>(null);
+
+  // Task picker dialog.
+  const [pickerSession, setPickerSession] = useState<SessionInfo | null>(null);
+
+  const openCtxMenu = (e: ReactMouseEvent<HTMLElement>, s: SessionInfo) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxSession(s);
+    setCtxAnchor(e.currentTarget);
+  };
+
   return (
     <Box
       role="tablist"
@@ -73,6 +94,7 @@ export function SessionTabBar({
             role="tab"
             aria-selected={active}
             onClick={() => onSelect(s.id)}
+            onContextMenu={(e) => openCtxMenu(e, s)}
             sx={{
               flex: tabFlex(columnSizes, idx),
               minWidth: 100,
@@ -258,6 +280,71 @@ export function SessionTabBar({
           <AddIcon sx={{ fontSize: 18 }} />
         </IconButton>
       </Tooltip>
+
+      {/* Right-click context menu for a session tab */}
+      <Menu
+        open={Boolean(ctxAnchor)}
+        anchorEl={ctxAnchor}
+        onClose={() => { setCtxAnchor(null); setCtxSession(null); }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+      >
+        {onSetTask && [
+          <MenuItem
+            key="assign"
+            onClick={() => {
+              setPickerSession(ctxSession);
+              setCtxAnchor(null);
+              setCtxSession(null);
+            }}
+          >
+            Přiřadit k úkolu…
+          </MenuItem>,
+          ctxSession?.taskId != null && (
+            <MenuItem
+              key="clear"
+              onClick={() => {
+                if (ctxSession && onSetTask) onSetTask(ctxSession.id, null);
+                setCtxAnchor(null);
+                setCtxSession(null);
+              }}
+            >
+              Zrušit přiřazení
+            </MenuItem>
+          ),
+          <Divider key="divider" />,
+        ]}
+        <MenuItem
+          onClick={() => {
+            if (ctxSession) onHide(ctxSession.id);
+            setCtxAnchor(null);
+            setCtxSession(null);
+          }}
+        >
+          Skrýt relaci
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (ctxSession) onClose(ctxSession.id);
+            setCtxAnchor(null);
+            setCtxSession(null);
+          }}
+        >
+          Zavřít relaci
+        </MenuItem>
+      </Menu>
+
+      {/* Task picker dialog — opened from the context menu */}
+      {pickerSession != null && onSetTask && (
+        <InstanceTaskPickerDialog
+          open={pickerSession != null}
+          instanceCwd={pickerSession.cwd}
+          currentTaskId={pickerSession.taskId}
+          onAssign={(taskId) => onSetTask(pickerSession.id, taskId)}
+          onClear={() => onSetTask(pickerSession.id, null)}
+          onClose={() => setPickerSession(null)}
+        />
+      )}
     </Box>
   );
 }

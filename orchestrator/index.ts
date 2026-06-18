@@ -519,6 +519,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           jiraKeyHint: null,
           argsJson: req.payload.args ? JSON.stringify(req.payload.args) : null,
           kind: instanceKind,
+          taskId: null,
         });
         spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [], kind: instanceKind });
         return { instanceId: id };
@@ -586,6 +587,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           status: r.status,
           lastActivityAt: r.lastActivityAt,
           kind: r.kind,
+          taskId: r.taskId,
         })),
       };
     }
@@ -923,8 +925,19 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
           status: r.status,
           lastActivityAt: r.lastActivityAt,
           jiraKeyHint: r.jiraKeyHint,
+          taskId: r.taskId,
         })),
       };
+    }
+
+    case 'instances:setTask': {
+      const { instanceId, taskId } = req.payload;
+      repo().setTask(instanceId, taskId);
+      const inst = repo().get(instanceId);
+      if (inst) {
+        api?.push({ kind: 'stateChanged', payload: { instanceId, status: inst.status } });
+      }
+      return { ok: true as const };
     }
 
     case 'claudeSettings:read': {

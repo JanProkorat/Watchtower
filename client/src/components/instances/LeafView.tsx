@@ -18,6 +18,7 @@ interface Props {
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(): void;
+  onSetTask?(instanceId: string, taskId: number | null): void;
   dashboardOnOpen?(id: string): void;
   dashboardOnKill?(id: string): void;
   dashboardOnRemove?(id: string): void;
@@ -34,6 +35,7 @@ export function LeafView({
   onHideSession,
   onUnhideSession,
   onAddSession,
+  onSetTask,
   dashboardOnOpen,
   dashboardOnKill,
   dashboardOnRemove,
@@ -69,11 +71,11 @@ export function LeafView({
   const accent = tabAccent(tab.id, tab.color);
   const sessionInfos = tab.columnOrder.map((id) => {
     const inst = instances.find((i) => i.id === id);
-    return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? 'claude' as const };
+    return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? 'claude' as const, taskId: inst?.taskId ?? null, cwd: inst?.cwd ?? '' };
   });
   const hiddenSessionInfos = tab.hiddenInstanceIds.map((id) => {
     const inst = instances.find((i) => i.id === id);
-    return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? 'claude' as const };
+    return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? 'claude' as const, taskId: inst?.taskId ?? null, cwd: inst?.cwd ?? '' };
   });
 
   // Empty (no visible columns) — still render the bar so the user can
@@ -92,6 +94,7 @@ export function LeafView({
           onHide={onHideSession}
           onUnhide={onUnhideSession}
           onAddSession={onAddSession}
+          onSetTask={onSetTask}
         />
         <Box
           sx={{
@@ -131,6 +134,7 @@ export function LeafView({
         onHide={onHideSession}
         onUnhide={onUnhideSession}
         onAddSession={onAddSession}
+        onSetTask={onSetTask}
       />
       <Box sx={{ flex: 1, minHeight: 0 }}>
         <PanelGroup

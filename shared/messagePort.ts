@@ -62,6 +62,7 @@ export type OrchRequest =
   | { id: string; kind: 'reports:rateChanges'; payload: { from: string; to: string; projectId?: number } }
   | { id: string; kind: 'dashboard:overview'; payload: import('./ipcContract.js').DashboardOverviewRequestPayload }
   | { id: string; kind: 'instances:findByCwd'; payload: { cwd: string } }
+  | { id: string; kind: 'instances:setTask'; payload: { instanceId: string; taskId: number | null } }
   | { id: string; kind: 'claudeSettings:read'; payload: { scope: 'global' | 'project'; projectPath?: string } }
   | { id: string; kind: 'claudeSettings:write'; payload: { scope: 'global' | 'project'; projectPath?: string; content: string } }
   | { id: string; kind: 'skills:list'; payload: Record<string, never> }
@@ -80,6 +81,7 @@ export interface OrchRunningInstance {
   status: string;
   lastActivityAt: number;
   jiraKeyHint: string | null;
+  taskId: number | null;
 }
 
 export interface OrchTrendDatum {
@@ -441,6 +443,7 @@ export type OrchResponse =
           status: string;
           lastActivityAt: number;
           kind: import('./stateModel.js').InstanceKind;
+          taskId: number | null;
         }>;
       };
     }
@@ -505,6 +508,7 @@ export type OrchResponse =
   | { kind: 'reports:rateChanges'; payload: { rateChanges: OrchRateChangeMarker[] } }
   | { kind: 'dashboard:overview'; payload: import('./ipcContract.js').DashboardOverviewResponsePayload }
   | { kind: 'instances:findByCwd'; payload: { instances: OrchRunningInstance[] } }
+  | { kind: 'instances:setTask'; payload: { ok: true } }
   | { kind: 'claudeSettings:read'; payload: { path: string; exists: boolean; content: string } }
   | { kind: 'claudeSettings:write'; payload: { ok: boolean; backupPath?: string; error?: string } }
   | { kind: 'skills:list'; payload: { skills: Array<{ name: string; path: string; source: string; description: string; body: string }> } }

@@ -40,7 +40,15 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(11);
+    expect(version.v).toBe(12);
+  });
+
+  it('v12 adds task_id column to instances', () => {
+    runMigrations(db as unknown as SqliteLike);
+    const cols = (
+      db.prepare(`PRAGMA table_info(instances)`).all() as Array<{ name: string }>
+    ).map((c) => c.name);
+    expect(cols).toContain('task_id');
   });
 
   it('v2 adds the display_order column with spawned_at as default', () => {

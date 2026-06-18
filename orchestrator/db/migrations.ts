@@ -201,6 +201,18 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       );
     },
   },
+  {
+    version: 12,
+    up: (db) => {
+      const cols = db.prepare(`PRAGMA table_info(instances)`).all() as Array<{ name: string }>;
+      if (cols.some((c) => c.name === 'task_id')) return; // fresh install already has it
+      // Phase A: tag an instance to a TimeTracker task. ON DELETE SET NULL so
+      // deleting a task doesn't orphan or block instance rows.
+      db.exec(
+        `ALTER TABLE instances ADD COLUMN task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL`,
+      );
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

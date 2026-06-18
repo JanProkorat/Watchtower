@@ -19,6 +19,7 @@ interface Props {
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(tabId: string): void;
+  onSetTask?(instanceId: string, taskId: number | null): void;
 }
 
 export function WorkspaceRoot({
@@ -36,6 +37,7 @@ export function WorkspaceRoot({
   onHideSession,
   onUnhideSession,
   onAddSession,
+  onSetTask,
 }: Props) {
   return (
     <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -53,6 +55,7 @@ export function WorkspaceRoot({
         onHideSession={onHideSession}
         onUnhideSession={onUnhideSession}
         onAddSession={onAddSession}
+        onSetTask={onSetTask}
         dashboardOnOpen={dashboardOnOpen}
         dashboardOnKill={dashboardOnKill}
         dashboardOnRemove={dashboardOnRemove}

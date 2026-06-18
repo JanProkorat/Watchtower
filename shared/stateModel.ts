@@ -40,4 +40,5 @@ export interface InstanceRow {
   jiraKeyHint: string | null;
   argsJson: string | null;
   kind: InstanceKind;
+  taskId: number | null;
 }

@@ -94,7 +94,7 @@ function LoadingScreen() {
 export function App() {
   const { mode, toggle: toggleThemeMode } = useThemeMode();
   const theme = useMemo(() => (mode === 'dark' ? darkTheme : lightTheme), [mode]);
-  const { instances, activeId, loaded, setActive, spawn, kill, remove } = useInstances();
+  const { instances, activeId, loaded, setActive, spawn, kill, remove, setTask } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
   const [confirmTabClose, setConfirmTabClose] = useState<{
@@ -523,6 +523,7 @@ export function App() {
                           onRestartColumn={(id) => void window.watchtower.invoke('restartInstance', { instanceId: id })}
                           onHideSession={handleHideSession}
                           onUnhideSession={unhideInstance}
+                          onSetTask={(instanceId, taskId) => void setTask(instanceId, taskId)}
                           onAddSession={(tabId) => {
                             const cwd = cwdForTab(tabId as TabId);
                             if (cwd) void doSpawn(cwd);

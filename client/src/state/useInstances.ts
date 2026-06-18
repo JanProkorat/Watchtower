@@ -6,6 +6,7 @@ export interface InstanceView {
   status: string;
   lastActivityAt: number;
   kind: 'claude' | 'shell';
+  taskId: number | null;
 }
 
 const ACTIVE_ID_KEY = 'watchtower.activeId';
@@ -34,6 +35,9 @@ export function useInstances(): {
   setActive(id: string | null): void;
   spawn(cwd: string, args?: string[], kind?: 'claude' | 'shell'): Promise<{ instanceId: string | null; error?: string }>;
   kill(instanceId: string): Promise<void>;
+  setTask(instanceId: string, taskId: number | null): Promise<void>;
+  remove(instanceId: string): Promise<void>;
+  reorder(orderedIds: string[]): Promise<void>;
   refresh(): Promise<void>;
 } {
   const [instances, setInstances] = useState<InstanceView[]>([]);
@@ -99,6 +103,15 @@ export function useInstances(): {
     [refresh],
   );
 
+  const setTask = useCallback(
+    async (instanceId: string, taskId: number | null) => {
+      await window.watchtower.invoke('instances:setTask', { instanceId, taskId });
+      // The orchestrator pushes stateChanged which triggers refresh via the
+      // existing listener above. Awaiting the invoke is sufficient.
+    },
+    [],
+  );
+
   const remove = useCallback(
     async (instanceId: string) => {
       await window.watchtower.invoke('removeInstance', { instanceId });
@@ -129,5 +142,5 @@ export function useInstances(): {
     await window.watchtower.invoke('reorderInstances', { orderedIds });
   }, []);
 
-  return { instances, activeId, loaded, setActive: setActiveId, spawn, kill, remove, reorder, refresh };
+  return { instances, activeId, loaded, setActive: setActiveId, spawn, kill, setTask, remove, reorder, refresh };
 }

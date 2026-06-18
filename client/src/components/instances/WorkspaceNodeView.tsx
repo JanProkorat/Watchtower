@@ -20,6 +20,7 @@ interface Props {
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(tabId: string): void;
+  onSetTask?(instanceId: string, taskId: number | null): void;
   dashboardOnOpen?(id: string): void;
   dashboardOnKill?(id: string): void;
   dashboardOnRemove?(id: string): void;
@@ -60,6 +61,7 @@ export function WorkspaceNodeView(props: Props) {
           onHideSession={props.onHideSession}
           onUnhideSession={props.onUnhideSession}
           onAddSession={() => props.onAddSession(tab.id)}
+          onSetTask={props.onSetTask}
           dashboardOnOpen={props.dashboardOnOpen}
           dashboardOnKill={props.dashboardOnKill}
           dashboardOnRemove={props.dashboardOnRemove}

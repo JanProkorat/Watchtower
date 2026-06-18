@@ -15,6 +15,7 @@ type DbInstanceRow = {
   jira_key_hint: string | null;
   args_json: string | null;
   kind: InstanceKind;
+  task_id: number | null;
 };
 
 function toRow(r: DbInstanceRow): InstanceRow {
@@ -31,6 +32,7 @@ function toRow(r: DbInstanceRow): InstanceRow {
     jiraKeyHint: r.jira_key_hint,
     argsJson: r.args_json,
     kind: r.kind,
+    taskId: r.task_id,
   };
 }
 
@@ -125,6 +127,10 @@ export class InstancesRepo {
     this.db
       .prepare(`UPDATE instances SET termination_reason = ?, exit_code = ? WHERE id = ?`)
       .run(reason, exitCode, id);
+  }
+
+  setTask(id: string, taskId: number | null): void {
+    this.db.prepare(`UPDATE instances SET task_id = ? WHERE id = ?`).run(taskId, id);
   }
 
   delete(id: string): void {
