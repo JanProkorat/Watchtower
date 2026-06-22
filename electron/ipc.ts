@@ -2,19 +2,11 @@ import { ipcMain, dialog, shell } from 'electron';
 import { exec } from 'node:child_process';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import type { IpcRequest, IpcResponse } from '../shared/ipcContract.js';
+import { type IpcRequest, type IpcResponse, ELECTRON_ONLY_KINDS } from '../shared/ipcContract.js';
 import { getMainWindow, createMainWindow } from './window.js';
 import { getOrchestrator } from './orchestratorHost.js';
 import { fireMacNotification, fireTestNotification } from './notifications.js';
 import { runBoardSignIn } from './boardSignIn.js';
-
-const ELECTRON_ONLY_KINDS = new Set<IpcRequest['kind']>([
-  'chooseDirectory',
-  'sendTestNotification',
-  'openInVSCode',
-  'openExternalUrl',
-  'board:signIn',
-]);
 
 export function registerIpc(): void {
   // Push events from the orchestrator are forwarded to the renderer verbatim;
