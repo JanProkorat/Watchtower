@@ -11,6 +11,8 @@ import {
   type MigrationStatus,
   type MigrateOptions,
 } from './db/migrateTimetracker.js';
+import { startWsBridge, type WsBridgeHandle } from './wsBridge.js';
+import type { OrchRequest } from '../shared/messagePort.js';
 
 export interface DbHandle {
   /** Whatever the underlying driver exposes — better-sqlite3 in prod, node:sqlite in tests. */
@@ -30,6 +32,16 @@ export interface BootstrapOptions {
    * Pass migrate options to override source path / source opener.
    */
   timetrackerMigration?: { skip: true } | MigrateOptions;
+  /**
+   * Required for the WS bridge. Pass `handleRequest` from index.ts here
+   * (rather than importing it) to avoid a circular dependency:
+   * index.ts → bootstrap.ts → index.ts.
+   */
+  handleRequest?: (req: OrchRequest) => Promise<unknown>;
+  /** Host for the WS bridge server. Defaults to '127.0.0.1'. */
+  wsHost?: string;
+  /** Port for the WS bridge server. 0 = ephemeral (good for tests). Defaults to 0. */
+  wsPort?: number;
 }
 
 export interface BootstrapHandle {
@@ -37,6 +49,7 @@ export interface BootstrapHandle {
   listener: HookListenerHandle;
   /** Result of the TimeTracker absorption migration attempted on startup. */
   timetrackerMigration: MigrationStatus | { status: 'skipped' };
+  wsBridge: WsBridgeHandle;
   shutdown(): Promise<void>;
 }
 
@@ -94,11 +107,20 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
     writtenAt: Date.now(),
   });
 
+  const wsBridge = await startWsBridge({
+    host: opts.wsHost ?? '127.0.0.1',
+    port: opts.wsPort ?? 0,
+    token,
+    handleRequest: opts.handleRequest ?? (async () => ({ ok: true })),
+  });
+
   return {
     db: dbHandle.raw,
     listener,
     timetrackerMigration: ttResult,
+    wsBridge,
     async shutdown() {
+      await wsBridge.stop();
       await listener.stop();
       dbHandle.close();
     },

@@ -1084,6 +1084,7 @@ function respawnIncompleteRowsOnBoot(): void {
     handle = await bootstrap({
       supportDir: supportDir(),
       portRange: [7421, 7430],
+      handleRequest,
       onHookEvent: async (eventName, body, instanceId) => {
         // Drop hook events fired by a NESTED `claude` (memory summarizer, skills,
         // sub-agents) that inherited this instance's WATCHTOWER_INSTANCE_ID but
@@ -1099,6 +1100,10 @@ function respawnIncompleteRowsOnBoot(): void {
         if (stateEvent) applyTransition(instanceId, stateEvent);
       },
     });
+    // Register the WS bridge's broadcast as the secondary push sink so every
+    // emitPush reaches remote (browser) clients as well as the Electron renderer.
+    setPushSink(handle.wsBridge.broadcast);
+
     api = new PortApi(
       event.ports[0] as unknown as ConstructorParameters<typeof PortApi>[0],
     );
