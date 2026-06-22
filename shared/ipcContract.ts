@@ -743,6 +743,14 @@ export type IpcPush =
       payload: { code: number | null; restarting: boolean };
     };
 
+export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
+  'chooseDirectory',
+  'sendTestNotification',
+  'openInVSCode',
+  'openExternalUrl',
+  'board:signIn',
+]);
+
 export interface WatchtowerBridge {
   invoke<T extends IpcRequest['kind']>(
     kind: T,

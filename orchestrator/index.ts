@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { PortApi, type OrchRequest, type OrchResponse } from '../shared/messagePort.js';
+import { PortApi, type OrchRequest, type OrchResponse, type OrchPush } from '../shared/messagePort.js';
 import { bootstrap, type BootstrapHandle } from './bootstrap.js';
 import { PtyManager } from './ptyManager.js';
 import { InstancesRepo } from './db/repositories/instances.js';
@@ -79,6 +79,21 @@ process.on('uncaughtException', (err) => {
 
 let api: PortApi | null = null;
 let handle: BootstrapHandle | null = null;
+
+let pushSink: ((msg: OrchPush) => void) | null = null;
+
+export function setPushSink(sink: ((msg: OrchPush) => void) | null): void {
+  pushSink = sink;
+}
+
+export function emitPush(msg: OrchPush): void {
+  api?.push(msg);
+  try {
+    pushSink?.(msg);
+  } catch (err) {
+    console.error('[orchestrator] push sink threw:', err);
+  }
+}
 const pty = new PtyManager();
 const terminalSnapshots = new TerminalSnapshots();
 let notifier: Notifier | null = null;
@@ -107,7 +122,7 @@ async function refreshTokenUsage(): Promise<TokenUsagePayload> {
     console.error('[tokenUsage] unavailable:', payload.error);
   }
   latestTokenUsage = payload;
-  api?.push({ kind: 'tokenUsage', payload });
+  emitPush({ kind: 'tokenUsage', payload });
   return payload;
 }
 
@@ -348,7 +363,7 @@ function applyTransition(instanceId: string, event: StateEvent): void {
   const isShell = inst.kind === 'shell';
   if (result.state !== prevStatus) {
     repo().updateStatus(instanceId, result.state, Date.now());
-    api?.push({ kind: 'stateChanged', payload: { instanceId, status: result.state } });
+    emitPush({ kind: 'stateChanged', payload: { instanceId, status: result.state } });
     if (notifier) notifier.apply(instanceId, inst.cwd, prevStatus, result.state, Date.now());
     if (!isShell && slackEscalator) slackEscalator.apply(instanceId, inst.cwd, prevStatus, result.state);
     if (!isShell && (result.state === 'crashed' || result.state === 'finished')) forgetSlackThread(instanceId);
@@ -428,12 +443,12 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
     env: cfg.env,
     onData: (chunk) => {
       terminalSnapshots.feed(opts.id, chunk);
-      api?.push({ kind: 'ptyData', payload: { instanceId: opts.id, chunk } });
+      emitPush({ kind: 'ptyData', payload: { instanceId: opts.id, chunk } });
       applyTransition(opts.id, { kind: 'ptyData' });
     },
     onExit: (code) => {
       if (opts.kind === 'shell') {
-        api?.push({ kind: 'ptyExit', payload: { instanceId: opts.id, code } });
+        emitPush({ kind: 'ptyExit', payload: { instanceId: opts.id, code } });
         if (code === 0) {
           // Clean exit (user typed `exit`) → drop the row; the renderer's
           // deriveTabs prune removes the now-orphaned column automatically.
@@ -445,7 +460,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
             r.updateStatus(opts.id, 'crashed', Date.now());
           }
         }
-        api?.push({ kind: 'stateChanged', payload: { instanceId: opts.id, status: code === 0 ? 'finished' : 'crashed' } });
+        emitPush({ kind: 'stateChanged', payload: { instanceId: opts.id, status: code === 0 ? 'finished' : 'crashed' } });
         return;
       }
       const lifespan = Date.now() - spawnedAt;
@@ -473,7 +488,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
         });
         return;
       }
-      api?.push({ kind: 'ptyExit', payload: { instanceId: opts.id, code } });
+      emitPush({ kind: 'ptyExit', payload: { instanceId: opts.id, code } });
       const r = repo();
       const inst = r.get(opts.id);
       if (inst) {
@@ -488,7 +503,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
   });
 }
 
-async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']> {
+export async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']> {
   switch (req.kind) {
     case 'ping':
       return { now: req.payload.now, orch: Date.now() };
@@ -570,7 +585,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
         kind: row.kind,
         resumeSessionId: row.kind === 'claude' ? (resolveResumeTarget(row) ?? undefined) : undefined,
       });
-      api?.push({ kind: 'stateChanged', payload: { instanceId: row.id, status: row.kind === 'shell' ? 'working' : 'spawning' } });
+      emitPush({ kind: 'stateChanged', payload: { instanceId: row.id, status: row.kind === 'shell' ? 'working' : 'spawning' } });
       return { ok: true };
     }
 
@@ -935,7 +950,7 @@ async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']>
       repo().setTask(instanceId, taskId);
       const inst = repo().get(instanceId);
       if (inst) {
-        api?.push({ kind: 'stateChanged', payload: { instanceId, status: inst.status } });
+        emitPush({ kind: 'stateChanged', payload: { instanceId, status: inst.status } });
       }
       return { ok: true as const };
     }
@@ -1069,6 +1084,7 @@ function respawnIncompleteRowsOnBoot(): void {
     handle = await bootstrap({
       supportDir: supportDir(),
       portRange: [7421, 7430],
+      handleRequest,
       onHookEvent: async (eventName, body, instanceId) => {
         // Drop hook events fired by a NESTED `claude` (memory summarizer, skills,
         // sub-agents) that inherited this instance's WATCHTOWER_INSTANCE_ID but
@@ -1084,6 +1100,10 @@ function respawnIncompleteRowsOnBoot(): void {
         if (stateEvent) applyTransition(instanceId, stateEvent);
       },
     });
+    // Register the WS bridge's broadcast as the secondary push sink so every
+    // emitPush reaches remote (browser) clients as well as the Electron renderer.
+    setPushSink(handle.wsBridge.broadcast);
+
     api = new PortApi(
       event.ports[0] as unknown as ConstructorParameters<typeof PortApi>[0],
     );
@@ -1092,7 +1112,7 @@ function respawnIncompleteRowsOnBoot(): void {
     // Wire the notifier + quiet timer now that api is available.
     notifier = new Notifier({
       notify: (p) => {
-        api?.push({ kind: 'notify', payload: p });
+        emitPush({ kind: 'notify', payload: p });
         try {
           new NotificationsRepo(handle!.db).log(
             p.instanceId,
@@ -1104,8 +1124,8 @@ function respawnIncompleteRowsOnBoot(): void {
           /* best-effort logging */
         }
       },
-      clearAttention: (instanceId) => api?.push({ kind: 'clearAttention', payload: { instanceId } }),
-      setBadge: (count) => api?.push({ kind: 'badge', payload: { count } }),
+      clearAttention: (instanceId) => emitPush({ kind: 'clearAttention', payload: { instanceId } }),
+      setBadge: (count) => emitPush({ kind: 'badge', payload: { count } }),
     });
     const settings = new SettingsRepo(handle!.db);
     const quietMs = settings.getNumber('quiet_timer_ms', DEFAULT_QUIET_MS);
