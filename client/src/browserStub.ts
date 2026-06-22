@@ -11,6 +11,8 @@
 // listInstances logs a console.warn so devs notice they're running standalone.
 
 import type { WatchtowerBridge, IpcRequest, IpcResponse, IpcPush } from '../../shared/ipcContract.js';
+import { readWsConfig } from './transport/selectTransport';
+import { createWebSocketTransport } from './transport/webSocketTransport';
 
 declare global {
   interface Window {
@@ -20,6 +22,12 @@ declare global {
 
 function installStub(): void {
   if (typeof window === 'undefined' || window.watchtower) return;
+
+  const wsCfg = readWsConfig(window.location, window.localStorage);
+  if (wsCfg) {
+    window.watchtower = createWebSocketTransport(wsCfg);
+    return;
+  }
 
   console.warn(
     '[watchtower] Running outside Electron — installing a no-op bridge. ' +
