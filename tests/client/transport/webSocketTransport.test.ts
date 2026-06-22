@@ -44,6 +44,25 @@ describe('WebSocketTransport', () => {
     await expect(p).rejects.toThrow(/not available/);
   });
 
+  it('queues invoke frames before open, then flushes on _open()', async () => {
+    let ws!: FakeWS;
+    const t = createWebSocketTransport({
+      url: 'ws://x', token: 't',
+      WebSocketImpl: class extends FakeWS { constructor(u: string) { super(u); ws = this; } } as never,
+    });
+    // socket NOT yet open — invoke must be queued, not sent
+    const p = t.invoke('projects:list', {} as never);
+    expect(ws.sent).toHaveLength(0);   // nothing sent yet
+    // now open the socket — the queued frame should flush
+    ws._open();
+    expect(ws.sent).toHaveLength(1);   // frame was flushed
+    const sent = JSON.parse(ws.sent[0]);
+    expect(sent.kind).toBe('projects:list');
+    // deliver the matching response and confirm the promise resolves
+    ws._recv({ id: sent.id, kind: 'projects:list', payload: { projects: [] } });
+    await expect(p).resolves.toEqual({ projects: [] });
+  });
+
   it('dispatches push frames to on() handlers', async () => {
     let ws!: FakeWS;
     const t = createWebSocketTransport({

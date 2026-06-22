@@ -2,7 +2,6 @@ import type { IpcRequest, IpcResponse, IpcPush, WatchtowerBridge } from '../../.
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: unknown) => void };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyBridge = {
   invoke(kind: string, payload: unknown): Promise<unknown>;
   on(kind: string, handler: (p: unknown) => void): () => void;
