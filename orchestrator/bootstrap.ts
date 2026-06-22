@@ -36,6 +36,8 @@ export interface BootstrapOptions {
    * Required for the WS bridge. Pass `handleRequest` from index.ts here
    * (rather than importing it) to avoid a circular dependency:
    * index.ts → bootstrap.ts → index.ts.
+   * Omitting this causes any inbound WS request to throw rather than silently
+   * succeed. Pass it explicitly whenever the WS path will be exercised.
    */
   handleRequest?: (req: OrchRequest) => Promise<unknown>;
   /** Host for the WS bridge server. Defaults to '127.0.0.1'. */
@@ -111,7 +113,7 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
     host: opts.wsHost ?? '127.0.0.1',
     port: opts.wsPort ?? 0,
     token,
-    handleRequest: opts.handleRequest ?? (async () => ({ ok: true })),
+    handleRequest: opts.handleRequest ?? (() => { throw new Error('handleRequest not wired'); }),
   });
 
   return {

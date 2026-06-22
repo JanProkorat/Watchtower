@@ -3,6 +3,7 @@ import fastifyWebsocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
 import { ELECTRON_ONLY_KINDS } from '../shared/ipcContract.js';
 import type { OrchRequest, OrchPush } from '../shared/messagePort.js';
+import { encodeFrame, decodeFrame, type WsRequestFrame, type WsPushFrame } from '../shared/wsProtocol.js';
 
 export interface WsBridgeOptions {
   host: string;
@@ -20,7 +21,7 @@ export interface WsBridgeHandle {
 
 export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHandle> {
   const app: FastifyInstance = Fastify();
-  await app.register(fastifyWebsocket);
+  await app.register(fastifyWebsocket, { options: { maxPayload: 1 * 1024 * 1024 } });
 
   const clients = new Set<WebSocket>();
 
@@ -41,14 +42,14 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
       socket.on('close', () => clients.delete(socket));
 
       socket.on('message', async (raw: Buffer) => {
-        let frame: { id: string; kind: OrchRequest['kind']; payload: unknown };
+        let frame: WsRequestFrame;
         try {
-          frame = JSON.parse(raw.toString());
+          frame = decodeFrame(raw.toString()) as WsRequestFrame;
         } catch {
           return;
         }
         const reply = (payload?: unknown, error?: string) =>
-          socket.send(JSON.stringify({ id: frame.id, kind: frame.kind, payload, error }));
+          socket.send(encodeFrame({ id: frame.id, kind: frame.kind, payload, error } as WsRequestFrame));
 
         if (ELECTRON_ONLY_KINDS.has(frame.kind as never)) {
           reply(undefined, `kind "${frame.kind}" is not available over the remote connection`);
@@ -70,7 +71,7 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
   return {
     port: actualPort,
     broadcast: (push: OrchPush) => {
-      const frame = JSON.stringify({ push: true, ...push });
+      const frame = encodeFrame({ push: true, ...push } as WsPushFrame);
       for (const c of clients) {
         if (c.readyState === c.OPEN) c.send(frame);
       }

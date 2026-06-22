@@ -1,4 +1,5 @@
-import type { IpcRequest, IpcResponse, IpcPush, WatchtowerBridge } from '../../../shared/ipcContract.js';
+import type { WatchtowerBridge } from '../../../shared/ipcContract.js';
+import { encodeFrame, decodeFrame, isPushFrame, type WsRequestFrame } from '../../../shared/wsProtocol.js';
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: unknown) => void };
 
@@ -25,23 +26,28 @@ export function createWebSocketTransport(opts: {
 
   ws.onopen = () => { open = true; outbox.splice(0).forEach((m) => ws.send(m)); };
   ws.onmessage = (e: MessageEvent) => {
-    const msg = JSON.parse(typeof e.data === 'string' ? e.data : String(e.data)) as {
-      push?: boolean; kind: string; id?: string; payload?: unknown; error?: string;
-    };
-    if (msg.push === true) {
+    const raw = typeof e.data === 'string' ? e.data : String(e.data);
+    let msg;
+    try {
+      msg = decodeFrame(raw);
+    } catch {
+      return;
+    }
+    if (isPushFrame(msg)) {
       handlers.get(msg.kind)?.forEach((h) => h(msg.payload));
       return;
     }
-    if (!msg.id) return;
+    // Response frame: must have an id to match a pending request.
+    if (!('id' in msg) || !msg.id) return;
     const p = pending.get(msg.id);
     if (!p) return;
     pending.delete(msg.id);
-    if (msg.error) p.reject(new Error(msg.error));
-    else p.resolve(msg.payload);
+    if ('error' in msg && msg.error) p.reject(new Error(msg.error));
+    else p.resolve('payload' in msg ? msg.payload : undefined);
   };
 
-  function send(frame: object) {
-    const raw = JSON.stringify(frame);
+  function send(frame: WsRequestFrame) {
+    const raw = encodeFrame(frame);
     if (open) ws.send(raw); else outbox.push(raw);
   }
 
@@ -50,7 +56,7 @@ export function createWebSocketTransport(opts: {
       const id = `c${++counter}`;
       return new Promise((resolve, reject) => {
         pending.set(id, { resolve, reject });
-        send({ id, kind, payload });
+        send({ id, kind, payload } as WsRequestFrame);
       });
     },
     on(kind: string, handler: (p: unknown) => void): () => void {
@@ -62,5 +68,6 @@ export function createWebSocketTransport(opts: {
     close() { ws.close(); },
   };
 
+  // TS2719 duplicate-identity drift (same as browserStub.ts); AnyBridge is structurally compatible
   return bridge as unknown as WatchtowerBridge & { close(): void };
 }
