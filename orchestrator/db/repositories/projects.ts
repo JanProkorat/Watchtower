@@ -302,6 +302,6 @@ export class ProjectsRepo {
 
   /** Internal helper — must be called inside an explicit transaction. */
   private clearDefault(): void {
-    this.db.prepare(`UPDATE projects SET is_default = 0 WHERE is_default = 1`).run();
+    this.db.prepare(`UPDATE projects SET is_default = 0, updated_at = ? WHERE is_default = 1`).run(nowIso());
   }
 }

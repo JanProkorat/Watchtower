@@ -263,7 +263,8 @@ export class TasksRepo {
             SELECT t.id FROM tasks t
               JOIN epics e ON e.id = t.epic_id
              WHERE e.project_id = ?
-               AND t.deleted_at IS NULL`;
+               AND t.deleted_at IS NULL
+               AND e.deleted_at IS NULL`;
     if (keepNumbers.length === 0) {
       const r = this.db
         .prepare(`${baseSql})`)
