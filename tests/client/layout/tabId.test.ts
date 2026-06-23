@@ -6,7 +6,7 @@ import {
   isCwdTabId,
   isDashboardTabId,
   parseTabId,
-} from '../../../client/src/layout/tabId.js';
+} from '../../../apps/desktop/src/layout/tabId.js';
 import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 
 describe('tabId helpers', () => {

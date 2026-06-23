@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { leafToCollapseOnHide } from '../../../client/src/layout/hiddenPaneCollapse.js';
-import { leaf, split } from '../../../client/src/layout/workspaceTreeOps.js';
+import { leafToCollapseOnHide } from '../../../apps/desktop/src/layout/hiddenPaneCollapse.js';
+import { leaf, split } from '../../../apps/desktop/src/layout/workspaceTreeOps.js';
 
 describe('leafToCollapseOnHide', () => {
   it('returns the leaf id when the pane is part of a split', () => {

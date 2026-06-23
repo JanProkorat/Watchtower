@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isLocked } from '../../client/src/util/lockSetting.js';
+import { isLocked } from '../../apps/desktop/src/util/lockSetting.js';
 
 describe('isLocked', () => {
   it('returns false when no lock is set', () => {

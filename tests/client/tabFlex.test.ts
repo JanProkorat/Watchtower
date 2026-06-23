@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tabFlex } from '../../client/src/util/tabFlex.js';
+import { tabFlex } from '../../apps/desktop/src/util/tabFlex.js';
 
 describe('tabFlex', () => {
   it('falls back to equal flex when no sizes are known yet', () => {

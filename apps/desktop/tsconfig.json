@@ -1,7 +1,7 @@
 {
-  "extends": "../tsconfig.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "../dist-renderer",
+    "outDir": "../../dist-renderer",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
@@ -10,8 +10,8 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@watchtower/shared/*": ["../packages/shared/src/*"],
-      "@watchtower/transport": ["../packages/transport/src/index.ts"]
+      "@watchtower/shared/*": ["../../packages/shared/src/*"],
+      "@watchtower/transport": ["../../packages/transport/src/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"]

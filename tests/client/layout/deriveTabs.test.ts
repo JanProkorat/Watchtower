@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deriveTabs } from '../../../client/src/layout/deriveTabs.js';
-import type { InstanceView } from '../../../client/src/state/useInstances.js';
+import { deriveTabs } from '../../../apps/desktop/src/layout/deriveTabs.js';
+import type { InstanceView } from '../../../apps/desktop/src/state/useInstances.js';
 import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 

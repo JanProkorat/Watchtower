@@ -6,7 +6,7 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {App} from './App.js';
 import {DevSupport} from "@react-buddy/ide-toolbox";
-import {ComponentPreviews, useInitial} from "../../dev";
+import {ComponentPreviews, useInitial} from "../../../dev";
 
 const container = document.getElementById('root');
 if (!container) throw new Error('#root missing');

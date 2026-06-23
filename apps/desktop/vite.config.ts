@@ -11,13 +11,13 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@watchtower/shared': path.resolve(__dirname, '../packages/shared/src'),
-      '@watchtower/transport': path.resolve(__dirname, '../packages/transport/src'),
+      '@watchtower/shared': path.resolve(__dirname, '../../packages/shared/src'),
+      '@watchtower/transport': path.resolve(__dirname, '../../packages/transport/src'),
     },
   },
   server: { port: 5173, strictPort: true },
   build: {
-    outDir: path.resolve(__dirname, '../dist-renderer'),
+    outDir: path.resolve(__dirname, '../../dist-renderer'),
     emptyOutDir: true,
   },
 });

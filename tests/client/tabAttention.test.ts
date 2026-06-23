@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tabsNeedingAttention, ACTION_NEEDED_STATUSES } from '../../client/src/util/tabAttention.js';
+import { tabsNeedingAttention, ACTION_NEEDED_STATUSES } from '../../apps/desktop/src/util/tabAttention.js';
 
 const tab = (id: string, columnOrder: string[], hiddenInstanceIds: string[] = []) => ({
   id,

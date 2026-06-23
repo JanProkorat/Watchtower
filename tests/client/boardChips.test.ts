@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { epicColours } from '../../client/src/components/timetracker/boardChips.js';
+import { epicColours } from '../../apps/desktop/src/components/timetracker/boardChips.js';
 
 describe('epicColours', () => {
   it('returns the same colour pair for the same epic name (deterministic)', () => {

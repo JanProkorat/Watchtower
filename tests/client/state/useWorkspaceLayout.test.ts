@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { hydrate, persist } from '../../../client/src/state/useWorkspaceLayout.js';
+import { hydrate, persist } from '../../../apps/desktop/src/state/useWorkspaceLayout.js';
 import {
   DASHBOARD_TAB_ID,
   SETTINGS_KEYS,
