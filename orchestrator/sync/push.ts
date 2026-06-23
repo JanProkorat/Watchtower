@@ -51,6 +51,9 @@ export async function pushAll(db: SqliteLike, store: PgStore): Promise<Record<st
       out[name] = await pushTable(db, store, tableDesc);
     }
   }
+  for (const t of SYNCED_TABLES) {
+    if (!(t.name in out)) throw new Error(`pushAll: ${t.name} missing from PUSH_ORDER — add it`);
+  }
   return out;
 }
 
