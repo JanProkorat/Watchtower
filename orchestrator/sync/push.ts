@@ -1,0 +1,94 @@
+import type { SqliteLike } from '../db/migrations.js';
+import type { PgStore } from '../db/pg/pool.js';
+import { SYNCED_TABLES, toPgValue, type SyncTable } from './schema.js';
+import { getCursor, setCursor } from './cursor.js';
+
+const PUSH_ORDER = ['projects', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'];
+
+function fkSource(table: SyncTable): { col: string; parentTable: string; localCol: string } | null {
+  switch (table.name) {
+    case 'epics': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id' };
+    case 'tasks': return { col: 'epic_sync_id', parentTable: 'epics', localCol: 'epic_id' };
+    case 'contracts': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id' };
+    case 'worklogs': return { col: 'task_sync_id', parentTable: 'tasks', localCol: 'task_id' };
+    default: return null;
+  }
+}
+
+/** Push local rows changed since the push cursor into Postgres (LWW upsert). */
+export async function pushTable(db: SqliteLike, store: PgStore, table: SyncTable): Promise<number> {
+  const cursor = getCursor(db, 'push', table.name);
+  const fk = fkSource(table);
+
+  // Read physical columns + resolved parent sync_id (for child FK).
+  const physical = table.columns.filter((c) => !c.name.endsWith('_sync_id') || c.name === 'sync_id');
+  const selectCols = physical.map((c) => `t.${c.name}`);
+  let joinSql = '';
+  if (fk) {
+    selectCols.push(`parent.sync_id AS ${fk.col}`);
+    joinSql = ` JOIN ${fk.parentTable} parent ON parent.id = t.${fk.localCol}`;
+  }
+  const rows = db
+    .prepare(`SELECT ${selectCols.join(', ')} FROM ${table.name} t${joinSql} WHERE t.updated_at > ? ORDER BY t.updated_at ASC`)
+    .all(cursor) as Array<Record<string, unknown>>;
+
+  let maxSeen = cursor;
+  for (const row of rows) {
+    await upsertRow(store, table, row, fk);
+    const u = String(row['updated_at']);
+    if (u > maxSeen) maxSeen = u;
+  }
+  if (maxSeen > cursor) setCursor(db, 'push', table.name, maxSeen);
+  return rows.length;
+}
+
+export async function pushAll(db: SqliteLike, store: PgStore): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  const byName = new Map(SYNCED_TABLES.map((t) => [t.name, t]));
+  for (const name of PUSH_ORDER) {
+    const tableDesc = byName.get(name);
+    if (tableDesc) {
+      out[name] = await pushTable(db, store, tableDesc);
+    }
+  }
+  return out;
+}
+
+async function upsertRow(
+  store: PgStore,
+  table: SyncTable,
+  row: Record<string, unknown>,
+  fk: { col: string; parentTable: string; localCol: string } | null,
+): Promise<void> {
+  const insertCols: string[] = [];
+  const insertExprs: string[] = [];
+  const params: unknown[] = [];
+  let p = 1;
+  for (const c of table.columns) {
+    const isSyntheticFk = c.name.endsWith('_sync_id') && c.name !== 'sync_id';
+    const value = isSyntheticFk
+      ? row[c.name] // already the parent's sync_id from the JOIN
+      : toPgValue(c.kind, row[c.name]);
+    if (fk && c.name === fk.col) {
+      insertCols.push(fk.localCol);
+      insertExprs.push(`(SELECT id FROM ${fk.parentTable} WHERE sync_id = $${p})`);
+    } else {
+      insertCols.push(c.name);
+      insertExprs.push(`$${p}`);
+    }
+    params.push(value);
+    p++;
+  }
+  const setClause = insertCols
+    .filter((c) => c !== 'sync_id')
+    .map((c) => `${c} = EXCLUDED.${c}`)
+    .join(', ');
+  // LWW guard: only overwrite when the incoming row is strictly newer.
+  const sql = `
+    INSERT INTO ${table.pgTable} (${insertCols.join(', ')})
+    VALUES (${insertExprs.join(', ')})
+    ON CONFLICT (sync_id) DO UPDATE SET ${setClause}
+    WHERE ${table.pgTable}.updated_at < EXCLUDED.updated_at
+  `;
+  await store.query(sql, params);
+}
