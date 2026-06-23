@@ -16,7 +16,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import type {
   ContractInputPayload,
   ContractViewPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 import { CZ_DATE_FORMAT } from '../../util/format.js';
 
 interface OverlapInfo {

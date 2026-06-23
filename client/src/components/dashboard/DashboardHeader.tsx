@@ -1,5 +1,5 @@
 import { Box, MenuItem, Stack, TextField, Typography } from '@mui/material';
-import type { ProjectViewPayload } from '../../../../shared/ipcContract.js';
+import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 import { formatWeekdayDateLongCz } from '../../util/format.js';
 
 export interface DashboardHeaderProps {

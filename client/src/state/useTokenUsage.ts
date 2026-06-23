@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { TokenUsagePayload } from '../../../shared/tokenUsageFormat.js';
+import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 
 export interface TokenUsageState {
   data: TokenUsagePayload | null;

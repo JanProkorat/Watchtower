@@ -25,7 +25,7 @@ import type {
   BoardCardPayload,
   BoardColumn,
   ProjectViewPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 // The board intentionally omits a "Done" column — completed tasks still
 // classify as `done` and bucket in `byCol` below (so card grouping never hits

@@ -23,7 +23,7 @@ import { ThreeMonthCalendar } from './ThreeMonthCalendar.js';
 import type {
   DayOffViewPayload,
   PublicHolidayPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 type MarkingKind = 'vacation' | 'sick' | 'other';
 

@@ -1,6 +1,6 @@
 import { Box } from '@mui/material';
 import { WorkspaceNodeView } from './WorkspaceNodeView.js';
-import type { PersistedLayout, TabRecord } from '../../../../shared/layout.js';
+import type { PersistedLayout, TabRecord } from '@watchtower/shared/layout.js';
 import type { InstanceView } from '../../state/useInstances.js';
 import type { WorkspaceLayoutActions } from '../../state/useWorkspaceLayout.js';
 

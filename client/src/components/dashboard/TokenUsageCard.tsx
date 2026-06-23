@@ -6,7 +6,7 @@ import {
   formatPercent,
   formatRemaining,
   formatTokenCount,
-} from '../../../../shared/tokenUsageFormat.js';
+} from '@watchtower/shared/tokenUsageFormat.js';
 
 export interface TokenUsageCardProps {
   usage: TokenUsageState;

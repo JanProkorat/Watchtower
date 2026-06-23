@@ -4,7 +4,7 @@ import {
   DASHBOARD_TAB_ID,
   SETTINGS_KEYS,
   type PersistedLayout,
-} from '../../../shared/layout.js';
+} from '@watchtower/shared/layout.js';
 
 interface Bridge {
   invoke: ReturnType<typeof vi.fn>;

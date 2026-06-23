@@ -3,7 +3,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import type {
   DayOffViewPayload,
   PublicHolidayPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 export type DayOffKind = 'vacation' | 'sick' | 'other' | 'holiday';
 

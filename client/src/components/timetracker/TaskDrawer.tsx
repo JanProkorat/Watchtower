@@ -14,7 +14,7 @@ import type {
   EpicViewPayload,
   TaskInputPayload,
   TaskViewPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   open: boolean;

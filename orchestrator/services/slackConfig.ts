@@ -1,5 +1,5 @@
 import type { SettingsRepo } from '../db/repositories/settings.js';
-import { DEFAULT_SLACK_CONFIG, SLACK_SETTING_KEYS, type SlackConfig, type SlackTriggers } from '../../shared/slackConfig.js';
+import { DEFAULT_SLACK_CONFIG, SLACK_SETTING_KEYS, type SlackConfig, type SlackTriggers } from '@watchtower/shared/slackConfig.js';
 
 function parseTriggers(raw: string): SlackTriggers {
   try {

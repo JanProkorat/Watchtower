@@ -59,10 +59,10 @@ import { pruneLayout } from './layout/pruneLayout.js';
 import { leafToCollapseOnHide } from './layout/hiddenPaneCollapse.js';
 import { pruneAdHocCwds } from './layout/pruneAdHocCwds.js';
 import { selectGlobalTab } from './layout/selectGlobalTab.js';
-import { DASHBOARD_TAB_ID, type TabId } from '../../shared/layout.js';
+import { DASHBOARD_TAB_ID, type TabId } from '@watchtower/shared/layout.js';
 import { useTimeTrackerView } from './state/useTimeTrackerView.js';
 import { useSettingsView } from './state/useSettingsView.js';
-import type { WatchtowerBridge } from '../../shared/ipcContract.js';
+import type { WatchtowerBridge } from '@watchtower/shared/ipcContract.js';
 
 declare global {
   interface Window {

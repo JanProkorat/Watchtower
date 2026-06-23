@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { SkillRowPayload } from '../../../shared/ipcContract.js';
+import type { SkillRowPayload } from '@watchtower/shared/ipcContract.js';
 
 interface State {
   loading: boolean;

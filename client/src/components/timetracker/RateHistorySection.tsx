@@ -18,7 +18,7 @@ import { useContracts } from '../../state/useContracts.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { ContractDrawer } from './ContractDrawer.js';
 import { formatDateAbbrCz, formatDateCz } from '../../util/format.js';
-import type { ContractViewPayload, DayOffViewPayload } from '../../../../shared/ipcContract.js';
+import type { ContractViewPayload, DayOffViewPayload } from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   projectId: number;

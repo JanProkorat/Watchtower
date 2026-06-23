@@ -3,7 +3,7 @@ import type {
   DayOffInputPayload,
   DayOffViewPayload,
   PublicHolidayPayload,
-} from '../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 export interface DaysOffState {
   days: DayOffViewPayload[];

@@ -1,6 +1,6 @@
 import type { InstanceView } from '../state/useInstances.js';
-import type { ProjectViewPayload } from '../../../shared/ipcContract.js';
-import { DASHBOARD_TAB_ID, type TabId, type TabRecord } from '../../../shared/layout.js';
+import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
+import { DASHBOARD_TAB_ID, type TabId, type TabRecord } from '@watchtower/shared/layout.js';
 import { cwdTabId, projectTabId } from './tabId.js';
 
 export function deriveTabs(

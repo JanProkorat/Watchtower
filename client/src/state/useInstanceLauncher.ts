@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { RunningInstancePayload } from '../../../shared/ipcContract.js';
+import type { RunningInstancePayload } from '@watchtower/shared/ipcContract.js';
 
 export interface LaunchState {
   /** When set, render the choice modal — there's at least one running instance. */

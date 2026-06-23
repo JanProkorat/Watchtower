@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SETTINGS_KEYS } from '../../../shared/layout.js';
+import { SETTINGS_KEYS } from '@watchtower/shared/layout.js';
 
 const PERSIST_DEBOUNCE_MS = 300;
 

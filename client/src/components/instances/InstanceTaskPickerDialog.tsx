@@ -9,7 +9,7 @@ import {
   Stack,
   TextField,
 } from '@mui/material';
-import type { EpicViewPayload, ProjectViewPayload, TaskViewPayload } from '../../../../shared/ipcContract.js';
+import type { EpicViewPayload, ProjectViewPayload, TaskViewPayload } from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   open: boolean;

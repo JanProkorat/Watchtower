@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ClaudeSettingsReadPayload } from '../../../shared/ipcContract.js';
+import type { ClaudeSettingsReadPayload } from '@watchtower/shared/ipcContract.js';
 
 export type SettingsScope = 'global' | 'project';
 

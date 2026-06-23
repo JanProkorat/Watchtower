@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { TaskGridResponsePayload } from '../../../shared/ipcContract.js';
+import type { TaskGridResponsePayload } from '@watchtower/shared/ipcContract.js';
 
 export interface TaskGridState {
   data: TaskGridResponsePayload | null;

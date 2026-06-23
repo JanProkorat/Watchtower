@@ -7,10 +7,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: __dirname,
-  // Relative base so the packaged renderer (loaded via file:// by Electron's
-  // loadFile) resolves /assets/* against index.html, not the filesystem root.
   base: './',
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@watchtower/shared': path.resolve(__dirname, '../packages/shared/src'),
+    },
+  },
   server: { port: 5173, strictPort: true },
   build: {
     outDir: path.resolve(__dirname, '../dist-renderer'),

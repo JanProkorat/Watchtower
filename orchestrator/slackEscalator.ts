@@ -1,5 +1,5 @@
-import type { InstanceStatus } from '../shared/stateModel.js';
-import type { SlackConfig } from '../shared/slackConfig.js';
+import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
+import type { SlackConfig } from '@watchtower/shared/slackConfig.js';
 
 export type SlackEscalationKind = 'waiting-permission' | 'idle-notify' | 'crashed';
 

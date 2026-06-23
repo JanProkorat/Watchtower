@@ -1,5 +1,5 @@
-import type { InstanceStatus } from '../shared/stateModel.js';
-import type { StateEvent, TransitionResult } from '../shared/events.js';
+import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
+import type { StateEvent, TransitionResult } from '@watchtower/shared/events.js';
 
 const TERMINAL: ReadonlyArray<InstanceStatus> = ['finished', 'crashed', 'suspended', 'resuming'];
 

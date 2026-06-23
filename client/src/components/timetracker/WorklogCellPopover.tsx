@@ -32,7 +32,7 @@ import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
 import type {
   ContractViewPayload,
   WorklogViewPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   anchor: HTMLElement | null;

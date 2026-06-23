@@ -6,7 +6,7 @@ import {
   type PersistedLayout,
   type TabId,
   type WorkspaceNode,
-} from '../../../shared/layout.js';
+} from '@watchtower/shared/layout.js';
 import {
   leaf,
   splitLeaf,

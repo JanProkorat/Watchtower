@@ -10,7 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import type { EpicInputPayload, EpicViewPayload } from '../../../../shared/ipcContract.js';
+import type { EpicInputPayload, EpicViewPayload } from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   open: boolean;

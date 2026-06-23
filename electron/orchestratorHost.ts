@@ -1,7 +1,7 @@
 import { utilityProcess, type UtilityProcess, MessageChannelMain } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PortApi } from '../shared/messagePort.js';
+import { PortApi } from '@watchtower/shared/messagePort.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { transition } from '../../orchestrator/stateMachine.js';
-import type { InstanceStatus } from '../../shared/stateModel.js';
-import type { StateEvent, StateOutput } from '../../shared/events.js';
+import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
+import type { StateEvent, StateOutput } from '@watchtower/shared/events.js';
 
 type Case = {
   name: string;

@@ -27,7 +27,7 @@ import { EpicsTreeView } from './EpicsTreeView.js';
 import type {
   ContractViewPayload,
   ProjectViewPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   projectId: number;

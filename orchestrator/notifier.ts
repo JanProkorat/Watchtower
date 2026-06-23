@@ -1,5 +1,5 @@
 import { decide, type RuleContext } from './notificationRules.js';
-import type { InstanceStatus } from '../shared/stateModel.js';
+import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
 
 export interface NotifierEmitters {
   notify(payload: {

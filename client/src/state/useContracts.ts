@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type {
   ContractInputPayload,
   ContractViewPayload,
-} from '../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 export interface OverlapErrorInfo {
   conflictingId: number;

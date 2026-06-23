@@ -49,7 +49,7 @@ import type {
   TaskGridTaskPayload,
   TaskViewPayload,
   WorklogViewPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 const WATCHTOWER_DB_PATH =
   '/Users/jan/Library/Application Support/Watchtower/data.db';
@@ -689,7 +689,7 @@ function Grid({
   onTaskKeyClick,
   onCellClick,
 }: {
-  data: import('../../../../shared/ipcContract.js').TaskGridResponsePayload;
+  data: import('@watchtower/shared/ipcContract.js').TaskGridResponsePayload;
   days: Array<{
     day: number;
     ymd: string;

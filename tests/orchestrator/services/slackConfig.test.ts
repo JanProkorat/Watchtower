@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SettingsRepo } from '../../../orchestrator/db/repositories/settings.js';
 import { readSlackConfig, writeSlackConfig } from '../../../orchestrator/services/slackConfig.js';
-import { DEFAULT_SLACK_CONFIG } from '../../../shared/slackConfig.js';
+import { DEFAULT_SLACK_CONFIG } from '@watchtower/shared/slackConfig.js';
 
 /** Minimal in-memory stand-in for the SqliteLike surface SettingsRepo uses. */
 function fakeDb() {

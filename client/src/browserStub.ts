@@ -10,7 +10,7 @@
 // so the Dashboard renders with a 0-instance message. Any invoke beyond
 // listInstances logs a console.warn so devs notice they're running standalone.
 
-import type { WatchtowerBridge, IpcRequest, IpcResponse, IpcPush } from '../../shared/ipcContract.js';
+import type { WatchtowerBridge, IpcRequest, IpcResponse, IpcPush } from '@watchtower/shared/ipcContract.js';
 import { readWsConfig } from './transport/selectTransport';
 import { createWebSocketTransport } from './transport/webSocketTransport';
 

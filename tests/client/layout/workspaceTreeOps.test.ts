@@ -11,7 +11,7 @@ import {
   setSizes,
   collectTabIds,
 } from '../../../client/src/layout/workspaceTreeOps.js';
-import type { WorkspaceNode } from '../../../shared/layout.js';
+import type { WorkspaceNode } from '@watchtower/shared/layout.js';
 
 const L = (id: string, tabId: string): WorkspaceNode =>
   ({ kind: 'leaf', id, tabId: tabId as never });

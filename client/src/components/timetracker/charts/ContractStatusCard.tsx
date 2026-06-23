@@ -1,6 +1,6 @@
 import { Box, LinearProgress, Stack, Tooltip, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import type { ContractReportRowPayload } from '../../../../../shared/ipcContract.js';
+import type { ContractReportRowPayload } from '@watchtower/shared/ipcContract.js';
 import { formatDateCz } from '../../../util/format';
 
 /**

@@ -1,4 +1,4 @@
-import { DASHBOARD_TAB_ID, type TabId, type WorkspaceNode } from '../../../shared/layout.js';
+import { DASHBOARD_TAB_ID, type TabId, type WorkspaceNode } from '@watchtower/shared/layout.js';
 import { leaf } from './workspaceTreeOps.js';
 import { newNodeId } from './newNodeId.js';
 

@@ -16,7 +16,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useAgents } from '../../state/useAgents.js';
-import type { AgentRowPayload } from '../../../../shared/ipcContract.js';
+import type { AgentRowPayload } from '@watchtower/shared/ipcContract.js';
 
 export function AgentsTab() {
   const state = useAgents();

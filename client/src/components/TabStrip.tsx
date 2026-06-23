@@ -6,8 +6,8 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { TabId, TabRecord } from '../../../shared/layout.js';
-import { DASHBOARD_TAB_ID } from '../../../shared/layout.js';
+import type { TabId, TabRecord } from '@watchtower/shared/layout.js';
+import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 import { tabAccent } from '../util/tabAccent.js';
 
 // Outer tab dot is locked to the project's accent color (or a hash-based

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ProjectInputPayload, ProjectViewPayload } from '../../../shared/ipcContract.js';
+import type { ProjectInputPayload, ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 
 export interface ProjectState {
   project: ProjectViewPayload | null;

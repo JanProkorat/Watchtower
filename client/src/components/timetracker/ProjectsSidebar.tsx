@@ -10,7 +10,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import StarIcon from '@mui/icons-material/Star';
-import type { ProjectViewPayload } from '../../../../shared/ipcContract.js';
+import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   projects: ProjectViewPayload[];

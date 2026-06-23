@@ -1,5 +1,5 @@
 import { Box, LinearProgress, Paper, Stack, Typography } from '@mui/material';
-import type { DashboardTopProjectPayload } from '../../../../shared/ipcContract.js';
+import type { DashboardTopProjectPayload } from '@watchtower/shared/ipcContract.js';
 import { formatHours } from '../../util/format.js';
 
 const ROW_CAP = 8;

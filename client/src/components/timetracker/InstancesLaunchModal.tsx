@@ -13,7 +13,7 @@ import { alpha } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import CloseIcon from '@mui/icons-material/Close';
-import type { RunningInstancePayload } from '../../../../shared/ipcContract.js';
+import type { RunningInstancePayload } from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   open: boolean;

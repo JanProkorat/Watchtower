@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import { useSlackConfig } from '../../state/useSlackConfig.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
-import type { SlackConfig } from '../../../../shared/slackConfig.js';
+import type { SlackConfig } from '@watchtower/shared/slackConfig.js';
 
 export function SlackTab() {
   const { config, connected, loading, error, save, sendTest } = useSlackConfig();

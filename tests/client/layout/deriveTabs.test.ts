@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { deriveTabs } from '../../../client/src/layout/deriveTabs.js';
 import type { InstanceView } from '../../../client/src/state/useInstances.js';
-import type { ProjectViewPayload } from '../../../shared/ipcContract.js';
-import { DASHBOARD_TAB_ID } from '../../../shared/layout.js';
+import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
+import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 
 const inst = (id: string, cwd: string): InstanceView => ({
   id,

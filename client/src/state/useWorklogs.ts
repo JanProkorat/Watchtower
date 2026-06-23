@@ -3,7 +3,7 @@ import type {
   WorklogInputPayload,
   WorklogListFilterPayload,
   WorklogViewPayload,
-} from '../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 function asLockedError(
   p: unknown,

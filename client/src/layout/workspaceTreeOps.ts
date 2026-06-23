@@ -4,7 +4,7 @@ import type {
   WorkspaceLeaf,
   WorkspaceNode,
   WorkspaceSplit,
-} from '../../../shared/layout.js';
+} from '@watchtower/shared/layout.js';
 import { newNodeId } from './newNodeId.js';
 
 export function leaf(id: NodeId, tabId: TabId): WorkspaceLeaf {

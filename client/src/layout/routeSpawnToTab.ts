@@ -1,4 +1,4 @@
-import type { TabId } from '../../../shared/layout.js';
+import type { TabId } from '@watchtower/shared/layout.js';
 import { cwdTabId, projectTabId } from './tabId.js';
 
 interface ProjectLike {

@@ -2,7 +2,7 @@ import { ipcMain, dialog, shell } from 'electron';
 import { exec } from 'node:child_process';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { type IpcRequest, type IpcResponse, ELECTRON_ONLY_KINDS } from '../shared/ipcContract.js';
+import { type IpcRequest, type IpcResponse, ELECTRON_ONLY_KINDS } from '@watchtower/shared/ipcContract.js';
 import { getMainWindow, createMainWindow } from './window.js';
 import { getOrchestrator } from './orchestratorHost.js';
 import { fireMacNotification, fireTestNotification } from './notifications.js';

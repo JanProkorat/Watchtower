@@ -3,7 +3,7 @@ import type {
   ProjectInputPayload,
   ProjectListFilterPayload,
   ProjectViewPayload,
-} from '../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 export type ProjectKind = 'work' | 'time_off';
 export type ArchiveFilter = 'active' | 'archived';

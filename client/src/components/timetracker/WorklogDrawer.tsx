@@ -22,7 +22,7 @@ import type {
   TaskViewPayload,
   WorklogInputPayload,
   WorklogViewPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   open: boolean;

@@ -14,7 +14,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import RemoveIcon from '@mui/icons-material/Close';
-import type { ProjectInputPayload, ProjectViewPayload } from '../../../../shared/ipcContract.js';
+import type { ProjectInputPayload, ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 
 const COLOR_PALETTE = [
   '#7aa7ff',

@@ -4,7 +4,7 @@ import type {
   EpicViewPayload,
   TaskInputPayload,
   TaskViewPayload,
-} from '../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 export interface EpicsAndTasksState {
   epics: EpicViewPayload[];

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pruneLayout } from '../../../client/src/layout/pruneLayout.js';
 import { leaf, split } from '../../../client/src/layout/workspaceTreeOps.js';
-import { DASHBOARD_TAB_ID } from '../../../shared/layout.js';
+import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 
 describe('pruneLayout', () => {
   it('keeps the tree intact when all tabIds are valid', () => {

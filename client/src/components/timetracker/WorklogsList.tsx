@@ -22,7 +22,7 @@ import {
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
 import { WorklogDrawer } from './WorklogDrawer.js';
-import type { ProjectViewPayload, WorklogViewPayload } from '../../../../shared/ipcContract.js';
+import type { ProjectViewPayload, WorklogViewPayload } from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   /**

@@ -4,7 +4,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ColumnSlot } from './ColumnSlot.js';
 import { SessionTabBar } from './SessionTabBar.js';
 import { DashboardTab } from '../DashboardTab.js';
-import type { TabRecord } from '../../../../shared/layout.js';
+import type { TabRecord } from '@watchtower/shared/layout.js';
 import type { InstanceView } from '../../state/useInstances.js';
 import { tabAccent } from '../../util/tabAccent.js';
 

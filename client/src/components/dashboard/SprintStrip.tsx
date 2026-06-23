@@ -17,7 +17,7 @@ import TodayIcon from '@mui/icons-material/Today';
 import DragHandleIcon from '@mui/icons-material/DragHandle';
 import dayjs, { type Dayjs } from 'dayjs';
 import 'dayjs/locale/cs';
-import type { DashboardSprintDayPayload } from '../../../../shared/ipcContract.js';
+import type { DashboardSprintDayPayload } from '@watchtower/shared/ipcContract.js';
 import { formatDateLongCz, formatMinutes } from '../../util/format.js';
 import { SprintDayCell } from './SprintDayCell.js';
 

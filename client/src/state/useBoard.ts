@@ -3,7 +3,7 @@ import type {
   BoardAuthPingPayload,
   BoardSnapshotPayload,
   BoardSyncResultPayload,
-} from '../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 /** Auto-sync threshold: refetch on mount if local snapshot is older than this. */
 const STALE_MS = 5 * 60 * 1000;

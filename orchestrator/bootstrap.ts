@@ -12,7 +12,7 @@ import {
   type MigrateOptions,
 } from './db/migrateTimetracker.js';
 import { startWsBridge, type WsBridgeHandle } from './wsBridge.js';
-import type { OrchRequest } from '../shared/messagePort.js';
+import type { OrchRequest } from '@watchtower/shared/messagePort.js';
 import { createPgStore, type PgStore } from './db/pg/pool.js';
 import { runPgMigrations } from './db/pg/migrate.js';
 import { SyncService } from './sync/service.js';

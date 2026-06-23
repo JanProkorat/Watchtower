@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { selectGlobalTab } from '../../../client/src/layout/selectGlobalTab.js';
-import { DASHBOARD_TAB_ID } from '../../../shared/layout.js';
+import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 
 function makeDeps(focused: Record<string, string | null> = {}) {
   return {

@@ -1,4 +1,4 @@
-import { DASHBOARD_TAB_ID, type TabId } from '../../../shared/layout.js';
+import { DASHBOARD_TAB_ID, type TabId } from '@watchtower/shared/layout.js';
 
 /**
  * Side-effecting dependencies the global tab bar needs to route a click.

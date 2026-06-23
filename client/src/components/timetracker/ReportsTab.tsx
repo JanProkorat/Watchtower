@@ -18,7 +18,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useReports, type Granularity } from '../../state/useReports.js';
 import { CZ_DATE_FORMAT } from '../../util/format.js';
-import type { ProjectViewPayload } from '../../../../shared/ipcContract.js';
+import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 import ChartCard from './charts/ChartCard.js';
 import TrendChart, {
   type RateChangeMarker,
@@ -28,7 +28,7 @@ import ProjectDonut, { type ProjectSlice } from './charts/ProjectDonut.js';
 import EarningsSummary, { type EarningsData } from './charts/EarningsSummary.js';
 import Heatmap, { type HeatmapDatum } from './charts/Heatmap.js';
 import ContractStatusCard from './charts/ContractStatusCard.js';
-import type { RateChangeMarkerPayload } from '../../../../shared/ipcContract.js';
+import type { RateChangeMarkerPayload } from '@watchtower/shared/ipcContract.js';
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
 

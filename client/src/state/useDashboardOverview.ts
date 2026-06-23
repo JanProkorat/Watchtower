@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type {
   DashboardOverviewRequestPayload,
   DashboardOverviewResponsePayload,
-} from '../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 export interface DashboardOverviewState {
   data: DashboardOverviewResponsePayload | null;

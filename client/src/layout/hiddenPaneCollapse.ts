@@ -1,4 +1,4 @@
-import type { NodeId, TabId, WorkspaceNode } from '../../../shared/layout.js';
+import type { NodeId, TabId, WorkspaceNode } from '@watchtower/shared/layout.js';
 import { collectTabIds, findLeafByTabId } from './workspaceTreeOps.js';
 
 /**

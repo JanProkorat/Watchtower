@@ -16,7 +16,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useSkills } from '../../state/useSkills.js';
-import type { SkillRowPayload } from '../../../../shared/ipcContract.js';
+import type { SkillRowPayload } from '@watchtower/shared/ipcContract.js';
 
 export function SkillsTab() {
   const state = useSkills();

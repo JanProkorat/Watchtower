@@ -6,7 +6,7 @@ import type {
   HeatmapDatumPayload,
   RateChangeMarkerPayload,
   TrendDatumPayload,
-} from '../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 export type Granularity = 'day' | 'week' | 'month';
 

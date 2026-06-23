@@ -36,7 +36,7 @@ import type {
   TaskViewPayload,
   WorklogInputPayload,
   WorklogViewPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 import {
   CZ_DATE_FORMAT,
   buildTaskUrl,

@@ -9,7 +9,7 @@ import type {
   DashboardHeatmapStatsPayload,
   DashboardTopProjectPayload,
   DashboardSprintWorklogPayload,
-} from '../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 interface MinutesRow {
   /** SQL COALESCE(..., 0) guarantees non-null. */

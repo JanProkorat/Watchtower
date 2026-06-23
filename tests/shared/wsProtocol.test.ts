@@ -1,6 +1,6 @@
 // tests/shared/wsProtocol.test.ts
 import { describe, it, expect } from 'vitest';
-import { encodeFrame, decodeFrame, isPushFrame } from '../../shared/wsProtocol';
+import { encodeFrame, decodeFrame, isPushFrame } from '@watchtower/shared/wsProtocol.js';
 
 describe('wsProtocol', () => {
   it('round-trips a request frame', () => {

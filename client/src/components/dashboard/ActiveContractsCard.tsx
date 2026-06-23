@@ -1,5 +1,5 @@
 import { Box, ButtonBase, Grid, Paper, Stack, Typography } from '@mui/material';
-import type { DashboardActiveContractPayload } from '../../../../shared/ipcContract.js';
+import type { DashboardActiveContractPayload } from '@watchtower/shared/ipcContract.js';
 import ContractStatusCard from '../timetracker/charts/ContractStatusCard.js';
 
 export interface ActiveContractsCardProps {

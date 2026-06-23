@@ -1,6 +1,6 @@
 import { Box, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import type { DashboardSprintDayPayload } from '../../../../shared/ipcContract.js';
+import type { DashboardSprintDayPayload } from '@watchtower/shared/ipcContract.js';
 import { formatMinutes } from '../../util/format.js';
 
 export interface SprintDayCellProps {

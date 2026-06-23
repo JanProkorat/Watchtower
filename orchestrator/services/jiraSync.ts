@@ -15,7 +15,7 @@ import type {
   OrchJiraSyncRequest,
   OrchJiraSyncResult,
   OrchJiraSyncEntry,
-} from '../../shared/messagePort.js';
+} from '@watchtower/shared/messagePort.js';
 
 const JIRA_KEY_RE = /^[A-Z][A-Z0-9_]*-\d+$/;
 const REFRESH_TIMEOUT_MS = 6 * 60 * 1000;

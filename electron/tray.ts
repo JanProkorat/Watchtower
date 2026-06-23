@@ -3,8 +3,8 @@ import path from 'node:path';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createMainWindow, getMainWindow } from './window.js';
-import type { TokenUsagePayload } from '../shared/tokenUsageFormat.js';
-import { formatTokenCount, formatRemaining, formatPercent, usageBar } from '../shared/tokenUsageFormat.js';
+import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
+import { formatTokenCount, formatRemaining, formatPercent, usageBar } from '@watchtower/shared/tokenUsageFormat.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

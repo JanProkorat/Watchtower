@@ -1,4 +1,4 @@
-import type { InstanceStatus } from '../shared/stateModel.js';
+import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
 
 export interface RuleContext {
   focused: boolean;

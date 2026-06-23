@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { InstanceView } from './useInstances.js';
-import type { ProjectViewPayload } from '../../../shared/ipcContract.js';
-import type { TabRecord } from '../../../shared/layout.js';
+import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
+import type { TabRecord } from '@watchtower/shared/layout.js';
 import { deriveTabs } from '../layout/deriveTabs.js';
 
 export function useTabs(

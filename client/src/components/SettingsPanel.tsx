@@ -22,7 +22,7 @@ import { WORKLOG_LOCK_SETTING_KEY } from '../util/lockSetting.js';
 import type {
   EpicWithProjectPayload,
   TaskByNumberPayload,
-} from '../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 const MEETINGS_DEFAULT_TASK_KEY = 'meetings.default_task_id';
 

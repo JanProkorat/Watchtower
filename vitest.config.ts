@@ -1,14 +1,19 @@
 import { defineConfig } from 'vitest/config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@watchtower/shared': path.resolve(__dirname, 'packages/shared/src'),
+    },
+  },
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
     reporters: ['default'],
-    // Serialize all test files. Integration tests that share the same
-    // Postgres database (push, pull, etl) interfere when run in parallel —
-    // concurrent beforeEach DROP SCHEMA calls clobber each other. A single
-    // fork keeps files sequential without requiring per-file schema isolation.
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } },
   },

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { DEFAULT_SLACK_CONFIG, type SlackConfig } from '../../../shared/slackConfig.js';
+import { DEFAULT_SLACK_CONFIG, type SlackConfig } from '@watchtower/shared/slackConfig.js';
 
 export interface SlackConfigState {
   config: SlackConfig;

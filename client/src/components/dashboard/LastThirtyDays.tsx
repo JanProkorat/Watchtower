@@ -1,6 +1,6 @@
 import { Box, Grid, Paper, Stack, Typography } from '@mui/material';
 import Heatmap from '../timetracker/charts/Heatmap.js';
-import type { DashboardHeatmapStatsPayload } from '../../../../shared/ipcContract.js';
+import type { DashboardHeatmapStatsPayload } from '@watchtower/shared/ipcContract.js';
 import { formatDateShortCz, formatHours } from '../../util/format.js';
 
 export interface LastThirtyDaysProps {

@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { LeafView } from './LeafView.js';
 import { SplitDropZones } from './SplitDropZones.js';
-import type { TabRecord, WorkspaceNode } from '../../../../shared/layout.js';
+import type { TabRecord, WorkspaceNode } from '@watchtower/shared/layout.js';
 import type { InstanceView } from '../../state/useInstances.js';
 
 interface Props {

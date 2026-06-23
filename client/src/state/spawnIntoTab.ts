@@ -1,4 +1,4 @@
-import type { PersistedLayout, TabId } from '../../../shared/layout.js';
+import type { PersistedLayout, TabId } from '@watchtower/shared/layout.js';
 import type { WorkspaceLayoutActions } from './useWorkspaceLayout.js';
 import { findLeafByTabId } from '../layout/workspaceTreeOps.js';
 

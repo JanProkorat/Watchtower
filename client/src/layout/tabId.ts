@@ -4,7 +4,7 @@ import {
   type DashboardTabId,
   type ProjectTabId,
   type TabId,
-} from '../../../shared/layout.js';
+} from '@watchtower/shared/layout.js';
 
 export function projectTabId(projectId: number): ProjectTabId {
   return `project:${projectId}`;

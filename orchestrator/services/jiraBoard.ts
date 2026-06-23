@@ -15,7 +15,7 @@ import type {
   BoardColumn,
   BoardSnapshotPayload,
   BoardSyncResultPayload,
-} from '../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 
 /** Deps for the board sync — identical surface to the worklog sync. */
 export type BoardSyncDeps = JiraSyncDeps;

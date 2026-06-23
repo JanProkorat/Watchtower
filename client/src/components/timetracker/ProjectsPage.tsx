@@ -4,7 +4,7 @@ import { useProjects } from '../../state/useProjects.js';
 import { ProjectsSidebar } from './ProjectsSidebar.js';
 import { ProjectDetailPane } from './ProjectDetailPane.js';
 import { ProjectDrawer } from './ProjectDrawer.js';
-import type { ProjectViewPayload } from '../../../../shared/ipcContract.js';
+import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 
 interface Props {
   selectedProjectId: number | null;

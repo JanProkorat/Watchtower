@@ -1,5 +1,5 @@
-import type { WatchtowerBridge } from '../../../shared/ipcContract.js';
-import { encodeFrame, decodeFrame, isPushFrame, type WsRequestFrame } from '../../../shared/wsProtocol.js';
+import type { WatchtowerBridge } from '@watchtower/shared/ipcContract.js';
+import { encodeFrame, decodeFrame, isPushFrame, type WsRequestFrame } from '@watchtower/shared/wsProtocol.js';
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: unknown) => void };
 

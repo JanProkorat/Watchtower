@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { bootstrap, type DbHandle } from '../../orchestrator/bootstrap.js';
 import { runMigrations, type SqliteLike } from '../../orchestrator/db/migrations.js';
-import type { OrchRequest } from '../../shared/messagePort.js';
+import type { OrchRequest } from '@watchtower/shared/messagePort.js';
 
 // Real WS server starts; give it headroom under contention.
 import { vi } from 'vitest';

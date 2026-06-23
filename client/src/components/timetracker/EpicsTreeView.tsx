@@ -22,7 +22,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import type {
   EpicViewPayload,
   TaskViewPayload,
-} from '../../../../shared/ipcContract.js';
+} from '@watchtower/shared/ipcContract.js';
 import { buildTaskUrl, formatMinutes, formatMinutesReadable } from '../../util/format.js';
 import { useEpicsAndTasks } from '../../state/useEpicsAndTasks.js';
 import { EpicDrawer } from './EpicDrawer.js';

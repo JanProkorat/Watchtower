@@ -5,7 +5,7 @@ import { InstancesRepo } from '../../orchestrator/db/repositories/instances.js';
 import { HookEventsRepo } from '../../orchestrator/db/repositories/hookEvents.js';
 import { NotificationsRepo } from '../../orchestrator/db/repositories/notifications.js';
 import { SettingsRepo } from '../../orchestrator/db/repositories/settings.js';
-import type { InstanceRow } from '../../shared/stateModel.js';
+import type { InstanceRow } from '@watchtower/shared/stateModel.js';
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
