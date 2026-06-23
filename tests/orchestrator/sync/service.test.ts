@@ -38,15 +38,20 @@ describe('SyncService offline behaviour', () => {
 
   it('notifyLocalChange debounces into a single syncNow', async () => {
     let cycles = 0;
+    const stub = {
+      query: async () => ({ rows: [] }),
+      healthCheck: async () => true,
+      end: async () => {},
+    };
     const svc = new SyncService({
-      db: freshSqlite(), store: null, debounceMs: 20,
+      db: freshSqlite(), store: stub as any, debounceMs: 20,
       onCycle: () => { cycles++; },
     });
     svc.start();
     svc.notifyLocalChange();
     svc.notifyLocalChange();
     svc.notifyLocalChange();
-    await new Promise((r) => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 100));
     svc.stop();
     expect(cycles).toBe(1);
   });

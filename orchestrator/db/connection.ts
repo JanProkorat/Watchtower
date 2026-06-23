@@ -4,8 +4,6 @@ import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { runMigrations, type SqliteLike } from './migrations.js';
 import { migrateTimetracker } from './migrateTimetracker.js';
-import { createPgStore, type PgStore } from './pg/pool.js';
-import { runPgMigrations } from './pg/migrate.js';
 
 export function appSupportDir(): string {
   const dir = path.join(homedir(), 'Library', 'Application Support', 'Watchtower');
@@ -37,21 +35,4 @@ export function openDb(overridePath?: string): Database.Database {
   }
 
   return db;
-}
-
-/**
- * Open both stores. SQLite is required (primary); Postgres is optional — when
- * WATCHTOWER_PG_URL is unset/unreachable the pg store is null and sync is
- * dormant. Postgres migrations run best-effort and never block boot.
- */
-export function openStores(overridePath?: string): { sqlite: Database.Database; pg: PgStore | null } {
-  const sqlite = openDb(overridePath);
-  const pg = createPgStore();
-  if (pg) {
-    // Fire-and-forget; a hub outage must not delay or crash startup.
-    runPgMigrations(pg).catch((err) => {
-      console.error('[orchestrator] Postgres migrations failed (sync dormant this session):', err);
-    });
-  }
-  return { sqlite, pg };
 }

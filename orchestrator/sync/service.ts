@@ -59,6 +59,7 @@ export class SyncService {
   }
 
   notifyLocalChange(): void {
+    if (!this.store) return;
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = null;
