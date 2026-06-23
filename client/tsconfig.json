@@ -10,7 +10,8 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@watchtower/shared/*": ["../packages/shared/src/*"]
+      "@watchtower/shared/*": ["../packages/shared/src/*"],
+      "@watchtower/transport": ["../packages/transport/src/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"]

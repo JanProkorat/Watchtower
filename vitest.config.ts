@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@watchtower/shared': path.resolve(__dirname, 'packages/shared/src'),
+      '@watchtower/transport': path.resolve(__dirname, 'packages/transport/src'),
     },
   },
   test: {

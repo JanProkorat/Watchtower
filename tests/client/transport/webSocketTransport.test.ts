@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createWebSocketTransport } from '../../../client/src/transport/webSocketTransport.js';
+import { createWebSocketTransport } from '@watchtower/transport';
 
 // Minimal fake WebSocket that lets the test drive open/messages.
 class FakeWS {

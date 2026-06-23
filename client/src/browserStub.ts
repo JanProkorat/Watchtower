@@ -11,8 +11,8 @@
 // listInstances logs a console.warn so devs notice they're running standalone.
 
 import type { WatchtowerBridge, IpcRequest, IpcResponse, IpcPush } from '@watchtower/shared/ipcContract.js';
-import { readWsConfig } from './transport/selectTransport';
-import { createWebSocketTransport } from './transport/webSocketTransport';
+import { readWsConfig } from '@watchtower/transport';
+import { createWebSocketTransport } from '@watchtower/transport';
 
 declare global {
   interface Window {
