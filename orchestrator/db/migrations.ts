@@ -270,6 +270,17 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       }
     },
   },
+  {
+    version: 14,
+    up: (db) => {
+      // #69: exclude tombstones from the worklog (source, external_id) unique index
+      // so a soft-deleted auto-import doesn't block re-creating/re-importing the
+      // same external worklog, and so a new-sync_id row can't collide on a
+      // non-sync_id index and wedge the LWW upsert.
+      db.exec(`DROP INDEX IF EXISTS idx_worklogs_external`);
+      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_worklogs_external ON worklogs(source, external_id) WHERE source IS NOT NULL AND deleted_at IS NULL`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

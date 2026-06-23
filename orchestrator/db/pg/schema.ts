@@ -159,4 +159,11 @@ export const PG_MIGRATIONS: Array<{ version: number; up: string[] }> = [
     version: 1,
     up: [PROJECTS, EPICS, TASKS, WORKLOGS, CONTRACTS, DAYS_OFF, SYNC_CONFLICTS],
   },
+  {
+    version: 2,
+    up: [
+      `DROP INDEX IF EXISTS idx_worklogs_external;`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_worklogs_external ON worklogs(source, external_id) WHERE source IS NOT NULL AND deleted_at IS NULL;`,
+    ],
+  },
 ];

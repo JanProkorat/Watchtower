@@ -394,5 +394,44 @@ describe('JiraSyncService', () => {
       expect(r.error).toMatch(/not configured/i);
       expect(r.posted).toBe(0);
     });
+
+    it('bumps updated_at when marking a worklog posted (LWW key advances)', async () => {
+      // Capture the pre-sync updated_at for the FIE1933-18887@5-22 worklog.
+      const target = worklogs
+        .list({ taskId: validTaskId })
+        .find((w) => w.workDate === '2026-05-22');
+      expect(target).toBeDefined();
+      const before = (
+        db.prepare('SELECT updated_at FROM worklogs WHERE id = ?').get(target!.id) as {
+          updated_at: string;
+        }
+      ).updated_at;
+
+      // markPosted uses real wall-clock nowIso(); wait so the ISO string differs.
+      await new Promise((r) => setTimeout(r, 5));
+
+      const svc = new JiraSyncService(db, {
+        config: CONFIG,
+        deps: makeDeps({
+          cookies: ['session=abc'],
+          fetch: {
+            responses: [
+              { status: 201, body: { id: 'w-100' } },
+              { status: 201, body: { id: 'w-done' } },
+              { status: 201, body: { id: 'w-101' } },
+            ],
+          },
+        }),
+      });
+      const r = await svc.sync({ from: '2026-05-01', to: '2026-05-31' });
+      expect(r.posted).toBe(3);
+
+      const after = (
+        db.prepare('SELECT updated_at FROM worklogs WHERE id = ?').get(target!.id) as {
+          updated_at: string;
+        }
+      ).updated_at;
+      expect(after > before).toBe(true);
+    });
   });
 });

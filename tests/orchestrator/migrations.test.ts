@@ -40,7 +40,7 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(13);
+    expect(version.v).toBe(14);
   });
 
   it('v12 adds task_id column to instances', () => {
