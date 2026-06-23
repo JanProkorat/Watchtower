@@ -97,12 +97,12 @@ export class DashboardOverviewService {
                          p.name  AS project_name,
                          p.color AS project_color,
                          (SELECT pr2.currency
-                            FROM project_rates pr2
+                            FROM contracts pr2
                            WHERE pr2.project_id = p.id
                            ORDER BY pr2.effective_from DESC, pr2.id DESC
                            LIMIT 1) AS currency
            FROM projects p
-           JOIN project_rates pr ON pr.project_id = p.id
+           JOIN contracts pr ON pr.project_id = p.id
           WHERE p.archived = 0
             AND p.kind = 'work'
             AND pr.effective_from <= ?

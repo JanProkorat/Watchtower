@@ -42,7 +42,7 @@ export const PROJECT_RATE_PERIODS_CTE = `
            LEAD(pr.effective_from) OVER (
              PARTITION BY pr.project_id ORDER BY pr.effective_from
            ) AS effective_to_exclusive
-    FROM project_rates pr
+    FROM contracts pr
   )
 `;
 

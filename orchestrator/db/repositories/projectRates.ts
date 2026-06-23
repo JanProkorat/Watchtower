@@ -83,7 +83,7 @@ export class ProjectRatesRepo {
       .prepare(
         `SELECT id, project_id, effective_from, rate_type, rate_amount, currency,
                 hours_per_day, end_date, md_limit, created_at
-           FROM project_rates
+           FROM contracts
           WHERE project_id = ?
           ORDER BY effective_from DESC, id DESC`,
       )
@@ -96,7 +96,7 @@ export class ProjectRatesRepo {
       .prepare(
         `SELECT id, project_id, effective_from, rate_type, rate_amount, currency,
                 hours_per_day, end_date, md_limit, created_at
-           FROM project_rates WHERE id = ?`,
+           FROM contracts WHERE id = ?`,
       )
       .get(id) as DbRow | undefined;
     return row ? toRow(row) : null;
@@ -109,7 +109,7 @@ export class ProjectRatesRepo {
       .prepare(
         `SELECT id, project_id, effective_from, rate_type, rate_amount, currency,
                 hours_per_day, end_date, md_limit, created_at
-           FROM project_rates
+           FROM contracts
           WHERE project_id = ?
             AND effective_from <= ?
             AND (end_date IS NULL OR end_date >= ?)
@@ -127,7 +127,7 @@ export class ProjectRatesRepo {
       this.assertNoOverlap(input.projectId, input.effectiveFrom, input.endDate ?? null, null);
       const info = this.db
         .prepare(
-          `INSERT INTO project_rates
+          `INSERT INTO contracts
              (project_id, effective_from, rate_type, rate_amount, currency,
               hours_per_day, end_date, md_limit)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -177,7 +177,7 @@ export class ProjectRatesRepo {
       if (sets.length > 0) {
         params.push(id);
         this.db
-          .prepare(`UPDATE project_rates SET ${sets.join(', ')} WHERE id = ?`)
+          .prepare(`UPDATE contracts SET ${sets.join(', ')} WHERE id = ?`)
           .run(...params);
       }
       this.db.exec('COMMIT');
@@ -189,7 +189,7 @@ export class ProjectRatesRepo {
   }
 
   delete(id: number): void {
-    this.db.prepare(`DELETE FROM project_rates WHERE id = ?`).run(id);
+    this.db.prepare(`DELETE FROM contracts WHERE id = ?`).run(id);
   }
 
   /**
@@ -202,7 +202,7 @@ export class ProjectRatesRepo {
     const dayBefore = previousDay(newFrom);
     this.db
       .prepare(
-        `UPDATE project_rates
+        `UPDATE contracts
             SET end_date = ?
           WHERE project_id = ?
             AND end_date IS NULL
@@ -225,7 +225,7 @@ export class ProjectRatesRepo {
     const SENTINEL_END = '9999-12-31';
     const row = this.db
       .prepare(
-        `SELECT id, effective_from, end_date FROM project_rates
+        `SELECT id, effective_from, end_date FROM contracts
           WHERE project_id = ?
             AND (? IS NULL OR id != ?)
             AND effective_from <= ?

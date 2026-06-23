@@ -298,7 +298,7 @@ export class TaskGridService {
 
     const ratesSql = `
       SELECT id, project_id, effective_from, end_date, rate_type, rate_amount, currency, hours_per_day
-        FROM project_rates
+        FROM contracts
        WHERE project_id IN (${projectIds.map(() => '?').join(',')})
        ORDER BY project_id, effective_from DESC
     `;

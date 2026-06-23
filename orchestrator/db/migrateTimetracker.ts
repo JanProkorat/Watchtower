@@ -56,6 +56,12 @@ const TABLES: Array<keyof TableCounts> = [
   'days_off',
 ];
 
+// v13 renamed project_rates → contracts in the Watchtower target DB.
+// The source TT DB still uses the old name; this map translates on INSERT.
+const TARGET_TABLE: Partial<Record<keyof TableCounts, string>> = {
+  project_rates: 'contracts',
+};
+
 const COLUMNS: Record<keyof TableCounts, readonly string[]> = {
   projects: [
     'id',
@@ -194,13 +200,14 @@ export function migrateTimetracker(
       const cols = COLUMNS[table];
       const colList = cols.join(', ');
       const placeholders = cols.map(() => '?').join(', ');
+      const targetTable = TARGET_TABLE[table] ?? table;
 
       const rows = source
         .prepare(`SELECT ${colList} FROM ${table}`)
         .all() as Array<Record<string, unknown>>;
 
       const insert = targetDb.prepare(
-        `INSERT INTO ${table} (${colList}) VALUES (${placeholders})`,
+        `INSERT INTO ${targetTable} (${colList}) VALUES (${placeholders})`,
       );
       for (const row of rows) {
         insert.run(...cols.map((c) => row[c] ?? null));

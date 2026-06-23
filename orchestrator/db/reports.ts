@@ -182,7 +182,7 @@ export class ReportsService {
                 p.color         AS project_color,
                 p.is_billable   AS is_billable,
                 (SELECT pr.currency
-                   FROM project_rates pr
+                   FROM contracts pr
                   WHERE pr.project_id = p.id
                   ORDER BY pr.effective_from DESC
                   LIMIT 1)      AS currency,
@@ -362,7 +362,7 @@ export class ReportsService {
                 p.color     AS project_color,
                 p.archived  AS archived
            FROM projects p
-           JOIN project_rates pr ON pr.project_id = p.id
+           JOIN contracts pr ON pr.project_id = p.id
           WHERE p.kind = 'work'
             AND pr.effective_from <= ?
             AND (pr.end_date IS NULL OR pr.end_date >= ?)
@@ -413,7 +413,7 @@ export class ReportsService {
                     ROW_NUMBER() OVER (
                       PARTITION BY pr.project_id ORDER BY pr.effective_from
                     ) AS rn
-               FROM project_rates pr
+               FROM contracts pr
            )
            SELECT o.project_id,
                   p.name        AS project_name,

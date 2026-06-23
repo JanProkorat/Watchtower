@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -211,6 +212,62 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       db.exec(
         `ALTER TABLE instances ADD COLUMN task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL`,
       );
+    },
+  },
+  {
+    version: 13,
+    up: (db) => {
+      // #69 TimeTracker → Postgres sync: add cross-store sync columns to the 6
+      // synced tables, rename project_rates → contracts, and backfill sync_id +
+      // updated_at on existing rows so the SQLite and Postgres stores start
+      // aligned (cursor = max(updated_at)). Operational tables (instances,
+      // hook_events, notifications, settings) are NOT synced and untouched.
+      const ISO_DEFAULT = `(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`;
+
+      // 1) Rename the table. SQLite ALTER TABLE RENAME is cheap and preserves
+      //    indexes/FKs (child FKs referencing project_rates are by table, and
+      //    SQLite rewrites them on rename in modern versions). The unique index
+      //    name is historical; recreate it under the new name for clarity.
+      db.exec(`ALTER TABLE project_rates RENAME TO contracts`);
+      db.exec(`DROP INDEX IF EXISTS idx_project_rates_pid_date`);
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_contracts_pid_date ON contracts(project_id, effective_from)`,
+      );
+
+      // 2) Add sync columns to each synced table. updated_at gets a NOT NULL
+      //    default in ISO-Z form so the SQL default and JS-set values match
+      //    byte-for-byte (LWW comparison key).
+      const tables = ['projects', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'];
+      for (const t of tables) {
+        db.exec(`ALTER TABLE ${t} ADD COLUMN sync_id TEXT`);
+        db.exec(`ALTER TABLE ${t} ADD COLUMN updated_at TEXT NOT NULL DEFAULT ${ISO_DEFAULT}`);
+        db.exec(`ALTER TABLE ${t} ADD COLUMN deleted_at TEXT`);
+        db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${t}_sync_id ON ${t}(sync_id)`);
+      }
+
+      // 3) Backfill: every existing row gets a fresh UUID sync_id and an
+      //    updated_at seeded from created_at (normalised to ISO-Z). days_off is
+      //    keyed by `date`, the others by integer id.
+      const normaliseTs = (raw: string | null): string => {
+        // SQLite created_at is 'YYYY-MM-DD HH:MM:SS' (UTC). Convert to ISO-Z.
+        if (!raw) return new Date().toISOString();
+        const iso = raw.includes('T') ? raw : raw.replace(' ', 'T') + 'Z';
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+      };
+
+      for (const t of tables) {
+        const keyCol = t === 'days_off' ? 'date' : 'id';
+        const rows = db
+          .prepare(`SELECT ${keyCol} AS k, created_at FROM ${t}`)
+          .all() as Array<{ k: string | number; created_at: string | null }>;
+        const upd = db.prepare(
+          `UPDATE ${t} SET sync_id = ?, updated_at = ? WHERE ${keyCol} = ?`,
+        );
+        for (const r of rows) {
+          upd.run(randomUUID(), normaliseTs(r.created_at), r.k);
+        }
+      }
     },
   },
 ];
