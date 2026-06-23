@@ -10,6 +10,12 @@ let reachable = false;
 beforeAll(async () => {
   store = createPgStore(PG_URL);
   if (!store) return;
+  // Safety guard: refuse to DROP SCHEMA against any non-localhost connection.
+  if (!/@(localhost|127\.0\.0\.1)[:/]/.test(PG_URL)) {
+    console.warn('[migrate.test] refusing DROP SCHEMA against non-localhost PG — skipping pg migration tests');
+    reachable = false;
+    return;
+  }
   try {
     await store.healthCheck();
     reachable = true;
@@ -67,6 +73,18 @@ describe('runPgMigrations', () => {
     const t = await store.query<{ id: number }>(`SELECT id FROM tasks WHERE sync_id='t1'`);
     const tid = t.rows[0].id;
 
+    // Positive case: two NULL-source rows must coexist (partial index WHERE source IS NOT NULL).
+    await store.query(
+      `INSERT INTO worklogs (sync_id, task_id, work_date, minutes, source, external_id, updated_at)
+       VALUES ('wn1',$1,'2026-01-10',30,NULL,NULL, now()), ('wn2',$1,'2026-01-11',30,NULL,NULL, now())`,
+      [tid],
+    );
+    const { rows: nullRows } = await store.query<{ sync_id: string }>(
+      `SELECT sync_id FROM worklogs WHERE source IS NULL ORDER BY sync_id`,
+    );
+    expect(nullRows.map((r) => r.sync_id)).toEqual(['wn1', 'wn2']);
+
+    // Negative case: two rows with same non-null (source, external_id) must be rejected.
     await store.query(
       `INSERT INTO worklogs (sync_id, task_id, work_date, minutes, source, external_id, updated_at)
        VALUES ('w1',$1,'2026-01-01',60,'jira','X', now()), ('w2',$1,'2026-01-02',60,'jira','Y', now())`,

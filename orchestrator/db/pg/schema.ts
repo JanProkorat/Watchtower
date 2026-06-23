@@ -7,6 +7,13 @@
 //   date-only columns; TIMESTAMPTZ for created/updated/deleted; NUMERIC for
 //   money/hours; JSONB for jira_globs. CHECK constraints + the partial unique
 //   worklog index carry over verbatim.
+//
+// ON DELETE CASCADE is intentionally omitted from all FK references
+// (epics.project_id, tasks.epic_id, worklogs.task_id, contracts.project_id).
+// The sync model uses soft-delete (deleted_at tombstones) and never issues hard
+// DELETEs — parent deletes propagate as explicit soft-delete cascades in the
+// repository layer (design §3.6), so DB-level CASCADE would never fire and
+// would only mask accidental hard-delete bugs.
 
 const PROJECTS = `
 CREATE TABLE IF NOT EXISTS projects (
@@ -117,6 +124,9 @@ CREATE TABLE IF NOT EXISTS contracts (
 CREATE INDEX IF NOT EXISTS idx_contracts_pid_date ON contracts(project_id, effective_from);
 `;
 
+// days_off uses date as the natural PK (faithful to the SQLite source where date
+// is the natural key). Nothing references days_off by FK and the local SERIAL id
+// never crosses the sync wire, so no surrogate id column is needed.
 const DAYS_OFF = `
 CREATE TABLE IF NOT EXISTS days_off (
   sync_id    TEXT NOT NULL UNIQUE,
