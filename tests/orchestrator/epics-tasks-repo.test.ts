@@ -106,8 +106,8 @@ describe('EpicsRepo', () => {
     const e = epics.create({ projectId, name: 'X' });
     db.prepare(`INSERT INTO tasks (epic_id, number, title) VALUES (?, 'T-1', 'task')`).run(e.id);
     epics.delete(e.id);
-    const tasks = db.prepare(`SELECT * FROM tasks WHERE epic_id = ?`).all(e.id);
-    expect(tasks).toEqual([]);
+    const task = db.prepare(`SELECT deleted_at FROM tasks WHERE epic_id = ?`).get(e.id) as any;
+    expect(task.deleted_at).toBeTruthy();
   });
 });
 
@@ -199,8 +199,8 @@ describe('TasksRepo', () => {
     const t = tasks.create({ epicId, number: 'X', title: 'X' });
     db.prepare(`INSERT INTO worklogs (task_id, work_date, minutes) VALUES (?, '2026-05-01', 30)`).run(t.id);
     tasks.delete(t.id);
-    const rows = db.prepare(`SELECT * FROM worklogs WHERE task_id = ?`).all(t.id);
-    expect(rows).toEqual([]);
+    const wl = db.prepare(`SELECT deleted_at FROM worklogs WHERE task_id = ?`).get(t.id) as any;
+    expect(wl.deleted_at).toBeTruthy();
   });
 
   describe('jira fields', () => {

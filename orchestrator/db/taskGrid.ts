@@ -148,7 +148,8 @@ export class TaskGridService {
          JOIN tasks t ON t.id = w.task_id
          JOIN epics e ON e.id = t.epic_id
          JOIN projects p ON p.id = e.project_id
-        WHERE w.work_date >= ? AND w.work_date <= ?`;
+        WHERE w.work_date >= ? AND w.work_date <= ?
+          AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL`;
     if (projectId !== undefined) {
       worklogSql += ' AND p.id = ?';
       worklogParams.push(projectId);
@@ -184,6 +185,7 @@ export class TaskGridService {
       JOIN epics e ON e.id = t.epic_id
       JOIN projects p ON p.id = e.project_id
       WHERE t.id IN (${taskIds.map(() => '?').join(',')})
+        AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL
     `;
     const taskMeta = this.db.prepare(taskMetaSql).all(...taskIds) as Array<
       TaskMetaRow & { epic_display_order: number | null }
@@ -300,6 +302,7 @@ export class TaskGridService {
       SELECT id, project_id, effective_from, end_date, rate_type, rate_amount, currency, hours_per_day
         FROM contracts
        WHERE project_id IN (${projectIds.map(() => '?').join(',')})
+         AND deleted_at IS NULL
        ORDER BY project_id, effective_from DESC
     `;
     const allRates = this.db.prepare(ratesSql).all(...projectIds) as RateRow[];

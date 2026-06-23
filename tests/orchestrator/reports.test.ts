@@ -284,4 +284,20 @@ describe('ReportsService', () => {
       expect(rows.map((r) => r.projectName)).toEqual(['Has limit']);
     });
   });
+
+  describe('soft-delete regression', () => {
+    it('byProject excludes soft-deleted worklogs', () => {
+      const { project, task } = seedSingleTaskWithWorklogs({
+        minutesByDate: { '2026-05-04': 60, '2026-05-05': 30 },
+      });
+      const before = reports.byProject('2026-05-01', '2026-05-31').find((r) => r.projectId === project.id);
+      expect(before?.minutes).toBe(90);
+      // Soft-delete the 60-minute worklog
+      const wls = worklogs.list({ projectId: project.id });
+      const wl60 = wls.find((w) => w.minutes === 60)!;
+      worklogs.delete(wl60.id);
+      const after = reports.byProject('2026-05-01', '2026-05-31').find((r) => r.projectId === project.id);
+      expect(after?.minutes).toBe(30);
+    });
+  });
 });

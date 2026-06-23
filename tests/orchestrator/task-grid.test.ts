@@ -341,4 +341,18 @@ describe('TaskGridService', () => {
       expect(res.earningsByCurrency.map((r) => r.currency)).toEqual(['CZK', 'EUR', 'USD']);
     });
   });
+
+  it('soft-deleted worklog is excluded from task grid', () => {
+    const p = s.projectsRepo.create({ name: 'P', kind: 'work' });
+    const e = s.epicsRepo.create({ projectId: p.id, name: 'E' });
+    const t = s.tasksRepo.create({ epicId: e.id, number: 'T-1', title: 'T' });
+    const wl = s.worklogsRepo.create({ taskId: t.id, workDate: '2026-05-15', minutes: 60 });
+
+    const before = s.service.get(2026, 5);
+    expect(before.tasks.find((r) => r.taskId === t.id)?.totalTracked).toBe(60);
+
+    s.worklogsRepo.delete(wl.id);
+    const after = s.service.get(2026, 5);
+    expect(after.tasks.find((r) => r.taskId === t.id)).toBeUndefined();
+  });
 });

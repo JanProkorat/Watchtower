@@ -1,4 +1,5 @@
 import type { SqliteLike } from '../migrations.js';
+import { nowIso, newSyncId } from '../syncColumns.js';
 
 export type DayOffKind = 'vacation' | 'sick' | 'other' | 'holiday';
 
@@ -41,7 +42,7 @@ export class DaysOffRepo {
     return (
       this.db
         .prepare(
-          `SELECT date, kind, note, created_at FROM days_off ORDER BY date ASC`,
+          `SELECT date, kind, note, created_at FROM days_off WHERE deleted_at IS NULL ORDER BY date ASC`,
         )
         .all() as DbRow[]
     ).map(toRow);
@@ -53,7 +54,7 @@ export class DaysOffRepo {
       this.db
         .prepare(
           `SELECT date, kind, note, created_at FROM days_off
-            WHERE date >= ? AND date <= ?
+            WHERE date >= ? AND date <= ? AND deleted_at IS NULL
             ORDER BY date ASC`,
         )
         .all(from, to) as DbRow[]
@@ -63,7 +64,7 @@ export class DaysOffRepo {
   /** Returns the row for a single date, or null if not marked. */
   get(date: string): DayOffRow | null {
     const row = this.db
-      .prepare(`SELECT date, kind, note, created_at FROM days_off WHERE date = ?`)
+      .prepare(`SELECT date, kind, note, created_at FROM days_off WHERE date = ? AND deleted_at IS NULL`)
       .get(date) as DbRow | undefined;
     return row ? toRow(row) : null;
   }
@@ -75,19 +76,30 @@ export class DaysOffRepo {
    * empty string to clear it.
    */
   upsert(input: DayOffInput): DayOffRow {
-    // Preserve existing note unless caller specified one (including null/empty).
-    const note =
-      input.note === undefined ? this.get(input.date)?.note ?? null : input.note;
+    const existing = this.getIncludingDeleted(input.date);
+    const note = input.note === undefined ? existing?.note ?? null : input.note;
+    const syncId = existing?.sync_id ?? newSyncId();
     this.db
       .prepare(
-        `INSERT INTO days_off (date, kind, note) VALUES (?, ?, ?)
-         ON CONFLICT(date) DO UPDATE SET kind = excluded.kind, note = excluded.note`,
+        `INSERT INTO days_off (date, kind, note, sync_id, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, NULL)
+         ON CONFLICT(date) DO UPDATE SET
+           kind = excluded.kind, note = excluded.note,
+           updated_at = excluded.updated_at, deleted_at = NULL`,
       )
-      .run(input.date, input.kind, note);
+      .run(input.date, input.kind, note, syncId, nowIso());
     return this.get(input.date)!;
   }
 
+  private getIncludingDeleted(date: string): { note: string | null; sync_id: string } | null {
+    const row = this.db.prepare(`SELECT note, sync_id FROM days_off WHERE date = ?`).get(date) as
+      | { note: string | null; sync_id: string }
+      | undefined;
+    return row ?? null;
+  }
+
   delete(date: string): void {
-    this.db.prepare(`DELETE FROM days_off WHERE date = ?`).run(date);
+    const ts = nowIso();
+    this.db.prepare(`UPDATE days_off SET deleted_at = ?, updated_at = ? WHERE date = ?`).run(ts, ts, date);
   }
 }

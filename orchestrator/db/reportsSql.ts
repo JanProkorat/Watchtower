@@ -43,6 +43,7 @@ export const PROJECT_RATE_PERIODS_CTE = `
              PARTITION BY pr.project_id ORDER BY pr.effective_from
            ) AS effective_to_exclusive
     FROM contracts pr
+    WHERE pr.deleted_at IS NULL
   )
 `;
 

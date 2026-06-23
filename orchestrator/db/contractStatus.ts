@@ -79,7 +79,8 @@ export class ContractStatusService {
           WHERE e.project_id = ?
             AND p.kind = 'work'
             AND w.work_date >= ?
-            AND w.work_date <= ?`,
+            AND w.work_date <= ?
+            AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL`,
       )
       .get(rate.projectId, rate.effectiveFrom, periodEnd) as { minutes: number };
 

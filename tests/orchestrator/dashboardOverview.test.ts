@@ -535,4 +535,16 @@ describe('DashboardOverviewService', () => {
       expect(res.activeContracts[0].contract.mdsRemaining).toBe(98.5);
     });
   });
+
+  it('soft-deleted worklog disappears from today.minutes', () => {
+    const { task } = seedTask('P', '#7aa7ff', 'T-1');
+    const wl = seedWorklog(task.id, '2026-05-25', 90);
+
+    const before = service.run({ projectId: null, sprintAnchor: '2026-05-25', todayDate: '2026-05-25' });
+    expect(before.today.minutes).toBe(90);
+
+    worklogs.delete(wl.id);
+    const after = service.run({ projectId: null, sprintAnchor: '2026-05-25', todayDate: '2026-05-25' });
+    expect(after.today.minutes).toBe(0);
+  });
 });

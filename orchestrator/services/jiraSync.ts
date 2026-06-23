@@ -152,6 +152,7 @@ function loadCandidates(
          JOIN epics e ON e.id = t.epic_id
          JOIN projects p ON p.id = e.project_id
          WHERE w.work_date BETWEEN ? AND ?${projectFilter}
+           AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL
          ORDER BY w.work_date ASC, w.id ASC`,
     )
     .all(...params) as CandidateRow[];

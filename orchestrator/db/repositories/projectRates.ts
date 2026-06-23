@@ -1,4 +1,5 @@
 import type { SqliteLike } from '../migrations.js';
+import { nowIso, newSyncId } from '../syncColumns.js';
 
 export type RateType = 'hourly' | 'daily';
 
@@ -85,6 +86,7 @@ export class ProjectRatesRepo {
                 hours_per_day, end_date, md_limit, created_at
            FROM contracts
           WHERE project_id = ?
+            AND deleted_at IS NULL
           ORDER BY effective_from DESC, id DESC`,
       )
       .all(projectId) as DbRow[];
@@ -96,7 +98,7 @@ export class ProjectRatesRepo {
       .prepare(
         `SELECT id, project_id, effective_from, rate_type, rate_amount, currency,
                 hours_per_day, end_date, md_limit, created_at
-           FROM contracts WHERE id = ?`,
+           FROM contracts WHERE id = ? AND deleted_at IS NULL`,
       )
       .get(id) as DbRow | undefined;
     return row ? toRow(row) : null;
@@ -113,6 +115,7 @@ export class ProjectRatesRepo {
           WHERE project_id = ?
             AND effective_from <= ?
             AND (end_date IS NULL OR end_date >= ?)
+            AND deleted_at IS NULL
           ORDER BY effective_from DESC, id DESC
           LIMIT 1`,
       )
@@ -129,8 +132,8 @@ export class ProjectRatesRepo {
         .prepare(
           `INSERT INTO contracts
              (project_id, effective_from, rate_type, rate_amount, currency,
-              hours_per_day, end_date, md_limit)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              hours_per_day, end_date, md_limit, sync_id, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           input.projectId,
@@ -141,6 +144,7 @@ export class ProjectRatesRepo {
           input.hoursPerDay ?? 8,
           input.endDate ?? null,
           input.mdLimit ?? null,
+          newSyncId(), nowIso(),
         ) as { lastInsertRowid: number | bigint };
       this.db.exec('COMMIT');
       return this.get(Number(info.lastInsertRowid))!;
@@ -173,6 +177,7 @@ export class ProjectRatesRepo {
       if (input.currency !== undefined) push('currency', input.currency);
       if (input.hoursPerDay !== undefined) push('hours_per_day', input.hoursPerDay);
       if (input.mdLimit !== undefined) push('md_limit', input.mdLimit);
+      push('updated_at', nowIso());
 
       if (sets.length > 0) {
         params.push(id);
@@ -189,7 +194,8 @@ export class ProjectRatesRepo {
   }
 
   delete(id: number): void {
-    this.db.prepare(`DELETE FROM contracts WHERE id = ?`).run(id);
+    const ts = nowIso();
+    this.db.prepare(`UPDATE contracts SET deleted_at = ?, updated_at = ? WHERE id = ?`).run(ts, ts, id);
   }
 
   /**
@@ -203,12 +209,13 @@ export class ProjectRatesRepo {
     this.db
       .prepare(
         `UPDATE contracts
-            SET end_date = ?
+            SET end_date = ?, updated_at = ?
           WHERE project_id = ?
             AND end_date IS NULL
-            AND effective_from < ?`,
+            AND effective_from < ?
+            AND deleted_at IS NULL`,
       )
-      .run(dayBefore, projectId, newFrom);
+      .run(dayBefore, nowIso(), projectId, newFrom);
   }
 
   /**
@@ -230,6 +237,7 @@ export class ProjectRatesRepo {
             AND (? IS NULL OR id != ?)
             AND effective_from <= ?
             AND COALESCE(end_date, ?) >= ?
+            AND deleted_at IS NULL
           LIMIT 1`,
       )
       .get(

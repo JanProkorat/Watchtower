@@ -77,7 +77,7 @@ const SNAPSHOT_SQL = `
     t.jira_component AS jira_component,
     t.jira_synced_at AS jira_synced_at,
     (SELECT COALESCE(SUM(w.minutes), 0)
-       FROM worklogs w WHERE w.task_id = t.id) AS logged_minutes,
+       FROM worklogs w WHERE w.task_id = t.id AND w.deleted_at IS NULL) AS logged_minutes,
     p.id            AS project_id,
     p.name          AS project_name,
     p.color         AS project_color,
@@ -87,6 +87,7 @@ const SNAPSHOT_SQL = `
   JOIN epics    e ON e.id = t.epic_id
   JOIN projects p ON p.id = e.project_id
   WHERE t.jira_status IS NOT NULL AND p.id = ?
+    AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL
   ORDER BY (t.jira_estimate_secs IS NULL), t.jira_estimate_secs DESC, t.number ASC
 `;
 

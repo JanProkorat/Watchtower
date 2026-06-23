@@ -1,4 +1,5 @@
 import type { SqliteLike } from '../migrations.js';
+import { nowIso, newSyncId } from '../syncColumns.js';
 
 export type ProjectKind = 'work' | 'time_off';
 
@@ -126,12 +127,12 @@ const LIST_SQL = `
   SELECT
     p.id, p.name, p.color, p.archived, p.kind, p.is_default,
     p.folder_path, p.jira_globs, p.jira_board_url, p.task_url_template, p.description, p.created_at,
-    (SELECT COUNT(*) FROM epics e WHERE e.project_id = p.id) AS epic_count,
+    (SELECT COUNT(*) FROM epics e WHERE e.project_id = p.id AND e.deleted_at IS NULL) AS epic_count,
     (SELECT COALESCE(SUM(w.minutes), 0)
        FROM worklogs w
        JOIN tasks t ON t.id = w.task_id
        JOIN epics e ON e.id = t.epic_id
-      WHERE e.project_id = p.id) AS total_minutes
+      WHERE e.project_id = p.id AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL) AS total_minutes
   FROM projects p
 `;
 
@@ -139,7 +140,7 @@ export class ProjectsRepo {
   constructor(private db: SqliteLike) {}
 
   list(filter: ProjectListFilter = {}): ProjectRow[] {
-    const where: string[] = [];
+    const where: string[] = ['p.deleted_at IS NULL'];
     const params: unknown[] = [];
 
     if (filter.archived !== undefined) {
@@ -166,7 +167,7 @@ export class ProjectsRepo {
   }
 
   get(id: number): ProjectRow | null {
-    const row = this.db.prepare(LIST_SQL + ' WHERE p.id = ?').get(id) as DbRow | undefined;
+    const row = this.db.prepare(LIST_SQL + ' WHERE p.id = ? AND p.deleted_at IS NULL').get(id) as DbRow | undefined;
     return row ? toRow(row) : null;
   }
 
@@ -187,20 +188,13 @@ export class ProjectsRepo {
       if (isDefault) this.clearDefault();
       const info = this.db
         .prepare(
-          `INSERT INTO projects (name, color, archived, is_billable, kind, is_default, folder_path, jira_globs, jira_board_url, task_url_template, description)
-           VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO projects (name, color, archived, is_billable, kind, is_default, folder_path, jira_globs, jira_board_url, task_url_template, description, sync_id, updated_at)
+           VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
-          input.name,
-          color,
-          isBillable,
-          kind,
-          isDefault,
-          input.folderPath ?? null,
-          globs,
-          boardUrl,
-          taskUrl,
-          input.description ?? null,
+          input.name, color, isBillable, kind, isDefault,
+          input.folderPath ?? null, globs, boardUrl, taskUrl, input.description ?? null,
+          newSyncId(), nowIso(),
         ) as { lastInsertRowid: number | bigint };
       this.db.exec('COMMIT');
       const id = Number(info.lastInsertRowid);
@@ -245,6 +239,7 @@ export class ProjectsRepo {
       try {
         if (input.isDefault) this.clearDefault();
         push('is_default', input.isDefault ? 1 : 0);
+        push('updated_at', nowIso());
         params.push(id);
         if (sets.length > 0) {
           this.db.prepare(`UPDATE projects SET ${sets.join(', ')} WHERE id = ?`).run(...params);
@@ -254,7 +249,8 @@ export class ProjectsRepo {
         this.db.exec('ROLLBACK');
         throw err;
       }
-    } else if (sets.length > 0) {
+    } else {
+      push('updated_at', nowIso());
       params.push(id);
       this.db.prepare(`UPDATE projects SET ${sets.join(', ')} WHERE id = ?`).run(...params);
     }
@@ -265,21 +261,43 @@ export class ProjectsRepo {
   }
 
   archive(id: number, archived: boolean): void {
-    // Archiving the current default would leave the user without one — clear
-    // the flag so the next non-archived project the user picks can take over.
+    const ts = nowIso();
     if (archived) {
-      this.db
-        .prepare(`UPDATE projects SET archived = 1, is_default = 0 WHERE id = ?`)
-        .run(id);
+      this.db.prepare(`UPDATE projects SET archived = 1, is_default = 0, updated_at = ? WHERE id = ?`).run(ts, id);
     } else {
-      this.db.prepare(`UPDATE projects SET archived = 0 WHERE id = ?`).run(id);
+      this.db.prepare(`UPDATE projects SET archived = 0, updated_at = ? WHERE id = ?`).run(ts, id);
     }
   }
 
   delete(id: number): void {
-    // ON DELETE CASCADE on epics / project_rates handles child rows; days_off
-    // is project-independent and worklogs cascade through tasks → epics.
-    this.db.prepare(`DELETE FROM projects WHERE id = ?`).run(id);
+    // Soft-delete + explicit cascade (FK ON DELETE CASCADE no longer fires —
+    // these are tombstones the sync propagates). Order: leaves first.
+    const ts = nowIso();
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.prepare(
+        `UPDATE worklogs SET deleted_at = ?, updated_at = ?
+           WHERE deleted_at IS NULL AND task_id IN (
+             SELECT t.id FROM tasks t JOIN epics e ON e.id = t.epic_id WHERE e.project_id = ?)`,
+      ).run(ts, ts, id);
+      this.db.prepare(
+        `UPDATE tasks SET deleted_at = ?, updated_at = ?
+           WHERE deleted_at IS NULL AND epic_id IN (SELECT id FROM epics WHERE project_id = ?)`,
+      ).run(ts, ts, id);
+      this.db.prepare(
+        `UPDATE epics SET deleted_at = ?, updated_at = ? WHERE deleted_at IS NULL AND project_id = ?`,
+      ).run(ts, ts, id);
+      this.db.prepare(
+        `UPDATE contracts SET deleted_at = ?, updated_at = ? WHERE deleted_at IS NULL AND project_id = ?`,
+      ).run(ts, ts, id);
+      this.db.prepare(
+        `UPDATE projects SET deleted_at = ?, updated_at = ? WHERE id = ?`,
+      ).run(ts, ts, id);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   /** Internal helper — must be called inside an explicit transaction. */

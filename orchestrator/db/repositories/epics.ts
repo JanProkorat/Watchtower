@@ -1,4 +1,5 @@
 import type { SqliteLike } from '../migrations.js';
+import { nowIso, newSyncId } from '../syncColumns.js';
 
 export type EpicStatus = 'planned' | 'active' | 'done';
 
@@ -82,11 +83,11 @@ const LIST_SQL = `
   SELECT
     e.id, e.project_id, e.name, e.description, e.status, e.display_order,
     e.jira_epic_key, e.shortcut, e.github_issue_url, e.created_at,
-    (SELECT COUNT(*) FROM tasks t WHERE t.epic_id = e.id) AS task_count,
+    (SELECT COUNT(*) FROM tasks t WHERE t.epic_id = e.id AND t.deleted_at IS NULL) AS task_count,
     (SELECT COALESCE(SUM(w.minutes), 0)
        FROM worklogs w
        JOIN tasks t ON t.id = w.task_id
-      WHERE t.epic_id = e.id) AS total_minutes
+      WHERE t.epic_id = e.id AND w.deleted_at IS NULL AND t.deleted_at IS NULL) AS total_minutes
   FROM epics e
 `;
 
@@ -97,7 +98,7 @@ export class EpicsRepo {
     const rows = this.db
       .prepare(
         LIST_SQL +
-          ` WHERE e.project_id = ?
+          ` WHERE e.project_id = ? AND e.deleted_at IS NULL
            ORDER BY e.display_order ASC, e.id ASC`,
       )
       .all(projectId) as DbRow[];
@@ -116,13 +117,14 @@ export class EpicsRepo {
         SELECT
           e.id, e.project_id, e.name, e.description, e.status, e.display_order,
           e.jira_epic_key, e.shortcut, e.github_issue_url, e.created_at,
-          (SELECT COUNT(*) FROM tasks t WHERE t.epic_id = e.id) AS task_count,
+          (SELECT COUNT(*) FROM tasks t WHERE t.epic_id = e.id AND t.deleted_at IS NULL) AS task_count,
           0 AS total_minutes,
           p.name  AS project_name,
           p.color AS project_color
         FROM epics e
         JOIN projects p ON p.id = e.project_id
         WHERE p.archived = 0
+          AND e.deleted_at IS NULL AND p.deleted_at IS NULL
         ORDER BY p.name COLLATE NOCASE ASC, e.display_order ASC, e.id ASC
         `,
       )
@@ -135,7 +137,7 @@ export class EpicsRepo {
   }
 
   get(id: number): EpicRow | null {
-    const row = this.db.prepare(LIST_SQL + ' WHERE e.id = ?').get(id) as DbRow | undefined;
+    const row = this.db.prepare(LIST_SQL + ' WHERE e.id = ? AND e.deleted_at IS NULL').get(id) as DbRow | undefined;
     return row ? toRow(row) : null;
   }
 
@@ -146,7 +148,7 @@ export class EpicsRepo {
    */
   findByJiraEpicKey(projectId: number, jiraEpicKey: string): EpicRow | null {
     const row = this.db
-      .prepare(LIST_SQL + ' WHERE e.project_id = ? AND e.jira_epic_key = ? LIMIT 1')
+      .prepare(LIST_SQL + ' WHERE e.project_id = ? AND e.jira_epic_key = ? AND e.deleted_at IS NULL LIMIT 1')
       .get(projectId, jiraEpicKey) as DbRow | undefined;
     return row ? toRow(row) : null;
   }
@@ -162,8 +164,8 @@ export class EpicsRepo {
     const info = this.db
       .prepare(
         `INSERT INTO epics
-           (project_id, name, description, status, display_order, jira_epic_key, shortcut, github_issue_url)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (project_id, name, description, status, display_order, jira_epic_key, shortcut, github_issue_url, sync_id, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.projectId,
@@ -174,6 +176,7 @@ export class EpicsRepo {
         input.jiraEpicKey ?? null,
         normaliseShortcut(input.shortcut),
         input.githubIssueUrl ?? null,
+        newSyncId(), nowIso(),
       ) as { lastInsertRowid: number | bigint };
 
     return this.get(Number(info.lastInsertRowid))!;
@@ -192,6 +195,7 @@ export class EpicsRepo {
     if (input.jiraEpicKey !== undefined) push('jira_epic_key', input.jiraEpicKey);
     if (input.shortcut !== undefined) push('shortcut', normaliseShortcut(input.shortcut));
     if (input.githubIssueUrl !== undefined) push('github_issue_url', input.githubIssueUrl);
+    push('updated_at', nowIso());
 
     if (sets.length > 0) {
       params.push(id);
@@ -207,10 +211,10 @@ export class EpicsRepo {
     this.db.exec('BEGIN IMMEDIATE');
     try {
       const update = this.db.prepare(
-        `UPDATE epics SET display_order = ? WHERE id = ? AND project_id = ?`,
+        `UPDATE epics SET display_order = ?, updated_at = ? WHERE id = ? AND project_id = ?`,
       );
       orderedIds.forEach((id, i) => {
-        update.run((i + 1) * 1000, id, projectId);
+        update.run((i + 1) * 1000, nowIso(), id, projectId);
       });
       this.db.exec('COMMIT');
     } catch (err) {
@@ -220,7 +224,23 @@ export class EpicsRepo {
   }
 
   delete(id: number): void {
-    // tasks → worklogs cascade via ON DELETE CASCADE on the schema FK
-    this.db.prepare(`DELETE FROM epics WHERE id = ?`).run(id);
+    const ts = nowIso();
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.prepare(
+        `UPDATE worklogs SET deleted_at = ?, updated_at = ?
+           WHERE deleted_at IS NULL AND task_id IN (SELECT id FROM tasks WHERE epic_id = ?)`,
+      ).run(ts, ts, id);
+      this.db.prepare(
+        `UPDATE tasks SET deleted_at = ?, updated_at = ? WHERE deleted_at IS NULL AND epic_id = ?`,
+      ).run(ts, ts, id);
+      this.db.prepare(
+        `UPDATE epics SET deleted_at = ?, updated_at = ? WHERE id = ?`,
+      ).run(ts, ts, id);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 }
