@@ -162,6 +162,10 @@ function resolveHelperPath(): string {
   return path.join(__dirname, '..', '..', 'dist-helper', 'watchtower-hook.mjs');
 }
 
+function notifySync(): void {
+  handle?.sync.notifyLocalChange();
+}
+
 function repo(): InstancesRepo {
   return new InstancesRepo(handle!.db);
 }
@@ -622,6 +626,8 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
         const v = req.payload.value.trim();
         if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
           tasksRepo().markToAcceptDoneOnOrBefore(v);
+          // Flipping to_accept→done on tasks is a synced-table mutation.
+          notifySync();
         }
       }
       return { ok: true };
@@ -709,21 +715,25 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
     case 'projects:create': {
       const input = req.payload as ProjectInput;
       const row = projectsRepo().create(input);
+      notifySync();
       return { project: projectViewOf(row) };
     }
 
     case 'projects:update': {
       const row = projectsRepo().update(req.payload.id, req.payload.input as Partial<ProjectInput>);
+      notifySync();
       return { project: projectViewOf(row) };
     }
 
     case 'projects:archive': {
       projectsRepo().archive(req.payload.id, req.payload.archived);
+      notifySync();
       return { ok: true };
     }
 
     case 'projects:delete': {
       projectsRepo().delete(req.payload.id);
+      notifySync();
       return { ok: true };
     }
 
@@ -733,18 +743,26 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
     case 'epics:listAll':
       return { epics: epicsRepo().listAll() };
 
-    case 'epics:create':
-      return { epic: epicsRepo().create(req.payload as EpicInput) };
+    case 'epics:create': {
+      const epic = epicsRepo().create(req.payload as EpicInput);
+      notifySync();
+      return { epic };
+    }
 
-    case 'epics:update':
-      return { epic: epicsRepo().update(req.payload.id, req.payload.input as Partial<EpicInput>) };
+    case 'epics:update': {
+      const epic = epicsRepo().update(req.payload.id, req.payload.input as Partial<EpicInput>);
+      notifySync();
+      return { epic };
+    }
 
     case 'epics:reorder':
       epicsRepo().reorder(req.payload.projectId, req.payload.orderedIds);
+      notifySync();
       return { ok: true };
 
     case 'epics:delete':
       epicsRepo().delete(req.payload.id);
+      notifySync();
       return { ok: true };
 
     case 'tasks:listForEpic':
@@ -759,20 +777,26 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
     case 'tasks:findById':
       return { task: resolveTaskByNumberPayload(tasksRepo().get(req.payload.id)) };
 
-    case 'tasks:create':
-      return { task: tasksRepo().create(req.payload as TaskInput) };
+    case 'tasks:create': {
+      const task = tasksRepo().create(req.payload as TaskInput);
+      notifySync();
+      return { task };
+    }
 
     case 'tasks:update': {
       // Block all user edits on a done task. Status field is the only one
       // a user could plausibly want to change (to re-open), and we still
       // disallow it — Jira is the source of truth for "is this done".
       assertTaskNotDone(req.payload.id, 'edit task');
-      return { task: tasksRepo().update(req.payload.id, req.payload.input as Partial<TaskInput>) };
+      const task = tasksRepo().update(req.payload.id, req.payload.input as Partial<TaskInput>);
+      notifySync();
+      return { task };
     }
 
     case 'tasks:delete':
       assertTaskNotDone(req.payload.id, 'delete task');
       tasksRepo().delete(req.payload.id);
+      notifySync();
       return { ok: true };
 
     case 'worklogs:list':
@@ -781,24 +805,27 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
     case 'worklogs:create': {
       const input = req.payload as WorklogInput;
       assertTaskNotDone(input.taskId, 'add worklog');
-      return { worklog: worklogsRepo().create(input) };
+      const worklog = worklogsRepo().create(input);
+      notifySync();
+      return { worklog };
     }
 
     case 'worklogs:update': {
       const existing = worklogsRepo().get(req.payload.id);
       if (existing) assertTaskNotDone(existing.taskId, 'edit worklog');
-      return {
-        worklog: worklogsRepo().update(
-          req.payload.id,
-          req.payload.input as Partial<WorklogInput>,
-        ),
-      };
+      const worklog = worklogsRepo().update(
+        req.payload.id,
+        req.payload.input as Partial<WorklogInput>,
+      );
+      notifySync();
+      return { worklog };
     }
 
     case 'worklogs:delete': {
       const existing = worklogsRepo().get(req.payload.id);
       if (existing) assertTaskNotDone(existing.taskId, 'delete worklog');
       worklogsRepo().delete(req.payload.id);
+      notifySync();
       return { ok: true };
     }
 
@@ -810,6 +837,7 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
     case 'contracts:create': {
       try {
         const row = projectRatesRepo().create(req.payload as ProjectRateInput);
+        notifySync();
         return { contract: contractViewOf(row) };
       } catch (err) {
         if (err instanceof RateOverlapError) {
@@ -830,6 +858,7 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
           req.payload.id,
           req.payload.input as Partial<ProjectRateInput>,
         );
+        notifySync();
         return { contract: contractViewOf(row) };
       } catch (err) {
         if (err instanceof RateOverlapError) {
@@ -846,6 +875,7 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
 
     case 'contracts:delete':
       projectRatesRepo().delete(req.payload.id);
+      notifySync();
       return { ok: true };
 
     case 'taskGrid:get': {
@@ -862,11 +892,15 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
         daysOff: new DaysOffRepo(handle!.db).listInRange(req.payload.from, req.payload.to),
       };
 
-    case 'daysOff:upsert':
-      return { dayOff: new DaysOffRepo(handle!.db).upsert(req.payload as DayOffInput) };
+    case 'daysOff:upsert': {
+      const dayOff = new DaysOffRepo(handle!.db).upsert(req.payload as DayOffInput);
+      notifySync();
+      return { dayOff };
+    }
 
     case 'daysOff:delete':
       new DaysOffRepo(handle!.db).delete(req.payload.date);
+      notifySync();
       return { ok: true };
 
     case 'holidays:list': {
@@ -974,8 +1008,11 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
     case 'jira:syncPreview':
       return new JiraSyncService(handle!.db).preview(req.payload);
 
-    case 'jira:sync':
-      return await new JiraSyncService(handle!.db).sync(req.payload);
+    case 'jira:sync': {
+      const jiraResult = await new JiraSyncService(handle!.db).sync(req.payload);
+      notifySync();
+      return jiraResult;
+    }
 
     case 'board:authPing':
       return new JiraBoardService(handle!.db).authPing();
@@ -987,11 +1024,13 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
       const svc = new JiraBoardService(handle!.db);
       const result = await svc.sync(req.payload.projectId);
       const snapshot = { ...svc.getSnapshot(req.payload.projectId), lastSyncResult: result };
+      notifySync();
       return { snapshot, result };
     }
 
     case 'board:remove': {
       new TasksRepo(handle!.db).clearJiraStatus(req.payload.taskId);
+      notifySync();
       return { snapshot: new JiraBoardService(handle!.db).getSnapshot(req.payload.projectId) };
     }
 

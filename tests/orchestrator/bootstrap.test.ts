@@ -57,6 +57,28 @@ describe('bootstrap', () => {
     expect(sidecar.token).toBe(existing);
   });
 
+  it('boots SQLite-only when Postgres is unavailable (sync dormant)', async () => {
+    const prevUrl = process.env.WATCHTOWER_PG_URL;
+    const prevDev = process.env.WATCHTOWER_DEV_URL;
+    delete process.env.WATCHTOWER_PG_URL;
+    delete process.env.WATCHTOWER_DEV_URL;
+    try {
+      handle = await bootstrap({
+        supportDir: mkdtempSync(path.join(tmpdir(), 'wt-boot-')),
+        portRange: [0, 0],
+        dbFactory: nodeSqliteFactory,
+        timetrackerMigration: { skip: true },
+      });
+      expect(handle.sync).toBeTruthy();
+      expect(handle.pg).toBeNull();
+      const r = await handle.sync.syncNow();
+      expect(r.ok).toBe(true);
+    } finally {
+      if (prevUrl === undefined) delete process.env.WATCHTOWER_PG_URL; else process.env.WATCHTOWER_PG_URL = prevUrl;
+      if (prevDev === undefined) delete process.env.WATCHTOWER_DEV_URL; else process.env.WATCHTOWER_DEV_URL = prevDev;
+    }
+  });
+
   it('writes hook events to the DB via the listener', async () => {
     const seen: Array<{ event: string; instanceId: string }> = [];
     handle = await bootstrap({
