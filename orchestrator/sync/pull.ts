@@ -62,12 +62,15 @@ export async function pullTable(
     if (existing) {
       const localUpdated = existing.updated_at;
       if (localUpdated >= remoteUpdated) {
-        // Local is newer-or-equal → keep local. If local changed since the last
-        // pull (i.e. > cursor, not just ==), this is a genuine conflict the local
-        // side won. The > (not >=) guard prevents false-positive conflicts on rows
-        // that were freshly pulled in a prior cycle (where local updated_at ==
-        // pull cursor, meaning no local mutation happened).
-        if (localUpdated > cursor) {
+        // Local is newer-or-equal → keep local.
+        // A genuine local-won conflict requires local to be STRICTLY newer than
+        // remote (real divergence). Equal timestamps mean the two stores are
+        // already aligned — e.g. immediately after ETL seeds Postgres from SQLite,
+        // or right after a push — so equality is convergence, not divergence.
+        // The second guard (> cursor) prevents false-positive conflicts on rows
+        // freshly pulled in a prior cycle (local updated_at == pull cursor means
+        // no local mutation happened since the last sync).
+        if (localUpdated > remoteUpdated && localUpdated > cursor) {
           conflicts++;
           await logConflict(store, table, syncId, 'local_won', 'remote', remote, localUpdated, remoteUpdated);
         }
@@ -104,6 +107,16 @@ export async function pullTable(
   return { pulled, conflicts };
 }
 
+/**
+ * Pull all synced tables from Postgres into SQLite in parent-before-child order.
+ *
+ * Isolation caveat: child tables MUST be pulled via `pullAll` (not `pullTable`
+ * in isolation), because a child row whose parent isn't local yet is skipped,
+ * and the pull cursor may advance past it if a later sibling in the same batch
+ * is processed. `pullAll`'s PULL_ORDER guarantees the parent has landed before
+ * any of its children are attempted, so the skip path is not reachable in
+ * normal use.
+ */
 export async function pullAll(
   db: SqliteLike,
   store: PgStore,

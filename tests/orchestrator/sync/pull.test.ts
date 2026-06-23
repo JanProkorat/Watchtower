@@ -79,4 +79,30 @@ describe('pullAll', () => {
     const { rows } = await store.query<{ c: string }>(`SELECT COUNT(*)::text c FROM sync_conflicts WHERE sync_id=$1`, [syncId]);
     expect(Number(rows[0]!.c)).toBeGreaterThanOrEqual(1);
   });
+
+  it('no spurious conflict when local and remote are aligned (post-ETL/post-push state)', async () => {
+    // Regression test for Fix 1: when localUpdated == remoteUpdated (i.e. the
+    // row was pushed and both stores now carry identical updated_at), a fresh
+    // pullAll with a EPOCH cursor must NOT log a local_won conflict.
+    if (!reachable || !store) return;
+    const db = freshSqlite();
+    // Create a project locally and push it to PG — both stores now have the
+    // same updated_at for this row.
+    const p = new ProjectsRepo(db).create({ name: 'Aligned' });
+    await pushAll(db, store);
+    const syncId = (db.prepare(`SELECT sync_id FROM projects WHERE id=?`).get(p.id) as any).sync_id;
+    // Use a second fresh SQLite with an EPOCH pull cursor (simulates first
+    // pullAll after ETL). The row exists in PG; the SQLite already has the same
+    // row with identical updated_at because it was just pushed.
+    // Simulate "fresh pull cursor" by running pullAll on the same db — the
+    // existing pull cursor was never set (EPOCH), so localUpdated == remoteUpdated.
+    const syncId2 = syncId; // same db, cursor is at EPOCH
+    const res = await pullAll(db, store);
+    expect(res.projects.conflicts).toBe(0);
+    const { rows } = await store.query<{ c: string }>(
+      `SELECT COUNT(*)::text c FROM sync_conflicts WHERE sync_id=$1`,
+      [syncId2],
+    );
+    expect(Number(rows[0]!.c)).toBe(0);
+  });
 });
