@@ -1,4 +1,5 @@
 import type { SqliteLike } from '../migrations.js';
+import { nowIso, newSyncId } from '../syncColumns.js';
 
 export type WorklogSource = 'manual' | 'watchtower-auto' | 'jira-sync' | string;
 
@@ -151,7 +152,7 @@ export class WorklogsRepo {
   }
 
   list(filter: WorklogListFilter = {}): WorklogRow[] {
-    const where: string[] = [];
+    const where: string[] = ['w.deleted_at IS NULL'];
     const params: unknown[] = [];
 
     if (filter.projectId !== undefined) {
@@ -199,7 +200,7 @@ export class WorklogsRepo {
   }
 
   get(id: number): WorklogRow | null {
-    const row = this.db.prepare(SELECT_JOINED + ' WHERE w.id = ?').get(id) as DbRow | undefined;
+    const row = this.db.prepare(SELECT_JOINED + ' WHERE w.id = ? AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL').get(id) as DbRow | undefined;
     return row ? toRow(row) : null;
   }
 
@@ -212,8 +213,8 @@ export class WorklogsRepo {
       .prepare(
         `INSERT INTO worklogs
            (task_id, description, work_date, minutes, reported_minutes,
-            source, external_id, jira_uploaded)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            source, external_id, jira_uploaded, sync_id, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.taskId,
@@ -224,6 +225,7 @@ export class WorklogsRepo {
         source,
         input.externalId ?? null,
         input.jiraUploaded ? 1 : 0,
+        newSyncId(), nowIso(),
       ) as { lastInsertRowid: number | bigint };
     return this.get(Number(info.lastInsertRowid))!;
   }
@@ -249,6 +251,7 @@ export class WorklogsRepo {
     // origin of the worklog stays accurate (Jira-sourced rows can't be
     // re-labelled as manual). To re-import, delete + recreate.
     if (input.jiraUploaded !== undefined) push('jira_uploaded', input.jiraUploaded ? 1 : 0);
+    push('updated_at', nowIso());
 
     if (sets.length > 0) {
       params.push(id);
@@ -262,6 +265,7 @@ export class WorklogsRepo {
   delete(id: number): void {
     const existing = this.get(id);
     this.throwIfLocked(existing?.workDate);
-    this.db.prepare(`DELETE FROM worklogs WHERE id = ?`).run(id);
+    const ts = nowIso();
+    this.db.prepare(`UPDATE worklogs SET deleted_at = ?, updated_at = ? WHERE id = ?`).run(ts, ts, id);
   }
 }

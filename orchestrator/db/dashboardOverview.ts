@@ -97,17 +97,19 @@ export class DashboardOverviewService {
                          p.name  AS project_name,
                          p.color AS project_color,
                          (SELECT pr2.currency
-                            FROM project_rates pr2
+                            FROM contracts pr2
                            WHERE pr2.project_id = p.id
+                             AND pr2.deleted_at IS NULL
                            ORDER BY pr2.effective_from DESC, pr2.id DESC
                            LIMIT 1) AS currency
            FROM projects p
-           JOIN project_rates pr ON pr.project_id = p.id
+           JOIN contracts pr ON pr.project_id = p.id
           WHERE p.archived = 0
             AND p.kind = 'work'
             AND pr.effective_from <= ?
             AND (pr.end_date IS NULL OR pr.end_date >= ?)
             AND (pr.end_date IS NOT NULL OR pr.md_limit IS NOT NULL)
+            AND p.deleted_at IS NULL AND pr.deleted_at IS NULL
           ORDER BY p.name ASC`,
       )
       .all(todayDate, todayDate) as Row[];
@@ -143,7 +145,8 @@ export class DashboardOverviewService {
       JOIN tasks   t ON t.id = w.task_id
       JOIN epics   e ON e.id = t.epic_id
       JOIN projects p ON p.id = e.project_id
-      WHERE w.work_date = ?${pc.sql}
+      WHERE w.work_date = ?
+        AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL${pc.sql}
     `;
     const row = this.db.prepare(sql).get(date, ...pc.params) as MinutesRow | undefined;
     return row?.minutes ?? 0;
@@ -158,7 +161,8 @@ export class DashboardOverviewService {
       JOIN tasks   t ON t.id = w.task_id
       JOIN epics   e ON e.id = t.epic_id
       JOIN projects p ON p.id = e.project_id
-      WHERE strftime('%Y-%m', w.work_date) = ?${pc.sql}
+      WHERE strftime('%Y-%m', w.work_date) = ?
+        AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL${pc.sql}
     `;
     const row = this.db.prepare(sql).get(ym, ...pc.params) as MinutesRow | undefined;
     return row?.minutes ?? 0;
@@ -182,7 +186,8 @@ export class DashboardOverviewService {
       JOIN tasks   t ON t.id = w.task_id
       JOIN epics   e ON e.id = t.epic_id
       JOIN projects p ON p.id = e.project_id
-      WHERE w.work_date BETWEEN ? AND ?${pc.sql}
+      WHERE w.work_date BETWEEN ? AND ?
+        AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL${pc.sql}
       ORDER BY w.work_date ASC, w.minutes DESC, w.id ASC
     `;
     const rows = this.db.prepare(sql).all(fromDate, toDate, ...pc.params) as SprintWorklogJoinedRow[];
@@ -218,7 +223,8 @@ export class DashboardOverviewService {
       JOIN tasks   t ON t.id = w.task_id
       JOIN epics   e ON e.id = t.epic_id
       JOIN projects p ON p.id = e.project_id
-      WHERE w.work_date BETWEEN ? AND ?${pc.sql}
+      WHERE w.work_date BETWEEN ? AND ?
+        AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL${pc.sql}
       GROUP BY w.work_date
       ORDER BY w.work_date ASC
     `;
@@ -244,7 +250,8 @@ export class DashboardOverviewService {
       JOIN tasks   t ON t.id = w.task_id
       JOIN epics   e ON e.id = t.epic_id
       JOIN projects p ON p.id = e.project_id
-      WHERE strftime('%Y-%m', w.work_date) = ?${pc.sql}
+      WHERE strftime('%Y-%m', w.work_date) = ?
+        AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL${pc.sql}
       GROUP BY p.id, p.name, p.color
       HAVING SUM(w.minutes) > 0
       ORDER BY minutes DESC, p.name ASC

@@ -237,8 +237,8 @@ describe('ProjectsRepo', () => {
       db.prepare(`INSERT INTO epics (project_id, name) VALUES (?, ?)`).run(p.id, 'E');
       repo.delete(p.id);
       expect(repo.get(p.id)).toBeNull();
-      const epicRows = db.prepare(`SELECT * FROM epics`).all();
-      expect(epicRows).toEqual([]);
+      const epic = db.prepare(`SELECT * FROM epics WHERE project_id = ?`).get(p.id) as any;
+      expect(epic.deleted_at).toBeTruthy();
     });
   });
 });

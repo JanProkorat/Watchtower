@@ -109,7 +109,8 @@ export class ReportsService {
                        JOIN epics e    ON e.id = t.epic_id
                        JOIN projects p ON p.id = e.project_id
                        ${RATE_PERIOD_JOIN}
-                      WHERE w.work_date BETWEEN ? AND ?`;
+                      WHERE w.work_date BETWEEN ? AND ?
+                        AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL`;
     if (projectId !== undefined) {
       totalsSql += `
                         AND e.project_id = ?`;
@@ -136,6 +137,7 @@ export class ReportsService {
                          JOIN projects p ON p.id = e.project_id
                          ${RATE_PERIOD_JOIN}
                         WHERE w.work_date BETWEEN ? AND ?
+                          AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL
                           AND p.is_billable = 1
                           AND rp.rate_amount IS NOT NULL`;
     if (projectId !== undefined) {
@@ -171,7 +173,7 @@ export class ReportsService {
     const params: unknown[] = [from, to];
     let whereProject = '';
     if (projectId !== undefined) {
-      whereProject = ' WHERE p.id = ?';
+      whereProject = ' AND p.id = ?';
       params.push(projectId);
     }
     const rows = this.db
@@ -182,8 +184,9 @@ export class ReportsService {
                 p.color         AS project_color,
                 p.is_billable   AS is_billable,
                 (SELECT pr.currency
-                   FROM project_rates pr
+                   FROM contracts pr
                   WHERE pr.project_id = p.id
+                    AND pr.deleted_at IS NULL
                   ORDER BY pr.effective_from DESC
                   LIMIT 1)      AS currency,
                 COALESCE(SUM(${EFFECTIVE_MINUTES}), 0) AS minutes,
@@ -193,11 +196,13 @@ export class ReportsService {
                   ELSE NULL
                 END             AS earned_amount
            FROM projects p
-           LEFT JOIN epics e    ON e.project_id = p.id
-           LEFT JOIN tasks t    ON t.epic_id    = e.id
+           LEFT JOIN epics e    ON e.project_id = p.id AND e.deleted_at IS NULL
+           LEFT JOIN tasks t    ON t.epic_id    = e.id AND t.deleted_at IS NULL
            LEFT JOIN worklogs w ON w.task_id    = t.id
                                 AND w.work_date BETWEEN ? AND ?
-           ${RATE_PERIOD_JOIN}${whereProject}
+                                AND w.deleted_at IS NULL
+           ${RATE_PERIOD_JOIN}
+          WHERE p.deleted_at IS NULL${whereProject}
           GROUP BY p.id
           HAVING minutes > 0
           ORDER BY minutes DESC`,
@@ -244,7 +249,8 @@ export class ReportsService {
            JOIN epics e    ON e.id = t.epic_id
            JOIN projects p ON p.id = e.project_id
            ${RATE_PERIOD_JOIN}
-          WHERE w.work_date BETWEEN ? AND ?${projectFilter}`,
+          WHERE w.work_date BETWEEN ? AND ?${projectFilter}
+            AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL`,
       )
       .get(...totalsParams) as {
         billable_minutes: number | null;
@@ -268,6 +274,7 @@ export class ReportsService {
            JOIN projects p ON p.id = e.project_id
            ${RATE_PERIOD_JOIN}
           WHERE w.work_date BETWEEN ? AND ?
+            AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL
             AND p.is_billable = 1
             AND rp.rate_amount IS NOT NULL${projectFilter}
           GROUP BY rp.currency`,
@@ -292,6 +299,7 @@ export class ReportsService {
            JOIN projects p ON p.id = e.project_id
            ${RATE_PERIOD_JOIN}
           WHERE w.work_date BETWEEN ? AND ?
+            AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL
             AND p.is_billable = 1
             AND rp.rate_amount IS NOT NULL${projectFilter}
           GROUP BY p.id
@@ -334,7 +342,8 @@ export class ReportsService {
                  JOIN epics e    ON e.id = t.epic_id
                  JOIN projects p ON p.id = e.project_id
                  ${RATE_PERIOD_JOIN}
-                WHERE w.work_date BETWEEN ? AND ?`;
+                WHERE w.work_date BETWEEN ? AND ?
+                  AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL`;
     if (projectId !== undefined) {
       sql += `
                   AND e.project_id = ?`;
@@ -362,11 +371,12 @@ export class ReportsService {
                 p.color     AS project_color,
                 p.archived  AS archived
            FROM projects p
-           JOIN project_rates pr ON pr.project_id = p.id
+           JOIN contracts pr ON pr.project_id = p.id
           WHERE p.kind = 'work'
             AND pr.effective_from <= ?
             AND (pr.end_date IS NULL OR pr.end_date >= ?)
-            AND (pr.end_date IS NOT NULL OR pr.md_limit IS NOT NULL)${projectFilter}
+            AND (pr.end_date IS NOT NULL OR pr.md_limit IS NOT NULL)
+            AND p.deleted_at IS NULL AND pr.deleted_at IS NULL${projectFilter}
           GROUP BY p.id
           ORDER BY p.archived ASC, p.name ASC`,
       )
@@ -413,7 +423,8 @@ export class ReportsService {
                     ROW_NUMBER() OVER (
                       PARTITION BY pr.project_id ORDER BY pr.effective_from
                     ) AS rn
-               FROM project_rates pr
+               FROM contracts pr
+              WHERE pr.deleted_at IS NULL
            )
            SELECT o.project_id,
                   p.name        AS project_name,
@@ -425,7 +436,8 @@ export class ReportsService {
              FROM ordered o
              JOIN projects p ON p.id = o.project_id
             WHERE o.rn > 1
-              AND o.effective_from BETWEEN ? AND ?${projectFilter}
+              AND o.effective_from BETWEEN ? AND ?
+              AND p.deleted_at IS NULL${projectFilter}
             ORDER BY o.effective_from ASC`,
         )
         .all(...params) as Array<{

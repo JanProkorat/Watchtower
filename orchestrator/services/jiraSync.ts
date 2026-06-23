@@ -10,6 +10,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { SqliteLike } from '../db/migrations.js';
+import { nowIso } from '../db/syncColumns.js';
 import type {
   OrchJiraSyncRequest,
   OrchJiraSyncResult,
@@ -152,6 +153,7 @@ function loadCandidates(
          JOIN epics e ON e.id = t.epic_id
          JOIN projects p ON p.id = e.project_id
          WHERE w.work_date BETWEEN ? AND ?${projectFilter}
+           AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL
          ORDER BY w.work_date ASC, w.id ASC`,
     )
     .all(...params) as CandidateRow[];
@@ -208,16 +210,16 @@ function markPosted(db: SqliteLike, worklogId: number, jiraId: string): void {
   if (jiraId) {
     db.prepare(
       `UPDATE worklogs
-         SET source = 'jira', external_id = ?, jira_uploaded = 1
+         SET source = 'jira', external_id = ?, jira_uploaded = 1, updated_at = ?
          WHERE id = ?`,
-    ).run(jiraId, worklogId);
+    ).run(jiraId, nowIso(), worklogId);
   } else {
     // Jira accepted (2xx) but returned no usable id. Flip jira_uploaded so a
     // re-sync doesn't duplicate, but leave source/external_id alone — writing
     // ('jira', '') would collide with the (source, external_id) unique index.
     db.prepare(
-      `UPDATE worklogs SET jira_uploaded = 1 WHERE id = ?`,
-    ).run(worklogId);
+      `UPDATE worklogs SET jira_uploaded = 1, updated_at = ? WHERE id = ?`,
+    ).run(nowIso(), worklogId);
   }
 }
 

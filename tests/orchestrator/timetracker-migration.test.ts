@@ -186,7 +186,7 @@ describe('migrateTimetracker', () => {
     expect(tableCount(target, 'epics')).toBe(2);
     expect(tableCount(target, 'tasks')).toBe(2);
     expect(tableCount(target, 'worklogs')).toBe(2);
-    expect(tableCount(target, 'project_rates')).toBe(1);
+    expect(tableCount(target, 'contracts')).toBe(1);
     expect(tableCount(target, 'days_off')).toBe(1);
 
     // Primary keys preserved (FK integrity check)
@@ -292,7 +292,7 @@ describe('migrations · v3 adds TimeTracker tables', () => {
     dbPath = path.join(mkdtempSync(path.join(tmpdir(), 'wt-')), 'data.db');
   });
 
-  it('creates projects, epics, tasks, worklogs, project_rates, days_off', () => {
+  it('creates projects, epics, tasks, worklogs, contracts, days_off', () => {
     const db = new DatabaseSync(dbPath);
     runMigrations(db as unknown as SqliteLike);
     const rows = db
@@ -303,7 +303,7 @@ describe('migrations · v3 adds TimeTracker tables', () => {
     expect(names).toContain('epics');
     expect(names).toContain('tasks');
     expect(names).toContain('worklogs');
-    expect(names).toContain('project_rates');
+    expect(names).toContain('contracts');
     expect(names).toContain('days_off');
     db.close();
   });

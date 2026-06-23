@@ -1,4 +1,5 @@
 import type { SqliteLike } from '../migrations.js';
+import { nowIso, newSyncId } from '../syncColumns.js';
 
 export type TaskStatus = 'open' | 'in_progress' | 'to_accept' | 'done';
 
@@ -69,7 +70,7 @@ const LIST_SQL = `
     t.id, t.epic_id, t.number, t.title, t.description, t.status,
     t.estimated_minutes, t.created_at,
     t.jira_status, t.jira_estimate_secs, t.jira_component, t.jira_synced_at,
-    (SELECT COALESCE(SUM(w.minutes), 0) FROM worklogs w WHERE w.task_id = t.id) AS total_minutes
+    (SELECT COALESCE(SUM(w.minutes), 0) FROM worklogs w WHERE w.task_id = t.id AND w.deleted_at IS NULL) AS total_minutes
   FROM tasks t
 `;
 
@@ -81,7 +82,7 @@ export class TasksRepo {
       this.db
         .prepare(
           LIST_SQL +
-            ` WHERE t.epic_id = ?
+            ` WHERE t.epic_id = ? AND t.deleted_at IS NULL
              ORDER BY t.id ASC`,
         )
         .all(epicId) as DbRow[]
@@ -94,7 +95,7 @@ export class TasksRepo {
         .prepare(
           LIST_SQL +
             ` JOIN epics e ON e.id = t.epic_id
-             WHERE e.project_id = ?
+             WHERE e.project_id = ? AND t.deleted_at IS NULL AND e.deleted_at IS NULL
              ORDER BY e.display_order ASC, t.id ASC`,
         )
         .all(projectId) as DbRow[]
@@ -102,15 +103,15 @@ export class TasksRepo {
   }
 
   get(id: number): TaskRow | null {
-    const row = this.db.prepare(LIST_SQL + ' WHERE t.id = ?').get(id) as DbRow | undefined;
+    const row = this.db.prepare(LIST_SQL + ' WHERE t.id = ? AND t.deleted_at IS NULL').get(id) as DbRow | undefined;
     return row ? toRow(row) : null;
   }
 
   create(input: TaskInput): TaskRow {
     const info = this.db
       .prepare(
-        `INSERT INTO tasks (epic_id, number, title, description, status, estimated_minutes)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO tasks (epic_id, number, title, description, status, estimated_minutes, sync_id, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.epicId,
@@ -119,6 +120,7 @@ export class TasksRepo {
         input.description ?? null,
         input.status ?? 'open',
         input.estimatedMinutes ?? null,
+        newSyncId(), nowIso(),
       ) as { lastInsertRowid: number | bigint };
     return this.get(Number(info.lastInsertRowid))!;
   }
@@ -136,6 +138,7 @@ export class TasksRepo {
     if (input.description !== undefined) push('description', input.description);
     if (input.status !== undefined) push('status', input.status);
     if (input.estimatedMinutes !== undefined) push('estimated_minutes', input.estimatedMinutes);
+    push('updated_at', nowIso());
 
     if (sets.length > 0) {
       params.push(id);
@@ -147,14 +150,22 @@ export class TasksRepo {
   }
 
   delete(id: number): void {
-    // worklogs cascade via ON DELETE CASCADE on the schema FK
-    this.db.prepare(`DELETE FROM tasks WHERE id = ?`).run(id);
+    const ts = nowIso();
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.prepare(`UPDATE worklogs SET deleted_at = ?, updated_at = ? WHERE deleted_at IS NULL AND task_id = ?`).run(ts, ts, id);
+      this.db.prepare(`UPDATE tasks SET deleted_at = ?, updated_at = ? WHERE id = ?`).run(ts, ts, id);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   /** Look up a task by its `number` (Jira key or local key). */
   findByNumber(number: string): TaskRow | null {
     const row = this.db
-      .prepare(LIST_SQL + ' WHERE t.number = ? LIMIT 1')
+      .prepare(LIST_SQL + ' WHERE t.number = ? AND t.deleted_at IS NULL LIMIT 1')
       .get(number) as DbRow | undefined;
     return row ? toRow(row) : null;
   }
@@ -175,7 +186,7 @@ export class TasksRepo {
     this.db
       .prepare(
         `UPDATE tasks
-            SET jira_status = ?, jira_estimate_secs = ?, jira_component = ?, jira_synced_at = ?
+            SET jira_status = ?, jira_estimate_secs = ?, jira_component = ?, jira_synced_at = ?, updated_at = ?
           WHERE id = ?`,
       )
       .run(
@@ -183,6 +194,7 @@ export class TasksRepo {
         fields.estimateSeconds,
         fields.component,
         fields.syncedAt,
+        nowIso(),
         id,
       );
   }
@@ -199,10 +211,11 @@ export class TasksRepo {
             SET jira_status = NULL,
                 jira_estimate_secs = NULL,
                 jira_component = NULL,
-                jira_synced_at = NULL
+                jira_synced_at = NULL,
+                updated_at = ?
           WHERE id = ?`,
       )
-      .run(id);
+      .run(nowIso(), id);
   }
 
   /**
@@ -217,15 +230,17 @@ export class TasksRepo {
     const r = this.db
       .prepare(
         `UPDATE tasks
-            SET status = 'done'
+            SET status = 'done', updated_at = ?
           WHERE status = 'to_accept'
+            AND deleted_at IS NULL
             AND id IN (
               SELECT task_id FROM worklogs
+               WHERE deleted_at IS NULL
                GROUP BY task_id
               HAVING MAX(work_date) <= ?
             )`,
       )
-      .run(lockDate) as { changes: number };
+      .run(nowIso(), lockDate) as { changes: number };
     return r.changes;
   }
 
@@ -240,22 +255,26 @@ export class TasksRepo {
       UPDATE tasks SET jira_status = NULL,
                        jira_estimate_secs = NULL,
                        jira_component = NULL,
-                       jira_synced_at = NULL
+                       jira_synced_at = NULL,
+                       updated_at = ?
         WHERE jira_status IS NOT NULL
+          AND deleted_at IS NULL
           AND id IN (
             SELECT t.id FROM tasks t
               JOIN epics e ON e.id = t.epic_id
-             WHERE e.project_id = ?`;
+             WHERE e.project_id = ?
+               AND t.deleted_at IS NULL
+               AND e.deleted_at IS NULL`;
     if (keepNumbers.length === 0) {
       const r = this.db
         .prepare(`${baseSql})`)
-        .run(projectId) as { changes: number };
+        .run(nowIso(), projectId) as { changes: number };
       return r.changes;
     }
     const placeholders = keepNumbers.map(() => '?').join(',');
     const r = this.db
       .prepare(`${baseSql} AND t.number NOT IN (${placeholders}))`)
-      .run(projectId, ...keepNumbers) as { changes: number };
+      .run(nowIso(), projectId, ...keepNumbers) as { changes: number };
     return r.changes;
   }
 }

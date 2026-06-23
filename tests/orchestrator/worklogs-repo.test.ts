@@ -338,5 +338,49 @@ describe('WorklogsRepo', () => {
       worklogs.create({ taskId, workDate: '2026-05-25', minutes: 30, source: null, externalId: 'X' });
       expect(worklogs.list({ projectId }).length).toBe(2);
     });
+
+    // #69 (v14): tombstones are excluded from the (source, external_id) unique
+    // index so a soft-deleted auto-import doesn't block re-importing the same
+    // external worklog, while two LIVE rows still collide.
+    it('allows re-creating (source, external_id) after the prior row is soft-deleted', () => {
+      const first = worklogs.create({
+        taskId,
+        workDate: '2026-05-24',
+        minutes: 30,
+        source: 'jira',
+        externalId: 'X',
+      });
+      worklogs.delete(first.id); // soft-delete -> sets deleted_at
+      // The same (source, external_id) must succeed now that the prior row is a
+      // tombstone excluded from the partial unique index.
+      expect(() =>
+        worklogs.create({
+          taskId,
+          workDate: '2026-05-25',
+          minutes: 30,
+          source: 'jira',
+          externalId: 'X',
+        }),
+      ).not.toThrow();
+    });
+
+    it('still rejects two LIVE rows with the same (source, external_id)', () => {
+      worklogs.create({
+        taskId,
+        workDate: '2026-05-24',
+        minutes: 30,
+        source: 'jira',
+        externalId: 'Y',
+      });
+      expect(() =>
+        worklogs.create({
+          taskId,
+          workDate: '2026-05-25',
+          minutes: 30,
+          source: 'jira',
+          externalId: 'Y',
+        }),
+      ).toThrow();
+    });
   });
 });

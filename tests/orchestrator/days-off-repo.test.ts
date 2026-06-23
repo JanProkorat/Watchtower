@@ -77,6 +77,8 @@ describe('DaysOffRepo', () => {
     repo.upsert({ date: '2026-05-15', kind: 'vacation' });
     repo.delete('2026-05-15');
     expect(repo.get('2026-05-15')).toBeNull();
+    const raw = db.prepare(`SELECT deleted_at FROM days_off WHERE date = ?`).get('2026-05-15') as any;
+    expect(raw.deleted_at).toBeTruthy();
   });
 
   it('check constraint rejects unknown kinds', () => {

@@ -13,6 +13,9 @@ import {
 } from './db/migrateTimetracker.js';
 import { startWsBridge, type WsBridgeHandle } from './wsBridge.js';
 import type { OrchRequest } from '../shared/messagePort.js';
+import { createPgStore, type PgStore } from './db/pg/pool.js';
+import { runPgMigrations } from './db/pg/migrate.js';
+import { SyncService } from './sync/service.js';
 
 export interface DbHandle {
   /** Whatever the underlying driver exposes — better-sqlite3 in prod, node:sqlite in tests. */
@@ -48,6 +51,8 @@ export interface BootstrapOptions {
 
 export interface BootstrapHandle {
   db: SqliteLike;
+  pg: PgStore | null;
+  sync: SyncService;
   listener: HookListenerHandle;
   /** Result of the TimeTracker absorption migration attempted on startup. */
   timetrackerMigration: MigrationStatus | { status: 'skipped' };
@@ -77,6 +82,16 @@ function defaultDbFactory(dbPath: string): DbHandle {
 export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle> {
   const dbFactory = opts.dbFactory ?? defaultDbFactory;
   const dbHandle = dbFactory(path.join(opts.supportDir, 'data.db'));
+
+  // Optional Postgres hub. Construction never connects eagerly — a bad URL only
+  // surfaces on first query, so an outage can't block startup.
+  const pg = createPgStore();
+  if (pg) {
+    try { await runPgMigrations(pg); }
+    catch (err) { console.error('[orchestrator] pg migrations failed (sync dormant):', err); }
+  }
+  const sync = new SyncService({ db: dbHandle.raw, store: pg });
+  sync.start();
 
   // One-shot import of legacy TimeTracker data. Idempotent — the function
   // returns `no-source` when there's nothing to import and `already-migrated`
@@ -118,12 +133,16 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
 
   return {
     db: dbHandle.raw,
+    pg,
+    sync,
     listener,
     timetrackerMigration: ttResult,
     wsBridge,
     async shutdown() {
       await wsBridge.stop();
       await listener.stop();
+      sync.stop();
+      if (pg) await pg.end();
       dbHandle.close();
     },
   };
