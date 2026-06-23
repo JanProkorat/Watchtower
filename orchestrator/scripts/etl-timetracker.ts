@@ -24,6 +24,7 @@ export async function etlFromSqlite(sqlite: SqliteLike, store: PgStore): Promise
 
   for (const name of order) {
     const table = byName.get(name)!;
+    console.log(`[etl] processing ${name}...`);
     counts[name] = await etlTable(sqlite, store, table);
   }
   return { counts };
@@ -53,6 +54,13 @@ async function etlTable(sqlite: SqliteLike, store: PgStore, table: SyncTable): P
     joinSql = ` JOIN ${fk.parentTable} parent ON parent.id = t.${fkLocalCol}`;
   }
   const rows = sqlite.prepare(`SELECT ${selectCols.join(', ')} FROM ${table.name} t${joinSql}`).all() as Array<Record<string, unknown>>;
+
+  if (fk) {
+    const rawCount = (sqlite.prepare(`SELECT COUNT(*) AS c FROM ${table.name}`).get() as { c: number }).c;
+    if (rawCount > rows.length) {
+      console.warn(`[etl] ${table.name}: dropped ${rawCount - rows.length} row(s) with unresolved parent sync_id (parent missing/NULL sync_id)`);
+    }
+  }
 
   for (const row of rows) {
     const cols = table.columns.map((c) => c.name);
