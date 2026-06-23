@@ -5,7 +5,19 @@ const PG_URL = process.env.WATCHTOWER_PG_URL ?? 'postgresql://watchtower:watchto
 
 describe('createPgStore', () => {
   it('returns null when no connection string is available', () => {
-    expect(createPgStore(undefined)).toBeNull();
+    // Hermetic: defaultPgUrl() falls back to the env vars, so a runner that has
+    // WATCHTOWER_PG_URL / WATCHTOWER_DEV_URL exported (a dogfooding-sync setup)
+    // would otherwise get a live store here. Clear both for this assertion.
+    const prevPg = process.env.WATCHTOWER_PG_URL;
+    const prevDev = process.env.WATCHTOWER_DEV_URL;
+    delete process.env.WATCHTOWER_PG_URL;
+    delete process.env.WATCHTOWER_DEV_URL;
+    try {
+      expect(createPgStore(undefined)).toBeNull();
+    } finally {
+      if (prevPg !== undefined) process.env.WATCHTOWER_PG_URL = prevPg;
+      if (prevDev !== undefined) process.env.WATCHTOWER_DEV_URL = prevDev;
+    }
   });
 
   it('builds a store from an explicit connection string', () => {
