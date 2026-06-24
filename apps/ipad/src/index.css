@@ -1,0 +1,18 @@
+:root {
+  color-scheme: dark;
+}
+
+/* Kill the default WKWebView body margin (and let the dark app bg reach every
+   edge) — otherwise an 8px white strip shows through, most visible on the left. */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background-color: #0e0f12;
+}
+
+* {
+  box-sizing: border-box;
+}

@@ -1,12 +1,10 @@
 // apps/ipad/src/components/TerminalView.tsx
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { useConnection } from '../state/connectionContext.js';
 import { attachTerminal } from '../lib/attachTerminal.js';
-import { ctrlChar } from '../lib/accessoryKeys.js';
-import { AccessoryBar } from './AccessoryBar.js';
 
 interface Props {
   instanceId: string;
@@ -17,12 +15,6 @@ export function TerminalView({ instanceId }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
-  // ctrlArmed is lifted here so AccessoryBar and the onData interceptor share it.
-  const [ctrlArmed, setCtrlArmed] = useState(false);
-  // Use a ref for the armed flag so the onData closure always reads current value
-  // without needing to re-register the listener every state change.
-  const ctrlArmedRef = useRef(false);
-  ctrlArmedRef.current = ctrlArmed;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -53,20 +45,8 @@ export function TerminalView({ instanceId }: Props) {
       try { fit.fit(); } catch { /* hidden element, will fit later */ }
     });
 
-    // --- Wire onData with sticky-Ctrl interception ---
-    // When ctrlArmed is true, the NEXT single character is transformed to its
-    // control byte. We use a ref so the closure doesn't go stale across renders.
+    // --- Wire keystrokes straight through to the pty ---
     const inputDisp = term.onData((data) => {
-      if (ctrlArmedRef.current) {
-        // Disarm immediately; only the next single character is intercepted.
-        setCtrlArmed(false);
-        ctrlArmedRef.current = false;
-        // ctrlChar maps a–z/A–Z → control byte; returns '' for unmappable chars.
-        // Use transformed only when non-empty so an unmappable key sends the raw char.
-        const transformed = data.length === 1 ? ctrlChar(data) : '';
-        void bridge.invoke('ptyWrite', { instanceId, data: transformed !== '' ? transformed : data });
-        return;
-      }
       void bridge.invoke('ptyWrite', { instanceId, data });
     });
 
@@ -133,35 +113,16 @@ export function TerminalView({ instanceId }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceId, bridge]);
 
-  function sendKey(seq: string) {
-    void bridge.invoke('ptyWrite', { instanceId, data: seq });
-  }
-
-  function handleToggleCtrl() {
-    setCtrlArmed((v) => !v);
-  }
-
   return (
     <div
+      ref={hostRef}
       style={{
-        display: 'flex',
-        flexDirection: 'column',
         width: '100%',
         height: '100%',
         backgroundColor: '#0e0f12',
         overflow: 'hidden',
+        position: 'relative',
       }}
-    >
-      {/* xterm host — fills all remaining space */}
-      <div
-        ref={hostRef}
-        style={{ flex: 1, minHeight: 0, position: 'relative' }}
-      />
-      <AccessoryBar
-        ctrlArmed={ctrlArmed}
-        onToggleCtrl={handleToggleCtrl}
-        onKey={sendKey}
-      />
-    </div>
+    />
   );
 }

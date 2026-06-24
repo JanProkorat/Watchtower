@@ -16,8 +16,12 @@ export function createReconnectingTransport(
   let inner: Inner | null = null;
   let attempt = 0;
   let closed = false;
+  let currentStatus: ConnStatus = 'connecting';
 
-  const setStatus = (s: ConnStatus) => statusCbs.forEach((cb) => cb(s));
+  const setStatus = (s: ConnStatus) => {
+    currentStatus = s;
+    statusCbs.forEach((cb) => cb(s));
+  };
 
   const bindAll = (t: Inner) => {
     for (const [kind, set] of handlers) for (const h of set) t.on(kind, h);
@@ -49,7 +53,15 @@ export function createReconnectingTransport(
       const offInner = inner?.on(kind, h);
       return () => { set!.delete(h); offInner?.(); };
     },
-    onStatus: (cb: (s: ConnStatus) => void) => { statusCbs.add(cb); return () => statusCbs.delete(cb); },
+    onStatus: (cb: (s: ConnStatus) => void) => {
+      // Replay the latest status immediately — the initial connect() runs during
+      // construction (before React's connectionContext subscribes via useEffect),
+      // so without this replay a late subscriber would miss 'connected' and stay
+      // stuck on its initial value.
+      cb(currentStatus);
+      statusCbs.add(cb);
+      return () => statusCbs.delete(cb);
+    },
     close: () => { closed = true; inner?.close(); },
   };
 }
