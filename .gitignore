@@ -42,3 +42,7 @@ shared/*.js.map
 
 # Local Claude Code scratch (worktrees, transient state)
 .claude/
+
+# Capacitor build outputs
+apps/ipad/dist/
+apps/ipad/ios/App/App/public/
