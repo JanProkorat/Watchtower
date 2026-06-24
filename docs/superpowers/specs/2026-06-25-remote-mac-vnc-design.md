@@ -54,9 +54,10 @@ A new WebSocket route alongside the existing `/ws` IPC endpoint in
   { binary: true })`. Close on either side propagates to the other.
 - The target is a **fixed constant** (`127.0.0.1:5900`), never client-supplied
   → no SSRF. The relay is **protocol-agnostic** — it never parses RFB.
-- **`maxPayload`:** the IPC route caps frames at 1 MB; VNC framebuffer updates
-  can exceed that. The `/vnc` route needs a larger payload limit (register the
-  websocket plugin per-route, or raise the shared limit).
+- **`maxPayload`:** Verified during planning: the relay forwards each TCP `data`
+  chunk (kernel-bounded, typically <64 KB) as an individual WS frame, so
+  per-frame size stays well under the 1 MB cap — no `maxPayload` change needed
+  for v1. Revisit only if oversized frames appear under load.
 
 ```
 iPad noVNC ──WS /vnc?token=…──▶ orchestrator relay ──TCP 127.0.0.1:5900──▶ macOS Screen Sharing
@@ -210,8 +211,13 @@ instance runs auth cmd → PreToolUse hook → watchtower-hook POST
 - **Auth-block hook coverage:** `PreToolUse` only sees the command Claude ran,
   not indirect invocations or plain-terminal sessions — the pty safety net
   covers those.
-- **`maxPayload`:** must be raised for the `/vnc` route or framebuffer updates
-  will be dropped/closed.
+- **`maxPayload`:** Verified during planning: the relay forwards each TCP `data`
+  chunk (kernel-bounded, typically <64 KB) as an individual WS frame, so
+  per-frame size stays well under the 1 MB cap — no `maxPayload` change needed
+  for v1. Revisit only if oversized frames appear under load.
+- **iOS minimum version:** noVNC uses top-level `await` (H264 capability check);
+  the iPad build target is set to `es2022`/`safari15`, which floors the minimum
+  iOS version at **iOS 15.0**.
 
 ---
 
