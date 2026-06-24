@@ -61,8 +61,10 @@ export function TerminalView({ instanceId }: Props) {
         // Disarm immediately; only the next single character is intercepted.
         setCtrlArmed(false);
         ctrlArmedRef.current = false;
-        const transformed = data.length === 1 ? ctrlChar(data) : data;
-        void bridge.invoke('ptyWrite', { instanceId, data: transformed || data });
+        // ctrlChar maps a–z/A–Z → control byte; returns '' for unmappable chars.
+        // Use transformed only when non-empty so an unmappable key sends the raw char.
+        const transformed = data.length === 1 ? ctrlChar(data) : '';
+        void bridge.invoke('ptyWrite', { instanceId, data: transformed !== '' ? transformed : data });
         return;
       }
       void bridge.invoke('ptyWrite', { instanceId, data });
@@ -95,13 +97,19 @@ export function TerminalView({ instanceId }: Props) {
     // the snapshot dims. The ResizeObserver above drives ptyResize; focus
     // ownership (Task 4) lets the orchestrator follow this client's size.
     let attachDispose: (() => void) | null = null;
+    // Guard against the component unmounting between attach resolving and the
+    // rAF firing; avoids calling ptyResize (and fit.fit on a disposed terminal)
+    // after teardown.
+    let disposed = false;
     void attachTerminal(bridge, instanceId, {
       write: (d) => term.write(d),
       resize: () => { /* no-op: viewport-fit takes priority */ },
     }).then((handle) => {
+      if (disposed) { handle.dispose(); return; }
       attachDispose = handle.dispose;
       // After the snapshot is applied, fit once more and report current size.
       requestAnimationFrame(() => {
+        if (disposed) return;
         try {
           fit.fit();
           void bridge.invoke('ptyResize', { instanceId, cols: term.cols, rows: term.rows });
@@ -110,6 +118,7 @@ export function TerminalView({ instanceId }: Props) {
     });
 
     return () => {
+      disposed = true;
       term.textarea?.removeEventListener('focus', onTextareaFocus);
       inputDisp.dispose();
       ro.disconnect();
