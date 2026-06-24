@@ -15,6 +15,25 @@ export interface SqliteLike {
   };
 }
 
+/** True if `name` is an existing table. Used to make table-level DDL replay-safe. */
+function tableExists(db: SqliteLike, name: string): boolean {
+  return (
+    db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name = ?`).get(name) != null
+  );
+}
+
+/**
+ * ALTER TABLE ADD COLUMN that is a no-op if the column already exists. SQLite
+ * has no `ADD COLUMN IF NOT EXISTS`, so a bare ADD COLUMN throws on replay; this
+ * keeps a partially-applied migration recoverable on the next run.
+ */
+function addColumnIfMissing(db: SqliteLike, table: string, column: string, decl: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  }
+}
+
 const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
   {
     version: 1,
@@ -222,32 +241,44 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       // updated_at on existing rows so the SQLite and Postgres stores start
       // aligned (cursor = max(updated_at)). Operational tables (instances,
       // hook_events, notifications, settings) are NOT synced and untouched.
-      const ISO_DEFAULT = `(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`;
+      // updated_at gets a NOT NULL default in ISO-Z form so the SQL default and
+      // JS-set values share the same byte format (LWW comparison key). It MUST
+      // be a constant literal, not an expression: SQLite rejects a non-constant
+      // (e.g. strftime(...)) default in ALTER TABLE ADD COLUMN — the prod engine
+      // (better-sqlite3) throws on it, while node:sqlite (tests) silently allows
+      // it. Existing rows are backfilled to a real timestamp in step 3; new rows
+      // always get updated_at from the repo layer, so this sentinel only fills
+      // the instant between ADD COLUMN and the backfill UPDATE.
+      const ISO_DEFAULT = `'1970-01-01T00:00:00.000Z'`;
 
-      // 1) Rename the table. SQLite ALTER TABLE RENAME is cheap and preserves
-      //    indexes/FKs (child FKs referencing project_rates are by table, and
-      //    SQLite rewrites them on rename in modern versions). The unique index
-      //    name is historical; recreate it under the new name for clarity.
-      db.exec(`ALTER TABLE project_rates RENAME TO contracts`);
+      // 1) Rename the table. Guarded so a replay (after a partial apply that
+      //    already renamed it) is a no-op rather than a "no such table" throw.
+      //    SQLite ALTER TABLE RENAME preserves indexes/FKs (child FKs referencing
+      //    project_rates are by table and SQLite rewrites them on rename). The
+      //    unique index name is historical; recreate it under the new name.
+      if (tableExists(db, 'project_rates') && !tableExists(db, 'contracts')) {
+        db.exec(`ALTER TABLE project_rates RENAME TO contracts`);
+      }
       db.exec(`DROP INDEX IF EXISTS idx_project_rates_pid_date`);
       db.exec(
         `CREATE INDEX IF NOT EXISTS idx_contracts_pid_date ON contracts(project_id, effective_from)`,
       );
 
-      // 2) Add sync columns to each synced table. updated_at gets a NOT NULL
-      //    default in ISO-Z form so the SQL default and JS-set values match
-      //    byte-for-byte (LWW comparison key).
+      // 2) Add sync columns to each synced table (replay-safe: skip columns that
+      //    already exist).
       const tables = ['projects', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'];
       for (const t of tables) {
-        db.exec(`ALTER TABLE ${t} ADD COLUMN sync_id TEXT`);
-        db.exec(`ALTER TABLE ${t} ADD COLUMN updated_at TEXT NOT NULL DEFAULT ${ISO_DEFAULT}`);
-        db.exec(`ALTER TABLE ${t} ADD COLUMN deleted_at TEXT`);
+        addColumnIfMissing(db, t, 'sync_id', 'TEXT');
+        addColumnIfMissing(db, t, 'updated_at', `TEXT NOT NULL DEFAULT ${ISO_DEFAULT}`);
+        addColumnIfMissing(db, t, 'deleted_at', 'TEXT');
         db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${t}_sync_id ON ${t}(sync_id)`);
       }
 
-      // 3) Backfill: every existing row gets a fresh UUID sync_id and an
-      //    updated_at seeded from created_at (normalised to ISO-Z). days_off is
-      //    keyed by `date`, the others by integer id.
+      // 3) Backfill: every existing row that doesn't yet have a sync_id gets a
+      //    fresh UUID sync_id and an updated_at seeded from created_at
+      //    (normalised to ISO-Z). The `sync_id IS NULL` filter keeps a replay
+      //    from re-stamping rows a prior partial run already backfilled.
+      //    days_off is keyed by `date`, the others by integer id.
       const normaliseTs = (raw: string | null): string => {
         // SQLite created_at is 'YYYY-MM-DD HH:MM:SS' (UTC). Convert to ISO-Z.
         if (!raw) return new Date().toISOString();
@@ -259,7 +290,7 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       for (const t of tables) {
         const keyCol = t === 'days_off' ? 'date' : 'id';
         const rows = db
-          .prepare(`SELECT ${keyCol} AS k, created_at FROM ${t}`)
+          .prepare(`SELECT ${keyCol} AS k, created_at FROM ${t} WHERE sync_id IS NULL`)
           .all() as Array<{ k: string | number; created_at: string | null }>;
         const upd = db.prepare(
           `UPDATE ${t} SET sync_id = ?, updated_at = ? WHERE ${keyCol} = ?`,
