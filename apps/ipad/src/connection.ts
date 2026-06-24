@@ -1,9 +1,9 @@
-export type Connection = { host: string; port: number; token: string };
+export type Connection = { host: string; port: number; token: string; vncPassword?: string };
 export type ConnStore = { get(k: string): Promise<string | null>; set(k: string, v: string): Promise<void> };
 
 const KEY = 'watchtower.connection';
 
-export function parseConnection(input: { host: string; port: string; token: string }):
+export function parseConnection(input: { host: string; port: string; token: string; vncPassword?: string }):
   | { ok: true; value: Connection }
   | { ok: false; error: string } {
   const host = input.host.trim();
@@ -12,11 +12,18 @@ export function parseConnection(input: { host: string; port: string; token: stri
   if (!Number.isInteger(port) || port < 1 || port > 65535) return { ok: false, error: 'Port must be 1–65535' };
   const token = input.token.trim();
   if (!token) return { ok: false, error: 'Token is required' };
-  return { ok: true, value: { host, port, token } };
+  const vncPassword = input.vncPassword?.trim();
+  const value: Connection = { host, port, token };
+  if (vncPassword) value.vncPassword = vncPassword;
+  return { ok: true, value };
 }
 
 export function connectionToWsUrl(c: Connection): string {
   return `ws://${c.host}:${c.port}/ws`;
+}
+
+export function connectionToVncWsUrl(c: Connection): string {
+  return `ws://${c.host}:${c.port}/vnc`;
 }
 
 export async function saveConnection(store: ConnStore, c: Connection): Promise<void> {

@@ -1,7 +1,7 @@
 // tests/ipad/connection.test.ts
 import { describe, it, expect } from 'vitest';
 import {
-  parseConnection, connectionToWsUrl, loadConnection, saveConnection,
+  parseConnection, connectionToWsUrl, connectionToVncWsUrl, loadConnection, saveConnection,
 } from '../../apps/ipad/src/connection.js';
 
 describe('parseConnection', () => {
@@ -24,6 +24,24 @@ describe('connectionToWsUrl', () => {
   it('builds the /ws url', () => {
     expect(connectionToWsUrl({ host: '192.168.1.42', port: 7445, token: 't' }))
       .toBe('ws://192.168.1.42:7445/ws');
+  });
+});
+
+describe('connectionToVncWsUrl', () => {
+  it('builds the /vnc url', () => {
+    expect(connectionToVncWsUrl({ host: '192.168.1.42', port: 7445, token: 't' }))
+      .toBe('ws://192.168.1.42:7445/vnc');
+  });
+});
+
+describe('parseConnection vncPassword', () => {
+  it('carries an optional vnc password through', () => {
+    const r = parseConnection({ host: 'h', port: '7445', token: 't', vncPassword: 'screen12' });
+    expect(r).toEqual({ ok: true, value: { host: 'h', port: 7445, token: 't', vncPassword: 'screen12' } });
+  });
+  it('omits vncPassword when blank', () => {
+    const r = parseConnection({ host: 'h', port: '7445', token: 't', vncPassword: '' });
+    expect(r.ok && 'vncPassword' in r.value).toBe(false);
   });
 });
 
