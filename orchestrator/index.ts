@@ -63,6 +63,7 @@ import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
 import { buildPtySpawnConfig, planBootAction } from './shellPolicy.js';
 import type { InstanceKind } from './shellPolicy.js';
+import { PtySizeOwnership } from './ptySizeOwnership.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -95,8 +96,17 @@ export function emitPush(msg: OrchPush): void {
     console.error('[orchestrator] push sink threw:', err);
   }
 }
+
+export function handleClientGone(clientId: string): void {
+  for (const { instanceId, cols, rows } of ptySizeOwnership.clientGone(clientId)) {
+    pty.get(instanceId)?.resize(cols, rows);
+    terminalSnapshots.resize(instanceId, cols, rows);
+  }
+}
 const pty = new PtyManager();
 const terminalSnapshots = new TerminalSnapshots();
+const ptySizeOwnership = new PtySizeOwnership();
+const LOCAL_CLIENT = 'local';
 let notifier: Notifier | null = null;
 let quietTimers: QuietTimers | null = null;
 let slackEscalator: SlackEscalator | null = null;
@@ -508,7 +518,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
   });
 }
 
-export async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']> {
+export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLIENT): Promise<OrchResponse['payload']> {
   switch (req.kind) {
     case 'ping':
       return { now: req.payload.now, orch: Date.now() };
@@ -560,9 +570,16 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
       pty.get(req.payload.instanceId)?.write(req.payload.data);
       return { ok: true };
 
-    case 'ptyResize':
-      pty.get(req.payload.instanceId)?.resize(req.payload.cols, req.payload.rows);
-      terminalSnapshots.resize(req.payload.instanceId, req.payload.cols, req.payload.rows);
+    case 'ptyResize': {
+      const { instanceId, cols, rows } = req.payload;
+      const decision = ptySizeOwnership.recordResize(instanceId, origin, cols, rows);
+      terminalSnapshots.resize(instanceId, cols, rows);
+      if (decision.apply) pty.get(instanceId)?.resize(cols, rows);
+      return { ok: true };
+    }
+
+    case 'terminalFocus':
+      ptySizeOwnership.focus(req.payload.instanceId, origin);
       return { ok: true };
 
     case 'terminalAttach': {
@@ -1134,6 +1151,7 @@ function respawnIncompleteRowsOnBoot(): void {
       supportDir: supportDir(),
       portRange: [7421, 7430],
       handleRequest,
+      onClientGone: handleClientGone,
       onHookEvent: async (eventName, body, instanceId) => {
         // Drop hook events fired by a NESTED `claude` (memory summarizer, skills,
         // sub-agents) that inherited this instance's WATCHTOWER_INSTANCE_ID but

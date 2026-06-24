@@ -74,7 +74,8 @@ export type OrchRequest =
   | { id: string; kind: 'board:get'; payload: { projectId: number } }
   | { id: string; kind: 'board:sync'; payload: { projectId: number } }
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
-  | { id: string; kind: 'tokens:usage'; payload: Record<string, never> };
+  | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
+  | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -530,7 +531,8 @@ export type OrchResponse =
       kind: 'board:remove';
       payload: { snapshot: import('./ipcContract.js').BoardSnapshotPayload };
     }
-  | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
+  | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
+  | { kind: 'terminalFocus'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
