@@ -48,27 +48,27 @@ function InstancesModule() {
   return (
     <div
       style={{
+        // Column: optional banner on top, then the rail + content row. The
+        // outer #root (index.css) already applies the safe-area insets, so this
+        // fills #root's content box and never sits under the iOS status bar.
         display: 'flex',
-        flexDirection: 'row',
-        width: '100vw',
-        height: '100vh',
+        flexDirection: 'column',
+        width: '100%',
+        height: '100%',
         overflow: 'hidden',
         backgroundColor: '#0e0f12',
         fontFamily: 'system-ui, sans-serif',
         color: '#e5e7eb',
       }}
     >
-      {/* Reconnecting banner — sits above everything when disconnected */}
+      {/* Reconnecting banner — full-width bar in normal flow (pushes content
+          down rather than overlaying it). */}
       {status !== 'connected' && (
         <div
           role="status"
           aria-live="polite"
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 200,
+            flexShrink: 0,
             backgroundColor: status === 'connecting' ? '#1e3a5f' : '#3b1f1f',
             borderBottom: `1px solid ${status === 'connecting' ? '#2563eb' : '#7f1d1d'}`,
             color: status === 'connecting' ? '#93c5fd' : '#fca5a5',
@@ -83,49 +83,42 @@ function InstancesModule() {
         </div>
       )}
 
-      {/* Left rail */}
-      <Rail active="instances" />
+      {/* Content row: left rail + main column */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
+        {/* Left rail */}
+        <Rail active="instances" />
 
-      {/* Main column: TabStrip + terminal body */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          minWidth: 0,
-          // Push content below the banner when it's visible
-          paddingTop: status !== 'connected' ? 30 : 0,
-          transition: 'padding-top 150ms ease',
-        }}
-      >
-        <TabStrip
-          instances={instances}
-          projects={projects}
-          activeInstanceId={activeId}
-          onSelectInstance={setActiveId}
-          onNew={() => setSpawnOpen(true)}
-        />
+        {/* Main column: TabStrip + terminal body */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <TabStrip
+            instances={instances}
+            projects={projects}
+            activeInstanceId={activeId}
+            onSelectInstance={setActiveId}
+            onNew={() => setSpawnOpen(true)}
+          />
 
-        {/* Terminal body */}
-        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-          {activeId ? (
-            <TerminalView key={activeId} instanceId={activeId} />
-          ) : (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: '#4b5563',
-                fontSize: 15,
-                fontWeight: 500,
-                letterSpacing: 0.2,
-              }}
-            >
-              Vyberte instanci
-            </div>
-          )}
+          {/* Terminal body */}
+          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            {activeId ? (
+              <TerminalView key={activeId} instanceId={activeId} />
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  color: '#4b5563',
+                  fontSize: 15,
+                  fontWeight: 500,
+                  letterSpacing: 0.2,
+                }}
+              >
+                Vyberte instanci
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -188,7 +181,7 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
         padding: 24,
         backgroundColor: '#0e0f12',
         color: '#e5e7eb',
-        minHeight: '100vh',
+        minHeight: '100%',
         boxSizing: 'border-box',
       }}
     >
