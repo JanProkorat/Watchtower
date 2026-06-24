@@ -1,5 +1,5 @@
 // apps/ipad/src/components/SpawnModal.tsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useConnection } from '../state/connectionContext.js';
 import type { ProjectSummary } from '../state/useProjects.js';
 
@@ -58,6 +58,17 @@ export function SpawnModal({
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
     spawnableProjects[0]?.id ?? null,
   );
+
+  // Auto-select the first spawnable project once the list loads async.
+  // Does not clobber a valid existing user selection.
+  useEffect(() => {
+    setSelectedProjectId((cur) =>
+      cur != null && spawnableProjects.some((p) => p.id === cur)
+        ? cur
+        : (spawnableProjects[0]?.id ?? null),
+    );
+  }, [spawnableProjects]);
+
   const [instanceKind, setInstanceKind] = useState<InstanceKind>('claude');
   const [spawning, setSpawning] = useState(false);
   const [error, setError] = useState<string | null>(null);
