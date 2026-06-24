@@ -129,6 +129,53 @@ describe('migrations', () => {
     }
   });
 
+  it('never adds a column with a non-constant default (rejected by better-sqlite3)', () => {
+    // SQLite forbids a non-constant/expression default in ALTER TABLE ADD
+    // COLUMN. The prod engine (better-sqlite3) enforces this; node:sqlite (the
+    // test engine) does NOT, so this class of bug slips past a normal run.
+    // Capture every exec'd statement and assert no ADD COLUMN carries an
+    // expression default — independent of the engine's leniency.
+    const execed: string[] = [];
+    const recorder: SqliteLike = {
+      exec: (sql: string) => {
+        execed.push(sql);
+        return undefined;
+      },
+      prepare: () => ({
+        get: () => ({ v: null }),
+        run: () => undefined,
+        all: () => [],
+      }),
+    };
+    runMigrations(recorder);
+
+    const statements = execed.join('\n;\n').split(';');
+    const addColumn = statements.filter((s) => /ADD\s+COLUMN/i.test(s));
+    const offenders = addColumn.filter(
+      (s) =>
+        /DEFAULT\s*\(/i.test(s) ||
+        /DEFAULT\s+(CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP)\b/i.test(s),
+    );
+    expect(
+      offenders,
+      `ADD COLUMN with non-constant default:\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('replays v13 safely when the schema is ahead of the recorded version', () => {
+    // Reproduces the production stuck state: v13 partially applied (table
+    // renamed, sync columns added) but its version row was never committed —
+    // because runMigrations is not transactional and the original ADD COLUMN
+    // threw on the prod engine. The recorded max stays at 12 while the schema
+    // is already migrated, so the next launch replays v13 and dies on
+    // `ALTER TABLE project_rates RENAME TO contracts` (no such table).
+    runMigrations(db as unknown as SqliteLike); // full → v14
+    db.exec('DELETE FROM schema_version WHERE version > 12');
+    expect(() => runMigrations(db as unknown as SqliteLike)).not.toThrow();
+    const v = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
+    expect(v.v).toBe(14);
+  });
+
   it('v13 backfills sync_id + updated_at on pre-existing rows', () => {
     // Run through v12 only, insert a legacy row, then apply v13 and check backfill.
     // Simplest: run all migrations (fresh DB has no rows), insert a project via
