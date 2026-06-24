@@ -3,6 +3,7 @@ import type { Socket } from 'node:net';
 export interface VncWsLike {
   on(ev: 'message', cb: (data: Buffer) => void): void;
   on(ev: 'close', cb: () => void): void;
+  on(ev: 'error', cb: (err: Error) => void): void;
   send(data: Buffer): void;
   close(): void;
 }
@@ -21,6 +22,7 @@ export function relayVnc(ws: VncWsLike, tcp: Socket): void {
   ws.on('message', (data) => { if (!tcp.destroyed) tcp.write(data); });
   tcp.on('data', (chunk: Buffer) => ws.send(chunk));
   ws.on('close', cleanup);
+  ws.on('error', cleanup);
   tcp.on('close', cleanup);
   tcp.on('error', cleanup);
 }
