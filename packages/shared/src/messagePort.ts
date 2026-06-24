@@ -6,6 +6,7 @@ export type OrchRequest =
   | { id: string; kind: 'restartInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { id: string; kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
+  | { id: string; kind: 'terminalAttach'; payload: { instanceId: string } }
   | { id: string; kind: 'killInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'removeInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'reorderInstances'; payload: { orderedIds: string[] } }
@@ -430,6 +431,7 @@ export type OrchResponse =
   | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
   | { kind: 'ptyWrite'; payload: { ok: true } }
   | { kind: 'ptyResize'; payload: { ok: true } }
+  | { kind: 'terminalAttach'; payload: { data: string; cols: number; rows: number } }
   | { kind: 'killInstance'; payload: { ok: true } }
   | { kind: 'removeInstance'; payload: { ok: true } }
   | { kind: 'restartInstance'; payload: { ok: boolean } }

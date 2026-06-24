@@ -40,6 +40,8 @@ export interface PtySpawnOptions {
 
 export interface PtyHandle {
   id: string;
+  cols: number;
+  rows: number;
   write(data: string): void;
   resize(cols: number, rows: number): void;
   kill(signal?: string): void;
@@ -70,8 +72,14 @@ export class PtyManager {
 
     const handle: PtyHandle = {
       id: opts.id,
+      cols: opts.cols ?? 120,
+      rows: opts.rows ?? 30,
       write: (d) => proc.write(d),
-      resize: (cols, rows) => proc.resize(cols, rows),
+      resize: (cols, rows) => {
+        handle.cols = cols;
+        handle.rows = rows;
+        proc.resize(cols, rows);
+      },
       kill: (signal) => proc.kill(signal),
     };
     this.handles.set(opts.id, handle);

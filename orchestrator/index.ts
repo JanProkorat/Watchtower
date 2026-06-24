@@ -43,6 +43,7 @@ import { QuietTimers } from './quietTimers.js';
 import { SlackEscalator } from './slackEscalator.js';
 import { SlackListener } from './slackListener.js';
 import { TerminalSnapshots } from './terminalSnapshots.js';
+import { buildTerminalAttachResponse } from './terminalAttach.js';
 import { formatEscalationMessage } from './escalationMessage.js';
 import { WebApiSlackClient, type SlackClient } from './services/slackClient.js';
 import { readSlackConfig, writeSlackConfig } from './services/slackConfig.js';
@@ -563,6 +564,15 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
       pty.get(req.payload.instanceId)?.resize(req.payload.cols, req.payload.rows);
       terminalSnapshots.resize(req.payload.instanceId, req.payload.cols, req.payload.rows);
       return { ok: true };
+
+    case 'terminalAttach': {
+      const getDims = (id: string) => {
+        const h = pty.get(id);
+        return h ? { cols: h.cols, rows: h.rows } : null;
+      };
+      await terminalSnapshots.flush(req.payload.instanceId);
+      return buildTerminalAttachResponse(terminalSnapshots, req.payload.instanceId, getDims);
+    }
 
     case 'killInstance':
       pty.get(req.payload.instanceId)?.kill();

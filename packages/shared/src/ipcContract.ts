@@ -5,6 +5,7 @@ export type IpcRequest =
   | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind } }
   | { kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
+  | { kind: 'terminalAttach'; payload: { instanceId: string } }
   | { kind: 'killInstance'; payload: { instanceId: string } }
   | { kind: 'removeInstance'; payload: { instanceId: string } }
   | { kind: 'restartInstance'; payload: { instanceId: string } }
@@ -491,6 +492,7 @@ export type IpcResponse =
   | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
   | { kind: 'ptyWrite'; payload: { ok: true } }
   | { kind: 'ptyResize'; payload: { ok: true } }
+  | { kind: 'terminalAttach'; payload: { data: string; cols: number; rows: number } }
   | { kind: 'killInstance'; payload: { ok: true } }
   | { kind: 'removeInstance'; payload: { ok: true } }
   | { kind: 'restartInstance'; payload: { ok: boolean } }
