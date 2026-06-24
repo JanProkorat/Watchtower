@@ -7,10 +7,13 @@ import { ConnectionProvider, useConnection } from './state/connectionContext.js'
 import { useInstances } from './state/useInstances.js';
 import { useProjects } from './state/useProjects.js';
 import { useActiveTerminal } from './state/useActiveTerminal.js';
-import { Rail } from './components/Rail.js';
+import { useAuthBlock } from './state/useAuthBlock.js';
+import { Rail, type RailModule } from './components/Rail.js';
 import { TabStrip } from './components/TabStrip.js';
 import { TerminalView } from './components/TerminalView.js';
 import { SpawnModal } from './components/SpawnModal.js';
+import { RemoteMacView } from './components/RemoteMacView.js';
+import { AuthBlockBanner } from './components/AuthBlockBanner.js';
 
 // ---------------------------------------------------------------------------
 // Capacitor Preferences store (same helper as before)
@@ -28,7 +31,7 @@ const store = {
 const NON_LIVE_STATUSES = new Set(['finished', 'crashed', 'suspended']);
 
 // ---------------------------------------------------------------------------
-// InstancesModule — rendered inside <ConnectionProvider>
+// InstancesModule — the instances view content (Rail lives in Shell now)
 // ---------------------------------------------------------------------------
 
 function InstancesModule() {
@@ -48,17 +51,12 @@ function InstancesModule() {
   return (
     <div
       style={{
-        // Column: optional banner on top, then the rail + content row. The
-        // outer #root (index.css) already applies the safe-area insets, so this
-        // fills #root's content box and never sits under the iOS status bar.
+        flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        width: '100%',
-        height: '100%',
+        minWidth: 0,
+        minHeight: 0,
         overflow: 'hidden',
-        backgroundColor: '#0e0f12',
-        fontFamily: 'system-ui, sans-serif',
-        color: '#e5e7eb',
       }}
     >
       {/* Reconnecting banner — full-width bar in normal flow (pushes content
@@ -83,43 +81,35 @@ function InstancesModule() {
         </div>
       )}
 
-      {/* Content row: left rail + main column */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
-        {/* Left rail */}
-        <Rail active="instances" />
+      {/* TabStrip + terminal body */}
+      <TabStrip
+        instances={instances}
+        projects={projects}
+        activeInstanceId={activeId}
+        onSelectInstance={setActiveId}
+        onNew={() => setSpawnOpen(true)}
+      />
 
-        {/* Main column: TabStrip + terminal body */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <TabStrip
-            instances={instances}
-            projects={projects}
-            activeInstanceId={activeId}
-            onSelectInstance={setActiveId}
-            onNew={() => setSpawnOpen(true)}
-          />
-
-          {/* Terminal body */}
-          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-            {activeId ? (
-              <TerminalView key={activeId} instanceId={activeId} />
-            ) : (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  color: '#4b5563',
-                  fontSize: 15,
-                  fontWeight: 500,
-                  letterSpacing: 0.2,
-                }}
-              >
-                Vyberte instanci
-              </div>
-            )}
+      {/* Terminal body */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        {activeId ? (
+          <TerminalView key={activeId} instanceId={activeId} />
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: '#4b5563',
+              fontSize: 15,
+              fontWeight: 500,
+              letterSpacing: 0.2,
+            }}
+          >
+            Vyberte instanci
           </div>
-        </div>
+        )}
       </div>
 
       {/* Spawn modal */}
@@ -135,6 +125,60 @@ function InstancesModule() {
 }
 
 // ---------------------------------------------------------------------------
+// Shell — rendered inside <ConnectionProvider>; owns module-selection state
+// and the shared Rail. useAuthBlock() must be called inside the provider.
+// ---------------------------------------------------------------------------
+
+interface ShellProps {
+  connection: Connection;
+}
+
+function Shell({ connection }: ShellProps) {
+  const [activeModule, setActiveModule] = useState<RailModule>('instances');
+  const { blockedIds } = useAuthBlock();
+
+  return (
+    <div
+      style={{
+        // Column: optional auth-block banner on top, then the rail + content row.
+        // The outer #root (index.css) already applies the safe-area insets, so this
+        // fills #root's content box and never sits under the iOS status bar.
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+        backgroundColor: '#0e0f12',
+        fontFamily: 'system-ui, sans-serif',
+        color: '#e5e7eb',
+      }}
+    >
+      {/* Auth-block banner — only visible when instances view is active and
+          at least one instance is blocked waiting for browser auth. */}
+      {activeModule === 'instances' && (
+        <AuthBlockBanner
+          blockedIds={blockedIds}
+          onOpen={() => setActiveModule('remote')}
+        />
+      )}
+
+      {/* Content row: shared left rail + module content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
+        {/* Shared left rail — active across all modules */}
+        <Rail active={activeModule} onSelect={setActiveModule} />
+
+        {/* Module content */}
+        {activeModule === 'instances' ? (
+          <InstancesModule />
+        ) : (
+          <RemoteMacView connection={connection} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Connection form — shown until a valid Connection is loaded/entered
 // ---------------------------------------------------------------------------
 
@@ -143,7 +187,7 @@ interface ConnectionFormProps {
 }
 
 function ConnectionForm({ onConnected }: ConnectionFormProps) {
-  const [form, setForm] = useState({ host: '', port: '7445', token: '' });
+  const [form, setForm] = useState({ host: '', port: '7445', token: '', vncPassword: '' });
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
@@ -151,7 +195,12 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
   useEffect(() => {
     void loadConnection(store).then((c) => {
       if (c) {
-        setForm({ host: c.host, port: String(c.port), token: c.token });
+        setForm({
+          host: c.host,
+          port: String(c.port),
+          token: c.token,
+          vncPassword: c.vncPassword ?? '',
+        });
         // Auto-connect if we have a saved connection.
         onConnected(c);
       }
@@ -206,6 +255,13 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
           type="password"
           value={form.token}
           onChange={(e) => setForm({ ...form, token: e.target.value })}
+          style={inputStyle}
+        />
+        <input
+          placeholder="heslo pro sdílení obrazovky (volitelné)"
+          type="password"
+          value={form.vncPassword}
+          onChange={(e) => setForm({ ...form, vncPassword: e.target.value })}
           style={inputStyle}
         />
         <button
@@ -268,7 +324,7 @@ export function App() {
 
   return (
     <ConnectionProvider connection={connection}>
-      <InstancesModule />
+      <Shell connection={connection} />
     </ConnectionProvider>
   );
 }
