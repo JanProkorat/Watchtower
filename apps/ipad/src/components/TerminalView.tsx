@@ -115,6 +115,8 @@ export function TerminalView({ instanceId }: Props) {
           void bridge.invoke('ptyResize', { instanceId, cols: term.cols, rows: term.rows });
         } catch { /* ignore */ }
       });
+    }).catch(() => {
+      /* attach failed (e.g. WS drop); reconnect remount will retry */
     });
 
     return () => {

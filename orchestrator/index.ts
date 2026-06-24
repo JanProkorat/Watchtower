@@ -430,6 +430,7 @@ function disposeInstanceRow(id: string): void {
   forgetSlackThread(id);
   slackEscalator?.clear(id);
   terminalSnapshots.dispose(id);
+  ptySizeOwnership.disposeInstance(id);
 }
 
 interface PtySpawnArgs {
@@ -495,6 +496,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
         // Start the fresh process with a clean snapshot buffer (the failed
         // resume's brief output shouldn't carry into the new session's screen).
         terminalSnapshots.dispose(opts.id);
+        ptySizeOwnership.disposeInstance(opts.id);
         spawnPtyForInstance({
           id: opts.id,
           cwd: opts.cwd,
@@ -595,6 +597,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'killInstance':
       pty.get(req.payload.instanceId)?.kill();
       terminalSnapshots.dispose(req.payload.instanceId);
+      ptySizeOwnership.disposeInstance(req.payload.instanceId);
       return { ok: true };
 
     case 'removeInstance': {
@@ -608,6 +611,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       // Re-spawn a fresh process into the SAME row id. Shells re-run the login
       // shell; claude rows resume via the row's session id.
       terminalSnapshots.dispose(row.id);
+      ptySizeOwnership.disposeInstance(row.id);
       repo().updateStatus(row.id, row.kind === 'shell' ? 'working' : 'spawning', Date.now());
       repo().setTermination(row.id, null, null);
       spawnPtyForInstance({
@@ -1108,6 +1112,7 @@ function respawnIncompleteRowsOnBoot(): void {
         r.updateStatus(row.id, 'working', Date.now());
         r.setTermination(row.id, null, null);
         terminalSnapshots.dispose(row.id); // stale scrollback from the dead pty
+        ptySizeOwnership.disposeInstance(row.id);
         spawnPtyForInstance({ id: row.id, cwd: row.cwd, extraArgs: [], kind: 'shell' });
         respawned++;
       } catch (err) {

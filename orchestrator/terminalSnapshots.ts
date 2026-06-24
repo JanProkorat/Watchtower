@@ -8,6 +8,7 @@ type SerializeAddon = InstanceType<typeof SerializeAddon>;
 
 const DEFAULT_COLS = 120;
 const DEFAULT_ROWS = 30;
+// Also caps the replay snapshot history sent to attaching clients (iPad sees ~200 lines of seeded scrollback regardless of its own xterm scrollback).
 const SCROLLBACK = 200;
 
 /**

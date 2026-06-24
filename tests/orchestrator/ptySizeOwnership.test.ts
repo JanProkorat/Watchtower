@@ -40,4 +40,16 @@ describe('PtySizeOwnership', () => {
     o.recordResize('i1', 'ipad', 80, 25);
     expect(o.clientGone('ipad')).toEqual([]);
   });
+
+  it('disposeInstance clears ownership + dims so first-writer-owns resets and clientGone omits the instance', () => {
+    const o = new PtySizeOwnership();
+    o.recordResize('i1', 'mac', 100, 40);
+    o.focus('i1', 'mac');
+    o.disposeInstance('i1');
+    // After dispose, ipad becomes the first writer and should own the instance again.
+    const r = o.recordResize('i1', 'ipad', 80, 25);
+    expect(r).toEqual({ apply: true, cols: 80, rows: 25 });
+    // mac was previously registered but its dims were wiped; clientGone should not surface i1.
+    expect(o.clientGone('mac')).toEqual([]);
+  });
 });

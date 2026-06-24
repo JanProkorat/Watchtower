@@ -23,6 +23,12 @@ export class PtySizeOwnership {
     return { apply, cols, rows };
   }
 
+  /** Drop all ownership + stored dims for an instance (call on kill/remove/exit). */
+  disposeInstance(instanceId: string): void {
+    this.owner.delete(instanceId);
+    this.dims.delete(instanceId);
+  }
+
   clientGone(clientId: string): Array<{ instanceId: string } & Dims> {
     const reapply: Array<{ instanceId: string } & Dims> = [];
     for (const [instanceId, perClient] of this.dims) {

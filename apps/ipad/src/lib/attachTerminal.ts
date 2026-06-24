@@ -28,9 +28,15 @@ export async function attachTerminal(
     else buffer.push(d.chunk);
   });
 
-  const res = (await bridge.invoke('terminalAttach', { instanceId })) as {
-    data: string; cols: number; rows: number;
-  };
+  let res: { data: string; cols: number; rows: number };
+  try {
+    res = (await bridge.invoke('terminalAttach', { instanceId })) as {
+      data: string; cols: number; rows: number;
+    };
+  } catch (err) {
+    off();
+    throw err;
+  }
   sink.resize(res.cols, res.rows);
   if (res.data) sink.write(res.data);
   for (const chunk of buffer.splice(0)) sink.write(chunk);

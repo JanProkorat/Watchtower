@@ -20,7 +20,31 @@ function fakeBridge() {
   };
 }
 
+function fakeBridgeRejecting() {
+  let handlerCount = 0;
+  return {
+    get ptyDataHandlerCount() { return handlerCount; },
+    bridge: {
+      invoke: async (kind: string) => {
+        if (kind === 'terminalAttach') throw new Error('WS drop');
+        return { ok: true };
+      },
+      on: (_kind: string, _h: (p: unknown) => void) => {
+        handlerCount++;
+        return () => { handlerCount--; };
+      },
+    },
+  };
+}
+
 describe('attachTerminal', () => {
+  it('cleans up ptyData subscription when terminalAttach rejects', async () => {
+    const { bridge, ptyDataHandlerCount } = fakeBridgeRejecting();
+    const sink = { write: () => {}, resize: () => {} };
+    await expect(attachTerminal(bridge, 'i1', sink)).rejects.toThrow('WS drop');
+    expect(ptyDataHandlerCount).toBe(0);
+  });
+
   it('writes snapshot then drains buffered chunks in order, no gap', async () => {
     const { bridge, emitData } = fakeBridge();
     const writes: string[] = [];
