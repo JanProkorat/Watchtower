@@ -19,7 +19,7 @@ WATCHTOWER_WS_HOST=192.168.1.42 npm run dev
 Look for the startup log line printed by the orchestrator:
 
 ```
-[orchestrator] iPad connect → ws://192.168.1.42:3001/ws  token: abc123xyz
+[orchestrator] iPad connect → ws://192.168.1.42:7445/ws  token: abc123xyz
 ```
 
 Copy the host, port, and token — you will need them on the iPad.
@@ -35,7 +35,7 @@ From the **repo root**:
 
 ```bash
 npm run build --workspace @watchtower/ipad
-LANG=en_US.UTF-8 npx cap sync ios --project apps/ipad
+cd apps/ipad && LANG=en_US.UTF-8 npx cap sync ios
 ```
 
 Or equivalently from `apps/ipad/`:
@@ -77,7 +77,7 @@ Xcode will compile, sign, and install the app on your iPad.
 1. Open the **Watchtower** app.
 2. In the connection screen, enter:
    - **Host**: the IP from the orchestrator log (e.g. `192.168.1.42`)
-   - **Port**: the port from the log (default `3001`)
+   - **Port**: the port from the log (default `7445`)
    - **Token**: the token from the log
 3. Tap **Connect**.
 4. You should see `status: connected` and the live instance list from the Mac.
