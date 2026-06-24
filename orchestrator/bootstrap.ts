@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { networkInterfaces } from 'node:os';
 import path from 'node:path';
+import { resolveWsRemoteBind, formatIpadConnectionInfo } from './remoteBind.js';
 import { openDb } from './db/connection.js';
 import { startHookListener, type HookListenerHandle } from './hookListener.js';
 import { writeListenerSidecar } from './listenerSidecar.js';
@@ -124,12 +126,16 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
     writtenAt: Date.now(),
   });
 
+  const remote = resolveWsRemoteBind(process.env, networkInterfaces() as never);
   const wsBridge = await startWsBridge({
-    host: opts.wsHost ?? '127.0.0.1',
-    port: opts.wsPort ?? 0,
+    host: remote?.host ?? opts.wsHost ?? '127.0.0.1',
+    port: remote?.port ?? opts.wsPort ?? 0,
     token,
     handleRequest: opts.handleRequest ?? (() => { throw new Error('handleRequest not wired'); }),
   });
+  if (remote) {
+    console.log(formatIpadConnectionInfo({ host: remote.host, port: wsBridge.port, token }));
+  }
 
   return {
     db: dbHandle.raw,
