@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_SLACK_CONFIG, SLACK_SETTING_KEYS } from '../../shared/slackConfig.js';
+import { DEFAULT_SLACK_CONFIG, SLACK_SETTING_KEYS } from '@watchtower/shared/slackConfig.js';
 
 describe('slackConfig defaults', () => {
   it('defaults to disabled with all triggers on and a 5-minute escalation', () => {

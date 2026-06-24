@@ -1,6 +1,6 @@
 import type { SqliteLike } from '../migrations.js';
-import type { InstanceRow, InstanceKind, InstanceStatus, TerminationReason } from '../../../shared/stateModel.js';
-import { LIVE_STATUSES } from '../../../shared/stateModel.js';
+import type { InstanceRow, InstanceKind, InstanceStatus, TerminationReason } from '@watchtower/shared/stateModel.js';
+import { LIVE_STATUSES } from '@watchtower/shared/stateModel.js';
 
 type DbInstanceRow = {
   id: string;

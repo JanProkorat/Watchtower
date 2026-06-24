@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ELECTRON_ONLY_KINDS } from '../../shared/ipcContract.js';
+import { ELECTRON_ONLY_KINDS } from '@watchtower/shared/ipcContract.js';
 
 describe('ELECTRON_ONLY_KINDS', () => {
   it('contains the electron-only kinds and not orchestrator kinds', () => {

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { runMigrations, type SqliteLike } from '../../orchestrator/db/migrations.js';
 import { InstancesRepo } from '../../orchestrator/db/repositories/instances.js';
-import type { InstanceRow } from '../../shared/stateModel.js';
+import type { InstanceRow } from '@watchtower/shared/stateModel.js';
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');

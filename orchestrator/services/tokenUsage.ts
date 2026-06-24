@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
-import type { TokenUsageBlock, TokenUsagePayload } from '../../shared/tokenUsageFormat.js';
+import type { TokenUsageBlock, TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 
 // Watchtower has no native source for the Claude Code 5-hour rolling block /
 // reset clock — Claude doesn't persist it. `ccusage` reconstructs it from the

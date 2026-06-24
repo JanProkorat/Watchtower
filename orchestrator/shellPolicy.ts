@@ -1,4 +1,4 @@
-import type { InstanceKind, InstanceRow } from '../shared/stateModel.js';
+import type { InstanceKind, InstanceRow } from '@watchtower/shared/stateModel.js';
 
 export type { InstanceKind };
 

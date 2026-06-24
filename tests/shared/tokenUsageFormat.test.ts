@@ -6,7 +6,7 @@ import {
   formatPercent,
   usageSeverity,
   usageBar,
-} from '../../shared/tokenUsageFormat.js';
+} from '@watchtower/shared/tokenUsageFormat.js';
 
 describe('formatTokenCount', () => {
   it('prints small values verbatim', () => {

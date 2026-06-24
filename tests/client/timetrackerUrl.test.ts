@@ -5,7 +5,7 @@ import {
   viewsEqual,
   DEFAULT_VIEW,
   type TimeTrackerView,
-} from '../../client/src/util/timetrackerUrl.js';
+} from '../../apps/desktop/src/util/timetrackerUrl.js';
 
 describe('parseTimeTrackerHash', () => {
   it('parses every tab without a project id', () => {

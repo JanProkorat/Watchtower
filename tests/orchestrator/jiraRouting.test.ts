@@ -4,7 +4,7 @@ import {
   extractEpicShortcut,
   pickProjectForKey,
 } from '../../orchestrator/services/jiraRouting.js';
-import type { ProjectViewPayload } from '../../shared/ipcContract.js';
+import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 
 function project(overrides: Partial<ProjectViewPayload>): ProjectViewPayload {
   return {

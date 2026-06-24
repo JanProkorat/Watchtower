@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { hydrate, persist } from '../../../client/src/state/useWorkspaceLayout.js';
+import { hydrate, persist } from '../../../apps/desktop/src/state/useWorkspaceLayout.js';
 import {
   DASHBOARD_TAB_ID,
   SETTINGS_KEYS,
   type PersistedLayout,
-} from '../../../shared/layout.js';
+} from '@watchtower/shared/layout.js';
 
 interface Bridge {
   invoke: ReturnType<typeof vi.fn>;

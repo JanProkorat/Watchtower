@@ -1,9 +1,9 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
-import { ELECTRON_ONLY_KINDS } from '../shared/ipcContract.js';
-import type { OrchRequest, OrchPush } from '../shared/messagePort.js';
-import { encodeFrame, decodeFrame, type WsRequestFrame, type WsPushFrame } from '../shared/wsProtocol.js';
+import { ELECTRON_ONLY_KINDS } from '@watchtower/shared/ipcContract.js';
+import type { OrchRequest, OrchPush } from '@watchtower/shared/messagePort.js';
+import { encodeFrame, decodeFrame, type WsRequestFrame, type WsPushFrame } from '@watchtower/shared/wsProtocol.js';
 
 export interface WsBridgeOptions {
   host: string;

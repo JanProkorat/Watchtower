@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { readActiveModule, writeActiveModule, DEFAULT_ACTIVE_MODULE } from '../../client/src/state/useActiveModule.js';
+import { readActiveModule, writeActiveModule, DEFAULT_ACTIVE_MODULE } from '../../apps/desktop/src/state/useActiveModule.js';
 
 class MemoryStorage implements Storage {
   private map = new Map<string, string>();

@@ -14,7 +14,7 @@ import {
   setTrayTokenUsage,
   startTray,
 } from './tray.js';
-import type { TokenUsagePayload } from '../shared/tokenUsageFormat.js';
+import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 
 const LIVE_STATUSES = new Set([
   'spawning',

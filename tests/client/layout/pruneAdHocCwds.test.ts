@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pruneAdHocCwds } from '../../../client/src/layout/pruneAdHocCwds.js';
-import type { InstanceView } from '../../../client/src/state/useInstances.js';
+import { pruneAdHocCwds } from '../../../apps/desktop/src/layout/pruneAdHocCwds.js';
+import type { InstanceView } from '../../../apps/desktop/src/state/useInstances.js';
 
 const inst = (id: string, cwd: string, status = 'working'): InstanceView => ({
   id,

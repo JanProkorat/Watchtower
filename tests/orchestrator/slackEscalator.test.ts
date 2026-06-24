@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SlackEscalator } from '../../orchestrator/slackEscalator.js';
-import { DEFAULT_SLACK_CONFIG, type SlackConfig } from '../../shared/slackConfig.js';
+import { DEFAULT_SLACK_CONFIG, type SlackConfig } from '@watchtower/shared/slackConfig.js';
 
 function makeEscalator(overrides: Partial<SlackConfig> = {}) {
   const config: SlackConfig = { ...DEFAULT_SLACK_CONFIG, enabled: true, escalateMs: 1000, ...overrides };

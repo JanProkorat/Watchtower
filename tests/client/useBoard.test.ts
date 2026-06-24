@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isStale, STALE_THRESHOLD_MS } from '../../client/src/state/useBoard.js';
-import type { BoardSnapshotPayload } from '../../shared/ipcContract.js';
+import { isStale, STALE_THRESHOLD_MS } from '../../apps/desktop/src/state/useBoard.js';
+import type { BoardSnapshotPayload } from '@watchtower/shared/ipcContract.js';
 
 function snapshot(syncedAt: string | null): BoardSnapshotPayload {
   return { cards: [], syncedAt, lastSyncResult: null };

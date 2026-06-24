@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PortApi } from '../../shared/messagePort.js';
+import { PortApi } from '@watchtower/shared/messagePort.js';
 
 // Build a linked pair of in-memory ports that forward postMessage to the
 // other side's 'message' listeners — a minimal stand-in for the real

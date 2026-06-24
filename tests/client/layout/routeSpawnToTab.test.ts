@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { routeSpawnToTab } from '../../../client/src/layout/routeSpawnToTab.js';
+import { routeSpawnToTab } from '../../../apps/desktop/src/layout/routeSpawnToTab.js';
 
 describe('routeSpawnToTab', () => {
   const projects = [

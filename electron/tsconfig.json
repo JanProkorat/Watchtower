@@ -2,8 +2,11 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "../dist-electron",
+    "rootDir": "..",
+    "composite": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts", "../shared/**/*.ts"],
-  "exclude": ["preload.ts"]
+  "include": ["**/*.ts"],
+  "exclude": ["preload.ts"],
+  "references": [{ "path": "../packages/shared" }]
 }

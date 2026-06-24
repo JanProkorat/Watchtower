@@ -1,4 +1,4 @@
-import type { ProjectViewPayload } from '../../shared/ipcContract.js';
+import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 
 const SUMMARY_TAG = /^\s*\[([A-Z][A-Z0-9]*)\]/;
 const EPIC_PREFIX = /^([A-Z][A-Z0-9]*)[-\s]/;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildPtySpawnConfig, planBootAction } from '../../orchestrator/shellPolicy.js';
-import type { InstanceRow } from '../../shared/stateModel.js';
+import type { InstanceRow } from '@watchtower/shared/stateModel.js';
 
 describe('buildPtySpawnConfig', () => {
   it('claude: --session-id <id> and injects WATCHTOWER_INSTANCE_ID', () => {

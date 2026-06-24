@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readWsConfig } from '../../../client/src/transport/selectTransport';
+import { readWsConfig } from '@watchtower/transport';
 
 const noStore = { getItem: () => null };
 

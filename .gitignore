@@ -9,6 +9,8 @@ dist-helper/
 dist-shared/
 dist-helper-src/
 release/
+packages/shared/dist/
+*.tsbuildinfo
 
 # Test / coverage
 coverage/

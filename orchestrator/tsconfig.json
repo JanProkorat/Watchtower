@@ -2,7 +2,10 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "../dist-orchestrator",
+    "rootDir": "..",
+    "composite": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts", "../shared/**/*.ts"]
+  "include": ["**/*.ts"],
+  "references": [{ "path": "../packages/shared" }]
 }
