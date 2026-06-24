@@ -13,6 +13,7 @@ export function createWebSocketTransport(opts: {
   url: string;
   token: string;
   WebSocketImpl?: typeof WebSocket;
+  onClose?: () => void;
 }): WatchtowerBridge & { close(): void } {
   const Impl = opts.WebSocketImpl ?? WebSocket;
   const sep = opts.url.includes('?') ? '&' : '?';
@@ -25,6 +26,7 @@ export function createWebSocketTransport(opts: {
   let counter = 0;
 
   ws.onopen = () => { open = true; outbox.splice(0).forEach((m) => ws.send(m)); };
+  ws.onclose = () => { opts.onClose?.(); };
   ws.onmessage = (e: MessageEvent) => {
     const raw = typeof e.data === 'string' ? e.data : String(e.data);
     let msg;

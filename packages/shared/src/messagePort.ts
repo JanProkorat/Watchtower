@@ -6,6 +6,7 @@ export type OrchRequest =
   | { id: string; kind: 'restartInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { id: string; kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
+  | { id: string; kind: 'terminalAttach'; payload: { instanceId: string } }
   | { id: string; kind: 'killInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'removeInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'reorderInstances'; payload: { orderedIds: string[] } }
@@ -73,7 +74,8 @@ export type OrchRequest =
   | { id: string; kind: 'board:get'; payload: { projectId: number } }
   | { id: string; kind: 'board:sync'; payload: { projectId: number } }
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
-  | { id: string; kind: 'tokens:usage'; payload: Record<string, never> };
+  | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
+  | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -430,6 +432,7 @@ export type OrchResponse =
   | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
   | { kind: 'ptyWrite'; payload: { ok: true } }
   | { kind: 'ptyResize'; payload: { ok: true } }
+  | { kind: 'terminalAttach'; payload: { data: string; cols: number; rows: number } }
   | { kind: 'killInstance'; payload: { ok: true } }
   | { kind: 'removeInstance'; payload: { ok: true } }
   | { kind: 'restartInstance'; payload: { ok: boolean } }
@@ -528,7 +531,8 @@ export type OrchResponse =
       kind: 'board:remove';
       payload: { snapshot: import('./ipcContract.js').BoardSnapshotPayload };
     }
-  | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
+  | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
+  | { kind: 'terminalFocus'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

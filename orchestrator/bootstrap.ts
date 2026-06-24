@@ -44,7 +44,12 @@ export interface BootstrapOptions {
    * Omitting this causes any inbound WS request to throw rather than silently
    * succeed. Pass it explicitly whenever the WS path will be exercised.
    */
-  handleRequest?: (req: OrchRequest) => Promise<unknown>;
+  handleRequest?: (req: OrchRequest, origin?: string) => Promise<unknown>;
+  /**
+   * Called when a WS client disconnects. Pass `handleClientGone` from index.ts
+   * to re-apply the surviving client's pty dimensions after the owner leaves.
+   */
+  onClientGone?: (clientId: string) => void;
   /** Host for the WS bridge server. Defaults to '127.0.0.1'. */
   wsHost?: string;
   /** Port for the WS bridge server. 0 = ephemeral (good for tests). Defaults to 0. */
@@ -132,6 +137,7 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
     port: remote?.port ?? opts.wsPort ?? 0,
     token,
     handleRequest: opts.handleRequest ?? (() => { throw new Error('handleRequest not wired'); }),
+    onClientGone: opts.onClientGone,
   });
   if (remote) {
     console.log(formatIpadConnectionInfo({ host: remote.host, port: wsBridge.port, token }));

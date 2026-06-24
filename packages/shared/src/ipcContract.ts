@@ -5,6 +5,7 @@ export type IpcRequest =
   | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind } }
   | { kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
+  | { kind: 'terminalAttach'; payload: { instanceId: string } }
   | { kind: 'killInstance'; payload: { instanceId: string } }
   | { kind: 'removeInstance'; payload: { instanceId: string } }
   | { kind: 'restartInstance'; payload: { instanceId: string } }
@@ -77,7 +78,8 @@ export type IpcRequest =
   | { kind: 'board:signIn'; payload: Record<string, never> }
   | { kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { kind: 'tokens:usage'; payload: Record<string, never> }
-  | { kind: 'openExternalUrl'; payload: { url: string } };
+  | { kind: 'openExternalUrl'; payload: { url: string } }
+  | { kind: 'terminalFocus'; payload: { instanceId: string } };
 
 export interface RunningInstancePayload {
   id: string;
@@ -491,6 +493,7 @@ export type IpcResponse =
   | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
   | { kind: 'ptyWrite'; payload: { ok: true } }
   | { kind: 'ptyResize'; payload: { ok: true } }
+  | { kind: 'terminalAttach'; payload: { data: string; cols: number; rows: number } }
   | { kind: 'killInstance'; payload: { ok: true } }
   | { kind: 'removeInstance'; payload: { ok: true } }
   | { kind: 'restartInstance'; payload: { ok: boolean } }
@@ -584,7 +587,8 @@ export type IpcResponse =
   | { kind: 'board:signIn'; payload: { ok: boolean; error?: string } }
   | { kind: 'board:remove'; payload: { snapshot: BoardSnapshotPayload } }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
-  | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } };
+  | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
+  | { kind: 'terminalFocus'; payload: { ok: true } };
 
 export interface AgentRowPayload {
   name: string;

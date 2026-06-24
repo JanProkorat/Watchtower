@@ -9,7 +9,8 @@ export interface WsBridgeOptions {
   host: string;
   port: number;
   token: string;
-  handleRequest: (req: OrchRequest) => Promise<unknown>;
+  handleRequest: (req: OrchRequest, origin?: string) => Promise<unknown>;
+  onClientGone?: (clientId: string) => void;
 }
 
 export interface WsBridgeHandle {
@@ -24,6 +25,7 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
   await app.register(fastifyWebsocket, { options: { maxPayload: 1 * 1024 * 1024 } });
 
   const clients = new Set<WebSocket>();
+  let nextClientId = 0;
 
   app.register(async (scoped) => {
     scoped.get('/ws', {
@@ -38,8 +40,12 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
       },
     }, (conn, req) => {
       const socket = conn.socket as unknown as WebSocket;
+      const clientId = `ws-${++nextClientId}`;
       clients.add(socket);
-      socket.on('close', () => clients.delete(socket));
+      socket.on('close', () => {
+        clients.delete(socket);
+        opts.onClientGone?.(clientId);
+      });
 
       socket.on('message', async (raw: Buffer) => {
         let frame: WsRequestFrame;
@@ -56,7 +62,10 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
           return;
         }
         try {
-          const payload = await opts.handleRequest({ id: frame.id, kind: frame.kind, payload: frame.payload } as OrchRequest);
+          const payload = await opts.handleRequest(
+            { id: frame.id, kind: frame.kind, payload: frame.payload } as OrchRequest,
+            clientId,
+          );
           reply(payload);
         } catch (err) {
           reply(undefined, err instanceof Error ? err.message : String(err));

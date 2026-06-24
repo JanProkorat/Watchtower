@@ -43,6 +43,7 @@ import { QuietTimers } from './quietTimers.js';
 import { SlackEscalator } from './slackEscalator.js';
 import { SlackListener } from './slackListener.js';
 import { TerminalSnapshots } from './terminalSnapshots.js';
+import { buildTerminalAttachResponse } from './terminalAttach.js';
 import { formatEscalationMessage } from './escalationMessage.js';
 import { WebApiSlackClient, type SlackClient } from './services/slackClient.js';
 import { readSlackConfig, writeSlackConfig } from './services/slackConfig.js';
@@ -62,6 +63,7 @@ import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
 import { buildPtySpawnConfig, planBootAction } from './shellPolicy.js';
 import type { InstanceKind } from './shellPolicy.js';
+import { PtySizeOwnership } from './ptySizeOwnership.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -94,8 +96,18 @@ export function emitPush(msg: OrchPush): void {
     console.error('[orchestrator] push sink threw:', err);
   }
 }
+
 const pty = new PtyManager();
 const terminalSnapshots = new TerminalSnapshots();
+const ptySizeOwnership = new PtySizeOwnership();
+const LOCAL_CLIENT = 'local';
+
+export function handleClientGone(clientId: string): void {
+  for (const { instanceId, cols, rows } of ptySizeOwnership.clientGone(clientId)) {
+    pty.get(instanceId)?.resize(cols, rows);
+    terminalSnapshots.resize(instanceId, cols, rows);
+  }
+}
 let notifier: Notifier | null = null;
 let quietTimers: QuietTimers | null = null;
 let slackEscalator: SlackEscalator | null = null;
@@ -418,6 +430,7 @@ function disposeInstanceRow(id: string): void {
   forgetSlackThread(id);
   slackEscalator?.clear(id);
   terminalSnapshots.dispose(id);
+  ptySizeOwnership.disposeInstance(id);
 }
 
 interface PtySpawnArgs {
@@ -483,6 +496,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
         // Start the fresh process with a clean snapshot buffer (the failed
         // resume's brief output shouldn't carry into the new session's screen).
         terminalSnapshots.dispose(opts.id);
+        ptySizeOwnership.disposeInstance(opts.id);
         spawnPtyForInstance({
           id: opts.id,
           cwd: opts.cwd,
@@ -507,7 +521,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
   });
 }
 
-export async function handleRequest(req: OrchRequest): Promise<OrchResponse['payload']> {
+export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLIENT): Promise<OrchResponse['payload']> {
   switch (req.kind) {
     case 'ping':
       return { now: req.payload.now, orch: Date.now() };
@@ -559,14 +573,31 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
       pty.get(req.payload.instanceId)?.write(req.payload.data);
       return { ok: true };
 
-    case 'ptyResize':
-      pty.get(req.payload.instanceId)?.resize(req.payload.cols, req.payload.rows);
-      terminalSnapshots.resize(req.payload.instanceId, req.payload.cols, req.payload.rows);
+    case 'ptyResize': {
+      const { instanceId, cols, rows } = req.payload;
+      const decision = ptySizeOwnership.recordResize(instanceId, origin, cols, rows);
+      terminalSnapshots.resize(instanceId, cols, rows);
+      if (decision.apply) pty.get(instanceId)?.resize(cols, rows);
       return { ok: true };
+    }
+
+    case 'terminalFocus':
+      ptySizeOwnership.focus(req.payload.instanceId, origin);
+      return { ok: true };
+
+    case 'terminalAttach': {
+      const getDims = (id: string) => {
+        const h = pty.get(id);
+        return h ? { cols: h.cols, rows: h.rows } : null;
+      };
+      await terminalSnapshots.flush(req.payload.instanceId);
+      return buildTerminalAttachResponse(terminalSnapshots, req.payload.instanceId, getDims);
+    }
 
     case 'killInstance':
       pty.get(req.payload.instanceId)?.kill();
       terminalSnapshots.dispose(req.payload.instanceId);
+      ptySizeOwnership.disposeInstance(req.payload.instanceId);
       return { ok: true };
 
     case 'removeInstance': {
@@ -580,6 +611,7 @@ export async function handleRequest(req: OrchRequest): Promise<OrchResponse['pay
       // Re-spawn a fresh process into the SAME row id. Shells re-run the login
       // shell; claude rows resume via the row's session id.
       terminalSnapshots.dispose(row.id);
+      ptySizeOwnership.disposeInstance(row.id);
       repo().updateStatus(row.id, row.kind === 'shell' ? 'working' : 'spawning', Date.now());
       repo().setTermination(row.id, null, null);
       spawnPtyForInstance({
@@ -1080,6 +1112,7 @@ function respawnIncompleteRowsOnBoot(): void {
         r.updateStatus(row.id, 'working', Date.now());
         r.setTermination(row.id, null, null);
         terminalSnapshots.dispose(row.id); // stale scrollback from the dead pty
+        ptySizeOwnership.disposeInstance(row.id);
         spawnPtyForInstance({ id: row.id, cwd: row.cwd, extraArgs: [], kind: 'shell' });
         respawned++;
       } catch (err) {
@@ -1124,6 +1157,7 @@ function respawnIncompleteRowsOnBoot(): void {
       supportDir: supportDir(),
       portRange: [7421, 7430],
       handleRequest,
+      onClientGone: handleClientGone,
       onHookEvent: async (eventName, body, instanceId) => {
         // Drop hook events fired by a NESTED `claude` (memory summarizer, skills,
         // sub-agents) that inherited this instance's WATCHTOWER_INSTANCE_ID but

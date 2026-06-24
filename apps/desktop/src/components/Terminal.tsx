@@ -77,6 +77,7 @@ export function Terminal({ instanceId, status }: Props) {
       cols: term.cols,
       rows: term.rows,
     });
+    void window.watchtower.invoke('terminalFocus', { instanceId });
 
     return () => {
       offData();
@@ -108,6 +109,7 @@ export function Terminal({ instanceId, status }: Props) {
                 rows: term.rows,
               });
               term.focus();
+              void window.watchtower.invoke('terminalFocus', { instanceId });
             }
           } catch {
             /* hidden */
