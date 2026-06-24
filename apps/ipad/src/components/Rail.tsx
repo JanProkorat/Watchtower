@@ -1,5 +1,5 @@
 // apps/ipad/src/components/Rail.tsx
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 
 // Mirrors the desktop ModuleRail: same four entries (icons + labels), the same
 // Watchtower logo, and collapse/expand. Only 'instances' is interactive in v1;

@@ -7,7 +7,7 @@ import { VNC_KEYSYMS } from '../lib/vncKeys.js';
 type VncStatus = 'connecting' | 'connected' | 'disconnected' | 'auth-failed';
 
 export function RemoteMacView({ connection }: { connection: Connection }) {
-  const { } = useConnection(); // ensures we're inside the provider
+  useConnection(); // ensures we're inside the provider
   const screenRef = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<RFB | null>(null);
   const [status, setStatus] = useState<VncStatus>('connecting');
