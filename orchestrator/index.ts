@@ -97,16 +97,17 @@ export function emitPush(msg: OrchPush): void {
   }
 }
 
+const pty = new PtyManager();
+const terminalSnapshots = new TerminalSnapshots();
+const ptySizeOwnership = new PtySizeOwnership();
+const LOCAL_CLIENT = 'local';
+
 export function handleClientGone(clientId: string): void {
   for (const { instanceId, cols, rows } of ptySizeOwnership.clientGone(clientId)) {
     pty.get(instanceId)?.resize(cols, rows);
     terminalSnapshots.resize(instanceId, cols, rows);
   }
 }
-const pty = new PtyManager();
-const terminalSnapshots = new TerminalSnapshots();
-const ptySizeOwnership = new PtySizeOwnership();
-const LOCAL_CLIENT = 'local';
 let notifier: Notifier | null = null;
 let quietTimers: QuietTimers | null = null;
 let slackEscalator: SlackEscalator | null = null;
