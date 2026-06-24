@@ -2,6 +2,9 @@ import './xtermHeadlessShim.js'; // MUST precede the @xterm/headless import
 import pkg from '@xterm/headless';
 const { Terminal } = pkg;
 type Terminal = InstanceType<typeof Terminal>;
+import serializePkg from '@xterm/addon-serialize';
+const { SerializeAddon } = serializePkg;
+type SerializeAddon = InstanceType<typeof SerializeAddon>;
 
 const DEFAULT_COLS = 120;
 const DEFAULT_ROWS = 30;
@@ -14,12 +17,16 @@ const SCROLLBACK = 200;
  */
 export class TerminalSnapshots {
   private terms = new Map<string, Terminal>();
+  private serializers = new Map<string, SerializeAddon>();
 
   private ensure(id: string): Terminal {
     let term = this.terms.get(id);
     if (!term) {
       term = new Terminal({ cols: DEFAULT_COLS, rows: DEFAULT_ROWS, scrollback: SCROLLBACK, allowProposedApi: true });
+      const ser = new SerializeAddon();
+      term.loadAddon(ser);
       this.terms.set(id, term);
+      this.serializers.set(id, ser);
     }
     return term;
   }
@@ -55,11 +62,18 @@ export class TerminalSnapshots {
     return lines.join('\n');
   }
 
+  /** Replayable ANSI snapshot of the current screen + scrollback. */
+  serialize(id: string): string {
+    const ser = this.serializers.get(id);
+    return ser ? ser.serialize() : '';
+  }
+
   dispose(id: string): void {
     const term = this.terms.get(id);
     if (term) {
       term.dispose();
       this.terms.delete(id);
+      this.serializers.delete(id);
     }
   }
 }
