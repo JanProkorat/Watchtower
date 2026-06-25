@@ -15,6 +15,26 @@ import {
   startTray,
 } from './tray.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
+import { config as loadEnv } from 'dotenv';
+
+// Load the developer's git-ignored repo-root env file (e.g. WATCHTOWER_PG_URL
+// for the Supabase hub) before anything reads process.env. The orchestrator is
+// a utilityProcess that inherits this env, so it must be populated before
+// startOrchestrator() forks it. Dev-only: a packaged app ships no .env and
+// gets its config from the user's shell/launchd environment instead.
+//
+// WATCHTOWER_ENV picks which hub a `npm run dev` session talks to (default
+// development), so the dev and prod connection strings live in separate files:
+//   npm run dev                          -> .env.development
+//   WATCHTOWER_ENV=production npm run dev -> .env.production
+// A plain `.env` is loaded last as a shared fallback and never overrides a
+// value already set by the mode file (dotenv's default override:false).
+if (!app.isPackaged) {
+  const mode = process.env.WATCHTOWER_ENV === 'production' ? 'production' : 'development';
+  const root = path.join(__dirname, '../../');
+  loadEnv({ path: path.join(root, `.env.${mode}`) });
+  loadEnv({ path: path.join(root, '.env') });
+}
 
 const LIVE_STATUSES = new Set([
   'spawning',
