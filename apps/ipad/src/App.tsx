@@ -9,6 +9,7 @@ import { useInstances } from './state/useInstances.js';
 import { useProjects } from './state/useProjects.js';
 import { useActiveTerminal } from './state/useActiveTerminal.js';
 import { useAuthBlock } from './state/useAuthBlock.js';
+import { usePings } from './state/usePings.js';
 import { registerForPush } from './state/pushRegistration.js';
 import { Rail, type RailModule } from './components/Rail.js';
 import { TabStrip } from './components/TabStrip.js';
@@ -16,6 +17,7 @@ import { TerminalView } from './components/TerminalView.js';
 import { SpawnModal } from './components/SpawnModal.js';
 import { RemoteMacView } from './components/RemoteMacView.js';
 import { AuthBlockBanner } from './components/AuthBlockBanner.js';
+import { PingReply } from './components/PingReply.js';
 
 // ---------------------------------------------------------------------------
 // Capacitor Preferences store (same helper as before)
@@ -147,6 +149,7 @@ function Shell({ connection }: ShellProps) {
   const [activeModule, setActiveModule] = useState<RailModule>('instances');
   const { blockedIds } = useAuthBlock();
   const { bridge } = useConnection();
+  const { ping, clear: clearPing, seedPing } = usePings();
 
   // Register for push notifications once on mount (iOS only; no-op on web).
   useEffect(() => {
@@ -158,6 +161,24 @@ function Shell({ connection }: ShellProps) {
         void PushNotifications.addListener('registration', (t) => cb(t.value));
       },
       sendToken: (t) => bridge.invoke('push:registerDevice', { token: t, platform: 'ios' }).then(() => undefined),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Handle tap on an attentionPing push notification: fetch the ping from the
+  // orchestrator and seed it into the store so the reply box appears immediately
+  // when the app opens from background.
+  useEffect(() => {
+    void PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      const data = action.notification.data as Record<string, unknown> | undefined;
+      const pingId = data?.pingId;
+      if (typeof pingId !== 'number') return;
+      void bridge.invoke('messaging:getPing', { pingId }).then((res) => {
+        const r = res as { ok: boolean; ping?: { instanceId: string; pingId: number; kind: string; title: string; body: string } };
+        if (r.ok && r.ping) {
+          seedPing(r.ping);
+        }
+      });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -178,6 +199,10 @@ function Shell({ connection }: ShellProps) {
         color: '#e5e7eb',
       }}
     >
+      {/* Ping reply banner — visible on any tab when an instance sends an
+          attentionPing (or user taps a push notification). */}
+      {ping && <PingReply ping={ping} onClear={clearPing} />}
+
       {/* Auth-block banner — only visible when instances view is active and
           at least one instance is blocked waiting for browser auth. */}
       {activeModule === 'instances' && (
