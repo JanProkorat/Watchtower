@@ -3,7 +3,7 @@ import { Preferences } from '@capacitor/preferences';
 import {
   parseConnection, loadConnection, saveConnection, type Connection,
 } from './connection.js';
-import { ConnectionProvider, useConnection } from './state/connectionContext.js';
+import { ConnectionProvider } from './state/connectionContext.js';
 import { useInstances } from './state/useInstances.js';
 import { useProjects } from './state/useProjects.js';
 import { useActiveTerminal } from './state/useActiveTerminal.js';
@@ -35,7 +35,6 @@ const NON_LIVE_STATUSES = new Set(['finished', 'crashed', 'suspended']);
 // ---------------------------------------------------------------------------
 
 function InstancesModule() {
-  const { status } = useConnection();
   const { instances } = useInstances();
   const { projects } = useProjects();
   const { activeId, setActiveId } = useActiveTerminal();
@@ -59,28 +58,6 @@ function InstancesModule() {
         overflow: 'hidden',
       }}
     >
-      {/* Reconnecting banner — full-width bar in normal flow (pushes content
-          down rather than overlaying it). */}
-      {status !== 'connected' && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            flexShrink: 0,
-            backgroundColor: status === 'connecting' ? '#1e3a5f' : '#3b1f1f',
-            borderBottom: `1px solid ${status === 'connecting' ? '#2563eb' : '#7f1d1d'}`,
-            color: status === 'connecting' ? '#93c5fd' : '#fca5a5',
-            fontSize: 13,
-            fontWeight: 500,
-            padding: '6px 16px',
-            textAlign: 'center',
-            letterSpacing: 0.2,
-          }}
-        >
-          {status === 'connecting' ? 'Připojuji…' : 'Odpojeno – obnovuji připojení'}
-        </div>
-      )}
-
       {/* TabStrip + terminal body */}
       <TabStrip
         instances={instances}
