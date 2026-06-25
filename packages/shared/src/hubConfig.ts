@@ -6,10 +6,13 @@ export interface HubConfig {
   apnsKeyId: string;
   apnsTeamId: string;
   apnsEnv: 'sandbox' | 'production';
+  escalateMs: number;
+  triggers: { permission: boolean; idle: boolean; crash: boolean };
 }
 
 export const DEFAULT_HUB_CONFIG: HubConfig = {
   enabled: false, apnsKey: '', apnsKeyId: '', apnsTeamId: '', apnsEnv: 'sandbox',
+  escalateMs: 300000, triggers: { permission: true, idle: true, crash: true },
 };
 
 export const HUB_SETTING_KEYS = {
@@ -18,4 +21,6 @@ export const HUB_SETTING_KEYS = {
   apnsKeyId: 'hub_apns_key_id',
   apnsTeamId: 'hub_apns_team_id',
   apnsEnv: 'hub_apns_env',
+  escalateMs: 'hub_escalate_ms',
+  triggers: 'hub_triggers',
 } as const;
