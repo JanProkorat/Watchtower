@@ -77,6 +77,54 @@ export function HubTab() {
           <MenuItem value="production">production</MenuItem>
         </TextField>
 
+        <TextField
+          label="Prodleva (ms)"
+          type="number"
+          fullWidth
+          value={value.escalateMs}
+          onChange={(e) => patch({ escalateMs: Number(e.target.value) })}
+          inputProps={{ min: 0 }}
+        />
+
+        <Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+            Spouštěče
+          </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={value.triggers.permission}
+                onChange={(e) =>
+                  patch({ triggers: { ...value.triggers, permission: e.target.checked } })
+                }
+              />
+            }
+            label="Povolení"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={value.triggers.idle}
+                onChange={(e) =>
+                  patch({ triggers: { ...value.triggers, idle: e.target.checked } })
+                }
+              />
+            }
+            label="Nečinnost"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={value.triggers.crash}
+                onChange={(e) =>
+                  patch({ triggers: { ...value.triggers, crash: e.target.checked } })
+                }
+              />
+            }
+            label="Pád"
+          />
+        </Box>
+
         <Box>
           <Button variant="contained" onClick={onSave} disabled={saving || draft === null}>
             Uložit

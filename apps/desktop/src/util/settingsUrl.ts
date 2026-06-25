@@ -13,7 +13,7 @@
  * to the default landing (General).
  */
 
-export const SETTINGS_TABS = ['general', 'json', 'hooks', 'skills', 'agents', 'mcp', 'slack', 'hub'] as const;
+export const SETTINGS_TABS = ['general', 'json', 'hooks', 'skills', 'agents', 'mcp', 'hub'] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 export interface SettingsView {
