@@ -177,9 +177,9 @@ function Shell({ connection }: ShellProps) {
       const id = Number(rawPingId);
       if (!Number.isFinite(id)) return;
       void bridge.invoke('messaging:getPing', { pingId: id }).then((res) => {
-        const r = res as { ok: boolean; ping?: { instanceId: string; pingId: number; kind: string; title: string; body: string } };
-        if (r.ok && r.ping) {
-          seedPing(r.ping);
+        const r = res as { ping: import('@watchtower/shared/ipcContract.js').PingView | null };
+        if (r.ping) {
+          seedPing({ instanceId: r.ping.instanceId, pingId: r.ping.id, kind: r.ping.kind, title: r.ping.title, body: r.ping.body });
         }
       });
     });
