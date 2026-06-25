@@ -12,7 +12,7 @@ const store = {
   set: async (k: string, v: string) => { await Preferences.set({ key: k, value: v }); },
 };
 
-type VncStatus = 'connecting' | 'connected' | 'disconnected' | 'auth-failed';
+type VncStatus = 'connecting' | 'connected' | 'disconnected';
 
 export function RemoteMacView({ connection }: { connection: Connection }) {
   useConnection(); // ensures we're inside the provider
@@ -21,6 +21,11 @@ export function RemoteMacView({ connection }: { connection: Connection }) {
   const [creds, setCreds] = useState<VncCreds | null>(null);
   const [credsLoaded, setCredsLoaded] = useState(false);
   const [status, setStatus] = useState<VncStatus>('connecting');
+  // loginOpen: show the macOS login form. Set on auth failure (a separate flag
+  // so the `disconnect` event noVNC fires *right after* securityfailure can't
+  // clobber it) and via the "Změnit přihlášení" escape hatch.
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [authFailed, setAuthFailed] = useState(false);
   const [nonce, setNonce] = useState(0); // bump to force a reconnect
   const [form, setForm] = useState({ username: '', password: '' });
 
@@ -39,17 +44,18 @@ export function RemoteMacView({ connection }: { connection: Connection }) {
     const url = `${connectionToVncWsUrl(connection)}?token=${encodeURIComponent(connection.token)}`;
     setStatus('connecting');
     const rfb = new RFB(screenRef.current, url, {
-      // macOS Screen Sharing uses Apple auth (RFB type 30): the macOS account
-      // username + password. noVNC computes the Diffie-Hellman exchange itself.
+      // macOS Screen Sharing uses Apple auth (RFB type 30): the macOS *account*
+      // short name + login password. noVNC computes the Diffie-Hellman itself.
       credentials: { username: creds.username, password: creds.password },
     });
     rfb.scaleViewport = true;
     rfb.background = '#0e0f12';
     rfbRef.current = rfb;
-    const onConnect = () => setStatus('connected');
+    const onConnect = () => { setStatus('connected'); setLoginOpen(false); setAuthFailed(false); };
     const onDisconnect = () => setStatus('disconnected');
-    // Wrong macOS credentials → server rejects, or noVNC re-requests them.
-    const onAuthFail = () => setStatus('auth-failed');
+    // Wrong creds → server rejects (securityfailure), or noVNC re-requests them.
+    // Re-open the login; do NOT rely on `status`, which `disconnect` overwrites.
+    const onAuthFail = () => { setAuthFailed(true); setLoginOpen(true); };
     rfb.addEventListener('connect', onConnect);
     rfb.addEventListener('disconnect', onDisconnect);
     rfb.addEventListener('securityfailure', onAuthFail);
@@ -75,12 +81,11 @@ export function RemoteMacView({ connection }: { connection: Connection }) {
     const next = { username: form.username.trim(), password: form.password };
     if (!next.username || !next.password) return;
     await saveVncCreds(store, next);
-    setStatus('connecting'); // clear auth-failed so the screen mounts + connect effect runs
-    setCreds(next);
+    setAuthFailed(false);
+    setLoginOpen(false);
+    setStatus('connecting');
+    setCreds(next); // new ref → reconnect effect runs
   }
-
-  // Show the macOS login when credentials are missing or were rejected.
-  const needCreds = credsLoaded && (!creds || status === 'auth-failed');
 
   if (!credsLoaded) {
     return (
@@ -90,24 +95,27 @@ export function RemoteMacView({ connection }: { connection: Connection }) {
     );
   }
 
-  if (needCreds) {
+  // Show the macOS login when there are no credentials yet, or auth failed,
+  // or the user explicitly asked to change them.
+  if (!creds || loginOpen) {
     return (
       <div style={{ ...fill, alignItems: 'center', justifyContent: 'center', padding: 24, boxSizing: 'border-box' }}>
         <div style={{ display: 'grid', gap: 10, width: '100%', maxWidth: 360 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#c4b8ff' }}>Přihlášení k obrazovce Macu</div>
           <div style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.4 }}>
-            Zadejte uživatelské jméno a heslo účtu macOS (Sdílení obrazovky).
+            Zadejte <b>uživatelské jméno účtu macOS</b> (krátké jméno, např. „jan“ — ne Apple ID)
+            a heslo, kterým se přihlašujete k Macu.
           </div>
-          {status === 'auth-failed' && (
+          {authFailed && (
             <div role="alert" style={{
               padding: '8px 12px', borderRadius: 8, backgroundColor: '#2d1515',
               border: '1px solid #7f1d1d', color: '#fca5a5', fontSize: 13,
             }}>
-              Přihlášení selhalo – zkontrolujte jméno a heslo účtu macOS.
+              Přihlášení selhalo – zkontrolujte krátké jméno účtu macOS a heslo.
             </div>
           )}
           <input
-            placeholder="uživatelské jméno macOS"
+            placeholder="krátké jméno účtu macOS (např. jan)"
             autoCapitalize="none"
             autoCorrect="off"
             value={form.username}
@@ -115,7 +123,7 @@ export function RemoteMacView({ connection }: { connection: Connection }) {
             style={inputStyle}
           />
           <input
-            placeholder="heslo"
+            placeholder="heslo k Macu"
             type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -140,7 +148,8 @@ export function RemoteMacView({ connection }: { connection: Connection }) {
           {status === 'disconnected' && (
             <>
               <span>Odpojeno – zkontrolujte Sdílení obrazovky na Macu</span>
-              <button onClick={() => setNonce((n) => n + 1)} style={retryBtn}>Zkusit znovu</button>
+              <button onClick={() => setNonce((n) => n + 1)} style={ghostBtn}>Zkusit znovu</button>
+              <button onClick={() => setLoginOpen(true)} style={ghostBtn}>Změnit přihlášení</button>
             </>
           )}
         </div>
@@ -151,6 +160,8 @@ export function RemoteMacView({ connection }: { connection: Connection }) {
         <KeyBtn label="Tab" onPress={() => tapKey(VNC_KEYSYMS.tab)} />
         <KeyBtn label="Ctrl" onPress={() => tapKey(VNC_KEYSYMS.ctrl)} />
         <KeyBtn label="Alt" onPress={() => tapKey(VNC_KEYSYMS.alt)} />
+        <div style={{ flex: 1 }} />
+        <KeyBtn label="Přihlášení" onPress={() => setLoginOpen(true)} />
       </div>
     </div>
   );
@@ -169,7 +180,7 @@ const primaryBtn: React.CSSProperties = {
   color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer',
 };
 
-const retryBtn: React.CSSProperties = {
+const ghostBtn: React.CSSProperties = {
   padding: '4px 10px', borderRadius: 6, border: '1px solid #7f1d1d',
   backgroundColor: 'transparent', color: '#fca5a5', fontSize: 12, fontWeight: 600,
   WebkitTapHighlightColor: 'transparent',
