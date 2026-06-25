@@ -9,6 +9,7 @@ import { PtyManager } from './ptyManager.js';
 import { InstancesRepo } from './db/repositories/instances.js';
 import { HookEventsRepo } from './db/repositories/hookEvents.js';
 import { NotificationsRepo } from './db/repositories/notifications.js';
+import { PushDevicesRepo } from './db/repositories/pushDevices.js';
 import { SettingsRepo } from './db/repositories/settings.js';
 import {
   ProjectsRepo,
@@ -1083,6 +1084,10 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       // Return the cached snapshot immediately; refresh in the background if we
       // don't have one yet (first call before the poll timer has fired).
       return latestTokenUsage ?? (await refreshTokenUsage());
+
+    case 'push:registerDevice':
+      new PushDevicesRepo(handle!.db).register(req.payload.token, req.payload.platform, Date.now());
+      return { ok: true };
   }
 }
 

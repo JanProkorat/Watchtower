@@ -40,7 +40,7 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(14);
+    expect(version.v).toBe(15);
   });
 
   it('v12 adds task_id column to instances', () => {
@@ -169,11 +169,11 @@ describe('migrations', () => {
     // threw on the prod engine. The recorded max stays at 12 while the schema
     // is already migrated, so the next launch replays v13 and dies on
     // `ALTER TABLE project_rates RENAME TO contracts` (no such table).
-    runMigrations(db as unknown as SqliteLike); // full → v14
+    runMigrations(db as unknown as SqliteLike); // full → v15
     db.exec('DELETE FROM schema_version WHERE version > 12');
     expect(() => runMigrations(db as unknown as SqliteLike)).not.toThrow();
     const v = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(v.v).toBe(14);
+    expect(v.v).toBe(15);
   });
 
   it('v13 backfills sync_id + updated_at on pre-existing rows', () => {

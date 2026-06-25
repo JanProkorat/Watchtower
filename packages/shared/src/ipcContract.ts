@@ -82,7 +82,8 @@ export type IpcRequest =
   | { kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { kind: 'tokens:usage'; payload: Record<string, never> }
   | { kind: 'openExternalUrl'; payload: { url: string } }
-  | { kind: 'terminalFocus'; payload: { instanceId: string } };
+  | { kind: 'terminalFocus'; payload: { instanceId: string } }
+  | { kind: 'push:registerDevice'; payload: { token: string; platform: string } };
 
 export interface RunningInstancePayload {
   id: string;
@@ -593,7 +594,8 @@ export type IpcResponse =
   | { kind: 'board:remove'; payload: { snapshot: BoardSnapshotPayload } }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
-  | { kind: 'terminalFocus'; payload: { ok: true } };
+  | { kind: 'terminalFocus'; payload: { ok: true } }
+  | { kind: 'push:registerDevice'; payload: { ok: true } };
 
 export interface AgentRowPayload {
   name: string;
