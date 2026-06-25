@@ -10,6 +10,7 @@ import { InstancesRepo } from './db/repositories/instances.js';
 import { HookEventsRepo } from './db/repositories/hookEvents.js';
 import { NotificationsRepo } from './db/repositories/notifications.js';
 import { PushDevicesRepo } from './db/repositories/pushDevices.js';
+import { PingsRepo } from './db/repositories/pings.js';
 import { SettingsRepo } from './db/repositories/settings.js';
 import {
   ProjectsRepo,
@@ -1088,6 +1089,9 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'push:registerDevice':
       new PushDevicesRepo(handle!.db).register(req.payload.token, req.payload.platform, Date.now());
       return { ok: true };
+
+    case 'messaging:getPing':
+      return { ping: new PingsRepo(handle!.db).get(req.payload.pingId) };
   }
 }
 

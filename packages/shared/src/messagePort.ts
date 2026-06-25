@@ -1,5 +1,6 @@
 import type { SlackConfig } from './slackConfig.js';
 import type { HubConfig } from './hubConfig.js';
+import type { PingView } from './ipcContract.js';
 
 export type OrchRequest =
   | { id: string; kind: 'ping'; payload: { now: number } }
@@ -79,7 +80,8 @@ export type OrchRequest =
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
   | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } }
-  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } };
+  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } }
+  | { id: string; kind: 'messaging:getPing'; payload: { pingId: number } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -539,7 +541,8 @@ export type OrchResponse =
     }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'terminalFocus'; payload: { ok: true } }
-  | { kind: 'push:registerDevice'; payload: { ok: true } };
+  | { kind: 'push:registerDevice'; payload: { ok: true } }
+  | { kind: 'messaging:getPing'; payload: { ping: PingView | null } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

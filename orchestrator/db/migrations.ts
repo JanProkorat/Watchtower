@@ -323,6 +323,20 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       )`);
     },
   },
+  {
+    version: 16,
+    up: (db) => {
+      db.exec(`CREATE TABLE IF NOT EXISTS pings (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        instance_id TEXT    NOT NULL,
+        kind        TEXT    NOT NULL,
+        title       TEXT    NOT NULL,
+        body        TEXT    NOT NULL,
+        created_at  INTEGER NOT NULL,
+        answered_at INTEGER
+      )`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {
