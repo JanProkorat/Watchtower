@@ -103,16 +103,6 @@ Settings module's read/write surface is:
 - Hooks + MCP servers are edited via the `claudeSettings:write` IPC —
   the renderer mutates the parsed `hooks` / `mcpServers` key in the
   draft, then saves the whole file.
-- `slack:getConfig` / `slack:setConfig` / `slack:test` — the Slack
-  escalation panel. Config (`SlackConfig`, see `shared/slackConfig.ts`)
-  is stored as individual `settings`-table keys (`slack_*`) via
-  `orchestrator/services/slackConfig.ts`. The orchestrator owns a
-  `SlackEscalator` (per-instance timers, `orchestrator/slackEscalator.ts`)
-  that DMs the user when an instance needs attention and the app window is
-  unfocused for N minutes, plus a `SlackListener` (Socket Mode,
-  `orchestrator/slackListener.ts`) that injects DM replies back into the
-  pty. The `windowFocusChanged` OrchRequest (electron-main → orchestrator,
-  bound in `electron/window.ts`) drives the focus gate.
 
 When adding a new kind:
 
