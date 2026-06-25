@@ -342,7 +342,7 @@ async function postSlack(instanceId: string, cwd: string, kind: 'waiting-permiss
   }
 }
 
-function deliverSlackReply(instanceId: string, text: string): boolean {
+function deliverReply(instanceId: string, text: string): boolean {
   const session = pty.get(instanceId);
   if (!session) return false;
   session.write(text + '\r');
@@ -1098,7 +1098,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'messaging:reply':
       return { ok: routeMessagingReply(req.payload, {
-        deliver: deliverSlackReply,
+        deliver: deliverReply,
         markAnswered: (id) => new PingsRepo(handle!.db).markAnsweredByInstance(id, Date.now()),
       }) };
   }
@@ -1258,18 +1258,16 @@ function respawnIncompleteRowsOnBoot(): void {
       },
     });
     const onEscalate = (instanceId: string, cwd: string, kind: EscalationKind) => {
-      const slack = readSlackConfig(new SettingsRepo(handle!.db));
-      if (slack.enabled) void postSlack(instanceId, cwd, kind);
       void hubSender.fire(instanceId, cwd, kind);
     };
     escalationGate = new EscalationGate(() => {
-      const slack = readSlackConfig(new SettingsRepo(handle!.db));
-      return { escalateMs: slack.escalateMs, triggers: slack.triggers, armEnabled: slack.enabled || readHubConfig(new SettingsRepo(handle!.db)).enabled };
+      const hub = readHubConfig(new SettingsRepo(handle!.db));
+      return { escalateMs: hub.escalateMs, triggers: hub.triggers, armEnabled: hub.enabled };
     }, onEscalate);
     slackListener = new SlackListener({
       dmChannelId: null,
       resolveInstance: (threadTs) => slackThreadToInstance.get(threadTs) ?? null,
-      deliver: deliverSlackReply,
+      deliver: deliverReply,
       ack: ackSlackReply,
     });
     void startSlackListener();
