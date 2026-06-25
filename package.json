@@ -39,8 +39,6 @@
     "@mui/x-date-pickers": "^7.29.4",
     "@react-buddy/ide-toolbox": "^2.5.0",
     "@react-buddy/palette-mui": "^5.0.1",
-    "@slack/socket-mode": "^2.0.7",
-    "@slack/web-api": "^7.16.0",
     "@types/dompurify": "^3.0.5",
     "@watchtower/shared": "*",
     "@xterm/addon-fit": "^0.10.0",

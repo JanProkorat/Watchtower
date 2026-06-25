@@ -1,5 +1,5 @@
 export interface MessagingReplyDeps {
-  deliver(instanceId: string, text: string): boolean; // = deliverSlackReply
+  deliver(instanceId: string, text: string): boolean; // = deliverReply in orchestrator/index.ts
   markAnswered(instanceId: string): void;
 }
 

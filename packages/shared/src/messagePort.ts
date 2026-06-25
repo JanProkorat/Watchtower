@@ -1,4 +1,3 @@
-import type { SlackConfig } from './slackConfig.js';
 import type { HubConfig } from './hubConfig.js';
 import type { PingView } from './ipcContract.js';
 
@@ -15,9 +14,6 @@ export type OrchRequest =
   | { id: string; kind: 'listInstances'; payload: Record<string, never> }
   | { id: string; kind: 'getSetting'; payload: { key: string } }
   | { id: string; kind: 'setSetting'; payload: { key: string; value: string } }
-  | { id: string; kind: 'slack:getConfig'; payload: Record<string, never> }
-  | { id: string; kind: 'slack:setConfig'; payload: { config: SlackConfig } }
-  | { id: string; kind: 'slack:test'; payload: Record<string, never> }
   | { id: string; kind: 'hub:getConfig'; payload: Record<string, never> }
   | { id: string; kind: 'hub:setConfig'; payload: { config: HubConfig } }
   | { id: string; kind: 'windowFocusChanged'; payload: { focused: boolean } }
@@ -459,9 +455,6 @@ export type OrchResponse =
     }
   | { kind: 'getSetting'; payload: { value: string | null } }
   | { kind: 'setSetting'; payload: { ok: true } }
-  | { kind: 'slack:getConfig'; payload: { config: SlackConfig; connected: boolean } }
-  | { kind: 'slack:setConfig'; payload: { ok: true } }
-  | { kind: 'slack:test'; payload: { ok: boolean; error?: string } }
   | { kind: 'hub:getConfig'; payload: { config: HubConfig } }
   | { kind: 'hub:setConfig'; payload: { ok: true } }
   | { kind: 'windowFocusChanged'; payload: { ok: true } }

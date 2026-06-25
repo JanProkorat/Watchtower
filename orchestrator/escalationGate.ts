@@ -5,7 +5,7 @@ export type EscalationKind = 'waiting-permission' | 'idle-notify' | 'crashed';
 export interface EscalationParams {
   escalateMs: number;
   triggers: { permission: boolean; idle: boolean; crash: boolean };
-  armEnabled: boolean; // arm timers when ANY channel (Slack or hub) is enabled
+  armEnabled: boolean; // arm timers when ANY escalation channel is enabled
 }
 
 const ATTENTION: ReadonlyArray<InstanceStatus> = ['waiting-permission', 'idle-notify'];
