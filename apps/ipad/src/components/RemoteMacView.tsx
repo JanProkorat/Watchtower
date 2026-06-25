@@ -154,7 +154,9 @@ export function RemoteMacView({ connection }: { connection: Connection }) {
           )}
         </div>
       )}
-      <div ref={screenRef} style={{ flex: 1, minHeight: 0 }} />
+      {/* touchAction:none stops the WebView from hijacking touch gestures so
+          noVNC's own gesture handler gets them (two-finger drag = scroll). */}
+      <div ref={screenRef} style={{ flex: 1, minHeight: 0, touchAction: 'none', overscrollBehavior: 'none' }} />
       <div style={{ flexShrink: 0, display: 'flex', gap: 8, padding: 8, backgroundColor: '#13141a', borderTop: '1px solid #2e3038' }}>
         <KeyBtn label="Esc" onPress={() => tapKey(VNC_KEYSYMS.esc)} />
         <KeyBtn label="Tab" onPress={() => tapKey(VNC_KEYSYMS.tab)} />

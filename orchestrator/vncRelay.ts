@@ -12,6 +12,9 @@ export interface VncWsLike {
 // chunks (kernel-bounded, typically <64 KB) are forwarded as individual WS
 // frames, so per-frame size stays well under the WS maxPayload — no buffering.
 export function relayVnc(ws: VncWsLike, tcp: Socket): void {
+  // Disable Nagle: VNC input events (pointer/key) are tiny RFB messages, and
+  // Nagle would batch them, adding ~40 ms of latency per keystroke/move.
+  try { tcp.setNoDelay(true); } catch { /* ignore (non-net sockets in tests) */ }
   let done = false;
   const cleanup = () => {
     if (done) return;
