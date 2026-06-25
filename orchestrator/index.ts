@@ -38,6 +38,7 @@ import { ReportsService } from './db/reports.js';
 import { DashboardOverviewService } from './db/dashboardOverview.js';
 import { transition } from './stateMachine.js';
 import { hookCwdMatches, resolveResumeTarget } from './sessionResume.js';
+import { createAuthBlockDetector } from './authBlockDetector.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
 import { SlackEscalator } from './slackEscalator.js';
@@ -100,6 +101,9 @@ export function emitPush(msg: OrchPush): void {
 const pty = new PtyManager();
 const terminalSnapshots = new TerminalSnapshots();
 const ptySizeOwnership = new PtySizeOwnership();
+const authBlockDetector = createAuthBlockDetector({
+  emit: (e) => emitPush({ kind: 'authBlock', payload: e }),
+});
 const LOCAL_CLIENT = 'local';
 
 export function handleClientGone(clientId: string): void {
@@ -461,6 +465,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
     onData: (chunk) => {
       terminalSnapshots.feed(opts.id, chunk);
       emitPush({ kind: 'ptyData', payload: { instanceId: opts.id, chunk } });
+      authBlockDetector.onPtyChunk(opts.id, chunk);
       applyTransition(opts.id, { kind: 'ptyData' });
     },
     onExit: (code) => {
@@ -1169,6 +1174,7 @@ function respawnIncompleteRowsOnBoot(): void {
         if (row.kind === 'shell') return; // shells post no hooks; ignore any that arrive
         const hookCwd = (body as { cwd?: unknown } | undefined)?.cwd;
         if (!hookCwdMatches(row.cwd, hookCwd)) return;
+        authBlockDetector.onHookEvent(eventName, body, instanceId);
         const stateEvent = mapHookEventToStateEvent(eventName, body);
         if (stateEvent) applyTransition(instanceId, stateEvent);
       },

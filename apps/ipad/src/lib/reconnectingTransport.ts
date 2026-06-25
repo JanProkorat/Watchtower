@@ -2,7 +2,7 @@
 import { createWebSocketTransport } from '@watchtower/transport';
 
 type Inner = { invoke(k: string, p: unknown): Promise<unknown>; on(k: string, h: (p: unknown) => void): () => void; close(): void };
-type Factory = (opts: { url: string; token: string; onClose?: () => void }) => Inner;
+type Factory = (opts: { url: string; token: string; onOpen?: () => void; onClose?: () => void }) => Inner;
 export type ConnStatus = 'connecting' | 'connected' | 'disconnected';
 
 export function createReconnectingTransport(
@@ -32,6 +32,15 @@ export function createReconnectingTransport(
     setStatus('connecting');
     inner = factory({
       url: conn.url, token: conn.token,
+      // 'connected' only when the socket actually opens — not the instant the
+      // WS is created. Reporting connected optimistically made the status bounce
+      // connected→disconnected→connecting on every failed retry, flickering the
+      // reconnect banner. Backoff also resets only on a confirmed open.
+      onOpen: () => {
+        if (closed) return;
+        setStatus('connected');
+        attempt = 0;
+      },
       onClose: () => {
         if (closed) return;
         setStatus('disconnected');
@@ -41,8 +50,6 @@ export function createReconnectingTransport(
       },
     });
     bindAll(inner);
-    setStatus('connected');
-    attempt = 0;
   };
   connect();
 

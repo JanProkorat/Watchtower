@@ -1,9 +1,11 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
+import net, { type Socket } from 'node:net';
 import type { WebSocket } from 'ws';
 import { ELECTRON_ONLY_KINDS } from '@watchtower/shared/ipcContract.js';
 import type { OrchRequest, OrchPush } from '@watchtower/shared/messagePort.js';
 import { encodeFrame, decodeFrame, type WsRequestFrame, type WsPushFrame } from '@watchtower/shared/wsProtocol.js';
+import { relayVnc, type VncWsLike } from './vncRelay.js';
 
 export interface WsBridgeOptions {
   host: string;
@@ -11,6 +13,8 @@ export interface WsBridgeOptions {
   token: string;
   handleRequest: (req: OrchRequest, origin?: string) => Promise<unknown>;
   onClientGone?: (clientId: string) => void;
+  /** Factory for the VNC target socket. Defaults to localhost:5900 (macOS Screen Sharing). Injectable for tests. */
+  vncConnect?: () => Socket;
 }
 
 export interface WsBridgeHandle {
@@ -71,6 +75,20 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
           reply(undefined, err instanceof Error ? err.message : String(err));
         }
       });
+    });
+
+    const vncConnect = opts.vncConnect ?? (() => net.connect(5900, '127.0.0.1'));
+    scoped.get('/vnc', {
+      websocket: true,
+      preHandler: (req, reply, done) => {
+        const url = new URL(req.url ?? '', 'http://localhost');
+        if (url.searchParams.get('token') !== opts.token) reply.code(401).send({ error: 'unauthorized' });
+        else done();
+      },
+    }, (conn) => {
+      const socket = conn.socket as unknown as VncWsLike;
+      const tcp = vncConnect();
+      relayVnc(socket, tcp);
     });
   });
 

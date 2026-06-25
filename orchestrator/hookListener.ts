@@ -6,6 +6,8 @@ const KNOWN_EVENTS = new Set([
   'Notification',
   'Stop',
   'SessionEnd',
+  'PreToolUse',
+  'PostToolUse',
 ]);
 const MAX_BODY = 32 * 1024;
 

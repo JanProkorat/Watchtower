@@ -7,10 +7,13 @@ import { ConnectionProvider, useConnection } from './state/connectionContext.js'
 import { useInstances } from './state/useInstances.js';
 import { useProjects } from './state/useProjects.js';
 import { useActiveTerminal } from './state/useActiveTerminal.js';
-import { Rail } from './components/Rail.js';
+import { useAuthBlock } from './state/useAuthBlock.js';
+import { Rail, type RailModule } from './components/Rail.js';
 import { TabStrip } from './components/TabStrip.js';
 import { TerminalView } from './components/TerminalView.js';
 import { SpawnModal } from './components/SpawnModal.js';
+import { RemoteMacView } from './components/RemoteMacView.js';
+import { AuthBlockBanner } from './components/AuthBlockBanner.js';
 
 // ---------------------------------------------------------------------------
 // Capacitor Preferences store (same helper as before)
@@ -28,7 +31,7 @@ const store = {
 const NON_LIVE_STATUSES = new Set(['finished', 'crashed', 'suspended']);
 
 // ---------------------------------------------------------------------------
-// InstancesModule — rendered inside <ConnectionProvider>
+// InstancesModule — the instances view content (Rail lives in Shell now)
 // ---------------------------------------------------------------------------
 
 function InstancesModule() {
@@ -37,6 +40,13 @@ function InstancesModule() {
   const { projects } = useProjects();
   const { activeId, setActiveId } = useActiveTerminal();
   const [spawnOpen, setSpawnOpen] = useState(false);
+
+  // Once we've had a live connection, any later non-connected state is a
+  // *reconnect*. Tracking this lets the banner stay steady (one message, one
+  // colour) for the whole reconnect instead of flipping connecting↔disconnected.
+  const [everConnected, setEverConnected] = useState(false);
+  useEffect(() => { if (status === 'connected') setEverConnected(true); }, [status]);
+  const disconnected = status !== 'connected';
 
   const nonLiveInstances = instances.filter((i) => NON_LIVE_STATUSES.has(i.status));
 
@@ -48,8 +58,98 @@ function InstancesModule() {
   return (
     <div
       style={{
-        // Column: optional banner on top, then the rail + content row. The
-        // outer #root (index.css) already applies the safe-area insets, so this
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minWidth: 0,
+        minHeight: 0,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Connection banner — stays visible for the whole reconnect (shown for
+          both 'connecting' and 'disconnected'), so it doesn't blink. One steady
+          message/colour once a live connection has been lost. */}
+      {disconnected && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            flexShrink: 0,
+            backgroundColor: everConnected ? '#3b1f1f' : '#1e3a5f',
+            borderBottom: `1px solid ${everConnected ? '#7f1d1d' : '#2563eb'}`,
+            color: everConnected ? '#fca5a5' : '#93c5fd',
+            fontSize: 13,
+            fontWeight: 500,
+            padding: '6px 16px',
+            textAlign: 'center',
+            letterSpacing: 0.2,
+          }}
+        >
+          {everConnected ? 'Mac odpojen – obnovuji připojení…' : 'Připojuji k Macu…'}
+        </div>
+      )}
+
+      {/* TabStrip + terminal body */}
+      <TabStrip
+        instances={instances}
+        projects={projects}
+        activeInstanceId={activeId}
+        onSelectInstance={setActiveId}
+        onNew={() => setSpawnOpen(true)}
+      />
+
+      {/* Terminal body */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        {activeId ? (
+          <TerminalView key={activeId} instanceId={activeId} />
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: '#4b5563',
+              fontSize: 15,
+              fontWeight: 500,
+              letterSpacing: 0.2,
+            }}
+          >
+            Vyberte instanci
+          </div>
+        )}
+      </div>
+
+      {/* Spawn modal */}
+      <SpawnModal
+        open={spawnOpen}
+        projects={projects}
+        nonLiveInstances={nonLiveInstances}
+        onClose={() => setSpawnOpen(false)}
+        onSpawned={handleSpawned}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shell — rendered inside <ConnectionProvider>; owns module-selection state
+// and the shared Rail. useAuthBlock() must be called inside the provider.
+// ---------------------------------------------------------------------------
+
+interface ShellProps {
+  connection: Connection;
+}
+
+function Shell({ connection }: ShellProps) {
+  const [activeModule, setActiveModule] = useState<RailModule>('instances');
+  const { blockedIds } = useAuthBlock();
+
+  return (
+    <div
+      style={{
+        // Column: optional auth-block banner on top, then the rail + content row.
+        // The outer #root (index.css) already applies the safe-area insets, so this
         // fills #root's content box and never sits under the iOS status bar.
         display: 'flex',
         flexDirection: 'column',
@@ -61,75 +161,27 @@ function InstancesModule() {
         color: '#e5e7eb',
       }}
     >
-      {/* Reconnecting banner — full-width bar in normal flow (pushes content
-          down rather than overlaying it). */}
-      {status !== 'connected' && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            flexShrink: 0,
-            backgroundColor: status === 'connecting' ? '#1e3a5f' : '#3b1f1f',
-            borderBottom: `1px solid ${status === 'connecting' ? '#2563eb' : '#7f1d1d'}`,
-            color: status === 'connecting' ? '#93c5fd' : '#fca5a5',
-            fontSize: 13,
-            fontWeight: 500,
-            padding: '6px 16px',
-            textAlign: 'center',
-            letterSpacing: 0.2,
-          }}
-        >
-          {status === 'connecting' ? 'Připojuji…' : 'Odpojeno – obnovuji připojení'}
-        </div>
+      {/* Auth-block banner — only visible when instances view is active and
+          at least one instance is blocked waiting for browser auth. */}
+      {activeModule === 'instances' && (
+        <AuthBlockBanner
+          blockedIds={blockedIds}
+          onOpen={() => setActiveModule('remote')}
+        />
       )}
 
-      {/* Content row: left rail + main column */}
+      {/* Content row: shared left rail + module content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
-        {/* Left rail */}
-        <Rail active="instances" />
+        {/* Shared left rail — active across all modules */}
+        <Rail active={activeModule} onSelect={setActiveModule} />
 
-        {/* Main column: TabStrip + terminal body */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <TabStrip
-            instances={instances}
-            projects={projects}
-            activeInstanceId={activeId}
-            onSelectInstance={setActiveId}
-            onNew={() => setSpawnOpen(true)}
-          />
-
-          {/* Terminal body */}
-          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-            {activeId ? (
-              <TerminalView key={activeId} instanceId={activeId} />
-            ) : (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  color: '#4b5563',
-                  fontSize: 15,
-                  fontWeight: 500,
-                  letterSpacing: 0.2,
-                }}
-              >
-                Vyberte instanci
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Module content */}
+        {activeModule === 'instances' ? (
+          <InstancesModule />
+        ) : (
+          <RemoteMacView connection={connection} />
+        )}
       </div>
-
-      {/* Spawn modal */}
-      <SpawnModal
-        open={spawnOpen}
-        projects={projects}
-        nonLiveInstances={nonLiveInstances}
-        onClose={() => setSpawnOpen(false)}
-        onSpawned={handleSpawned}
-      />
     </div>
   );
 }
@@ -268,7 +320,7 @@ export function App() {
 
   return (
     <ConnectionProvider connection={connection}>
-      <InstancesModule />
+      <Shell connection={connection} />
     </ConnectionProvider>
   );
 }

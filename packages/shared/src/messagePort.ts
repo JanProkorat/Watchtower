@@ -543,6 +543,7 @@ export type OrchPush =
       payload: { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
     }
   | { kind: 'clearAttention'; payload: { instanceId: string } }
+  | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
   | { kind: 'badge'; payload: { count: number } }
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
 

@@ -1,12 +1,12 @@
 // apps/ipad/src/components/Rail.tsx
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 
 // Mirrors the desktop ModuleRail: same four entries (icons + labels), the same
 // Watchtower logo, and collapse/expand. Only 'instances' is interactive in v1;
 // Dashboard / Billing / Settings are shown disabled for parity. The desktop's
 // light/dark toggle is omitted — the iPad app is dark-only.
 
-export type RailModule = 'instances';
+export type RailModule = 'instances' | 'remote';
 
 interface Props {
   active: RailModule;
@@ -40,6 +40,7 @@ function Icon({ d }: { d: string }) {
 }
 
 const DASHBOARD_D = 'M11 21H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h6zm2 0h6c1.1 0 2-.9 2-2v-7h-8zm8-11V5c0-1.1-.9-2-2-2h-6v7z';
+const SCREEN_D = 'M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7v2H8v2h8v-2h-2v-2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m0 14H3V5h18z';
 const TERMINAL_D = 'M20 4H4c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.89-2-2-2m0 14H4V8h16zm-2-1h-6v-2h6zM7.5 17l-1.41-1.41L8.67 13l-2.59-2.59L7.5 9l4 4z';
 const BILLING_D = 'M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8zm1 10h-4v1h3c.55 0 1 .45 1 1v3c0 .55-.45 1-1 1h-1v1h-2v-1H9v-2h4v-1h-3c-.55 0-1-.45-1-1v-3c0-.55.45-1 1-1h1V9h2v1h2zm-2-4V3.5L17.5 8z';
 const SETTINGS_D = 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6';
@@ -68,6 +69,7 @@ interface RailItem {
 const ITEMS: RailItem[] = [
   { id: 'dashboard', label: 'Dashboard', d: DASHBOARD_D, enabled: false },
   { id: 'instances', label: 'Instances', d: TERMINAL_D, enabled: true },
+  { id: 'remote', label: 'Vzdálený Mac', d: SCREEN_D, enabled: true },
   { id: 'billing', label: 'Billing', d: BILLING_D, enabled: false },
   { id: 'settings', label: 'Settings', d: SETTINGS_D, enabled: false },
 ];
@@ -139,7 +141,7 @@ export function Rail({ active, onSelect }: Props) {
           <button
             key={item.id}
             disabled={!item.enabled}
-            onClick={() => item.enabled && onSelect?.('instances')}
+            onClick={() => item.enabled && onSelect?.(item.id as RailModule)}
             title={item.enabled ? item.label : `${item.label} (připravujeme)`}
             style={{
               display: 'flex',

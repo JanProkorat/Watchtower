@@ -738,6 +738,7 @@ export type IpcPush =
       payload: { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
     }
   | { kind: 'clearAttention'; payload: { instanceId: string } }
+  | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
   | { kind: 'badge'; payload: { count: number } }
   | { kind: 'activateInstance'; payload: { instanceId: string } }
   | { kind: 'triggerNewInstance'; payload: Record<string, never> }
