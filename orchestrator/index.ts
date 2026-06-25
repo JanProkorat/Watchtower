@@ -48,6 +48,7 @@ import { buildTerminalAttachResponse } from './terminalAttach.js';
 import { formatEscalationMessage } from './escalationMessage.js';
 import { WebApiSlackClient, type SlackClient } from './services/slackClient.js';
 import { readSlackConfig, writeSlackConfig } from './services/slackConfig.js';
+import { readHubConfig, writeHubConfig } from './services/hubConfig.js';
 import {
   previewHookInstall,
   ensureHooksInstalled,
@@ -681,6 +682,13 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       void startSlackListener();
       return { ok: true };
     }
+
+    case 'hub:getConfig':
+      return { config: readHubConfig(new SettingsRepo(handle!.db)) };
+
+    case 'hub:setConfig':
+      writeHubConfig(new SettingsRepo(handle!.db), req.payload.config);
+      return { ok: true };
 
     case 'slack:test': {
       const cfg = readSlackConfig(new SettingsRepo(handle!.db));

@@ -1,4 +1,5 @@
 import type { SlackConfig } from './slackConfig.js';
+import type { HubConfig } from './hubConfig.js';
 
 export type OrchRequest =
   | { id: string; kind: 'ping'; payload: { now: number } }
@@ -16,6 +17,8 @@ export type OrchRequest =
   | { id: string; kind: 'slack:getConfig'; payload: Record<string, never> }
   | { id: string; kind: 'slack:setConfig'; payload: { config: SlackConfig } }
   | { id: string; kind: 'slack:test'; payload: Record<string, never> }
+  | { id: string; kind: 'hub:getConfig'; payload: Record<string, never> }
+  | { id: string; kind: 'hub:setConfig'; payload: { config: HubConfig } }
   | { id: string; kind: 'windowFocusChanged'; payload: { focused: boolean } }
   | { id: string; kind: 'previewHookInstall'; payload: Record<string, never> }
   | { id: string; kind: 'installHooks'; payload: Record<string, never> }
@@ -455,6 +458,8 @@ export type OrchResponse =
   | { kind: 'slack:getConfig'; payload: { config: SlackConfig; connected: boolean } }
   | { kind: 'slack:setConfig'; payload: { ok: true } }
   | { kind: 'slack:test'; payload: { ok: boolean; error?: string } }
+  | { kind: 'hub:getConfig'; payload: { config: HubConfig } }
+  | { kind: 'hub:setConfig'; payload: { ok: true } }
   | { kind: 'windowFocusChanged'; payload: { ok: true } }
   | {
       kind: 'previewHookInstall';
