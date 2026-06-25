@@ -51,6 +51,7 @@
     "better-sqlite3": "^11.3.0",
     "dayjs": "^1.11.20",
     "dompurify": "^3.4.7",
+    "dotenv": "^16.6.1",
     "fastify": "^4.28.1",
     "node-pty": "^1.0.0",
     "pg": "^8.22.0",

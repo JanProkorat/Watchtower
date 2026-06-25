@@ -32,8 +32,16 @@ export function createPgStore(connectionString?: string): PgStore | null {
   const url = connectionString ?? defaultPgUrl();
   if (!url) return null;
 
+  // The local dev container speaks plaintext; any remote hub (Supabase) requires
+  // TLS and rejects non-SSL handshakes. Decide by host so the user only ever
+  // pastes a connection string — no extra sslmode flag to remember. We don't
+  // pin Supabase's CA yet, so verification is relaxed; tightening it (download
+  // the project CA, set `ca`/`rejectUnauthorized: true`) is the hardening step.
+  const isLocal = /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url);
+
   const pool = new pg.Pool({
     connectionString: url,
+    ssl: isLocal ? undefined : { rejectUnauthorized: false },
     // Keep the footprint tiny — the desktop is a single client.
     max: 4,
     connectionTimeoutMillis: 5_000,
