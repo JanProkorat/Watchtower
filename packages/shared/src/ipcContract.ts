@@ -765,7 +765,8 @@ export type IpcPush =
   | {
       kind: 'orchestratorCrashed';
       payload: { code: number | null; restarting: boolean };
-    };
+    }
+  | { kind: 'attentionPing'; payload: { instanceId: string; pingId: number; kind: 'waiting-permission' | 'idle-notify' | 'crashed'; title: string; body: string } };
 
 export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'chooseDirectory',

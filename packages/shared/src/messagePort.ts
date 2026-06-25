@@ -555,7 +555,8 @@ export type OrchPush =
   | { kind: 'clearAttention'; payload: { instanceId: string } }
   | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
   | { kind: 'badge'; payload: { count: number } }
-  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
+  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
+  | { kind: 'attentionPing'; payload: { instanceId: string; pingId: number; kind: 'waiting-permission' | 'idle-notify' | 'crashed'; title: string; body: string } };
 
 type AnyPort = {
   postMessage(data: unknown): void;

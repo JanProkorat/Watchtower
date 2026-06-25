@@ -51,6 +51,8 @@ import { formatEscalationMessage } from './escalationMessage.js';
 import { WebApiSlackClient, type SlackClient } from './services/slackClient.js';
 import { readSlackConfig, writeSlackConfig } from './services/slackConfig.js';
 import { readHubConfig, writeHubConfig } from './services/hubConfig.js';
+import { createHubSender } from './hubSender.js';
+import { sendApns } from './services/apns.js';
 import {
   previewHookInstall,
   ensureHooksInstalled,
@@ -1228,14 +1230,34 @@ function respawnIncompleteRowsOnBoot(): void {
     quietTimers = new QuietTimers(quietMs, (instanceId) => {
       applyTransition(instanceId, { kind: 'quietTimerFired' });
     });
+    const hubSender = createHubSender({
+      getConfig: () => readHubConfig(new SettingsRepo(handle!.db)),
+      logPing: (p) => new PingsRepo(handle!.db).create({ ...p, now: Date.now() }),
+      listTokens: () => new PushDevicesRepo(handle!.db).listTokens(),
+      removeToken: (token) => new PushDevicesRepo(handle!.db).remove(token),
+      emitPush,
+      sendApns,
+      buildContext: (instanceId, cwd, kind) => {
+        const name = cwd.split('/').filter(Boolean).pop() || instanceId;
+        const title =
+          kind === 'waiting-permission' ? `${name} — čeká na povolení` :
+          kind === 'crashed' ? `${name} — pád procesu` :
+          `${name} — čeká na vstup`;
+        const body =
+          kind === 'waiting-permission' ? 'Claude potřebuje vaše rozhodnutí o povolení.' :
+          kind === 'crashed' ? 'Claude process neočekávaně skončil.' :
+          'Claude dokončil práci a čeká na váš vstup.';
+        return { title, body };
+      },
+    });
     const onEscalate = (instanceId: string, cwd: string, kind: EscalationKind) => {
       const slack = readSlackConfig(new SettingsRepo(handle!.db));
       if (slack.enabled) void postSlack(instanceId, cwd, kind);
-      // Task 7 adds: hub dispatch here.
+      void hubSender.fire(instanceId, cwd, kind);
     };
     escalationGate = new EscalationGate(() => {
       const slack = readSlackConfig(new SettingsRepo(handle!.db));
-      return { escalateMs: slack.escalateMs, triggers: slack.triggers, armEnabled: slack.enabled };
+      return { escalateMs: slack.escalateMs, triggers: slack.triggers, armEnabled: slack.enabled || readHubConfig(new SettingsRepo(handle!.db)).enabled };
     }, onEscalate);
     slackListener = new SlackListener({
       dmChannelId: null,
