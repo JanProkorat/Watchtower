@@ -52,6 +52,7 @@ import { WebApiSlackClient, type SlackClient } from './services/slackClient.js';
 import { readSlackConfig, writeSlackConfig } from './services/slackConfig.js';
 import { readHubConfig, writeHubConfig } from './services/hubConfig.js';
 import { createHubSender } from './hubSender.js';
+import { routeMessagingReply } from './messagingReply.js';
 import { sendApns } from './services/apns.js';
 import {
   previewHookInstall,
@@ -1094,6 +1095,12 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'messaging:getPing':
       return { ping: new PingsRepo(handle!.db).get(req.payload.pingId) };
+
+    case 'messaging:reply':
+      return { ok: routeMessagingReply(req.payload, {
+        deliver: deliverSlackReply,
+        markAnswered: (id) => new PingsRepo(handle!.db).markAnsweredByInstance(id, Date.now()),
+      }) };
   }
 }
 

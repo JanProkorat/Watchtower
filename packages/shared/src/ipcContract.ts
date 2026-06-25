@@ -84,7 +84,8 @@ export type IpcRequest =
   | { kind: 'openExternalUrl'; payload: { url: string } }
   | { kind: 'terminalFocus'; payload: { instanceId: string } }
   | { kind: 'push:registerDevice'; payload: { token: string; platform: string } }
-  | { kind: 'messaging:getPing'; payload: { pingId: number } };
+  | { kind: 'messaging:getPing'; payload: { pingId: number } }
+  | { kind: 'messaging:reply'; payload: { instanceId: string; text: string } };
 
 export interface PingView {
   id: number;
@@ -607,7 +608,8 @@ export type IpcResponse =
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
   | { kind: 'push:registerDevice'; payload: { ok: true } }
-  | { kind: 'messaging:getPing'; payload: { ping: PingView | null } };
+  | { kind: 'messaging:getPing'; payload: { ping: PingView | null } }
+  | { kind: 'messaging:reply'; payload: { ok: boolean } };
 
 export interface AgentRowPayload {
   name: string;
