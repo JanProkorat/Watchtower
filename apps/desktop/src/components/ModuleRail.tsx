@@ -21,6 +21,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CableIcon from '@mui/icons-material/Cable';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import type { ThemeMode } from '../theme.js';
@@ -73,6 +74,7 @@ const SETTINGS_SUB_TABS: Array<SubTabMeta<SettingsTab>> = [
   { id: 'agents', label: 'Agents', icon: <SmartToyIcon fontSize="inherit" /> },
   { id: 'mcp', label: 'MCP', icon: <CableIcon fontSize="inherit" /> },
   { id: 'slack', label: 'Slack', icon: <NotificationsActiveIcon fontSize="inherit" /> },
+  { id: 'hub', label: 'Messaging hub', icon: <PhoneIphoneIcon fontSize="inherit" /> },
 ];
 
 const COLLAPSED_WIDTH = 52;
