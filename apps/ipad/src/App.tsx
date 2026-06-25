@@ -187,7 +187,7 @@ interface ConnectionFormProps {
 }
 
 function ConnectionForm({ onConnected }: ConnectionFormProps) {
-  const [form, setForm] = useState({ host: '', port: '7445', token: '', vncPassword: '' });
+  const [form, setForm] = useState({ host: '', port: '7445', token: '' });
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
@@ -195,12 +195,7 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
   useEffect(() => {
     void loadConnection(store).then((c) => {
       if (c) {
-        setForm({
-          host: c.host,
-          port: String(c.port),
-          token: c.token,
-          vncPassword: c.vncPassword ?? '',
-        });
+        setForm({ host: c.host, port: String(c.port), token: c.token });
         // Auto-connect if we have a saved connection.
         onConnected(c);
       }
@@ -255,13 +250,6 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
           type="password"
           value={form.token}
           onChange={(e) => setForm({ ...form, token: e.target.value })}
-          style={inputStyle}
-        />
-        <input
-          placeholder="heslo pro sdílení obrazovky (volitelné)"
-          type="password"
-          value={form.vncPassword}
-          onChange={(e) => setForm({ ...form, vncPassword: e.target.value })}
           style={inputStyle}
         />
         <button

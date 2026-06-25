@@ -32,7 +32,7 @@ on a browser-auth step and offers a one-tap jump into the VNC view.
 | **Transport** | **WS→TCP relay in the orchestrator**: new Fastify route `GET /vnc` on the existing `wsBridge.ts` server, same `?token=` auth as `/ws`, piping to `127.0.0.1:5900`. | Reuses the orchestrator's token-authed WS server. macOS Screen Sharing speaks raw RFB over TCP 5900; the browser needs WebSocket. Relay is a dumb byte pipe. |
 | **Reach** | **Same-Wi-Fi LAN only.** Tailscale/WAN (#72) deferred. | No home hardware yet. When Tailscale lands, only the bind interface changes — no module change. |
 | **Auth-block detection** | **Hook-primary + pty safety net.** `PreToolUse(Bash)` command match → `authBlocked`; `PostToolUse` clears. pty-output marker scan as fallback for indirect invocation / plain terminals. | Hooks reuse existing `watchtower-hook` → orchestrator plumbing and are precise. pty fallback closes the coverage gap (saml2aws called from a script, or a plain-terminal instance). |
-| **VNC password** | **Stored on the iPad** (Capacitor Preferences), sent client-side by noVNC; relay stays a dumb pipe. | Simplest for v1. The bearer token is the real access control; the 8-char VNC password is secondary defence. Auth-inject relay (password stays on Mac) documented as future hardening. |
+| **VNC auth** | **Apple authentication (RFB type 30)** using the **macOS account** username + password, stored on the iPad (Capacitor Preferences), sent client-side by noVNC; relay stays a dumb pipe. | **Revised during testing:** macOS Screen Sharing advertises Apple auth (type 30) ahead of the legacy VNC password (type 2), and noVNC selects the first supported type — so the macOS account is what's actually used. The original "8-char VNC password (type 2)" assumption did not hold against a real macOS server. The bearer token remains the real access control; the macOS credential lives on the iPad (auth-inject relay that keeps it on the Mac is documented future hardening). |
 | **Code location** | **Flat `apps/ipad/src/`**, not the `packages/` workspace from parent §5. | That restructure (sub-project #3) has not happened. Follow the current layout; do not pretend the workspace exists. |
 | **VNC mode** | **View + control.** | SSO logins require clicking and typing. |
 
@@ -145,12 +145,13 @@ instance runs auth cmd → PreToolUse hook → watchtower-hook POST
 
 - **Relay** reuses the bearer token (`?token=`) and the LAN bind from
   `remoteBind.ts`; fixed `127.0.0.1:5900` target (no client-controlled host).
-- **VNC password:** macOS legacy *"VNC viewers may control screen with
-  password"* (8-char limit). Stored on the iPad — secondary to the bearer
-  token, which is the real access control.
+- **VNC auth:** Apple authentication (RFB type 30) with the **macOS account**
+  username + password, stored on the iPad — secondary to the bearer token,
+  which is the real access control. Note the macOS account credential has a
+  larger blast radius than a standalone VNC password would.
 - **Future hardening (documented, out of v1):** an auth-inject relay that holds
-  the VNC password on the Mac and performs the RFB challenge-response itself, so
-  the password never leaves the machine.
+  the macOS credential on the Mac and performs the RFB handshake itself, so the
+  credential never leaves the machine.
 - **LAN-only:** server binds to the LAN interface; Tailscale (#72) deferred —
   when it lands, only the bind interface changes.
 
@@ -202,10 +203,13 @@ instance runs auth cmd → PreToolUse hook → watchtower-hook POST
 
 ## 9. Known constraints / risks
 
-- **noVNC ↔ macOS Screen Sharing compatibility** (encodings + auth) is the main
-  unknown. macOS only offers standard VNC password auth — which noVNC supports —
-  when the legacy "VNC viewers" option is enabled (§7). Mitigated by validating
-  in a desktop browser on day one.
+- **noVNC ↔ macOS Screen Sharing auth** (resolved during testing): macOS lists
+  Apple auth (type 30) ahead of the standalone VNC password (type 2), and noVNC
+  picks the first supported type — so it uses Apple auth with the macOS account
+  (username + password), not the type-2 password the design first assumed. The
+  iPad therefore prompts for macOS account credentials (§3.4) and must handle the
+  `credentialsrequired`/`securityfailure` events (a missing/rejected credential
+  re-shows the login instead of hanging).
 - **VNC quality** will feel laggier/blurrier than a dedicated app; acceptable
   because IDE use is glance-only and logins are occasional.
 - **Auth-block hook coverage:** `PreToolUse` only sees the command Claude ran,

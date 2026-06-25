@@ -34,17 +34,6 @@ describe('connectionToVncWsUrl', () => {
   });
 });
 
-describe('parseConnection vncPassword', () => {
-  it('carries an optional vnc password through', () => {
-    const r = parseConnection({ host: 'h', port: '7445', token: 't', vncPassword: 'screen12' });
-    expect(r).toEqual({ ok: true, value: { host: 'h', port: 7445, token: 't', vncPassword: 'screen12' } });
-  });
-  it('omits vncPassword when blank', () => {
-    const r = parseConnection({ host: 'h', port: '7445', token: 't', vncPassword: '' });
-    expect(r.ok && 'vncPassword' in r.value).toBe(false);
-  });
-});
-
 describe('persistence', () => {
   it('round-trips through a store', async () => {
     const mem = new Map<string, string>();
