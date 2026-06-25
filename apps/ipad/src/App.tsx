@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Preferences } from '@capacitor/preferences';
+import { PushNotifications } from '@capacitor/push-notifications';
 import {
   parseConnection, loadConnection, saveConnection, type Connection,
 } from './connection.js';
@@ -8,6 +9,7 @@ import { useInstances } from './state/useInstances.js';
 import { useProjects } from './state/useProjects.js';
 import { useActiveTerminal } from './state/useActiveTerminal.js';
 import { useAuthBlock } from './state/useAuthBlock.js';
+import { registerForPush } from './state/pushRegistration.js';
 import { Rail, type RailModule } from './components/Rail.js';
 import { TabStrip } from './components/TabStrip.js';
 import { TerminalView } from './components/TerminalView.js';
@@ -144,6 +146,21 @@ interface ShellProps {
 function Shell({ connection }: ShellProps) {
   const [activeModule, setActiveModule] = useState<RailModule>('instances');
   const { blockedIds } = useAuthBlock();
+  const { bridge } = useConnection();
+
+  // Register for push notifications once on mount (iOS only; no-op on web).
+  useEffect(() => {
+    void registerForPush({
+      requestPermission: async () =>
+        (await PushNotifications.requestPermissions()).receive === 'granted',
+      register: () => PushNotifications.register(),
+      onToken: (cb) => {
+        void PushNotifications.addListener('registration', (t) => cb(t.value));
+      },
+      sendToken: (t) => bridge.invoke('push:registerDevice', { token: t, platform: 'ios' }).then(() => undefined),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
