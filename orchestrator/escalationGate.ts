@@ -1,4 +1,4 @@
-import type { InstanceStatus } from '@watchtower/shared/messagePort.js';
+import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
 
 export type EscalationKind = 'waiting-permission' | 'idle-notify' | 'crashed';
 

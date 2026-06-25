@@ -41,7 +41,7 @@ import { hookCwdMatches, resolveResumeTarget } from './sessionResume.js';
 import { createAuthBlockDetector } from './authBlockDetector.js';
 import { Notifier } from './notifier.js';
 import { QuietTimers } from './quietTimers.js';
-import { SlackEscalator } from './slackEscalator.js';
+import { EscalationGate, type EscalationKind } from './escalationGate.js';
 import { SlackListener } from './slackListener.js';
 import { TerminalSnapshots } from './terminalSnapshots.js';
 import { buildTerminalAttachResponse } from './terminalAttach.js';
@@ -114,7 +114,7 @@ export function handleClientGone(clientId: string): void {
 }
 let notifier: Notifier | null = null;
 let quietTimers: QuietTimers | null = null;
-let slackEscalator: SlackEscalator | null = null;
+let escalationGate: EscalationGate | null = null;
 let slackListener: SlackListener | null = null;
 /** threadTs <-> instanceId, populated when we post; read by the reply listener. */
 const slackThreadToInstance = new Map<string, string>();
@@ -385,7 +385,7 @@ function applyTransition(instanceId: string, event: StateEvent): void {
     repo().updateStatus(instanceId, result.state, Date.now());
     emitPush({ kind: 'stateChanged', payload: { instanceId, status: result.state } });
     if (notifier) notifier.apply(instanceId, inst.cwd, prevStatus, result.state, Date.now());
-    if (!isShell && slackEscalator) slackEscalator.apply(instanceId, inst.cwd, prevStatus, result.state);
+    if (!isShell) escalationGate?.apply(instanceId, inst.cwd, prevStatus, result.state);
     if (!isShell && (result.state === 'crashed' || result.state === 'finished')) forgetSlackThread(instanceId);
   }
   for (const out of result.outputs) {
@@ -397,7 +397,7 @@ function applyTransition(instanceId: string, event: StateEvent): void {
       quietTimers?.clear(instanceId);
     } else if (out.kind === 'clearAttention') {
       notifier?.clearAttention(instanceId);
-      slackEscalator?.clear(instanceId);
+      escalationGate?.clear(instanceId);
       forgetSlackThread(instanceId);
     }
   }
@@ -432,7 +432,7 @@ function disposeInstanceRow(id: string): void {
   new NotificationsRepo(handle!.db).deleteForInstance(id);
   repo().delete(id);
   forgetSlackThread(id);
-  slackEscalator?.clear(id);
+  escalationGate?.clear(id);
   terminalSnapshots.dispose(id);
   ptySizeOwnership.disposeInstance(id);
 }
@@ -699,7 +699,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'windowFocusChanged': {
       const { focused } = req.payload;
-      slackEscalator?.setWindowFocused(focused);
+      escalationGate?.setWindowFocused(focused);
       notifier?.setWindowFocused(focused);
       if (focused) {
         // Returning to the window acknowledges the instance the user is now
@@ -1211,10 +1211,15 @@ function respawnIncompleteRowsOnBoot(): void {
     quietTimers = new QuietTimers(quietMs, (instanceId) => {
       applyTransition(instanceId, { kind: 'quietTimerFired' });
     });
-    slackEscalator = new SlackEscalator(
-      () => readSlackConfig(new SettingsRepo(handle!.db)),
-      { post: (id, cwd, kind) => void postSlack(id, cwd, kind) },
-    );
+    const onEscalate = (instanceId: string, cwd: string, kind: EscalationKind) => {
+      const slack = readSlackConfig(new SettingsRepo(handle!.db));
+      if (slack.enabled) void postSlack(instanceId, cwd, kind);
+      // Task 7 adds: hub dispatch here.
+    };
+    escalationGate = new EscalationGate(() => {
+      const slack = readSlackConfig(new SettingsRepo(handle!.db));
+      return { escalateMs: slack.escalateMs, triggers: slack.triggers, armEnabled: slack.enabled };
+    }, onEscalate);
     slackListener = new SlackListener({
       dmChannelId: null,
       resolveInstance: (threadTs) => slackThreadToInstance.get(threadTs) ?? null,
@@ -1237,7 +1242,7 @@ function respawnIncompleteRowsOnBoot(): void {
 // so pending escalation timers are cleared and the Socket Mode WebSocket is
 // closed gracefully when the utility process exits.
 process.on('exit', () => {
-  slackEscalator?.clearAll();
+  escalationGate?.clearAll();
   void slackListener?.stop();
 });
 process.on('SIGTERM', () => { void slackListener?.stop(); });

@@ -1,98 +1,47 @@
+// SlackEscalator has been replaced by EscalationGate (orchestrator/escalationGate.ts).
+// Core behaviour tests live in escalationGate.test.ts. This file retains the two
+// focus-flip and timer-reset cases that were unique to the old SlackEscalator suite.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SlackEscalator } from '../../orchestrator/slackEscalator.js';
-import { DEFAULT_SLACK_CONFIG, type SlackConfig } from '@watchtower/shared/slackConfig.js';
+import { EscalationGate, type EscalationParams } from '../../orchestrator/escalationGate.js';
 
-function makeEscalator(overrides: Partial<SlackConfig> = {}) {
-  const config: SlackConfig = { ...DEFAULT_SLACK_CONFIG, enabled: true, escalateMs: 1000, ...overrides };
-  const posts: Array<{ id: string; kind: string }> = [];
-  const esc = new SlackEscalator(
-    () => config,
-    { post: (id, _cwd, kind) => posts.push({ id, kind }) },
+const BASE: EscalationParams = {
+  escalateMs: 1000,
+  triggers: { permission: true, idle: true, crash: true },
+  armEnabled: true,
+};
+
+function makeGate(overrides: Partial<EscalationParams> = {}) {
+  const fired: Array<{ id: string; kind: string }> = [];
+  const gate = new EscalationGate(
+    () => ({ ...BASE, ...overrides }),
+    (id, _cwd, kind) => fired.push({ id, kind }),
   );
-  return { esc, posts, config };
+  return { gate, fired };
 }
 
-describe('SlackEscalator', () => {
+describe('EscalationGate (focus-flip + timer-reset)', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('posts after escalateMs when the user never engages and the window is blurred', () => {
-    const { esc, posts } = makeEscalator();
-    esc.setWindowFocused(false);
-    esc.apply('a', '/cwd', 'working', 'waiting-permission');
-    expect(posts).toHaveLength(0);
+  it('still fires when the window is blurred AFTER arming (focus flip down)', () => {
+    const { gate, fired } = makeGate();
+    gate.setWindowFocused(true);
+    gate.apply('a', '/cwd', 'working', 'waiting-permission'); // armed while focused
+    gate.setWindowFocused(false); // user walks away before it fires
     vi.advanceTimersByTime(1000);
-    expect(posts).toEqual([{ id: 'a', kind: 'waiting-permission' }]);
-  });
-
-  it('does NOT post if the window is focused when the timer fires', () => {
-    const { esc, posts } = makeEscalator();
-    esc.setWindowFocused(true);
-    esc.apply('a', '/cwd', 'working', 'idle-notify');
-    vi.advanceTimersByTime(1000);
-    expect(posts).toHaveLength(0);
-  });
-
-  it('cancels the timer when the instance leaves the attention state', () => {
-    const { esc, posts } = makeEscalator();
-    esc.setWindowFocused(false);
-    esc.apply('a', '/cwd', 'working', 'waiting-permission');
-    esc.apply('a', '/cwd', 'waiting-permission', 'working');
-    vi.advanceTimersByTime(1000);
-    expect(posts).toHaveLength(0);
-  });
-
-  it('posts crashes immediately (no timer) when the window is blurred', () => {
-    const { esc, posts } = makeEscalator();
-    esc.setWindowFocused(false);
-    esc.apply('a', '/cwd', 'working', 'crashed');
-    expect(posts).toEqual([{ id: 'a', kind: 'crashed' }]);
-  });
-
-  it('respects disabled config and per-trigger toggles', () => {
-    const { esc, posts } = makeEscalator({ triggers: { permission: false, idle: true, crash: true } });
-    esc.setWindowFocused(false);
-    esc.apply('a', '/cwd', 'working', 'waiting-permission');
-    vi.advanceTimersByTime(1000);
-    expect(posts).toHaveLength(0);
-  });
-
-  it('does nothing when disabled entirely', () => {
-    const { esc, posts } = makeEscalator({ enabled: false });
-    esc.setWindowFocused(false);
-    esc.apply('a', '/cwd', 'working', 'idle-notify');
-    vi.advanceTimersByTime(1000);
-    expect(posts).toHaveLength(0);
-  });
-
-  it('still posts when the window is blurred AFTER arming (focus flip down)', () => {
-    const { esc, posts } = makeEscalator();
-    esc.setWindowFocused(true);
-    esc.apply('a', '/cwd', 'working', 'waiting-permission'); // armed while focused
-    esc.setWindowFocused(false); // user walks away before it fires
-    vi.advanceTimersByTime(1000);
-    expect(posts).toEqual([{ id: 'a', kind: 'waiting-permission' }]);
-  });
-
-  it('suppresses the post when the window regains focus AFTER arming (focus flip up)', () => {
-    const { esc, posts } = makeEscalator();
-    esc.setWindowFocused(false);
-    esc.apply('a', '/cwd', 'working', 'idle-notify'); // armed while blurred
-    esc.setWindowFocused(true); // user comes back before it fires
-    vi.advanceTimersByTime(1000);
-    expect(posts).toHaveLength(0);
+    expect(fired).toEqual([{ id: 'a', kind: 'waiting-permission' }]);
   });
 
   it('re-arming on a fresh attention entry resets the timer', () => {
-    const { esc, posts } = makeEscalator();
-    esc.setWindowFocused(false);
-    esc.apply('a', '/cwd', 'working', 'waiting-permission'); // arm #1
+    const { gate, fired } = makeGate();
+    gate.setWindowFocused(false);
+    gate.apply('a', '/cwd', 'working', 'waiting-permission'); // arm #1
     vi.advanceTimersByTime(600);
-    esc.apply('a', '/cwd', 'waiting-permission', 'working');  // engaged, cancels
-    esc.apply('a', '/cwd', 'working', 'idle-notify');         // arm #2 (fresh 1000ms)
+    gate.apply('a', '/cwd', 'waiting-permission', 'working');  // engaged, cancels
+    gate.apply('a', '/cwd', 'working', 'idle-notify');         // arm #2 (fresh 1000ms)
     vi.advanceTimersByTime(600); // 1200ms since arm#1 but only 600ms since arm#2
-    expect(posts).toHaveLength(0);
+    expect(fired).toHaveLength(0);
     vi.advanceTimersByTime(400); // now 1000ms since arm#2
-    expect(posts).toEqual([{ id: 'a', kind: 'idle-notify' }]);
+    expect(fired).toEqual([{ id: 'a', kind: 'idle-notify' }]);
   });
 });
