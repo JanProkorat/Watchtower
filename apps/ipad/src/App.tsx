@@ -153,15 +153,17 @@ function Shell({ connection }: ShellProps) {
 
   // Register for push notifications once on mount (iOS only; no-op on web).
   useEffect(() => {
+    let listenerHandle: ReturnType<typeof PushNotifications.addListener> | null = null;
     void registerForPush({
       requestPermission: async () =>
         (await PushNotifications.requestPermissions()).receive === 'granted',
       register: () => PushNotifications.register(),
       onToken: (cb) => {
-        void PushNotifications.addListener('registration', (t) => cb(t.value));
+        listenerHandle = PushNotifications.addListener('registration', (t) => cb(t.value));
       },
       sendToken: (t) => bridge.invoke('push:registerDevice', { token: t, platform: 'ios' }).then(() => undefined),
     });
+    return () => { if (listenerHandle) void (listenerHandle as Promise<{ remove(): void }>).then((l) => l.remove()); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -169,19 +171,21 @@ function Shell({ connection }: ShellProps) {
   // orchestrator and seed it into the store so the reply box appears immediately
   // when the app opens from background.
   useEffect(() => {
-    void PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+    const h = PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
       const data = action.notification.data as Record<string, unknown> | undefined;
-      const pingId = data?.pingId;
-      if (typeof pingId !== 'number') return;
-      void bridge.invoke('messaging:getPing', { pingId }).then((res) => {
+      const rawPingId = data?.pingId;
+      const id = Number(rawPingId);
+      if (!Number.isFinite(id)) return;
+      void bridge.invoke('messaging:getPing', { pingId: id }).then((res) => {
         const r = res as { ok: boolean; ping?: { instanceId: string; pingId: number; kind: string; title: string; body: string } };
         if (r.ok && r.ping) {
           seedPing(r.ping);
         }
       });
     });
+    return () => { void h.then((l) => l.remove()); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [bridge]);
 
   return (
     <div
