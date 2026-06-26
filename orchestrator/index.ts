@@ -10,7 +10,6 @@ import { InstancesRepo } from './db/repositories/instances.js';
 import { HookEventsRepo } from './db/repositories/hookEvents.js';
 import { NotificationsRepo } from './db/repositories/notifications.js';
 import { PushDevicesRepo } from './db/repositories/pushDevices.js';
-import { PingsRepo } from './db/repositories/pings.js';
 import { SettingsRepo } from './db/repositories/settings.js';
 import {
   ProjectsRepo,
@@ -48,7 +47,6 @@ import { TerminalSnapshots } from './terminalSnapshots.js';
 import { buildTerminalAttachResponse } from './terminalAttach.js';
 import { readHubConfig, writeHubConfig } from './services/hubConfig.js';
 import { createHubSender } from './hubSender.js';
-import { routeMessagingReply } from './messagingReply.js';
 import { sendApns } from './services/apns.js';
 import {
   previewHookInstall,
@@ -302,15 +300,6 @@ function projectViewOf(row: ProjectRow): ProjectRow {
 
 function statusOf(id: string): InstanceStatus {
   return repo().get(id)?.status ?? 'crashed';
-}
-
-function deliverReply(instanceId: string, text: string): boolean {
-  const session = pty.get(instanceId);
-  if (!session) return false;
-  session.write(text + '\r');
-  // Treat a remote reply as engagement so attention state clears + badge updates.
-  applyTransition(instanceId, { kind: 'userPromptSubmit' });
-  return true;
 }
 
 function applyTransition(instanceId: string, event: StateEvent): void {
@@ -995,14 +984,6 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       new PushDevicesRepo(handle!.db).register(req.payload.token, req.payload.platform, Date.now());
       return { ok: true };
 
-    case 'messaging:getPing':
-      return { ping: new PingsRepo(handle!.db).get(req.payload.pingId) };
-
-    case 'messaging:reply':
-      return { ok: routeMessagingReply(req.payload, {
-        deliver: deliverReply,
-        markAnswered: (id) => new PingsRepo(handle!.db).markAnsweredByInstance(id, Date.now()),
-      }) };
   }
 }
 
@@ -1141,10 +1122,8 @@ function respawnIncompleteRowsOnBoot(): void {
     });
     const hubSender = createHubSender({
       getConfig: () => readHubConfig(new SettingsRepo(handle!.db)),
-      logPing: (p) => new PingsRepo(handle!.db).create({ ...p, now: Date.now() }),
       listTokens: () => new PushDevicesRepo(handle!.db).listTokens(),
       removeToken: (token) => new PushDevicesRepo(handle!.db).remove(token),
-      emitPush,
       sendApns,
       buildContext: (instanceId, cwd, kind) => {
         const name = cwd.split('/').filter(Boolean).pop() || instanceId;

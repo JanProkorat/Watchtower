@@ -1,5 +1,4 @@
 import type { HubConfig } from './hubConfig.js';
-import type { PingView } from './ipcContract.js';
 
 export type OrchRequest =
   | { id: string; kind: 'ping'; payload: { now: number } }
@@ -76,9 +75,7 @@ export type OrchRequest =
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
   | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } }
-  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } }
-  | { id: string; kind: 'messaging:getPing'; payload: { pingId: number } }
-  | { id: string; kind: 'messaging:reply'; payload: { instanceId: string; text: string } };
+  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -535,9 +532,7 @@ export type OrchResponse =
     }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'terminalFocus'; payload: { ok: true } }
-  | { kind: 'push:registerDevice'; payload: { ok: true } }
-  | { kind: 'messaging:getPing'; payload: { ping: PingView | null } }
-  | { kind: 'messaging:reply'; payload: { ok: boolean } };
+  | { kind: 'push:registerDevice'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
@@ -550,8 +545,7 @@ export type OrchPush =
   | { kind: 'clearAttention'; payload: { instanceId: string } }
   | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
   | { kind: 'badge'; payload: { count: number } }
-  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
-  | { kind: 'attentionPing'; payload: { instanceId: string; pingId: number; kind: 'waiting-permission' | 'idle-notify' | 'crashed'; title: string; body: string } };
+  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
 
 type AnyPort = {
   postMessage(data: unknown): void;

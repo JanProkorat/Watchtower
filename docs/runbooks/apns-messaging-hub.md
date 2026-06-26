@@ -11,6 +11,8 @@
    (**sandbox** for an Xcode/dev install, **production** for TestFlight).
    Enable the hub.
 4. On the iPad, accept the notification permission prompt on first launch.
+   Tapping a delivered notification opens the instance's terminal so you can
+   respond directly.
 
 **Gotcha:** a sandbox/production mismatch makes APNs silently not deliver
 (no error) — the env must match how the build was signed/installed.
