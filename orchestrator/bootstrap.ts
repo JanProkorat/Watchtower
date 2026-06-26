@@ -18,6 +18,7 @@ import type { OrchRequest } from '@watchtower/shared/messagePort.js';
 import { createPgStore, type PgStore } from './db/pg/pool.js';
 import { runPgMigrations } from './db/pg/migrate.js';
 import { SyncService } from './sync/service.js';
+import { SettingsRepo } from './db/repositories/settings.js';
 
 export interface DbHandle {
   /** Whatever the underlying driver exposes — better-sqlite3 in prod, node:sqlite in tests. */
@@ -97,6 +98,23 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
     try { await runPgMigrations(pg); }
     catch (err) { console.error('[orchestrator] pg migrations failed (sync dormant):', err); }
   }
+
+  // One-time backfill: re-push all worklogs once so the derived billing columns
+  // populate on rows synced before they existed. Guarded by a settings flag.
+  // Only runs when pg is configured; resets the worklog push cursor to epoch so
+  // the next sync cycle re-sends all worklog rows with computed billing fields.
+  const BACKFILL_FLAG = 'sync.backfill.worklogs_billing.done';
+  if (pg) {
+    const settings = new SettingsRepo(dbHandle.raw);
+    const done = settings.getString(BACKFILL_FLAG, '');
+    if (!done) {
+      dbHandle.raw
+        .prepare(`DELETE FROM settings WHERE key = ?`)
+        .run('sync.cursor.push.worklogs');
+      settings.set(BACKFILL_FLAG, '1');
+    }
+  }
+
   const sync = new SyncService({ db: dbHandle.raw, store: pg });
   sync.start();
 

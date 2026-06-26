@@ -1,6 +1,6 @@
 import type { SqliteLike } from '../db/migrations.js';
 import type { PgStore } from '../db/pg/pool.js';
-import { SYNCED_TABLES, toPgValue, type SyncTable } from './schema.js';
+import { SYNCED_TABLES, DERIVERS, toPgValue, type SyncTable } from './schema.js';
 import { getCursor, setCursor } from './cursor.js';
 
 const PUSH_ORDER = ['projects', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'];
@@ -20,8 +20,15 @@ export async function pushTable(db: SqliteLike, store: PgStore, table: SyncTable
   const cursor = getCursor(db, 'push', table.name);
   const fk = fkSource(table);
 
-  // Read physical columns + resolved parent sync_id (for child FK).
-  const physical = table.columns.filter((c) => !c.name.endsWith('_sync_id') || c.name === 'sync_id');
+  // Build the deriver once per push cycle (if this table has one).
+  const deriverFactory = DERIVERS[table.name];
+  const deriver = deriverFactory ? deriverFactory(db) : null;
+
+  // Read physical, non-derived columns + resolved parent sync_id (for child FK).
+  // Derived columns are Postgres-only: their values come from the deriver, not SQLite.
+  const physical = table.columns.filter(
+    (c) => !c.derived && (!c.name.endsWith('_sync_id') || c.name === 'sync_id'),
+  );
   const selectCols = physical.map((c) => `t.${c.name}`);
   let joinSql = '';
   if (fk) {
@@ -33,9 +40,11 @@ export async function pushTable(db: SqliteLike, store: PgStore, table: SyncTable
     .all(cursor) as Array<Record<string, unknown>>;
 
   let maxSeen = cursor;
-  for (const row of rows) {
+  for (const rawRow of rows) {
+    // Merge derived (Postgres-only) values computed from the SQLite state.
+    const row = deriver ? { ...rawRow, ...deriver(rawRow) } : rawRow;
     await upsertRow(store, table, row, fk);
-    const u = String(row['updated_at']);
+    const u = String(rawRow['updated_at']);
     if (u > maxSeen) maxSeen = u;
   }
   if (maxSeen > cursor) setCursor(db, 'push', table.name, maxSeen);

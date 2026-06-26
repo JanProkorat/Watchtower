@@ -9,6 +9,10 @@ import { runPgMigrations } from '../../../orchestrator/db/pg/migrate.js';
 import { pushAll } from '../../../orchestrator/sync/push.js';
 import { pullAll } from '../../../orchestrator/sync/pull.js';
 import { ProjectsRepo } from '../../../orchestrator/db/repositories/projects.js';
+import { EpicsRepo } from '../../../orchestrator/db/repositories/epics.js';
+import { TasksRepo } from '../../../orchestrator/db/repositories/tasks.js';
+import { WorklogsRepo } from '../../../orchestrator/db/repositories/worklogs.js';
+import { ProjectRatesRepo } from '../../../orchestrator/db/repositories/projectRates.js';
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
@@ -104,5 +108,48 @@ describe('pullAll', () => {
       [syncId2],
     );
     expect(Number(rows[0]!.c)).toBe(0);
+  });
+
+  it('pulls a worklog carrying Postgres-only derived billing columns without writing them to SQLite', async () => {
+    // Regression test: the worklogs table has Postgres-only derived columns
+    // (effective_minutes, resolved_rate, rate_currency, earned_amount) flagged
+    // `derived: true` — they exist in Postgres but not in SQLite. Before the
+    // pull.ts fix, pullAll SELECTed them from PG and tried to INSERT them into
+    // SQLite, throwing "table worklogs has no column named effective_minutes".
+    // The pull path must skip `derived` columns symmetrically with push.ts.
+    if (!reachable || !store) return;
+    const db = freshSqlite();
+    const project = new ProjectsRepo(db).create({ name: 'Billed P' });
+    new ProjectRatesRepo(db).create({
+      projectId: project.id,
+      effectiveFrom: '2026-01-01',
+      rateType: 'hourly',
+      rateAmount: 100,
+      currency: 'CZK',
+      hoursPerDay: 8,
+    });
+    const epic = new EpicsRepo(db).create({ projectId: project.id, name: 'Billed E' });
+    const task = new TasksRepo(db).create({ epicId: epic.id, number: 'B-1', title: 'Billed T' });
+    const worklog = new WorklogsRepo(db).create({ taskId: task.id, workDate: '2026-06-01', minutes: 120 });
+    const wlSyncId = (db.prepare('SELECT sync_id FROM worklogs WHERE id=?').get(worklog.id) as any).sync_id;
+
+    // Push: PG now holds the worklog row with its derived billing columns populated.
+    await pushAll(db, store);
+
+    // Pull into a SECOND fresh SQLite (EPOCH cursor) — PULL_ORDER lands the
+    // parents (project→epic→task) before worklogs, so a single pullAll
+    // round-trips the whole hierarchy. This MUST NOT throw on the derived columns.
+    const db2 = freshSqlite();
+    const res = await pullAll(db2, store);
+    expect(res.worklogs.pulled).toBeGreaterThanOrEqual(1);
+    const pulled = db2.prepare('SELECT minutes, work_date FROM worklogs WHERE sync_id=?').get(wlSyncId) as any;
+    // The point of this test is that the pull completes (no "no such column"
+    // throw from the Postgres-only derived columns) and the row round-trips.
+    // Assert on `minutes` (a non-date field): work_date is deliberately not
+    // asserted exactly here because `toSqliteValue`'s date coercion has a
+    // separate, pre-existing UTC-vs-local off-by-one-day shift on pull
+    // (tracked as a follow-up), unrelated to the derived-columns fix.
+    expect(pulled.minutes).toBe(120);
+    expect(pulled.work_date).toBeTruthy();
   });
 });

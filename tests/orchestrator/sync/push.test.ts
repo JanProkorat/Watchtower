@@ -11,6 +11,9 @@ import { getCursor, setCursor } from '../../../orchestrator/sync/cursor.js';
 import { SYNCED_TABLES } from '../../../orchestrator/sync/schema.js';
 import { ProjectsRepo } from '../../../orchestrator/db/repositories/projects.js';
 import { EpicsRepo } from '../../../orchestrator/db/repositories/epics.js';
+import { TasksRepo } from '../../../orchestrator/db/repositories/tasks.js';
+import { WorklogsRepo } from '../../../orchestrator/db/repositories/worklogs.js';
+import { ProjectRatesRepo } from '../../../orchestrator/db/repositories/projectRates.js';
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
@@ -85,5 +88,74 @@ describe('pushAll', () => {
     await pushTable(db, store, SYNCED_TABLES.find((t) => t.name === 'projects')!);
     const { rows } = await store.query<{ name: string }>(`SELECT name FROM projects WHERE sync_id=$1`, [syncId]);
     expect(rows[0]?.name).toBe('RemoteNewer'); // remote (newer) survived
+  });
+
+  it('derived billing columns land in Postgres after push', async () => {
+    if (!reachable || !store) return;
+    const db = freshSqlite();
+
+    // Seed: project → contract → epic → task → worklog
+    const project = new ProjectsRepo(db).create({ name: 'Billing Project' });
+    new ProjectRatesRepo(db).create({
+      projectId: project.id,
+      effectiveFrom: '2026-01-01',
+      rateType: 'hourly',
+      rateAmount: 120,
+      currency: 'CZK',
+      hoursPerDay: 8,
+    });
+    const epic = new EpicsRepo(db).create({ projectId: project.id, name: 'Billing Epic' });
+    const task = new TasksRepo(db).create({ epicId: epic.id, number: 'B-1', title: 'Billing Task' });
+    const worklog = new WorklogsRepo(db).create({
+      taskId: task.id,
+      workDate: '2026-06-01',
+      minutes: 60, // 1 hour @ 120 CZK = 120 CZK
+    });
+
+    const wlSyncId = (db.prepare('SELECT sync_id FROM worklogs WHERE id = ?').get(worklog.id) as any).sync_id;
+
+    await pushAll(db, store);
+
+    const { rows } = await store.query<{
+      effective_minutes: number;
+      resolved_rate: string;
+      rate_currency: string;
+      earned_amount: string;
+    }>(`SELECT effective_minutes, resolved_rate, rate_currency, earned_amount
+          FROM worklogs WHERE sync_id = $1`, [wlSyncId]);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].effective_minutes).toBe(60);
+    expect(Number(rows[0].resolved_rate)).toBe(120);
+    expect(rows[0].rate_currency).toBe('CZK');
+    expect(Number(rows[0].earned_amount)).toBeCloseTo(120, 5);
+  });
+
+  it('derived billing columns are null for a worklog with no matching contract', async () => {
+    if (!reachable || !store) return;
+    const db = freshSqlite();
+
+    // Seed: project (no contract) → epic → task → worklog
+    const project = new ProjectsRepo(db).create({ name: 'No Contract Project' });
+    const epic = new EpicsRepo(db).create({ projectId: project.id, name: 'NC Epic' });
+    const task = new TasksRepo(db).create({ epicId: epic.id, number: 'NC-1', title: 'NC Task' });
+    const worklog = new WorklogsRepo(db).create({
+      taskId: task.id,
+      workDate: '2026-06-01',
+      minutes: 60,
+    });
+
+    const wlSyncId = (db.prepare('SELECT sync_id FROM worklogs WHERE id = ?').get(worklog.id) as any).sync_id;
+
+    await pushAll(db, store);
+
+    const { rows } = await store.query<{
+      effective_minutes: number;
+      earned_amount: string | null;
+    }>(`SELECT effective_minutes, earned_amount FROM worklogs WHERE sync_id = $1`, [wlSyncId]);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].effective_minutes).toBe(60);
+    expect(rows[0].earned_amount).toBeNull();
   });
 });

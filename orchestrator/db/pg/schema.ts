@@ -154,6 +154,13 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
 CREATE INDEX IF NOT EXISTS idx_sync_conflicts_table ON sync_conflicts(table_name, sync_id);
 `;
 
+const WORKLOGS_BILLING = `
+ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS effective_minutes INTEGER;
+ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS resolved_rate     NUMERIC;
+ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS rate_currency     TEXT;
+ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS earned_amount     NUMERIC;
+`;
+
 export const PG_MIGRATIONS: Array<{ version: number; up: string[] }> = [
   {
     version: 1,
@@ -164,6 +171,34 @@ export const PG_MIGRATIONS: Array<{ version: number; up: string[] }> = [
     up: [
       `DROP INDEX IF EXISTS idx_worklogs_external;`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_worklogs_external ON worklogs(source, external_id) WHERE source IS NOT NULL AND deleted_at IS NULL;`,
+    ],
+  },
+  {
+    version: 3,
+    up: [WORKLOGS_BILLING],
+  },
+  {
+    version: 4,
+    up: [
+      // Enable RLS + authenticated-SELECT policy on each client-readable table.
+      // sync_conflicts is internal — left without RLS.
+      // Idempotent: ALTER TABLE … ENABLE ROW LEVEL SECURITY is safe to re-run;
+      // DROP POLICY IF EXISTS avoids the pre-PG15 lack of CREATE POLICY IF NOT EXISTS.
+      // Portability: `authenticated` is a Supabase built-in role. On a plain
+      // Postgres (local dev / the test harness) it does not exist, so the
+      // CREATE POLICY is guarded by a role-existence check — RLS is still
+      // enabled (the table-owning sync role bypasses it), the policy is simply
+      // skipped where the client role is absent. On Supabase the role exists
+      // and the authenticated-SELECT policy is created as intended.
+      ...['projects', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'].map(
+        (t) => `ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS read_authenticated ON ${t};
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE POLICY read_authenticated ON ${t} FOR SELECT TO authenticated USING (true);
+  END IF;
+END $$;`,
+      ),
     ],
   },
 ];

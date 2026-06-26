@@ -32,6 +32,8 @@ import {
   type ProjectRateRow,
 } from './db/repositories/projectRates.js';
 import { ContractStatusService } from './db/contractStatus.js';
+import { markWorklogsForRebill } from './db/rebill.js';
+import { nowIso } from './db/syncColumns.js';
 import { TaskGridService } from './db/taskGrid.js';
 import { DaysOffRepo, type DayOffInput } from './db/repositories/daysOff.js';
 import { czechHolidays } from './db/workdays.js';
@@ -778,6 +780,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'contracts:create': {
       try {
         const row = projectRatesRepo().create(req.payload as ProjectRateInput);
+        markWorklogsForRebill(handle!.db, row.projectId, row.effectiveFrom, nowIso());
         notifySync();
         return { contract: contractViewOf(row) };
       } catch (err) {
@@ -795,10 +798,20 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'contracts:update': {
       try {
-        const row = projectRatesRepo().update(
+        const repo = projectRatesRepo();
+        const oldRow = repo.get(req.payload.id);
+        const row = repo.update(
           req.payload.id,
           req.payload.input as Partial<ProjectRateInput>,
         );
+        // Use the earliest effective_from so moving a contract earlier also
+        // re-bills the newly-covered range.
+        const newFrom = (req.payload.input as Partial<ProjectRateInput>).effectiveFrom;
+        const fromDate =
+          oldRow && newFrom && newFrom < oldRow.effectiveFrom
+            ? newFrom
+            : (oldRow?.effectiveFrom ?? row.effectiveFrom);
+        markWorklogsForRebill(handle!.db, row.projectId, fromDate, nowIso());
         notifySync();
         return { contract: contractViewOf(row) };
       } catch (err) {
@@ -814,10 +827,16 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       }
     }
 
-    case 'contracts:delete':
-      projectRatesRepo().delete(req.payload.id);
+    case 'contracts:delete': {
+      const delRepo = projectRatesRepo();
+      const delRow = delRepo.get(req.payload.id);
+      delRepo.delete(req.payload.id);
+      if (delRow) {
+        markWorklogsForRebill(handle!.db, delRow.projectId, delRow.effectiveFrom, nowIso());
+      }
       notifySync();
       return { ok: true };
+    }
 
     case 'taskGrid:get': {
       const { year, month, projectId } = req.payload;
