@@ -312,6 +312,17 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
       db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_worklogs_external ON worklogs(source, external_id) WHERE source IS NOT NULL AND deleted_at IS NULL`);
     },
   },
+  {
+    version: 15,
+    up: (db) => {
+      db.exec(`CREATE TABLE IF NOT EXISTS push_devices (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        apns_token    TEXT    NOT NULL UNIQUE,
+        platform      TEXT    NOT NULL DEFAULT 'ios',
+        registered_at INTEGER NOT NULL
+      )`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

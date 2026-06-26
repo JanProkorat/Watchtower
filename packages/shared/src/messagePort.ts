@@ -1,4 +1,4 @@
-import type { SlackConfig } from './slackConfig.js';
+import type { HubConfig } from './hubConfig.js';
 
 export type OrchRequest =
   | { id: string; kind: 'ping'; payload: { now: number } }
@@ -13,9 +13,8 @@ export type OrchRequest =
   | { id: string; kind: 'listInstances'; payload: Record<string, never> }
   | { id: string; kind: 'getSetting'; payload: { key: string } }
   | { id: string; kind: 'setSetting'; payload: { key: string; value: string } }
-  | { id: string; kind: 'slack:getConfig'; payload: Record<string, never> }
-  | { id: string; kind: 'slack:setConfig'; payload: { config: SlackConfig } }
-  | { id: string; kind: 'slack:test'; payload: Record<string, never> }
+  | { id: string; kind: 'hub:getConfig'; payload: Record<string, never> }
+  | { id: string; kind: 'hub:setConfig'; payload: { config: HubConfig } }
   | { id: string; kind: 'windowFocusChanged'; payload: { focused: boolean } }
   | { id: string; kind: 'previewHookInstall'; payload: Record<string, never> }
   | { id: string; kind: 'installHooks'; payload: Record<string, never> }
@@ -75,7 +74,8 @@ export type OrchRequest =
   | { id: string; kind: 'board:sync'; payload: { projectId: number } }
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
-  | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } };
+  | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } }
+  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -452,9 +452,8 @@ export type OrchResponse =
     }
   | { kind: 'getSetting'; payload: { value: string | null } }
   | { kind: 'setSetting'; payload: { ok: true } }
-  | { kind: 'slack:getConfig'; payload: { config: SlackConfig; connected: boolean } }
-  | { kind: 'slack:setConfig'; payload: { ok: true } }
-  | { kind: 'slack:test'; payload: { ok: boolean; error?: string } }
+  | { kind: 'hub:getConfig'; payload: { config: HubConfig } }
+  | { kind: 'hub:setConfig'; payload: { ok: true } }
   | { kind: 'windowFocusChanged'; payload: { ok: true } }
   | {
       kind: 'previewHookInstall';
@@ -532,7 +531,8 @@ export type OrchResponse =
       payload: { snapshot: import('./ipcContract.js').BoardSnapshotPayload };
     }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
-  | { kind: 'terminalFocus'; payload: { ok: true } };
+  | { kind: 'terminalFocus'; payload: { ok: true } }
+  | { kind: 'push:registerDevice'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

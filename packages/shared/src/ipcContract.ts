@@ -1,4 +1,4 @@
-import type { SlackConfig } from './slackConfig.js';
+import type { HubConfig } from './hubConfig.js';
 
 export type IpcRequest =
   | { kind: 'ping'; payload: { now: number } }
@@ -14,9 +14,8 @@ export type IpcRequest =
   | { kind: 'chooseDirectory'; payload: { defaultPath?: string } }
   | { kind: 'getSetting'; payload: { key: string } }
   | { kind: 'setSetting'; payload: { key: string; value: string } }
-  | { kind: 'slack:getConfig'; payload: Record<string, never> }
-  | { kind: 'slack:setConfig'; payload: { config: SlackConfig } }
-  | { kind: 'slack:test'; payload: Record<string, never> }
+  | { kind: 'hub:getConfig'; payload: Record<string, never> }
+  | { kind: 'hub:setConfig'; payload: { config: HubConfig } }
   | { kind: 'previewHookInstall'; payload: Record<string, never> }
   | { kind: 'installHooks'; payload: Record<string, never> }
   | { kind: 'uninstallHooks'; payload: Record<string, never> }
@@ -79,7 +78,8 @@ export type IpcRequest =
   | { kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { kind: 'tokens:usage'; payload: Record<string, never> }
   | { kind: 'openExternalUrl'; payload: { url: string } }
-  | { kind: 'terminalFocus'; payload: { instanceId: string } };
+  | { kind: 'terminalFocus'; payload: { instanceId: string } }
+  | { kind: 'push:registerDevice'; payload: { token: string; platform: string } };
 
 export interface RunningInstancePayload {
   id: string;
@@ -514,9 +514,8 @@ export type IpcResponse =
   | { kind: 'chooseDirectory'; payload: { path: string | null } }
   | { kind: 'getSetting'; payload: { value: string | null } }
   | { kind: 'setSetting'; payload: { ok: true } }
-  | { kind: 'slack:getConfig'; payload: { config: SlackConfig; connected: boolean } }
-  | { kind: 'slack:setConfig'; payload: { ok: true } }
-  | { kind: 'slack:test'; payload: { ok: boolean; error?: string } }
+  | { kind: 'hub:getConfig'; payload: { config: HubConfig } }
+  | { kind: 'hub:setConfig'; payload: { ok: true } }
   | {
       kind: 'previewHookInstall';
       payload: {
@@ -588,7 +587,8 @@ export type IpcResponse =
   | { kind: 'board:remove'; payload: { snapshot: BoardSnapshotPayload } }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
-  | { kind: 'terminalFocus'; payload: { ok: true } };
+  | { kind: 'terminalFocus'; payload: { ok: true } }
+  | { kind: 'push:registerDevice'; payload: { ok: true } };
 
 export interface AgentRowPayload {
   name: string;

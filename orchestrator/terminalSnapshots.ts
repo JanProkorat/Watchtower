@@ -14,7 +14,7 @@ const SCROLLBACK = 200;
 /**
  * Per-instance headless terminal emulator. Every pty data chunk is fed in via
  * `feed`; `snapshot` renders the current visible buffer to clean text (exactly
- * what the user would see), used to make Slack escalation DMs actionable.
+ * what the user would see), used to make escalation notifications actionable.
  */
 export class TerminalSnapshots {
   private terms = new Map<string, Terminal>();

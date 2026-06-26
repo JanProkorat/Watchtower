@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Preferences } from '@capacitor/preferences';
+import { PushNotifications } from '@capacitor/push-notifications';
 import {
   parseConnection, loadConnection, saveConnection, type Connection,
 } from './connection.js';
@@ -8,12 +9,15 @@ import { useInstances } from './state/useInstances.js';
 import { useProjects } from './state/useProjects.js';
 import { useActiveTerminal } from './state/useActiveTerminal.js';
 import { useAuthBlock } from './state/useAuthBlock.js';
+import { useAttention } from './state/useAttention.js';
+import { registerForPush } from './state/pushRegistration.js';
 import { Rail, type RailModule } from './components/Rail.js';
 import { TabStrip } from './components/TabStrip.js';
 import { TerminalView } from './components/TerminalView.js';
 import { SpawnModal } from './components/SpawnModal.js';
 import { RemoteMacView } from './components/RemoteMacView.js';
 import { AuthBlockBanner } from './components/AuthBlockBanner.js';
+import { NotificationHub } from './components/NotificationHub.js';
 
 // ---------------------------------------------------------------------------
 // Capacitor Preferences store (same helper as before)
@@ -34,11 +38,10 @@ const NON_LIVE_STATUSES = new Set(['finished', 'crashed', 'suspended']);
 // InstancesModule — the instances view content (Rail lives in Shell now)
 // ---------------------------------------------------------------------------
 
-function InstancesModule() {
+function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string | null; setActiveId: (id: string | null) => void; ackedIds: ReadonlySet<string> }) {
   const { status } = useConnection();
   const { instances } = useInstances();
   const { projects } = useProjects();
-  const { activeId, setActiveId } = useActiveTerminal();
   const [spawnOpen, setSpawnOpen] = useState(false);
 
   // Once we've had a live connection, any later non-connected state is a
@@ -94,6 +97,7 @@ function InstancesModule() {
         instances={instances}
         projects={projects}
         activeInstanceId={activeId}
+        ackedIds={ackedIds}
         onSelectInstance={setActiveId}
         onNew={() => setSpawnOpen(true)}
       />
@@ -143,7 +147,47 @@ interface ShellProps {
 
 function Shell({ connection }: ShellProps) {
   const [activeModule, setActiveModule] = useState<RailModule>('instances');
+  const { activeId, setActiveId } = useActiveTerminal();
+  const { items: attention, ackedIds, acknowledge } = useAttention();
+  const [hubOpen, setHubOpen] = useState(false);
   const { blockedIds } = useAuthBlock();
+  const { bridge } = useConnection();
+
+  // Select (focus) an instance and mark it seen — clears its tab ⚠️ and drops
+  // it from the bell count. Used by the hub, push taps, and tab taps.
+  // Stable (setActiveId is a state setter, acknowledge is memoized) so the
+  // push-tap listener below can close over it safely.
+  const selectInstance = useCallback((id: string | null) => {
+    setActiveId(id);
+    if (id) acknowledge(id);
+  }, [setActiveId, acknowledge]);
+
+  // Register for push notifications once on mount (iOS only; no-op on web).
+  useEffect(() => {
+    let listenerHandle: ReturnType<typeof PushNotifications.addListener> | null = null;
+    void registerForPush({
+      requestPermission: async () =>
+        (await PushNotifications.requestPermissions()).receive === 'granted',
+      register: () => PushNotifications.register(),
+      onToken: (cb) => {
+        listenerHandle = PushNotifications.addListener('registration', (t) => cb(t.value));
+      },
+      sendToken: (t) => bridge.invoke('push:registerDevice', { token: t, platform: 'ios' }).then(() => undefined),
+    });
+    return () => { if (listenerHandle) void (listenerHandle as Promise<{ remove(): void }>).then((l) => l.remove()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Handle tap on a push notification: navigate to the instance directly.
+  useEffect(() => {
+    const h = PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      const data = action.notification?.data as { instanceId?: unknown } | undefined;
+      const id = data?.instanceId;
+      if (typeof id === 'string' && id) { setActiveModule('instances'); selectInstance(id); }
+    });
+    return () => { void h.then((l) => l.remove()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
@@ -171,15 +215,29 @@ function Shell({ connection }: ShellProps) {
       )}
 
       {/* Content row: shared left rail + module content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, position: 'relative' }}>
         {/* Shared left rail — active across all modules */}
-        <Rail active={activeModule} onSelect={setActiveModule} />
+        <Rail
+          active={activeModule}
+          onSelect={setActiveModule}
+          notificationCount={attention.length}
+          onOpenNotifications={() => setHubOpen(true)}
+        />
 
         {/* Module content */}
         {activeModule === 'instances' ? (
-          <InstancesModule />
+          <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} />
         ) : (
           <RemoteMacView connection={connection} />
+        )}
+
+        {/* Notification hub popover */}
+        {hubOpen && (
+          <NotificationHub
+            items={attention}
+            onClose={() => setHubOpen(false)}
+            onSelect={(id) => { setActiveModule('instances'); selectInstance(id); setHubOpen(false); }}
+          />
         )}
       </div>
     </div>

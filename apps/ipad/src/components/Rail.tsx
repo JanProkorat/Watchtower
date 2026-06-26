@@ -11,6 +11,8 @@ export type RailModule = 'instances' | 'remote';
 interface Props {
   active: RailModule;
   onSelect?(id: RailModule): void;
+  notificationCount?: number;
+  onOpenNotifications?: () => void;
 }
 
 const COLLAPSED_WIDTH = 52;
@@ -74,7 +76,7 @@ const ITEMS: RailItem[] = [
   { id: 'settings', label: 'Settings', d: SETTINGS_D, enabled: false },
 ];
 
-export function Rail({ active, onSelect }: Props) {
+export function Rail({ active, onSelect, notificationCount, onOpenNotifications }: Props) {
   const [expanded, setExpanded] = useState<boolean>(readExpanded);
 
   useEffect(() => {
@@ -133,6 +135,29 @@ export function Rail({ active, onSelect }: Props) {
           </span>
         )}
       </div>
+
+      {/* Notification bell — visible in every module */}
+      <button
+        onClick={() => onOpenNotifications?.()}
+        title="Upozornění"
+        style={{
+          position: 'relative', width: 40, height: 40, marginBottom: 4, borderRadius: 8,
+          border: 'none', background: 'transparent', color: '#9ca3af', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent',
+          alignSelf: expanded ? 'flex-start' : 'center', marginLeft: expanded ? 4 : 0,
+        }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2m6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1z" />
+        </svg>
+        {notificationCount ? (
+          <span style={{
+            position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16, padding: '0 4px',
+            borderRadius: 8, background: '#dc2626', color: '#fff', fontSize: 10, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>{notificationCount}</span>
+        ) : null}
+      </button>
 
       {/* Nav items */}
       {ITEMS.map((item) => {
