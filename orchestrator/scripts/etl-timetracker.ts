@@ -45,7 +45,11 @@ async function etlTable(sqlite: SqliteLike, store: PgStore, table: SyncTable): P
   const fk = fkSource(table);
   // Physical SQLite columns to read = descriptor columns minus the synthetic
   // *_sync_id (resolved via a JOIN) plus the real FK we need to join on.
-  const physical = table.columns.filter((c) => !c.name.endsWith('_sync_id') || c.name === 'sync_id');
+  // Derived columns are Postgres-only and have no SQLite equivalent — skip them here;
+  // the ETL does not compute billing fields (that's the push deriver's job).
+  const physical = table.columns.filter(
+    (c) => !c.derived && (!c.name.endsWith('_sync_id') || c.name === 'sync_id'),
+  );
   const selectCols = physical.map((c) => `t.${c.name}`);
   let joinSql = '';
   if (fk) {
@@ -62,9 +66,12 @@ async function etlTable(sqlite: SqliteLike, store: PgStore, table: SyncTable): P
     }
   }
 
+  // Exclude derived columns from the upsert — ETL copies raw data; billing fields
+  // are backfilled separately by the sync push deriver.
+  const upsertCols = table.columns.filter((c) => !c.derived);
   for (const row of rows) {
-    const cols = table.columns.map((c) => c.name);
-    const values = table.columns.map((c) => toPgValue(c.kind, row[c.name]));
+    const cols = upsertCols.map((c) => c.name);
+    const values = upsertCols.map((c) => toPgValue(c.kind, row[c.name]));
     await upsertRow(store, table, cols, values, fk);
   }
   return rows.length;

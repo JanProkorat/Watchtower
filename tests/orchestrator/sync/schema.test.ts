@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toPgValue, toSqliteValue, deterministicSyncId, SYNCED_TABLES } from '../../../orchestrator/sync/schema.js';
+import { toPgValue, toSqliteValue, deterministicSyncId, SYNCED_TABLES, DERIVERS } from '../../../orchestrator/sync/schema.js';
 
 describe('value transforms', () => {
   it('bool: sqlite 0/1 ↔ pg boolean', () => {
@@ -49,5 +49,15 @@ describe('value transforms', () => {
       expect(cols).toContain('deleted_at');
       expect(cols).not.toContain('id'); // local PK never crosses the wire
     }
+  });
+
+  it('worklogs descriptor carries the 4 derived billing columns', () => {
+    const wl = SYNCED_TABLES.find((t) => t.name === 'worklogs')!;
+    const derived = wl.columns.filter((c) => c.derived).map((c) => c.name).sort();
+    expect(derived).toEqual(['earned_amount', 'effective_minutes', 'rate_currency', 'resolved_rate']);
+  });
+
+  it('DERIVERS has a worklogs entry that is a factory function', () => {
+    expect(typeof DERIVERS['worklogs']).toBe('function');
   });
 });

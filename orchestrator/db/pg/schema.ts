@@ -154,6 +154,13 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
 CREATE INDEX IF NOT EXISTS idx_sync_conflicts_table ON sync_conflicts(table_name, sync_id);
 `;
 
+const WORKLOGS_BILLING = `
+ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS effective_minutes INTEGER;
+ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS resolved_rate     NUMERIC;
+ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS rate_currency     TEXT;
+ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS earned_amount     NUMERIC;
+`;
+
 export const PG_MIGRATIONS: Array<{ version: number; up: string[] }> = [
   {
     version: 1,
@@ -165,5 +172,9 @@ export const PG_MIGRATIONS: Array<{ version: number; up: string[] }> = [
       `DROP INDEX IF EXISTS idx_worklogs_external;`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_worklogs_external ON worklogs(source, external_id) WHERE source IS NOT NULL AND deleted_at IS NULL;`,
     ],
+  },
+  {
+    version: 3,
+    up: [WORKLOGS_BILLING],
   },
 ];

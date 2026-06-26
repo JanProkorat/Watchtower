@@ -1,10 +1,14 @@
 import { v5 as uuidv5 } from 'uuid';
+import { createWorklogDeriver } from './derive.js';
 
 export type ColKind = 'text' | 'int' | 'bool' | 'numeric' | 'date' | 'ts' | 'json';
 
 export interface SyncColumn {
   name: string;
   kind: ColKind;
+  /** When true, the column is Postgres-only: omitted from the SQLite SELECT,
+   *  and its value is supplied by the table's DERIVER before upsert. */
+  derived?: boolean;
 }
 
 export interface SyncTable {
@@ -138,6 +142,11 @@ export const SYNCED_TABLES: SyncTable[] = [
       { name: 'created_at', kind: 'ts' },
       { name: 'updated_at', kind: 'ts' },
       { name: 'deleted_at', kind: 'ts' },
+      // Postgres-only derived billing columns — never read from SQLite.
+      { name: 'effective_minutes', kind: 'int', derived: true },
+      { name: 'resolved_rate', kind: 'numeric', derived: true },
+      { name: 'rate_currency', kind: 'text', derived: true },
+      { name: 'earned_amount', kind: 'numeric', derived: true },
     ],
   },
   {
@@ -170,3 +179,13 @@ export const SYNCED_TABLES: SyncTable[] = [
     ],
   },
 ];
+
+/**
+ * Map of table name → deriver factory. A deriver factory takes the SQLite db
+ * handle and returns a per-row function that computes the derived (Postgres-only)
+ * column values for a given raw SQLite row.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const DERIVERS: Record<string, (db: any) => (row: Record<string, unknown>) => Record<string, unknown>> = {
+  worklogs: createWorklogDeriver,
+};
