@@ -11,8 +11,8 @@ the home Wi-Fi by reaching the Mac over Tailscale.
    binding, so it's reachable both away (over Tailscale) and at home (Tailscale
    routes locally). (Or set `WATCHTOWER_WS_HOST` to the `100.x` IP explicitly.)
 4. On the iPad, enter that **`100.x` Tailscale IP** as the host (port 7445,
-   same bearer token). Pings, the reply box, and the terminal mirror now work
-   off-LAN.
+   same bearer token). The terminal mirror now works off-LAN (the terminal is
+   where you answer; APNs taps open the instance that needs attention).
 
 **Still required:** APNs (to wake a locked/closed iPad — unchanged). **Not
 covered here:** Wake-on-LAN to wake a *sleeping* Mac (the hardware part of #72,
