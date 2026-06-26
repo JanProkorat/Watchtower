@@ -8,21 +8,25 @@ interface Props {
   instances: ReadonlyArray<GroupableInstance>;
   projects: ReadonlyArray<GroupableProject>;
   activeInstanceId: string | null;
+  /** Instances the user has acknowledged (focused) — suppressed from the ⚠️. */
+  ackedIds: ReadonlySet<string>;
   onSelectInstance(instanceId: string): void;
   onNew(): void;
 }
 
 /**
  * Top horizontal strip. One tab per project group computed by
- * `groupInstancesByProject`. A ⚠️ marker appears when any instance in the
- * group is in an action-needed state (waiting-permission, waiting-input,
- * crashed). Tapping a tab selects the group's "best" instance: the currently-
+ * `groupInstancesByProject`. A ⚠️ marker appears when any *un-acknowledged*
+ * instance in the group is in an action-needed state (waiting-permission,
+ * waiting-input, crashed); focusing an instance acknowledges it, so the marker
+ * clears. Tapping a tab selects the group's "best" instance: the currently-
  * active one if it belongs to the group, otherwise the first in `instanceIds`.
  */
 export function TabStrip({
   instances,
   projects,
   activeInstanceId,
+  ackedIds,
   onSelectInstance,
   onNew,
 }: Props) {
@@ -56,9 +60,10 @@ export function TabStrip({
       }}
     >
       {groups.map((group) => {
-        // Is any instance in this group in an action-needed state?
+        // Is any *un-acknowledged* instance in this group in an action-needed
+        // state? Acknowledged (focused) instances are suppressed.
         const needsAttention = group.instanceIds.some(
-          (id) => ACTION_NEEDED_STATUSES.has(statusById.get(id) ?? ''),
+          (id) => ACTION_NEEDED_STATUSES.has(statusById.get(id) ?? '') && !ackedIds.has(id),
         );
 
         // Which instance should be selected when this tab is tapped?
