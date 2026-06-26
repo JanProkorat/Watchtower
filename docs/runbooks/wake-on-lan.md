@@ -3,6 +3,15 @@
 Wakes a sleeping, wired Mac from the iPad. Unicast magic packet — no Apple
 multicast entitlement needed.
 
+## Build prerequisite (one-time, in Xcode)
+The native `WakePlugin.swift` lives at `apps/ipad/ios/App/App/WakePlugin.swift`
+but **`cap sync` does not add it to the App target** — until it is, the
+"Probudit Mac" button appears to work but sends nothing (the native plugin
+isn't compiled in). In Xcode: drag `WakePlugin.swift` into the **App** group
+(uncheck "Copy items if needed"; check target **App**), or right-click the App
+group → Add Files to "App…". No entitlement, Podfile, or AppDelegate change is
+needed — registration is automatic via `CAPBridgedPlugin` once it compiles in.
+
 ## macOS (the Mac to wake)
 1. Connect the Mac to the router by **wired Ethernet** (USB-C dock). Wi-Fi WoL
    is unreliable on Apple Silicon and unsupported by the router for WoL.
