@@ -10,6 +10,7 @@ import { useProjects } from './state/useProjects.js';
 import { useActiveTerminal } from './state/useActiveTerminal.js';
 import { useAuthBlock } from './state/useAuthBlock.js';
 import { usePings } from './state/usePings.js';
+import { useAttentionInstances } from './state/useAttentionInstances.js';
 import { registerForPush } from './state/pushRegistration.js';
 import { Rail, type RailModule } from './components/Rail.js';
 import { TabStrip } from './components/TabStrip.js';
@@ -18,6 +19,7 @@ import { SpawnModal } from './components/SpawnModal.js';
 import { RemoteMacView } from './components/RemoteMacView.js';
 import { AuthBlockBanner } from './components/AuthBlockBanner.js';
 import { PingReply } from './components/PingReply.js';
+import { NotificationHub } from './components/NotificationHub.js';
 
 // ---------------------------------------------------------------------------
 // Capacitor Preferences store (same helper as before)
@@ -38,11 +40,10 @@ const NON_LIVE_STATUSES = new Set(['finished', 'crashed', 'suspended']);
 // InstancesModule — the instances view content (Rail lives in Shell now)
 // ---------------------------------------------------------------------------
 
-function InstancesModule() {
+function InstancesModule({ activeId, setActiveId }: { activeId: string | null; setActiveId: (id: string | null) => void }) {
   const { status } = useConnection();
   const { instances } = useInstances();
   const { projects } = useProjects();
-  const { activeId, setActiveId } = useActiveTerminal();
   const [spawnOpen, setSpawnOpen] = useState(false);
 
   // Once we've had a live connection, any later non-connected state is a
@@ -147,6 +148,9 @@ interface ShellProps {
 
 function Shell({ connection }: ShellProps) {
   const [activeModule, setActiveModule] = useState<RailModule>('instances');
+  const { activeId, setActiveId } = useActiveTerminal();
+  const attention = useAttentionInstances();
+  const [hubOpen, setHubOpen] = useState(false);
   const { blockedIds } = useAuthBlock();
   const { bridge } = useConnection();
   const { ping, clear: clearPing, seedPing } = usePings();
@@ -217,15 +221,29 @@ function Shell({ connection }: ShellProps) {
       )}
 
       {/* Content row: shared left rail + module content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, position: 'relative' }}>
         {/* Shared left rail — active across all modules */}
-        <Rail active={activeModule} onSelect={setActiveModule} />
+        <Rail
+          active={activeModule}
+          onSelect={setActiveModule}
+          notificationCount={attention.length}
+          onOpenNotifications={() => setHubOpen(true)}
+        />
 
         {/* Module content */}
         {activeModule === 'instances' ? (
-          <InstancesModule />
+          <InstancesModule activeId={activeId} setActiveId={setActiveId} />
         ) : (
           <RemoteMacView connection={connection} />
+        )}
+
+        {/* Notification hub popover */}
+        {hubOpen && (
+          <NotificationHub
+            items={attention}
+            onClose={() => setHubOpen(false)}
+            onSelect={(id) => { setActiveModule('instances'); setActiveId(id); setHubOpen(false); }}
+          />
         )}
       </div>
     </div>
