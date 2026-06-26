@@ -18,6 +18,7 @@ import { SpawnModal } from './components/SpawnModal.js';
 import { RemoteMacView } from './components/RemoteMacView.js';
 import { AuthBlockBanner } from './components/AuthBlockBanner.js';
 import { NotificationHub } from './components/NotificationHub.js';
+import { WakeButton } from './components/WakeButton.js';
 
 // ---------------------------------------------------------------------------
 // Capacitor Preferences store (same helper as before)
@@ -38,7 +39,7 @@ const NON_LIVE_STATUSES = new Set(['finished', 'crashed', 'suspended']);
 // InstancesModule — the instances view content (Rail lives in Shell now)
 // ---------------------------------------------------------------------------
 
-function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string | null; setActiveId: (id: string | null) => void; ackedIds: ReadonlySet<string> }) {
+function InstancesModule({ activeId, setActiveId, ackedIds, connection }: { activeId: string | null; setActiveId: (id: string | null) => void; ackedIds: ReadonlySet<string>; connection: Connection }) {
   const { status } = useConnection();
   const { instances } = useInstances();
   const { projects } = useProjects();
@@ -89,6 +90,11 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
           }}
         >
           {everConnected ? 'Mac odpojen – obnovuji připojení…' : 'Připojuji k Macu…'}
+          {connection.mac && (
+            <div style={{ marginTop: 8 }}>
+              <WakeButton connection={connection} />
+            </div>
+          )}
         </div>
       )}
 
@@ -226,7 +232,7 @@ function Shell({ connection }: ShellProps) {
 
         {/* Module content */}
         {activeModule === 'instances' ? (
-          <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} />
+          <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} connection={connection} />
         ) : (
           <RemoteMacView connection={connection} />
         )}
@@ -253,7 +259,7 @@ interface ConnectionFormProps {
 }
 
 function ConnectionForm({ onConnected }: ConnectionFormProps) {
-  const [form, setForm] = useState({ host: '', port: '7445', token: '' });
+  const [form, setForm] = useState({ host: '', port: '7445', token: '', mac: '', lanIp: '', wanHost: '', wanPort: '' });
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
@@ -261,7 +267,10 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
   useEffect(() => {
     void loadConnection(store).then((c) => {
       if (c) {
-        setForm({ host: c.host, port: String(c.port), token: c.token });
+        setForm({
+          host: c.host, port: String(c.port), token: c.token,
+          mac: c.mac ?? '', lanIp: c.lanIp ?? '', wanHost: c.wanHost ?? '', wanPort: c.wanPort ? String(c.wanPort) : '',
+        });
         // Auto-connect if we have a saved connection.
         onConnected(c);
       }
@@ -283,6 +292,14 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
       setConnecting(false);
     }
   }
+
+  const parsedForWake = parseConnection(form);
+  const wakeConnection = parsedForWake.ok
+    ? parsedForWake.value
+    : { host: form.host, port: 0, token: form.token,
+        mac: form.mac.trim() || undefined, lanIp: form.lanIp.trim() || undefined,
+        wanHost: form.wanHost.trim() || undefined,
+        wanPort: form.wanPort.trim() ? Number(form.wanPort) : undefined };
 
   return (
     <main
@@ -318,6 +335,20 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
           onChange={(e) => setForm({ ...form, token: e.target.value })}
           style={inputStyle}
         />
+        <div style={{ borderTop: '1px solid #2e3038', margin: '6px 0', paddingTop: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#9ca3af', marginBottom: 8 }}>Probuzení (Wake-on-LAN)</div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            <input placeholder="MAC adresa (AA:BB:CC:DD:EE:FF)" value={form.mac}
+              onChange={(e) => setForm({ ...form, mac: e.target.value })} style={inputStyle} />
+            <input placeholder="LAN IP Macu (doma)" value={form.lanIp}
+              onChange={(e) => setForm({ ...form, lanIp: e.target.value })} style={inputStyle} />
+            <input placeholder="DDNS host (mimo síť)" value={form.wanHost}
+              onChange={(e) => setForm({ ...form, wanHost: e.target.value })} style={inputStyle} />
+            <input placeholder="DDNS port (výchozí 9)" value={form.wanPort}
+              onChange={(e) => setForm({ ...form, wanPort: e.target.value })} style={inputStyle} />
+            <WakeButton connection={wakeConnection} />
+          </div>
+        </div>
         <button
           onClick={() => void handleConnect()}
           disabled={connecting}
