@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import Database from 'better-sqlite3';
+import { createRequire } from 'node:module';
 import { runMigrations } from '../../orchestrator/db/migrations.js';
 import { PingsRepo } from '../../orchestrator/db/repositories/pings.js';
 
-function db() { const d = new Database(':memory:'); runMigrations(d as never); return d; }
+// node:sqlite (no native ABI) like the other orchestrator tests — keeps the
+// suite independent of how better-sqlite3 is compiled (Node vs Electron).
+const require = createRequire(import.meta.url);
+const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
+
+function db() { const d = new DatabaseSync(':memory:'); runMigrations(d as never); return d; }
 
 describe('PingsRepo', () => {
   it('creates, gets, and marks answered', () => {
