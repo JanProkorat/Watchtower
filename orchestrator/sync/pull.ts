@@ -25,7 +25,9 @@ export async function pullTable(
   const fk = fkSource(table);
 
   // Select remote rows changed since the cursor, joining the parent sync_id.
-  const pgCols = table.columns.filter((c) => !c.name.endsWith('_sync_id') || c.name === 'sync_id').map((c) => `t.${c.name}`);
+  // Derived columns are Postgres-only computed values (e.g. billing aggregates);
+  // they do not exist in SQLite so must be excluded from the SELECT list.
+  const pgCols = table.columns.filter((c) => !c.derived && (!c.name.endsWith('_sync_id') || c.name === 'sync_id')).map((c) => `t.${c.name}`);
   let joinSql = '';
   if (fk) {
     pgCols.push(`parent.sync_id AS ${fk.col}`);
@@ -149,6 +151,8 @@ function upsertLocal(
   const cols: string[] = [];
   const values: unknown[] = [];
   for (const c of table.columns) {
+    // Derived columns are Postgres-only; they have no corresponding SQLite column.
+    if (c.derived) continue;
     if (fk && c.name === fk.col) {
       cols.push(fk.localCol);
       values.push(localFkId);

@@ -184,24 +184,21 @@ export const PG_MIGRATIONS: Array<{ version: number; up: string[] }> = [
       // sync_conflicts is internal — left without RLS.
       // Idempotent: ALTER TABLE … ENABLE ROW LEVEL SECURITY is safe to re-run;
       // DROP POLICY IF EXISTS avoids the pre-PG15 lack of CREATE POLICY IF NOT EXISTS.
-      `ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS read_authenticated ON projects;
-CREATE POLICY read_authenticated ON projects FOR SELECT TO authenticated USING (true);`,
-      `ALTER TABLE epics ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS read_authenticated ON epics;
-CREATE POLICY read_authenticated ON epics FOR SELECT TO authenticated USING (true);`,
-      `ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS read_authenticated ON tasks;
-CREATE POLICY read_authenticated ON tasks FOR SELECT TO authenticated USING (true);`,
-      `ALTER TABLE worklogs ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS read_authenticated ON worklogs;
-CREATE POLICY read_authenticated ON worklogs FOR SELECT TO authenticated USING (true);`,
-      `ALTER TABLE contracts ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS read_authenticated ON contracts;
-CREATE POLICY read_authenticated ON contracts FOR SELECT TO authenticated USING (true);`,
-      `ALTER TABLE days_off ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS read_authenticated ON days_off;
-CREATE POLICY read_authenticated ON days_off FOR SELECT TO authenticated USING (true);`,
+      // Portability: `authenticated` is a Supabase built-in role. On a plain
+      // Postgres (local dev / the test harness) it does not exist, so the
+      // CREATE POLICY is guarded by a role-existence check — RLS is still
+      // enabled (the table-owning sync role bypasses it), the policy is simply
+      // skipped where the client role is absent. On Supabase the role exists
+      // and the authenticated-SELECT policy is created as intended.
+      ...['projects', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'].map(
+        (t) => `ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS read_authenticated ON ${t};
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE POLICY read_authenticated ON ${t} FOR SELECT TO authenticated USING (true);
+  END IF;
+END $$;`,
+      ),
     ],
   },
 ];
