@@ -8,11 +8,13 @@ export function aggregateMonthEarnings(rows: WorklogRow[], month: string) {
   const byProject = new Map<number, ProjectEarning>();
   let totalCzk = 0;
   for (const r of rows) {
-    if (!inMonth(r.workDate, month) || !isCzkEarned(r)) continue;
-    totalCzk += r.earnedAmount!;
+    if (!inMonth(r.workDate, month)) continue;
     const cur = byProject.get(r.projectId) ?? { projectId: r.projectId, name: r.projectName, color: r.projectColor, minutes: 0, earnedCzk: 0 };
     cur.minutes += r.minutes;
-    cur.earnedCzk += r.earnedAmount!;
+    if (isCzkEarned(r)) {
+      cur.earnedCzk += r.earnedAmount!;
+      totalCzk += r.earnedAmount!;
+    }
     byProject.set(r.projectId, cur);
   }
   const perProject = [...byProject.values()].sort((a, b) => b.earnedCzk - a.earnedCzk);
@@ -39,7 +41,7 @@ export function trailingMonths(rows: WorklogRow[], endMonth: string, n: number) 
 }
 
 export function topProjects(rows: WorklogRow[], month: string, limit: number) {
-  const by = new Map<number, { projectId: number; name: string; color: string | null; minutes: number; earnedCzk: number }>();
+  const by = new Map<number, ProjectEarning>();
   for (const r of rows) {
     if (!inMonth(r.workDate, month)) continue;
     const cur = by.get(r.projectId) ?? { projectId: r.projectId, name: r.projectName, color: r.projectColor, minutes: 0, earnedCzk: 0 };

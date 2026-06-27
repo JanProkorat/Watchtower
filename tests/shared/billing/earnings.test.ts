@@ -21,13 +21,34 @@ describe('aggregateMonthEarnings', () => {
     expect(r.perProject.map(p => [p.name, p.earnedCzk])).toEqual([['A', 3000], ['B', 500]]);
   });
 
-  it('ignores non-CZK and null earned rows', () => {
+  it('ignores non-CZK and null earned rows for totalCzk but still counts minutes', () => {
     const rows = [
       wl({ earnedAmount: 1000, rateCurrency: 'CZK' }),
       wl({ earnedAmount: 50, rateCurrency: 'EUR' }),
       wl({ earnedAmount: null, rateCurrency: null }),
     ];
     expect(aggregateMonthEarnings(rows, '2026-06').totalCzk).toBe(1000);
+  });
+
+  it('includes project in perProject with minutes counted even when all rows are non-CZK', () => {
+    const rows = [
+      wl({ projectId: 1, projectName: 'A', earnedAmount: 50, rateCurrency: 'EUR', minutes: 45 }),
+    ];
+    const r = aggregateMonthEarnings(rows, '2026-06');
+    expect(r.totalCzk).toBe(0);
+    expect(r.perProject).toHaveLength(1);
+    expect(r.perProject[0]).toMatchObject({ name: 'A', minutes: 45, earnedCzk: 0 });
+  });
+
+  it('counts all minutes for a project with mixed CZK and non-CZK rows', () => {
+    const rows = [
+      wl({ projectId: 1, projectName: 'Alpha', earnedAmount: 1500, rateCurrency: 'CZK', minutes: 60 }),
+      wl({ projectId: 1, projectName: 'Alpha', earnedAmount: 50, rateCurrency: 'EUR', minutes: 30 }),
+    ];
+    const r = aggregateMonthEarnings(rows, '2026-06');
+    expect(r.totalCzk).toBe(1500);
+    expect(r.perProject).toHaveLength(1);
+    expect(r.perProject[0]).toMatchObject({ name: 'Alpha', minutes: 90, earnedCzk: 1500 });
   });
 });
 
@@ -41,6 +62,17 @@ describe('trailingMonths', () => {
       { month: '2026-06', earnedCzk: 100 },
     ]);
   });
+
+  it('ignores a CZK row outside the n-month window', () => {
+    const rows = [
+      wl({ workDate: '2026-03-15', earnedAmount: 9999, rateCurrency: 'CZK' }), // outside 3-month window ending 2026-06
+      wl({ workDate: '2026-06-01', earnedAmount: 200, rateCurrency: 'CZK' }),
+    ];
+    const r = trailingMonths(rows, '2026-06', 3);
+    expect(r.find(e => e.month === '2026-03')).toBeUndefined();
+    expect(r.find(e => e.month === '2026-06')?.earnedCzk).toBe(200);
+    expect(r.reduce((acc, e) => acc + e.earnedCzk, 0)).toBe(200);
+  });
 });
 
 describe('topProjects', () => {
@@ -52,5 +84,14 @@ describe('topProjects', () => {
     ];
     const r = topProjects(rows, '2026-06', 5);
     expect(r.map(p => p.name)).toEqual(['B', 'A']); // B has more minutes
+  });
+
+  it('tie-breaks equal minutes by name ascending', () => {
+    const rows = [
+      wl({ projectId: 1, projectName: 'Zebra', minutes: 60, earnedAmount: 1000 }),
+      wl({ projectId: 2, projectName: 'Alpha', minutes: 60, earnedAmount: 500 }),
+    ];
+    const r = topProjects(rows, '2026-06', 5);
+    expect(r.map(p => p.name)).toEqual(['Alpha', 'Zebra']);
   });
 });
