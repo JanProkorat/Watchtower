@@ -7,11 +7,12 @@
  */
 
 import { countWorkdays } from './workdays.js';
-import type { ContractRow, DayOffRow, WorklogRow } from './types.js';
+import type { ContractRow, DayOffRow, ProjectRow, WorklogRow } from './types.js';
 
 export interface ContractBurn {
   projectId: number;
   projectName: string;
+  projectColor: string | null;
   mdsUsed: number;
   mdLimit: number | null;
   mdsRemaining: number | null;
@@ -52,22 +53,22 @@ function minDate(a: string, b: string): string {
  * @param contracts  One entry per project_rate row (all time windows).
  * @param rows       Denormalised worklog rows (incl. effectiveMinutes).
  * @param daysOff    User-marked days off — all kinds contribute to extraNonWorking.
+ * @param projects   Full project list — used to resolve projectName/projectColor.
  * @param opts       `{ today }` — YYYY-MM-DD string (injected for testability).
  */
 export function contractBurn(
   contracts: ContractRow[],
   rows: WorklogRow[],
   daysOff: DayOffRow[],
+  projects: ProjectRow[],
   opts: { today: string },
 ): ContractBurn[] {
   const { today } = opts;
 
-  // Build a lookup of projectName from worklog rows (best-effort — use first match).
-  const projectNames = new Map<number, string>();
-  for (const r of rows) {
-    if (!projectNames.has(r.projectId)) {
-      projectNames.set(r.projectId, r.projectName);
-    }
+  // Build a lookup of project metadata from the projects list.
+  const projectMap = new Map<number, ProjectRow>();
+  for (const p of projects) {
+    projectMap.set(p.id, p);
   }
 
   // Pre-build the extra-non-working set from all daysOff (source lines 94–100).
@@ -134,9 +135,11 @@ export function contractBurn(
         ? round2((mdsUsed / elapsedWorkdays) * totalWorkdays)
         : null;
 
+    const proj = projectMap.get(rate.projectId);
     result.push({
       projectId: rate.projectId,
-      projectName: projectNames.get(rate.projectId) ?? '',
+      projectName: proj?.name ?? '',
+      projectColor: proj?.color ?? null,
       mdsUsed,
       mdLimit: rate.mdLimit,
       mdsRemaining,

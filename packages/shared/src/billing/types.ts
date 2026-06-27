@@ -29,6 +29,8 @@ export interface ContractRow {
 
 export interface DayOffRow { date: string; kind: string }
 
+export interface ProjectRow { id: number; name: string; color: string | null }
+
 export interface ProjectEarning {
   projectId: number;
   name: string;
