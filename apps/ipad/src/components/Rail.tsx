@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 // Dashboard / Billing / Settings are shown disabled for parity. The desktop's
 // light/dark toggle is omitted — the iPad app is dark-only.
 
-export type RailModule = 'instances' | 'remote';
+export type RailModule = 'instances' | 'remote' | 'billing';
 
 interface Props {
   active: RailModule;
@@ -72,7 +72,7 @@ const ITEMS: RailItem[] = [
   { id: 'dashboard', label: 'Dashboard', d: DASHBOARD_D, enabled: false },
   { id: 'instances', label: 'Instances', d: TERMINAL_D, enabled: true },
   { id: 'remote', label: 'Vzdálený Mac', d: SCREEN_D, enabled: true },
-  { id: 'billing', label: 'Billing', d: BILLING_D, enabled: false },
+  { id: 'billing', label: 'Billing', d: BILLING_D, enabled: true },
   { id: 'settings', label: 'Settings', d: SETTINGS_D, enabled: false },
 ];
 
