@@ -28,3 +28,11 @@ export interface ContractRow {
 }
 
 export interface DayOffRow { date: string; kind: string }
+
+export interface ProjectEarning {
+  projectId: number;
+  name: string;
+  color: string | null;
+  minutes: number;
+  earnedCzk: number;
+}
