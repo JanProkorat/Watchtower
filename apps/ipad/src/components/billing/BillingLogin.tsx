@@ -17,6 +17,8 @@ export function BillingLogin({ signIn }: Props): JSX.Element {
     try {
       const result = await signIn(email, password);
       if (result.error) setError(result.error);
+    } catch {
+      setError('Přihlášení se nezdařilo. Zkuste to znovu.');
     } finally {
       setBusy(false);
     }

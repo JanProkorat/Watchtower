@@ -74,7 +74,7 @@ export function BillingModule(): JSX.Element {
             backgroundColor: activeTab === 'dashboard' ? '#2d2857' : 'transparent',
             color: activeTab === 'dashboard' ? '#a89cf0' : '#9ca3af',
           }}
-          onClick={() => setActiveTab('dashboard')}
+          onClick={() => { setActiveTab('dashboard'); setSelectedProject(null); }}
         >
           Přehled
         </button>
@@ -84,7 +84,7 @@ export function BillingModule(): JSX.Element {
             backgroundColor: activeTab === 'earnings' ? '#2d2857' : 'transparent',
             color: activeTab === 'earnings' ? '#a89cf0' : '#9ca3af',
           }}
-          onClick={() => setActiveTab('earnings')}
+          onClick={() => { setActiveTab('earnings'); setSelectedProject(null); }}
         >
           Výdělky
         </button>
