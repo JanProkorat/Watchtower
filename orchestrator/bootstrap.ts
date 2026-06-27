@@ -99,18 +99,26 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
     catch (err) { console.error('[orchestrator] pg migrations failed (sync dormant):', err); }
   }
 
-  // One-time backfill: re-push all worklogs once so the derived billing columns
-  // populate on rows synced before they existed. Guarded by a settings flag.
-  // Only runs when pg is configured; resets the worklog push cursor to epoch so
-  // the next sync cycle re-sends all worklog rows with computed billing fields.
-  const BACKFILL_FLAG = 'sync.backfill.worklogs_billing.done';
+  // One-time backfill: re-derive the Postgres-only billing columns onto worklog
+  // rows that synced before those columns existed. Guarded by a settings flag;
+  // only runs when pg is configured.
+  //
+  // The push is LWW-guarded (`ON CONFLICT … WHERE updated_at < EXCLUDED.updated_at`,
+  // see sync/push.ts), so merely resetting the push cursor is NOT enough: the
+  // re-pushed rows carry an UNCHANGED updated_at, the guard's `X < X` is false, and
+  // the UPDATE is skipped — the derived columns stay null. We therefore BUMP
+  // updated_at on every live worklog, which both re-selects them (updated_at >
+  // cursor) and lets the upsert pass the LWW guard so the derived fields are written.
+  // Flag is versioned: v1 marked the earlier, ineffective cursor-only attempt; v2
+  // forces the corrected backfill to run once even where v1 already "completed".
+  const BACKFILL_FLAG = 'sync.backfill.worklogs_billing.v2.done';
   if (pg) {
     const settings = new SettingsRepo(dbHandle.raw);
     const done = settings.getString(BACKFILL_FLAG, '');
     if (!done) {
       dbHandle.raw
-        .prepare(`DELETE FROM settings WHERE key = ?`)
-        .run('sync.cursor.push.worklogs');
+        .prepare(`UPDATE worklogs SET updated_at = ? WHERE deleted_at IS NULL`)
+        .run(new Date().toISOString());
       settings.set(BACKFILL_FLAG, '1');
     }
   }

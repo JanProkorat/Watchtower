@@ -16,6 +16,7 @@ import { TabStrip } from './components/TabStrip.js';
 import { TerminalView } from './components/TerminalView.js';
 import { SpawnModal } from './components/SpawnModal.js';
 import { RemoteMacView } from './components/RemoteMacView.js';
+import { BillingModule } from './components/billing/BillingModule.js';
 import { AuthBlockBanner } from './components/AuthBlockBanner.js';
 import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
@@ -233,6 +234,8 @@ function Shell({ connection }: ShellProps) {
         {/* Module content */}
         {activeModule === 'instances' ? (
           <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} connection={connection} />
+        ) : activeModule === 'billing' ? (
+          <BillingModule />
         ) : (
           <RemoteMacView connection={connection} />
         )}
