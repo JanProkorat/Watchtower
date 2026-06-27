@@ -40,11 +40,11 @@ export function relativeTimeCz(isoTimestamp: string, nowMs = Date.now()): string
   }
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24) {
-    const h = diffH === 1 ? 'hodinou' : diffH < 5 ? `${diffH} hodinami` : `${diffH} hodinami`;
+    const h = diffH === 1 ? 'hodinou' : `${diffH} hodinami`;
     return `před ${h}`;
   }
   const diffD = Math.floor(diffH / 24);
-  const d = diffD === 1 ? 'dnem' : diffD < 5 ? `${diffD} dny` : `${diffD} dny`;
+  const d = diffD === 1 ? 'dnem' : diffD < 5 ? `${diffD} dny` : `${diffD} dní`;
   return `před ${d}`;
 }
 

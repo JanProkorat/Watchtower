@@ -30,8 +30,19 @@ describe('relativeTimeCz', () => {
     expect(relativeTimeCz(iso(NOW - 24 * 60 * 60_000), NOW)).toBe('před dnem');
   });
 
-  it('returns "před X dny" for 2+ days', () => {
+  it('returns "před X dny" for 2–4 days', () => {
     expect(relativeTimeCz(iso(NOW - 2 * 24 * 60 * 60_000), NOW)).toBe('před 2 dny');
-    expect(relativeTimeCz(iso(NOW - 7 * 24 * 60 * 60_000), NOW)).toBe('před 7 dny');
+    expect(relativeTimeCz(iso(NOW - 3 * 24 * 60 * 60_000), NOW)).toBe('před 3 dny');
+    expect(relativeTimeCz(iso(NOW - 4 * 24 * 60 * 60_000), NOW)).toBe('před 4 dny');
+  });
+
+  it('returns "před X dní" for 5+ days', () => {
+    expect(relativeTimeCz(iso(NOW - 5 * 24 * 60 * 60_000), NOW)).toBe('před 5 dní');
+    expect(relativeTimeCz(iso(NOW - 7 * 24 * 60 * 60_000), NOW)).toBe('před 7 dní');
+  });
+
+  it('returns "právě teď" for future timestamps (negative diff)', () => {
+    expect(relativeTimeCz(iso(NOW + 60_000), NOW)).toBe('právě teď');
+    expect(relativeTimeCz(iso(NOW + 1), NOW)).toBe('právě teď');
   });
 });
