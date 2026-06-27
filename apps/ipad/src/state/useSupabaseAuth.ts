@@ -14,7 +14,7 @@ export function authErrorMessage(err: AuthErrorLike): string {
   const msg = (err.message ?? '').toLowerCase();
   const code = (err.code ?? '').toLowerCase();
 
-  if (code === 'invalid_credentials' || msg.includes('invalid')) {
+  if (code === 'invalid_credentials' || msg.includes('invalid login credentials')) {
     return 'Nesprávný e-mail nebo heslo.';
   }
   if (msg.includes('not confirmed') || msg.includes('email not confirmed')) {
@@ -46,7 +46,7 @@ export function useSupabaseAuth(): SupabaseAuthState {
       const s = data.session ?? null;
       setSession(s);
       setStatus(s ? 'in' : 'out');
-    });
+    }).catch(() => setStatus('out'));
 
     // Subscribe to auth state changes (sign-in, sign-out, token refresh).
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {

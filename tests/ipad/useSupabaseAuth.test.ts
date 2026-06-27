@@ -16,9 +16,19 @@ describe('authErrorMessage', () => {
       .toBe('E-mail není potvrzený.');
   });
 
-  it('matches "invalid" in message text (bad credentials fallback)', () => {
-    expect(authErrorMessage({ message: 'Invalid credentials provided' }))
+  it('maps "Invalid login credentials" message text to bad-credentials message', () => {
+    expect(authErrorMessage({ message: 'Invalid login credentials' }))
       .toBe('Nesprávný e-mail nebo heslo.');
+  });
+
+  it('maps unrelated "Invalid OTP" error to generic Czech fallback (not bad-credentials)', () => {
+    expect(authErrorMessage({ message: 'Invalid OTP' }))
+      .toBe('Přihlášení se nezdařilo. Zkuste to znovu.');
+  });
+
+  it('maps "Invalid refresh token" to generic Czech fallback (not bad-credentials)', () => {
+    expect(authErrorMessage({ message: 'Invalid refresh token' }))
+      .toBe('Přihlášení se nezdařilo. Zkuste to znovu.');
   });
 
   it('maps unknown/network errors to generic Czech fallback', () => {
