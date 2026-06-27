@@ -331,7 +331,7 @@ export function ProjectDetailView({
 
                 return (
                   <div
-                    key={`${contract.effectiveFrom}-${contract.rateAmount}`}
+                    key={`${contract.effectiveFrom}-${contract.endDate ?? 'open'}-${contract.rateAmount}`}
                     style={{
                       display: 'flex',
                       alignItems: 'center',

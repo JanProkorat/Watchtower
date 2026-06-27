@@ -83,12 +83,12 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
       )
       .is('deleted_at', null),
     supabase
-      .from('project_rates')
+      .from('contracts')
       .select(
         'project_id,effective_from,end_date,rate_type,rate_amount,currency,hours_per_day,md_limit',
       )
       .is('deleted_at', null),
-    supabase.from('days_off').select('date,kind'),
+    supabase.from('days_off').select('date,kind').is('deleted_at', null),
     supabase
       .from('projects')
       .select('id,name,color,kind,is_billable')

@@ -94,7 +94,8 @@ export function contractBurn(
       if (
         r.projectId === rate.projectId &&
         r.workDate >= rate.effectiveFrom &&
-        r.workDate <= periodEnd
+        r.workDate <= periodEnd &&
+        r.projectKind === 'work'
       ) {
         minutesLogged += r.effectiveMinutes;
       }

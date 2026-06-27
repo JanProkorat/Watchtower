@@ -66,6 +66,15 @@ describe('contractBurn', () => {
     expect(b.mdsRemaining).toBe(18);
   });
 
+  it('excludes non-work project worklogs from mdsUsed', () => {
+    // A personal-kind worklog in the same window must NOT count toward mdsUsed.
+    const workRow = wl('2026-06-02', 480);                                        // kind='work'
+    const personalRow: WorklogRow = { ...wl('2026-06-03', 480), projectKind: 'personal' };
+    const [b] = contractBurn([contract()], [workRow, personalRow], [], [proj()], { today: '2026-06-05' });
+    expect(b.mdsUsed).toBe(1);    // only the work row: 480 / 60 / 8 = 1
+    expect(b.mdsRemaining).toBe(19);
+  });
+
   it('today == endDate (last day): workdaysRemaining is 0', () => {
     const rows = [wl('2026-06-30', 480)];
     const [b] = contractBurn(
