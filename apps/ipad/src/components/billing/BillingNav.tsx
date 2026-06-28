@@ -55,7 +55,7 @@ export function BillingNav({ active, onSelect, onSignOut }: Props): JSX.Element 
   return (
     <div style={{ flexShrink: 0, width: 184, borderRight: `1px solid ${C.border}`, background: '#13141a', display: 'flex', flexDirection: 'column', padding: '10px 8px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 6px 8px' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, color: C.muted, textTransform: 'uppercase' }}>Billing</span>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, color: C.muted, textTransform: 'uppercase' }}>Fakturace</span>
         <button onClick={toggle} title="Sbalit" style={{ background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 16 }}>‹</button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
