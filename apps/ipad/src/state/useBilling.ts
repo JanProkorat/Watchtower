@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSupabase } from '../lib/supabaseClient.js';
-import type { ContractRow, DayOffRow, ProjectRow, TaskRow } from '@watchtower/shared/billing/types.js';
+import type { ContractRow, DayOffRow, ProjectRow, TaskRow, WorklogRow } from '@watchtower/shared/billing/types.js';
 import {
   mapWorklogRow,
   mapDayOffRow,
@@ -27,6 +27,7 @@ export interface BillingHookResult {
   lastUpdated: string | null;
   refresh(): void;
   patchDaysOff(next: DayOffRow[]): void;
+  patchWorklogs(next: WorklogRow[]): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -44,7 +45,8 @@ export type BillingAction =
   | { type: 'CACHE_MISS' }
   | { type: 'FETCH_SUCCESS'; dataset: BillingDataset }
   | { type: 'FETCH_ERROR' }
-  | { type: 'PATCH_DAYS_OFF'; daysOff: DayOffRow[] };
+  | { type: 'PATCH_DAYS_OFF'; daysOff: DayOffRow[] }
+  | { type: 'PATCH_WORKLOGS'; worklogs: WorklogRow[] };
 
 export function billingReducer(
   prev: BillingReducerState,
@@ -74,6 +76,8 @@ export function billingReducer(
       return { data: null, state: 'offline', lastUpdated: null };
     case 'PATCH_DAYS_OFF':
       return prev.data ? { ...prev, data: { ...prev.data, daysOff: action.daysOff } } : prev;
+    case 'PATCH_WORKLOGS':
+      return prev.data ? { ...prev, data: { ...prev.data, worklogs: action.worklogs } } : prev;
     default:
       return prev;
   }
@@ -226,6 +230,7 @@ export function useBilling(storeOverride?: BillingStore): BillingHookResult {
   }, [storeOverride, runFetch]);
 
   const patchDaysOff = useCallback((next: DayOffRow[]) => dispatch({ type: 'PATCH_DAYS_OFF', daysOff: next }), [dispatch]);
+  const patchWorklogs = useCallback((next: WorklogRow[]) => dispatch({ type: 'PATCH_WORKLOGS', worklogs: next }), [dispatch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -259,5 +264,6 @@ export function useBilling(storeOverride?: BillingStore): BillingHookResult {
     lastUpdated: bState.lastUpdated,
     refresh,
     patchDaysOff,
+    patchWorklogs,
   };
 }
