@@ -78,7 +78,7 @@ export function TimeOffView(): JSX.Element {
         ))}
       </div>
 
-      {picker && (
+      {picker && editable && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 16px', borderTop: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, color: C.muted }}>{picker}:</span>
           {(['vacation', 'sick', 'other'] as const).map((k) => (
