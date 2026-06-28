@@ -206,4 +206,19 @@ END $$;`,
       `ALTER TABLE worklogs DROP COLUMN IF EXISTS rate_currency;`,
     ],
   },
+  {
+    version: 6,
+    up: [
+      // Write-back slice 1: allow authenticated INSERT/UPDATE on days_off (soft-delete
+      // is an UPDATE). Mirrors the v4 read policy: idempotent + role-guarded so plain
+      // Postgres (dev/test, no `authenticated` role) still applies cleanly.
+      `ALTER TABLE days_off ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS write_authenticated ON days_off;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE POLICY write_authenticated ON days_off FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  END IF;
+END $$;`,
+    ],
+  },
 ];

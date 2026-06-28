@@ -4,13 +4,21 @@ import { buildTimeOffModel, type TimeOffKind } from '../../../state/timeOffModel
 import { addMonths } from '../../../lib/monthHelpers.js';
 import { formatDateCz } from '../../../lib/czFormat.js';
 import { C } from '../reports/tokens.js';
+import { useDaysOffMutations } from '../../../state/useDaysOffMutations.js';
+import { canEdit } from '../../../state/billingWrites.js';
 
 const KIND_COLOR: Record<TimeOffKind, string> = { vacation: '#22D3EE', sick: '#f87171', other: '#fbbf24', holiday: '#6d5fbb' };
 const KIND_LABEL: Record<TimeOffKind, string> = { vacation: 'Dovolená', sick: 'Nemoc', other: 'Jiné', holiday: 'Svátek' };
 const DOW = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 
 export function TimeOffView(): JSX.Element {
-  const { data } = useBilling();
+  const { data, state, patchDaysOff } = useBilling();
+  const editable = canEdit(state);
+  const { setDayOff, clearDayOff, pending, error } = useDaysOffMutations({
+    daysOff: data?.daysOff ?? [],
+    patchDaysOff,
+  });
+  const [picker, setPicker] = useState<string | null>(null);
   const [focus, setFocus] = useState(() => new Date().toISOString().slice(0, 7));
   const today = new Date().toISOString().slice(0, 10);
   const model = buildTimeOffModel(focus, data?.daysOff ?? [], today);
@@ -29,6 +37,9 @@ export function TimeOffView(): JSX.Element {
             <span style={{ width: 8, height: 8, borderRadius: 2, background: KIND_COLOR[k] }} />{KIND_LABEL[k]}
           </span>
         ))}
+        {!editable && <span style={{ fontSize: 11, color: C.muted }}>jen pro čtení offline</span>}
+        {pending && <span style={{ fontSize: 11, color: C.muted }}>ukládám…</span>}
+        {error && <span style={{ fontSize: 11, color: C.red }}>{error}</span>}
       </div>
 
       <div style={{ padding: '16px', display: 'flex', flexWrap: 'wrap', gap: 16 }}>
@@ -38,24 +49,27 @@ export function TimeOffView(): JSX.Element {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
               {DOW.map((d) => <div key={d} style={{ fontSize: 10, color: C.muted, textAlign: 'center' }}>{d}</div>)}
               {mc.weeks.flat().map((c, i) => (
-                <div key={i} title={c.date ? formatDateCz(c.date) : ''} style={{
-                  aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, borderRadius: 5,
-                  // Holidays: dashed outline (transparent fill) so they read distinctly from solid
-                  // user days-off and stay visible when a vacation/sick day shadows the same date.
-                  color: c.date
-                    ? c.kind === 'holiday'
-                      ? KIND_COLOR.holiday
-                      : c.kind
-                        ? '#0F0F17'
-                        : c.isWeekend
-                          ? C.muted
-                          : C.text
-                    : 'transparent',
-                  background: c.kind && c.kind !== 'holiday' ? KIND_COLOR[c.kind] : 'transparent',
-                  border: c.kind === 'holiday' ? `1px dashed ${KIND_COLOR.holiday}` : 'none',
-                  fontWeight: c.kind ? 700 : 400,
-                }}>
+                <div key={i} title={c.date ? formatDateCz(c.date) : ''}
+                  onClick={() => editable && c.date && setPicker(c.date)}
+                  style={{
+                    aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, borderRadius: 5,
+                    cursor: editable && c.date ? 'pointer' : 'default',
+                    // Holidays: dashed outline (transparent fill) so they read distinctly from solid
+                    // user days-off and stay visible when a vacation/sick day shadows the same date.
+                    color: c.date
+                      ? c.kind === 'holiday'
+                        ? KIND_COLOR.holiday
+                        : c.kind
+                          ? '#0F0F17'
+                          : c.isWeekend
+                            ? C.muted
+                            : C.text
+                      : 'transparent',
+                    background: c.kind && c.kind !== 'holiday' ? KIND_COLOR[c.kind] : 'transparent',
+                    border: c.kind === 'holiday' ? `1px dashed ${KIND_COLOR.holiday}` : 'none',
+                    fontWeight: c.kind ? 700 : 400,
+                  }}>
                   {c.date ? Number(c.date.slice(8, 10)) : ''}
                 </div>
               ))}
@@ -63,6 +77,26 @@ export function TimeOffView(): JSX.Element {
           </div>
         ))}
       </div>
+
+      {picker && editable && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 16px', borderTop: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: C.muted }}>{picker}:</span>
+          {(['vacation', 'sick', 'other'] as const).map((k) => (
+            <button key={k} onClick={() => { void setDayOff(picker, k); setPicker(null); }}
+              style={{ background: KIND_COLOR[k], color: '#0F0F17', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              {KIND_LABEL[k]}
+            </button>
+          ))}
+          <button onClick={() => { void clearDayOff(picker); setPicker(null); }}
+            style={{ background: 'transparent', color: C.muted, border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 12px', fontSize: 13, cursor: 'pointer' }}>
+            Smazat
+          </button>
+          <button onClick={() => setPicker(null)}
+            style={{ background: 'transparent', color: C.muted, border: 'none', fontSize: 13, cursor: 'pointer' }}>
+            Zrušit
+          </button>
+        </div>
+      )}
 
       <div style={{ padding: '0 16px 32px' }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, color: C.muted, textTransform: 'uppercase', marginBottom: 8 }}>Nadcházející</div>

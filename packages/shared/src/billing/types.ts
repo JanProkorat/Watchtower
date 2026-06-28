@@ -26,7 +26,7 @@ export interface ContractRow {
   mdLimit: number | null;
 }
 
-export interface DayOffRow { date: string; kind: string }
+export interface DayOffRow { date: string; kind: string; syncId: string }
 
 export interface ProjectRow { id: number; name: string; color: string | null }
 

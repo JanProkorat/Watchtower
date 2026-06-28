@@ -73,6 +73,16 @@ export function mapWorklogRow(raw: RawWorklogRow): WorklogRow {
 }
 
 // ---------------------------------------------------------------------------
+// Pure mapper — PostgREST raw days_off row → DayOffRow
+// ---------------------------------------------------------------------------
+
+export type RawDayOffRow = { date: string; kind: string; sync_id: string };
+
+export function mapDayOffRow(raw: RawDayOffRow): DayOffRow {
+  return { date: raw.date, kind: raw.kind, syncId: raw.sync_id };
+}
+
+// ---------------------------------------------------------------------------
 // Cache persistence — key for Capacitor Preferences
 // ---------------------------------------------------------------------------
 

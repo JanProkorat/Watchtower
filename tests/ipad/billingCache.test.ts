@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   mapWorklogRow,
+  mapDayOffRow,
   loadCache,
   saveCache,
   type BillingDataset,
@@ -123,6 +124,13 @@ describe('mapWorklogRow source', () => {
 
   it('defaults a missing source to null', () => {
     expect(mapWorklogRow(base as never).source).toBeNull();
+  });
+});
+
+describe('mapDayOffRow', () => {
+  it('maps date, kind, and sync_id', () => {
+    expect(mapDayOffRow({ date: '2026-07-06', kind: 'vacation', sync_id: 'abc' } as never))
+      .toEqual({ date: '2026-07-06', kind: 'vacation', syncId: 'abc' });
   });
 });
 
