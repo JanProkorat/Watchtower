@@ -15,9 +15,9 @@ function normalizeKind(k: string): TimeOffKind {
 }
 
 function buildMonth(month: string, daysOff: Map<string, TimeOffKind>, holidays: Map<string, string>): MonthCal {
-  const parts = month.split('-').map(Number);
-  const y = parts[0] ?? 0;
-  const m = parts[1] ?? 1;
+  const parts = month.split('-');
+  const y = parseInt(parts[0] ?? '0', 10);
+  const m = parseInt(parts[1] ?? '1', 10);
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
   // Monday-first leading pad: JS getUTCDay() Sun=0..Sat=6 → Mon=0..Sun=6
   const firstDow = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
@@ -52,9 +52,10 @@ export function buildTimeOffModel(focusMonth: string, daysOff: DayOffRow[], toda
     buildMonth(mm, userByDate, holidays),
   );
 
-  // Upcoming: future user days_off ∪ holidays (focus year + next), user wins, asc, cap 30.
+  // Upcoming: future user days_off ∪ holidays (prior year + focus year + next), user wins, asc, cap 30.
+  // Include focusYear-1 because the -1 calendar pane can show still-future prior-year holidays (e.g. Dec when focus=Jan).
   const upcomingByDate = new Map<string, UpcomingItem>();
-  for (const yr of [focusYear, focusYear + 1]) {
+  for (const yr of [focusYear - 1, focusYear, focusYear + 1]) {
     for (const [date, name] of czechHolidays(yr)) {
       if (date >= today) upcomingByDate.set(date, { date, kind: 'holiday', note: name });
     }
