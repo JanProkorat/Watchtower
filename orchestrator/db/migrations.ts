@@ -34,7 +34,7 @@ function addColumnIfMissing(db: SqliteLike, table: string, column: string, decl:
   }
 }
 
-const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
+export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
   {
     version: 1,
     up: (db) => {
@@ -326,74 +326,20 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
   {
     version: 16,
     up: (db) => {
-      // #108 CZK-only: the sync layer no longer writes the `currency` column on
-      // contracts or projects (removed from SYNCED_TABLES). The SQLite columns
-      // were inherited verbatim from timetracker_schema.sql as `TEXT NOT NULL`
-      // without a DEFAULT. Recreate both tables with `DEFAULT 'CZK'` so
-      // pull-path upserts that omit the column succeed.
-      //
-      // SQLite has no `ALTER COLUMN SET DEFAULT`; table recreation is the only
-      // option. FK enforcement is disabled for the duration.
-      db.exec(`PRAGMA foreign_keys = OFF`);
-
-      // --- contracts ---
-      db.exec(`CREATE TABLE contracts_new (
-        id             INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_id     INTEGER NOT NULL REFERENCES projects(id),
-        effective_from TEXT    NOT NULL,
-        rate_type      TEXT    NOT NULL CHECK (rate_type IN ('hourly','daily')),
-        rate_amount    REAL    NOT NULL CHECK (rate_amount >= 0),
-        currency       TEXT    NOT NULL DEFAULT 'CZK',
-        hours_per_day  REAL    NOT NULL DEFAULT 8 CHECK (hours_per_day > 0),
-        end_date       TEXT,
-        md_limit       REAL    CHECK (md_limit IS NULL OR md_limit > 0),
-        created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
-        updated_at     TEXT    NOT NULL DEFAULT '1970-01-01T00:00:00.000Z',
-        deleted_at     TEXT,
-        sync_id        TEXT,
-        UNIQUE(project_id, effective_from)
-      )`);
-      db.exec(`INSERT INTO contracts_new SELECT * FROM contracts`);
-      db.exec(`DROP TABLE contracts`);
-      db.exec(`ALTER TABLE contracts_new RENAME TO contracts`);
-      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contracts_sync_id ON contracts(sync_id)`);
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_contracts_pid_date ON contracts(project_id, effective_from)`);
-
-      // --- projects: change DEFAULT from 'USD' to 'CZK', preserve all other
-      //     constraints exactly as they are in timetracker_schema.sql +
-      //     migration 13 additions (sync_id, updated_at, deleted_at) ---
-      db.exec(`CREATE TABLE projects_new (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        name            TEXT    NOT NULL,
-        base_url        TEXT,
-        color           TEXT    NOT NULL DEFAULT '#1976d2',
-        archived        INTEGER NOT NULL DEFAULT 0,
-        is_billable     INTEGER NOT NULL DEFAULT 0,
-        kind            TEXT    NOT NULL DEFAULT 'work'
-                          CHECK (kind IN ('work','time_off')),
-        rate_type       TEXT    NOT NULL DEFAULT 'hourly'
-                          CHECK (rate_type IN ('hourly','daily')),
-        rate_amount     REAL,
-        currency        TEXT    NOT NULL DEFAULT 'CZK',
-        hours_per_day   REAL    NOT NULL DEFAULT 8,
-        is_default      INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0,1)),
-        folder_path     TEXT,
-        jira_globs      TEXT,
-        description     TEXT,
-        jira_board_url  TEXT,
-        task_url_template TEXT,
-        created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-        updated_at      TEXT    NOT NULL DEFAULT '1970-01-01T00:00:00.000Z',
-        deleted_at      TEXT,
-        sync_id         TEXT
-      )`);
-      db.exec(`INSERT INTO projects_new SELECT * FROM projects`);
-      db.exec(`DROP TABLE projects`);
-      db.exec(`ALTER TABLE projects_new RENAME TO projects`);
-      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_sync_id ON projects(sync_id)`);
-      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_is_default ON projects(is_default) WHERE is_default = 1`);
-
-      db.exec(`PRAGMA foreign_keys = ON`);
+      // #108 CZK-only: drop the now-unused currency columns. No data migration —
+      // all existing contracts are CZK. DROP COLUMN (not a table rebuild) so there
+      // is no positional column-copy to misalign.
+      // Guards: SQLite has no DROP COLUMN IF EXISTS, so check PRAGMA first to
+      // keep this migration replay-safe (re-run after a partial migration recovery
+      // must not re-throw "no such column").
+      const contractCols = (db.prepare(`PRAGMA table_info(contracts)`).all() as Array<{ name: string }>).map((c) => c.name);
+      if (contractCols.includes('currency')) {
+        db.exec(`ALTER TABLE contracts DROP COLUMN currency`);
+      }
+      const projectCols = (db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>).map((c) => c.name);
+      if (projectCols.includes('currency')) {
+        db.exec(`ALTER TABLE projects DROP COLUMN currency`);
+      }
     },
   },
 ];

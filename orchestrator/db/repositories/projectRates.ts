@@ -127,16 +127,15 @@ export class ProjectRatesRepo {
       const info = this.db
         .prepare(
           `INSERT INTO contracts
-             (project_id, effective_from, rate_type, rate_amount, currency,
+             (project_id, effective_from, rate_type, rate_amount,
               hours_per_day, end_date, md_limit, sync_id, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           input.projectId,
           input.effectiveFrom,
           input.rateType,
           input.rateAmount,
-          'CZK', // bridge: contracts.currency is NOT NULL until migration v16 drops it (Task 4)
           input.hoursPerDay ?? 8,
           input.endDate ?? null,
           input.mdLimit ?? null,

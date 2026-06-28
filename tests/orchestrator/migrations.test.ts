@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { mkdtempSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { runMigrations, type SqliteLike } from '../../orchestrator/db/migrations.js';
+import { runMigrations, MIGRATIONS, type SqliteLike } from '../../orchestrator/db/migrations.js';
 
 // node:sqlite isn't on Vite's known-builtins list, so it strips the `node:` prefix
 // and tries to resolve "sqlite" as a userland package. Bypass Vite's resolver
@@ -190,5 +190,84 @@ describe('migrations', () => {
     };
     expect(row.sync_id).toBe('s1');
     expect(row.updated_at).toBe('2026-01-01T00:00:00.000Z');
+  });
+
+  it('v16 drops the currency columns and preserves seeded row data intact', () => {
+    // Run migrations only up through v15 so currency columns still exist,
+    // then seed rows with DISTINCT values, then apply v16, and assert:
+    //   (a) currency is gone from contracts + projects
+    //   (b) seeded rows survive intact — sync_id is preserved, deleted_at is
+    //       still NULL, created_at is intact.
+    // This test would have FAILED against the buggy positional-copy rebuild
+    // (INSERT INTO contracts_new SELECT * FROM contracts) because the column
+    // order in the CREATE TABLE differed from the original schema (sync_id +
+    // updated_at + deleted_at were added in v13 at the end, while the rebuild
+    // put currency before hours_per_day which was already the case — the real
+    // risk was any SELECT * misalignment landing wrong values in wrong columns).
+
+    const schemaVersion = db.prepare(`CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER PRIMARY KEY,
+      applied_at INTEGER NOT NULL
+    )`);
+    schemaVersion.run();
+
+    // Apply only v1..v15
+    for (const m of MIGRATIONS) {
+      if (m.version >= 16) break;
+      m.up(db as unknown as SqliteLike);
+      db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)').run(m.version, Date.now());
+    }
+
+    // Seed a project + a contract with distinct, recognisable values.
+    // After v13, projects and contracts both have sync_id + updated_at + deleted_at.
+    const projectSyncId = 'proj-sync-aaa111';
+    const contractSyncId = 'cont-sync-bbb222';
+    const createdAt = '2025-12-01T08:00:00.000Z';
+    const updatedAt = '2026-01-15T10:30:00.000Z';
+
+    db.prepare(
+      `INSERT INTO projects (name, color, currency, sync_id, created_at, updated_at)
+       VALUES ('TestProject', '#ff0000', 'CZK', ?, ?, ?)`,
+    ).run(projectSyncId, createdAt, updatedAt);
+    const projId = (db.prepare(`SELECT id FROM projects WHERE sync_id = ?`).get(projectSyncId) as { id: number }).id;
+
+    db.prepare(
+      `INSERT INTO contracts (project_id, effective_from, rate_type, rate_amount, currency, sync_id, created_at, updated_at)
+       VALUES (?, '2025-01-01', 'hourly', 1500, 'CZK', ?, ?, ?)`,
+    ).run(projId, contractSyncId, createdAt, updatedAt);
+
+    // Apply v16 (the migration under test)
+    const v16 = MIGRATIONS.find((m) => m.version === 16)!;
+    v16.up(db as unknown as SqliteLike);
+
+    // (a) currency column must be gone
+    const contractCols = (db.prepare(`PRAGMA table_info(contracts)`).all() as Array<{ name: string }>).map((c) => c.name);
+    const projectCols = (db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>).map((c) => c.name);
+    expect(contractCols).not.toContain('currency');
+    expect(projectCols).not.toContain('currency');
+
+    // (b) seeded project row survives intact — sync_id preserved, deleted_at NULL, created_at correct
+    const proj = db.prepare(`SELECT sync_id, deleted_at, created_at FROM projects WHERE id = ?`).get(projId) as {
+      sync_id: string; deleted_at: string | null; created_at: string;
+    };
+    expect(proj.sync_id).toBe(projectSyncId);
+    expect(proj.deleted_at).toBeNull();
+    expect(proj.created_at).toBe(createdAt);
+
+    // (b) seeded contract row survives intact
+    const contract = db.prepare(`SELECT sync_id, deleted_at, created_at FROM contracts WHERE sync_id = ?`).get(contractSyncId) as {
+      sync_id: string; deleted_at: string | null; created_at: string;
+    };
+    expect(contract.sync_id).toBe(contractSyncId);
+    expect(contract.deleted_at).toBeNull();
+    expect(contract.created_at).toBe(createdAt);
+  });
+
+  it('migration v16 drops the currency columns on a fresh DB', () => {
+    runMigrations(db as unknown as SqliteLike);
+    const contractCols = (db.prepare(`PRAGMA table_info(contracts)`).all() as Array<{ name: string }>).map(c => c.name);
+    const projectCols = (db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>).map(c => c.name);
+    expect(contractCols).not.toContain('currency');
+    expect(projectCols).not.toContain('currency');
   });
 });
