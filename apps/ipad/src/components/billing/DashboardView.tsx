@@ -249,6 +249,9 @@ function HeatmapGrid({
         display: 'grid',
         gridTemplateColumns: 'repeat(7, 1fr)',
         gap: 3,
+        // Cap the width so the aspect-ratio cells stay small squares on a wide
+        // iPad instead of stretching to ~width/7 and dominating the card.
+        maxWidth: 280,
       }}
     >
       {days.map((d) => (
@@ -557,31 +560,6 @@ export function DashboardView(): JSX.Element {
           </div>
         )}
 
-        {/* ---- Activity heatmap ---- */}
-        <div>
-          <SectionHeader title="Aktivita (30 dní)" />
-          <div
-            style={{
-              background: C.surface,
-              border: `1px solid ${C.border}`,
-              borderRadius: 12,
-              padding: '14px 16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-            }}
-          >
-            <HeatmapGrid days={heatmap.days} />
-            <StatStrip
-              currentStreak={heatmap.stats.currentStreak}
-              longestStreak={heatmap.stats.longestStreak}
-              activeDays={heatmap.stats.activeDays}
-              weeklyAvgMinutes={heatmap.stats.weeklyAvgMinutes}
-              busiestDay={heatmap.stats.busiestDay}
-            />
-          </div>
-        </div>
-
         {/* ---- Top projects ---- */}
         {monthHasData ? (
           <div>
@@ -629,6 +607,31 @@ export function DashboardView(): JSX.Element {
             žádná data pro tento měsíc
           </div>
         )}
+
+        {/* ---- Activity heatmap ---- */}
+        <div>
+          <SectionHeader title="Aktivita (30 dní)" />
+          <div
+            style={{
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: 12,
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <HeatmapGrid days={heatmap.days} />
+            <StatStrip
+              currentStreak={heatmap.stats.currentStreak}
+              longestStreak={heatmap.stats.longestStreak}
+              activeDays={heatmap.stats.activeDays}
+              weeklyAvgMinutes={heatmap.stats.weeklyAvgMinutes}
+              busiestDay={heatmap.stats.busiestDay}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
