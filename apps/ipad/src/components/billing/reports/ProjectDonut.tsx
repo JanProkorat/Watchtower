@@ -50,7 +50,7 @@ export function ProjectDonut({ slices, onOpenProject }: ProjectDonutProps): JSX.
                   stroke={s.drawColor}
                   strokeWidth={22}
                   strokeDasharray={dash}
-                  strokeDashoffset={-offset}
+                  strokeDashoffset={CIRC - offset}
                 />
               );
               offset += len;
