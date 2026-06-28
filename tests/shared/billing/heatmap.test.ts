@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { activityHeatmap } from '../../../packages/shared/src/billing/heatmap.js';
 import type { WorklogRow } from '../../../packages/shared/src/billing/types.js';
 const wl = (workDate: string, minutes: number): WorklogRow => ({
-  syncId: workDate, workDate, minutes, effectiveMinutes: minutes, earnedAmount: 0, rateCurrency: 'CZK',
+  syncId: workDate, workDate, minutes, effectiveMinutes: minutes, earnedAmount: 0,
   projectId: 1, projectName: 'A', projectColor: null, projectKind: 'work', isBillable: true, taskNumber: null, taskTitle: null,
 });
 

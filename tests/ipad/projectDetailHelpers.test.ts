@@ -18,7 +18,6 @@ function makeContract(overrides: Partial<ContractRow> & { effectiveFrom: string 
     endDate: overrides.endDate ?? null,
     rateType: overrides.rateType ?? 'hourly',
     rateAmount: overrides.rateAmount ?? 1500,
-    currency: overrides.currency ?? 'CZK',
     hoursPerDay: overrides.hoursPerDay ?? 8,
     mdLimit: overrides.mdLimit ?? null,
   };
@@ -27,7 +26,6 @@ function makeContract(overrides: Partial<ContractRow> & { effectiveFrom: string 
 function makeWorklog(overrides: {
   workDate: string;
   earnedAmount?: number | null;
-  rateCurrency?: string | null;
 }): WorklogRow {
   // Preserve explicit null — only default to 1500 when key is absent.
   const earnedAmount = Object.prototype.hasOwnProperty.call(overrides, 'earnedAmount')
@@ -39,7 +37,6 @@ function makeWorklog(overrides: {
     minutes: 60,
     effectiveMinutes: 60,
     earnedAmount,
-    rateCurrency: overrides.rateCurrency ?? 'CZK',
     projectId: 1,
     projectName: 'Test',
     projectColor: null,
@@ -137,13 +134,13 @@ describe('rollupEarningsByContract', () => {
     expect(result[1]?.earnedCzk).toBe(5000); // 3000 + 2000
   });
 
-  it('ignores non-CZK earnings', () => {
+  it('sums all earnedAmount values (always CZK since #108)', () => {
     const worklogs: WorklogRow[] = [
-      makeWorklog({ workDate: '2026-02-10', earnedAmount: 100, rateCurrency: 'EUR' }),
-      makeWorklog({ workDate: '2026-02-11', earnedAmount: 2000, rateCurrency: 'CZK' }),
+      makeWorklog({ workDate: '2026-02-10', earnedAmount: 100 }),
+      makeWorklog({ workDate: '2026-02-11', earnedAmount: 2000 }),
     ];
     const result = rollupEarningsByContract(worklogs, [c1]);
-    expect(result[0]?.earnedCzk).toBe(2000);
+    expect(result[0]?.earnedCzk).toBe(2100);
   });
 
   it('ignores worklogs with null earnedAmount', () => {

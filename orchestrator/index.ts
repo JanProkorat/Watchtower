@@ -255,7 +255,6 @@ function contractViewOf(rate: ProjectRateRow): {
   endDate: string | null;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
-  currency: string;
   hoursPerDay: number;
   mdLimit: number | null;
   createdAt: string;
@@ -277,7 +276,6 @@ function contractViewOf(rate: ProjectRateRow): {
     endDate: rate.endDate,
     rateType: rate.rateType,
     rateAmount: rate.rateAmount,
-    currency: rate.currency,
     hoursPerDay: rate.hoursPerDay,
     mdLimit: rate.mdLimit,
     createdAt: rate.createdAt,

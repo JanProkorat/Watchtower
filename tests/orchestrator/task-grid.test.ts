@@ -217,7 +217,6 @@ describe('TaskGridService', () => {
           effectiveFrom: '2026-01-01',
           rateType: 'hourly',
           rateAmount: 100,
-          currency: 'CZK',
         });
       }
       const res = s.service.get(2026, 5);
@@ -225,7 +224,7 @@ describe('TaskGridService', () => {
       // workdays (May 2026 minus Labour & Liberation Day) × 100 CZK/h ×
       // 8 h = 15200 CZK.
       expect(res.earningsByCurrency).toEqual([
-        { currency: 'CZK', perDay: { 10: 100 }, totalAmount: 100, expectedAmount: 15200 },
+        { perDay: { 10: 100 }, totalAmount: 100, expectedAmount: 15200 },
       ]);
     });
 
@@ -239,7 +238,6 @@ describe('TaskGridService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'hourly',
         rateAmount: 1600,
-        currency: 'CZK',
       });
       s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-04', minutes: 60 });
       s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-05', minutes: 90 });
@@ -247,7 +245,6 @@ describe('TaskGridService', () => {
       // Expected = 19 workdays × 1600 × 8 = 243200.
       expect(res.earningsByCurrency).toEqual([
         {
-          currency: 'CZK',
           perDay: { 4: 1600, 5: 2400 },
           totalAmount: 4000,
           expectedAmount: 243200,
@@ -265,7 +262,6 @@ describe('TaskGridService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'daily',
         rateAmount: 12800,
-        currency: 'CZK',
         hoursPerDay: 8,
       });
       s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-04', minutes: 60 });
@@ -274,7 +270,6 @@ describe('TaskGridService', () => {
       // Expected = 19 workdays × 12800 (MD) = 243200.
       expect(res.earningsByCurrency).toEqual([
         {
-          currency: 'CZK',
           perDay: { 4: 1600, 5: 2400 },
           totalAmount: 4000,
           expectedAmount: 243200,
@@ -292,14 +287,12 @@ describe('TaskGridService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'hourly',
         rateAmount: 1000,
-        currency: 'CZK',
       });
       s.ratesRepo.create({
         projectId: project.id,
         effectiveFrom: '2026-05-15',
         rateType: 'hourly',
         rateAmount: 2000,
-        currency: 'CZK',
       });
       // Auto-close set the previous contract's end_date = 2026-05-14
       s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-10', minutes: 60 }); // old rate → 1000
@@ -309,7 +302,6 @@ describe('TaskGridService', () => {
       // 11 workdays at 2000 CZK/h × 8 h = 64000 + 176000 = 240000.
       expect(res.earningsByCurrency).toEqual([
         {
-          currency: 'CZK',
           perDay: { 10: 1000, 20: 2000 },
           totalAmount: 3000,
           expectedAmount: 240000,
@@ -317,28 +309,26 @@ describe('TaskGridService', () => {
       ]);
     });
 
-    it('emits one row per currency, alphabetically sorted', () => {
-      const eu = s.projectsRepo.create({ name: 'EU', kind: 'work' });
-      const us = s.projectsRepo.create({ name: 'US', kind: 'work' });
-      const cz = s.projectsRepo.create({ name: 'CZ', kind: 'work' });
-      for (const { p, currency, amount } of [
-        { p: eu, currency: 'EUR', amount: 50 },
-        { p: us, currency: 'USD', amount: 100 },
-        { p: cz, currency: 'CZK', amount: 1000 },
+    it('merges earnings from multiple projects into a single CZK row', () => {
+      // All contracts now hardcode CZK — multiple projects combine into one row.
+      for (const { name, amount } of [
+        { name: 'P1', amount: 50 },
+        { name: 'P2', amount: 100 },
+        { name: 'P3', amount: 1000 },
       ]) {
+        const p = s.projectsRepo.create({ name, kind: 'work' });
         const epic = s.epicsRepo.create({ projectId: p.id, name: 'E' });
-        const task = s.tasksRepo.create({ epicId: epic.id, number: `${currency}-T`, title: 'X' });
+        const task = s.tasksRepo.create({ epicId: epic.id, number: `${name}-T`, title: 'X' });
         s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-10', minutes: 60 });
         s.ratesRepo.create({
           projectId: p.id,
           effectiveFrom: '2026-01-01',
           rateType: 'hourly',
           rateAmount: amount,
-          currency,
         });
       }
       const res = s.service.get(2026, 5);
-      expect(res.earningsByCurrency.map((r) => r.currency)).toEqual(['CZK', 'EUR', 'USD']);
+      expect(res.earningsByCurrency).toHaveLength(1);
     });
   });
 

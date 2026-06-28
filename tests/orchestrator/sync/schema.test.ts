@@ -51,10 +51,11 @@ describe('value transforms', () => {
     }
   });
 
-  it('worklogs descriptor carries the 4 derived billing columns', () => {
+  it('worklogs descriptor carries the 3 derived billing columns (no rate_currency)', () => {
     const wl = SYNCED_TABLES.find((t) => t.name === 'worklogs')!;
     const derived = wl.columns.filter((c) => c.derived).map((c) => c.name).sort();
-    expect(derived).toEqual(['earned_amount', 'effective_minutes', 'rate_currency', 'resolved_rate']);
+    expect(derived).toEqual(['earned_amount', 'effective_minutes', 'resolved_rate']);
+    expect(derived).not.toContain('rate_currency');
   });
 
   it('DERIVERS has a worklogs entry that is a factory function', () => {

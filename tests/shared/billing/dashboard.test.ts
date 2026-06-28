@@ -3,7 +3,7 @@ import { sprintWindow, dashboardKpis } from '../../../packages/shared/src/billin
 import type { WorklogRow } from '../../../packages/shared/src/billing/types.js';
 
 const wl = (workDate: string, minutes: number, earnedAmount: number | null = minutes * 25): WorklogRow => ({
-  syncId: workDate + minutes, workDate, minutes, effectiveMinutes: minutes, earnedAmount, rateCurrency: 'CZK',
+  syncId: workDate + minutes, workDate, minutes, effectiveMinutes: minutes, earnedAmount,
   projectId: 1, projectName: 'A', projectColor: null, projectKind: 'work', isBillable: true, taskNumber: null, taskTitle: null,
 });
 

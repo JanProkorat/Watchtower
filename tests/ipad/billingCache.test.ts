@@ -31,7 +31,6 @@ describe('mapWorklogRow', () => {
     minutes: 480,
     effective_minutes: 450,
     earned_amount: 5000,
-    rate_currency: 'CZK',
     tasks: {
       number: 'WT-42',
       title: 'Fix billing bug',
@@ -54,7 +53,6 @@ describe('mapWorklogRow', () => {
     expect(row.minutes).toBe(480);
     expect(row.effectiveMinutes).toBe(450);
     expect(row.earnedAmount).toBe(5000);
-    expect(row.rateCurrency).toBe('CZK');
     expect(row.projectId).toBe(7);
     expect(row.projectName).toBe('Watchtower');
     expect(row.projectColor).toBe('#7c3aed');
@@ -99,18 +97,16 @@ describe('mapWorklogRow', () => {
     expect(row.taskNumber).toBe('WT-2');
   });
 
-  it('passes through non-CZK currency unchanged', () => {
-    const rawEur: RawWorklogRow = { ...fullRaw, rate_currency: 'EUR', earned_amount: 200 };
+  it('passes through earnedAmount', () => {
+    const rawEur: RawWorklogRow = { ...fullRaw, earned_amount: 200 };
     const row = mapWorklogRow(rawEur);
-    expect(row.rateCurrency).toBe('EUR');
     expect(row.earnedAmount).toBe(200);
   });
 
-  it('passes through null earnedAmount and rateCurrency', () => {
-    const rawNull: RawWorklogRow = { ...fullRaw, earned_amount: null, rate_currency: null };
+  it('passes through null earnedAmount', () => {
+    const rawNull: RawWorklogRow = { ...fullRaw, earned_amount: null };
     const row = mapWorklogRow(rawNull);
     expect(row.earnedAmount).toBeNull();
-    expect(row.rateCurrency).toBeNull();
   });
 });
 
@@ -158,7 +154,6 @@ describe('billing cache persistence', () => {
       minutes: 120,
       effectiveMinutes: 100,
       earnedAmount: 1000,
-      rateCurrency: 'CZK',
       projectId: 3,
       projectName: 'Test',
       projectColor: null,
@@ -173,7 +168,6 @@ describe('billing cache persistence', () => {
       endDate: null,
       rateType: 'hourly',
       rateAmount: 1000,
-      currency: 'CZK',
       hoursPerDay: 8,
       mdLimit: null,
     };

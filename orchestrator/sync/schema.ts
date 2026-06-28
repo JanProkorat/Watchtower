@@ -78,7 +78,6 @@ export const SYNCED_TABLES: SyncTable[] = [
       { name: 'kind', kind: 'text' },
       { name: 'rate_type', kind: 'text' },
       { name: 'rate_amount', kind: 'numeric' },
-      { name: 'currency', kind: 'text' },
       { name: 'hours_per_day', kind: 'numeric' },
       { name: 'is_default', kind: 'bool' },
       { name: 'folder_path', kind: 'text' },
@@ -145,7 +144,6 @@ export const SYNCED_TABLES: SyncTable[] = [
       // Postgres-only derived billing columns — never read from SQLite.
       { name: 'effective_minutes', kind: 'int', derived: true },
       { name: 'resolved_rate', kind: 'numeric', derived: true },
-      { name: 'rate_currency', kind: 'text', derived: true },
       { name: 'earned_amount', kind: 'numeric', derived: true },
     ],
   },
@@ -157,7 +155,6 @@ export const SYNCED_TABLES: SyncTable[] = [
       { name: 'effective_from', kind: 'date' },
       { name: 'rate_type', kind: 'text' },
       { name: 'rate_amount', kind: 'numeric' },
-      { name: 'currency', kind: 'text' },
       { name: 'hours_per_day', kind: 'numeric' },
       { name: 'end_date', kind: 'date' },
       { name: 'md_limit', kind: 'numeric' },

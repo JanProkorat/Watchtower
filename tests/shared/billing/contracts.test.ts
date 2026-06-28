@@ -4,10 +4,10 @@ import type { WorklogRow, ContractRow, ProjectRow } from '../../../packages/shar
 
 const contract = (o: Partial<ContractRow> = {}): ContractRow => ({
   projectId: 1, effectiveFrom: '2026-06-01', endDate: '2026-06-30', rateType: 'hourly',
-  rateAmount: 1500, currency: 'CZK', hoursPerDay: 8, mdLimit: 20, ...o,
+  rateAmount: 1500, hoursPerDay: 8, mdLimit: 20, ...o,
 });
 const wl = (workDate: string, effectiveMinutes: number, projectId = 1): WorklogRow => ({
-  syncId: workDate, workDate, minutes: effectiveMinutes, effectiveMinutes, earnedAmount: 0, rateCurrency: 'CZK',
+  syncId: workDate, workDate, minutes: effectiveMinutes, effectiveMinutes, earnedAmount: 0,
   projectId, projectName: 'A', projectColor: null, projectKind: 'work', isBillable: true, taskNumber: null, taskTitle: null,
 });
 const proj = (o: Partial<ProjectRow> = {}): ProjectRow => ({

@@ -27,7 +27,7 @@ export interface BillingStore {
 //
 // Embedded select:
 //   worklogs?select=sync_id,work_date,minutes,effective_minutes,earned_amount,
-//                   rate_currency,tasks(number,title,epics(projects(id,name,color,kind,is_billable)))
+//                   tasks(number,title,epics(projects(id,name,color,kind,is_billable)))
 // ---------------------------------------------------------------------------
 
 type RawProject = {
@@ -47,7 +47,6 @@ export type RawWorklogRow = {
   minutes: number;
   effective_minutes: number;
   earned_amount: number | null;
-  rate_currency: string | null;
   tasks: RawTask;
 };
 
@@ -61,7 +60,6 @@ export function mapWorklogRow(raw: RawWorklogRow): WorklogRow {
     minutes: raw.minutes,
     effectiveMinutes: raw.effective_minutes,
     earnedAmount: raw.earned_amount,
-    rateCurrency: raw.rate_currency,
     projectId: proj?.id ?? 0,
     projectName: proj?.name ?? '',
     projectColor: proj?.color ?? null,

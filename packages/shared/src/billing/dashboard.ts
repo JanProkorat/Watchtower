@@ -12,7 +12,7 @@ export function sprintWindow(anchor: string, startDate = '2026-01-05', lengthDay
   return { from: fmt(from), to: fmt(from + (len - 1) * DAY) };
 }
 
-const isCzk = (r: WorklogRow) => r.rateCurrency === 'CZK' && r.earnedAmount != null;
+const isCzk = (r: WorklogRow) => r.earnedAmount != null;
 function agg(rows: WorklogRow[], pred: (r: WorklogRow) => boolean) {
   let minutes = 0, earnedCzk = 0;
   for (const r of rows) { if (!pred(r)) continue; minutes += r.minutes; if (isCzk(r)) earnedCzk += r.earnedAmount!; }

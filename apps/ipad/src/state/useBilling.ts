@@ -85,7 +85,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
       supabase
         .from('worklogs')
         .select(
-          'sync_id,work_date,minutes,effective_minutes,earned_amount,rate_currency,' +
+          'sync_id,work_date,minutes,effective_minutes,earned_amount,' +
             'tasks(number,title,epics(projects(id,name,color,kind,is_billable)))',
         )
         .is('deleted_at', null)
@@ -98,7 +98,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
     supabase
       .from('contracts')
       .select(
-        'project_id,effective_from,end_date,rate_type,rate_amount,currency,hours_per_day,md_limit',
+        'project_id,effective_from,end_date,rate_type,rate_amount,hours_per_day,md_limit',
       )
       .is('deleted_at', null),
     supabase.from('days_off').select('date,kind').is('deleted_at', null),
@@ -122,7 +122,6 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
       endDate: r.end_date ?? null,
       rateType: r.rate_type,
       rateAmount: r.rate_amount,
-      currency: r.currency,
       hoursPerDay: r.hours_per_day,
       mdLimit: r.md_limit ?? null,
     }),

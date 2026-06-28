@@ -7,14 +7,12 @@ export interface ContractLite {
   effectiveFrom: string;          // 'YYYY-MM-DD'
   rateType: 'hourly' | 'daily';
   rateAmount: number;
-  currency: string;
   hoursPerDay: number;
 }
 
 export interface WorklogBilling {
   effectiveMinutes: number;
   resolvedRate: number | null;
-  rateCurrency: string | null;
   earnedAmount: number | null;
 }
 
@@ -43,11 +41,11 @@ export function computeWorklogBilling(input: {
   const effectiveMinutes = input.reportedMinutes ?? input.minutes;
   const c = resolveContract(input.workDate, input.contracts);
   if (!c) {
-    return { effectiveMinutes, resolvedRate: null, rateCurrency: null, earnedAmount: null };
+    return { effectiveMinutes, resolvedRate: null, earnedAmount: null };
   }
   const earnedAmount =
     c.rateType === 'hourly'
       ? (effectiveMinutes * c.rateAmount) / 60
       : (effectiveMinutes / 60 / c.hoursPerDay) * c.rateAmount;
-  return { effectiveMinutes, resolvedRate: c.rateAmount, rateCurrency: c.currency, earnedAmount };
+  return { effectiveMinutes, resolvedRate: c.rateAmount, earnedAmount };
 }

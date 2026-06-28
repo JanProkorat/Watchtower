@@ -89,19 +89,12 @@ export class DashboardOverviewService {
       project_id: number;
       project_name: string;
       project_color: string;
-      currency: string | null;
     }
     const rows = this.db
       .prepare(
         `SELECT DISTINCT p.id    AS project_id,
                          p.name  AS project_name,
-                         p.color AS project_color,
-                         (SELECT pr2.currency
-                            FROM contracts pr2
-                           WHERE pr2.project_id = p.id
-                             AND pr2.deleted_at IS NULL
-                           ORDER BY pr2.effective_from DESC, pr2.id DESC
-                           LIMIT 1) AS currency
+                         p.color AS project_color
            FROM projects p
            JOIN contracts pr ON pr.project_id = p.id
           WHERE p.archived = 0
@@ -123,7 +116,6 @@ export class DashboardOverviewService {
         projectId: r.project_id,
         projectName: r.project_name,
         projectColor: r.project_color,
-        currency: r.currency,
         contract,
       });
     }

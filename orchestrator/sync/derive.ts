@@ -35,7 +35,7 @@ export function createWorklogDeriver(db: SqliteLike) {
     if (contractsByProject.has(projectId)) return contractsByProject.get(projectId)!;
     const rows = db.prepare(
       `SELECT effective_from AS effectiveFrom, rate_type AS rateType,
-              rate_amount AS rateAmount, currency, hours_per_day AS hoursPerDay
+              rate_amount AS rateAmount, hours_per_day AS hoursPerDay
          FROM contracts
         WHERE project_id = ? AND deleted_at IS NULL`,
     ).all(projectId) as ContractLite[];
@@ -56,7 +56,6 @@ export function createWorklogDeriver(db: SqliteLike) {
     return {
       effective_minutes: b.effectiveMinutes,
       resolved_rate: b.resolvedRate,
-      rate_currency: b.rateCurrency,
       earned_amount: b.earnedAmount,
     };
   };

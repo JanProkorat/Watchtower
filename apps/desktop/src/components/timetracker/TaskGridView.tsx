@@ -101,8 +101,8 @@ function fmtHoursTrim(minutes: number): string {
   return h.toFixed(2).replace(/\.?0+$/, '');
 }
 
-function formatAmount(amount: number, currency: string): string {
-  return `${amount.toLocaleString('cs-CZ')} ${currency}`;
+function formatAmount(amount: number): string {
+  return `${amount.toLocaleString('cs-CZ')} Kč`;
 }
 
 interface Props {
@@ -1033,11 +1033,11 @@ function Grid({
             })}
           </tr>
 
-          {/* Earnings rows — one per currency, stacking up from the bottom */}
+          {/* Earnings row — single CZK row pinned at the bottom */}
           {data.earningsByCurrency.map((row, idx) => {
             const rowBottom = (data.earningsByCurrency.length - 1 - idx) * TOTAL_ROW_HEIGHT;
             return (
-              <tr key={row.currency}>
+              <tr key={idx}>
                 <td
                   style={{
                     position: 'sticky',
@@ -1049,7 +1049,7 @@ function Grid({
                     height: TOTAL_ROW_HEIGHT,
                   }}
                 >
-                  Earned ({row.currency})
+                  Earned
                 </td>
                 <td
                   style={{
@@ -1073,14 +1073,14 @@ function Grid({
                     borderRight: `2px solid ${divider}`,
                     fontVariantNumeric: 'tabular-nums',
                   }}
-                  title={`Capacity target: ${formatAmount(row.expectedAmount, row.currency)} (workdays × MD rate)`}
+                  title={`Capacity target: ${formatAmount(row.expectedAmount)} (workdays × MD rate)`}
                 >
-                  {formatAmount(row.totalAmount, row.currency)}
+                  {formatAmount(row.totalAmount)}
                   <Box
                     component="span"
                     sx={{ color: 'text.secondary', fontWeight: 400, ml: 0.5 }}
                   >
-                    / {formatAmount(row.expectedAmount, row.currency)}
+                    / {formatAmount(row.expectedAmount)}
                   </Box>
                 </td>
                 {days.map((d) => {
@@ -1106,7 +1106,7 @@ function Grid({
                         height: TOTAL_ROW_HEIGHT,
                         fontSize: 11,
                       }}
-                      title={v > 0 ? formatAmount(v, row.currency) : undefined}
+                      title={v > 0 ? formatAmount(v) : undefined}
                     >
                       {v > 0 ? Math.round(v).toLocaleString('cs-CZ') : ''}
                     </td>

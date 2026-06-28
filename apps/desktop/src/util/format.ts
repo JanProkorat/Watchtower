@@ -57,16 +57,16 @@ export function formatWeekdayDateLongCz(date: string | null | undefined): string
 
 const MONEY_LOCALE = 'cs-CZ';
 
-export function formatEarnings(amount: number | null | undefined, currency: string): string {
+export function formatEarnings(amount: number | null | undefined): string {
   if (amount === null || amount === undefined) return '—';
   try {
     return new Intl.NumberFormat(MONEY_LOCALE, {
       style: 'currency',
-      currency,
+      currency: 'CZK',
       maximumFractionDigits: 2,
     }).format(amount);
   } catch {
-    return `${amount.toFixed(2)} ${currency}`;
+    return `${amount.toFixed(2)} Kč`;
   }
 }
 

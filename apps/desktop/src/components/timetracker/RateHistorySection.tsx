@@ -32,7 +32,7 @@ const CZK_FORMATTER = new Intl.NumberFormat('cs-CZ', {
 function formatRate(c: ContractViewPayload): string {
   const amount = CZK_FORMATTER.format(c.rateAmount);
   const unit = c.rateType === 'hourly' ? '/ hr' : '/ MD';
-  return `${amount} ${c.currency} ${unit}`;
+  return `${amount} Kč ${unit}`;
 }
 
 function formatHours(minutes: number): string {
@@ -49,8 +49,8 @@ function computeEarnings(c: ContractViewPayload): number {
   return c.rateType === 'hourly' ? hours * c.rateAmount : (hours / c.hoursPerDay) * c.rateAmount;
 }
 
-function formatEarningsCzk(amount: number, currency: string): string {
-  return `${CZK_FORMATTER.format(amount)} ${currency}`;
+function formatEarningsCzk(amount: number): string {
+  return `${CZK_FORMATTER.format(amount)} Kč`;
 }
 
 /**
@@ -391,7 +391,7 @@ function RateRow({
             display: 'block',
           }}
         >
-          {contract.minutesLogged > 0 ? formatEarningsCzk(earnings, contract.currency) : '—'}
+          {contract.minutesLogged > 0 ? formatEarningsCzk(earnings) : '—'}
         </Typography>
       </Box>
       <Tooltip title="Edit rate period">
