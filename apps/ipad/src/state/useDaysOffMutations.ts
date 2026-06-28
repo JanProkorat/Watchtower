@@ -25,8 +25,10 @@ export function useDaysOffMutations({ daysOff, patchDaysOff }: Args) {
         // re-marked date would overwrite the row's sync_id on the date-PK upsert, and
         // since the Mac sync keys on sync_id, that wedges convergence on both push/pull.
         // Mint only when no row exists for the date at all.
-        let syncId = existing?.syncId;
-        if (!syncId) {
+        let syncId: string;
+        if (existing?.syncId) {
+          syncId = existing.syncId;
+        } else {
           const { data: found, error: lookupErr } = await getSupabase()
             .from('days_off')
             .select('sync_id')
@@ -34,7 +36,7 @@ export function useDaysOffMutations({ daysOff, patchDaysOff }: Args) {
             .limit(1)
             .maybeSingle();
           if (lookupErr) throw lookupErr;
-          syncId = found?.sync_id ?? crypto.randomUUID();
+          syncId = (found?.sync_id as string | undefined) ?? crypto.randomUUID();
         }
         const now = new Date().toISOString();
         const row: DayOffRow = { date, kind, syncId };
