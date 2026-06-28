@@ -67,7 +67,7 @@ export function TaskGridView(): JSX.Element {
               })}
             </tbody>
             <tfoot>
-              <tr style={{ position: 'sticky', bottom: 22 }}>
+              <tr style={{ position: 'sticky', bottom: 22, background: C.ground }}>
                 <td style={{ ...nameCol, fontSize: 11, color: C.muted, fontWeight: 700, paddingTop: 8 }}>Celkem (h)</td>
                 {g.dailyTotals.map((min, i) => <td key={i} style={{ ...cellBase, paddingTop: 8, color: C.violet, fontWeight: 600 }}>{hrs(min)}</td>)}
                 <td style={{ ...cellBase, minWidth: 56, width: 56, paddingTop: 8, color: C.violet, fontWeight: 700 }}>{formatHours(g.monthTotalMinutes)}</td>

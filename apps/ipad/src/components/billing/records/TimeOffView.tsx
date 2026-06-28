@@ -41,8 +41,18 @@ export function TimeOffView(): JSX.Element {
                 <div key={i} title={c.date ? formatDateCz(c.date) : ''} style={{
                   aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 11, borderRadius: 5,
-                  color: c.date ? (c.kind ? '#0F0F17' : c.isWeekend ? C.muted : C.text) : 'transparent',
-                  background: c.kind ? KIND_COLOR[c.kind] : 'transparent',
+                  // Holidays: dashed outline (transparent fill) so they read distinctly from solid
+                  // user days-off and stay visible when a vacation/sick day shadows the same date.
+                  color: c.date
+                    ? c.kind === 'holiday'
+                      ? KIND_COLOR.holiday
+                      : c.kind
+                        ? '#0F0F17'
+                        : c.isWeekend
+                          ? C.muted
+                          : C.text
+                    : 'transparent',
+                  background: c.kind && c.kind !== 'holiday' ? KIND_COLOR[c.kind] : 'transparent',
                   border: c.kind === 'holiday' ? `1px dashed ${KIND_COLOR.holiday}` : 'none',
                   fontWeight: c.kind ? 700 : 400,
                 }}>
