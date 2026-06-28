@@ -13,6 +13,7 @@ import { EpicsRepo } from '../../../orchestrator/db/repositories/epics.js';
 import { TasksRepo } from '../../../orchestrator/db/repositories/tasks.js';
 import { WorklogsRepo } from '../../../orchestrator/db/repositories/worklogs.js';
 import { ProjectRatesRepo } from '../../../orchestrator/db/repositories/projectRates.js';
+import { DaysOffRepo } from '../../../orchestrator/db/repositories/daysOff.js';
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
@@ -149,6 +150,55 @@ describe('pullAll', () => {
     // separate, pre-existing UTC-vs-local off-by-one-day shift on pull
     // (tracked as a follow-up), unrelated to the derived-columns fix.
     expect(pulled.minutes).toBe(120);
-    expect(pulled.work_date).toBeTruthy();
+    // Exact round-trip: PG DATE must survive the pull without UTC↔local shift.
+    expect(pulled.work_date).toBe('2026-06-01');
+  });
+
+  it('date columns round-trip exactly through push→pull (contracts effective_from, days_off date)', async () => {
+    // Regression: node-postgres parses DATE OID 1082 as a JS Date at local
+    // midnight. toISOString() then converts to UTC, shifting the date back by
+    // 1 day in Europe/Prague (UTC+1/+2). The fix registers a type parser that
+    // returns the raw 'YYYY-MM-DD' string, so toSqliteValue never sees a Date
+    // for date-kind columns.
+    if (!reachable || !store) return;
+    const db = freshSqlite();
+
+    // contracts: push a contract with a specific effective_from and end_date.
+    const project = new ProjectsRepo(db).create({ name: 'DateTest P' });
+    new ProjectRatesRepo(db).create({
+      projectId: project.id,
+      effectiveFrom: '2026-03-15',
+      rateType: 'hourly',
+      rateAmount: 200,
+      currency: 'CZK',
+      hoursPerDay: 8,
+      endDate: '2026-12-31',
+    });
+    const contractSyncId = (db.prepare(
+      `SELECT sync_id FROM contracts WHERE project_id=?`
+    ).get(project.id) as any).sync_id;
+
+    // days_off: push a day-off row.
+    const dayOff = new DaysOffRepo(db).upsert({ date: '2026-07-04', kind: 'vacation' });
+    const dayOffSyncId = (db.prepare(
+      `SELECT sync_id FROM days_off WHERE date=?`
+    ).get(dayOff.date) as any).sync_id;
+
+    await pushAll(db, store);
+
+    // Pull into a fresh SQLite and verify exact date strings.
+    const db2 = freshSqlite();
+    await pullAll(db2, store);
+
+    const contract = db2.prepare(
+      `SELECT effective_from, end_date FROM contracts WHERE sync_id=?`
+    ).get(contractSyncId) as any;
+    expect(contract.effective_from).toBe('2026-03-15');
+    expect(contract.end_date).toBe('2026-12-31');
+
+    const daysOffRow = db2.prepare(
+      `SELECT date FROM days_off WHERE sync_id=?`
+    ).get(dayOffSyncId) as any;
+    expect(daysOffRow.date).toBe('2026-07-04');
   });
 });

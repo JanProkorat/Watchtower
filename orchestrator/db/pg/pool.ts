@@ -1,5 +1,12 @@
 import pg from 'pg';
 
+// node-postgres parses Postgres DATE (OID 1082) into a JS Date at local
+// midnight, then any .toISOString() call converts to UTC — shifting the date
+// back by 1 day in timezones ahead of UTC (e.g. Europe/Prague = UTC+1/+2).
+// Override the type parser to return the raw 'YYYY-MM-DD' string so no Date
+// object is ever constructed for date columns, eliminating the TZ shift on pull.
+pg.types.setTypeParser(pg.types.builtins.DATE, (v: string) => v);
+
 /** Dev-only Postgres in the shared fitness-postgres container (isolated `watchtower` DB). */
 const DEV_PG_URL =
   'postgresql://watchtower:watchtower_dev_password@localhost:5432/watchtower';
