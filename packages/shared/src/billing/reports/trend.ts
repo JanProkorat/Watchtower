@@ -1,7 +1,8 @@
 import type { WorklogRow, ContractRow } from '../types.js';
 import { bucketKey, type Granularity } from './buckets.js';
 
-const isCzkEarned = (r: WorklogRow) => r.rateCurrency === 'CZK' && r.earnedAmount != null;
+// Post-#108 the app is CZK-only (rate_currency dropped); every earned amount is CZK.
+const isCzkEarned = (r: WorklogRow) => r.earnedAmount != null;
 const cmpStr = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 export interface TrendBucket {
@@ -32,7 +33,6 @@ export interface RateMarker {
   effectiveFrom: string;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
-  currency: string;
 }
 
 export function rateChangeMarkers(
@@ -51,6 +51,5 @@ export function rateChangeMarkers(
       effectiveFrom: c.effectiveFrom,
       rateType: c.rateType,
       rateAmount: c.rateAmount,
-      currency: c.currency,
     }));
 }

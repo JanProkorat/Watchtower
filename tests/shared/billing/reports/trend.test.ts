@@ -5,7 +5,7 @@ import type { WorklogRow, ContractRow } from '../../../../packages/shared/src/bi
 function wl(over: Partial<WorklogRow>): WorklogRow {
   return {
     syncId: 's', workDate: '2026-06-01', minutes: 60, effectiveMinutes: 60,
-    earnedAmount: 1000, rateCurrency: 'CZK', projectId: 1, projectName: 'P1',
+    earnedAmount: 1000, projectId: 1, projectName: 'P1',
     projectColor: '#fff', projectKind: 'work', isBillable: true,
     taskNumber: null, taskTitle: null, ...over,
   };
@@ -13,7 +13,7 @@ function wl(over: Partial<WorklogRow>): WorklogRow {
 function ct(over: Partial<ContractRow>): ContractRow {
   return {
     projectId: 1, effectiveFrom: '2026-01-01', endDate: null, rateType: 'hourly',
-    rateAmount: 1000, currency: 'CZK', hoursPerDay: 8, mdLimit: null, ...over,
+    rateAmount: 1000, hoursPerDay: 8, mdLimit: null, ...over,
   };
 }
 
@@ -41,8 +41,8 @@ describe('trendSeries', () => {
     ]);
   });
 
-  it('counts minutes but not earnings for non-CZK rows', () => {
-    const rows = [wl({ rateCurrency: 'EUR', earnedAmount: 200, effectiveMinutes: 60 })];
+  it('counts minutes but not earnings for rows with no earned amount', () => {
+    const rows = [wl({ earnedAmount: null, effectiveMinutes: 60 })];
     expect(trendSeries(rows, { from: '2026-06-01', to: '2026-06-30', granularity: 'month' })).toEqual([
       { bucket: '2026-06', minutes: 60, earnedCzk: 0 },
     ]);
@@ -63,7 +63,7 @@ describe('rateChangeMarkers', () => {
       ct({ projectId: 2, effectiveFrom: '2026-02-01', rateAmount: 999 }),
     ];
     expect(rateChangeMarkers(contracts, { from: '2026-01-01', to: '2026-06-30', projectId: 1 })).toEqual([
-      { effectiveFrom: '2026-03-01', rateType: 'hourly', rateAmount: 1200, currency: 'CZK' },
+      { effectiveFrom: '2026-03-01', rateType: 'hourly', rateAmount: 1200 },
     ]);
   });
 });

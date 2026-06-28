@@ -21,7 +21,8 @@ export function projectBreakdown(
       map.get(r.projectId) ??
       { projectId: r.projectId, name: r.projectName, color: r.projectColor, minutes: 0, earnedCzk: 0 };
     cur.minutes += r.effectiveMinutes;
-    if (r.rateCurrency === 'CZK' && r.earnedAmount != null) cur.earnedCzk += r.earnedAmount;
+    // Post-#108 the app is CZK-only (rate_currency dropped); every earned amount is CZK.
+    if (r.earnedAmount != null) cur.earnedCzk += r.earnedAmount;
     map.set(r.projectId, cur);
   }
   const slices = [...map.values()].filter((s) => s.minutes > 0);
