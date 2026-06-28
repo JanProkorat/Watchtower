@@ -78,8 +78,8 @@ describe('ReportsService', () => {
       });
       const rows = reports.trend('2026-01-01', '2026-12-31', 'month');
       expect(rows).toEqual([
-        { bucket: '2026-04', minutes: 60, mds: 60 / 60 / 8, earnedByCurrency: {} },
-        { bucket: '2026-05', minutes: 120, mds: 120 / 60 / 8, earnedByCurrency: {} },
+        { bucket: '2026-04', minutes: 60, mds: 60 / 60 / 8, earned: 0 },
+        { bucket: '2026-05', minutes: 120, mds: 120 / 60 / 8, earned: 0 },
       ]);
     });
 
@@ -131,7 +131,7 @@ describe('ReportsService', () => {
       // so set it explicitly here).
       db.prepare(`UPDATE projects SET is_billable = 1 WHERE id = ?`).run(project.id);
       const rows = reports.trend('2026-05-01', '2026-05-31', 'day');
-      expect(rows[0]?.earnedByCurrency).toEqual({ CZK: 1600 });
+      expect(rows[0]?.earned).toBe(1600);
     });
   });
 
@@ -156,7 +156,7 @@ describe('ReportsService', () => {
 
       const trendA = reports.trend('2026-05-01', '2026-05-31', 'day', a.id);
       expect(trendA).toEqual([
-        { bucket: '2026-05-05', minutes: 60, mds: 60 / 60 / 8, earnedByCurrency: {} },
+        { bucket: '2026-05-05', minutes: 60, mds: 60 / 60 / 8, earned: 0 },
       ]);
 
       const byProjA = reports.byProject('2026-05-01', '2026-05-31', a.id);

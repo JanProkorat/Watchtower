@@ -6,19 +6,18 @@ export interface KpiTilesProps {
   todayMinutes: number;
   sprintMinutes: number;
   monthMinutes: number;
-  todayEarned: Record<string, number>;
-  sprintEarned: Record<string, number>;
-  monthEarned: Record<string, number>;
+  todayEarned: number;
+  sprintEarned: number;
+  monthEarned: number;
 }
 
 interface TileProps {
   label: string;
   minutes: number;
-  earned: Record<string, number>;
+  earned: number;
 }
 
 function Tile({ label, minutes, earned }: TileProps) {
-  const earnedEntries = Object.entries(earned).filter(([, v]) => v > 0);
   return (
     <Paper
       variant="outlined"
@@ -58,18 +57,13 @@ function Tile({ label, minutes, earned }: TileProps) {
         </Typography>
         <Typography variant="body2" color="text.secondary">hours</Typography>
       </Stack>
-      {earnedEntries.length > 0 && (
-        <Stack spacing={0.25} sx={{ mt: 1 }}>
-          {earnedEntries.map(([currency, amount]) => (
-            <Typography
-              key={currency}
-              variant="body2"
-              sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
-            >
-              {formatEarnings(amount, currency)}
-            </Typography>
-          ))}
-        </Stack>
+      {earned > 0 && (
+        <Typography
+          variant="body2"
+          sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums', mt: 1 }}
+        >
+          {formatEarnings(earned)}
+        </Typography>
       )}
     </Paper>
   );

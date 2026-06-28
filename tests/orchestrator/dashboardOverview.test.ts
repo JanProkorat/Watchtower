@@ -64,9 +64,9 @@ describe('DashboardOverviewService', () => {
     });
 
     expect(res.today.minutes).toBe(90);
-    expect(res.today.earned).toEqual({});
-    expect(res.month.earned).toEqual({});
-    expect(res.sprint.totalEarned).toEqual({});
+    expect(res.today.earned).toBe(0);
+    expect(res.month.earned).toBe(0);
+    expect(res.sprint.totalEarned).toBe(0);
   });
 
   it('today.minutes respects projectId filter', () => {
@@ -373,7 +373,6 @@ describe('DashboardOverviewService', () => {
         projectId: a.id,
         projectName: 'Alpha',
         projectColor: '#aaa',
-        currency: 'CZK',
       });
       expect(res.activeContracts[0].contract).toMatchObject({
         projectId: a.id,

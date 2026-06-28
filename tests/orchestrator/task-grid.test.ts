@@ -224,7 +224,7 @@ describe('TaskGridService', () => {
       // workdays (May 2026 minus Labour & Liberation Day) × 100 CZK/h ×
       // 8 h = 15200 CZK.
       expect(res.earningsByCurrency).toEqual([
-        { currency: 'CZK', perDay: { 10: 100 }, totalAmount: 100, expectedAmount: 15200 },
+        { perDay: { 10: 100 }, totalAmount: 100, expectedAmount: 15200 },
       ]);
     });
 
@@ -245,7 +245,6 @@ describe('TaskGridService', () => {
       // Expected = 19 workdays × 1600 × 8 = 243200.
       expect(res.earningsByCurrency).toEqual([
         {
-          currency: 'CZK',
           perDay: { 4: 1600, 5: 2400 },
           totalAmount: 4000,
           expectedAmount: 243200,
@@ -271,7 +270,6 @@ describe('TaskGridService', () => {
       // Expected = 19 workdays × 12800 (MD) = 243200.
       expect(res.earningsByCurrency).toEqual([
         {
-          currency: 'CZK',
           perDay: { 4: 1600, 5: 2400 },
           totalAmount: 4000,
           expectedAmount: 243200,
@@ -304,7 +302,6 @@ describe('TaskGridService', () => {
       // 11 workdays at 2000 CZK/h × 8 h = 64000 + 176000 = 240000.
       expect(res.earningsByCurrency).toEqual([
         {
-          currency: 'CZK',
           perDay: { 10: 1000, 20: 2000 },
           totalAmount: 3000,
           expectedAmount: 240000,
@@ -331,7 +328,7 @@ describe('TaskGridService', () => {
         });
       }
       const res = s.service.get(2026, 5);
-      expect(res.earningsByCurrency.map((r) => r.currency)).toEqual(['CZK']);
+      expect(res.earningsByCurrency).toHaveLength(1);
     });
   });
 

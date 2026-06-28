@@ -131,7 +131,7 @@ export function ReportsTab() {
   const rateChangeMarkers = useMemo<RateChangeMarker[]>(() => {
     return state.rateChanges.map((r: RateChangeMarkerPayload) => ({
       bucket: bucketKeyFor(r.effectiveFrom, granularity),
-      label: `${r.rateAmount} ${r.currency}${r.rateType === 'hourly' ? '/hr' : '/MD'}`,
+      label: `${r.rateAmount} Kč${r.rateType === 'hourly' ? '/hr' : '/MD'}`,
       project_color: r.projectColor,
     }));
   }, [state.rateChanges, granularity]);
@@ -145,7 +145,7 @@ export function ReportsTab() {
         bucket: t.bucket,
         minutes: t.minutes,
         mds: t.mds,
-        earned_by_currency: t.earnedByCurrency,
+        earned: t.earned,
       })),
     [state.trend],
   );
@@ -168,20 +168,17 @@ export function ReportsTab() {
       unbillable_minutes: state.earnings?.unbillableMinutes ?? 0,
       billable_mds: state.earnings?.billableMds ?? 0,
       unbillable_mds: state.earnings?.unbillableMds ?? 0,
-      total_earned: state.earnings?.totalEarned ?? {},
-      avg_effective_hourly_rate: state.earnings?.avgEffectiveHourlyRate ?? {},
-      // Chart requires non-null currency + earned_amount. The server's
-      // by_project list already filters to billable projects with a rate
-      // present, but the wire type allows null for safety — coerce here.
+      total_earned: state.earnings?.totalEarned ?? 0,
+      avg_effective_hourly_rate: state.earnings?.avgEffectiveHourlyRate ?? 0,
+      // Chart requires non-null earned_amount — filter out rows where it is null.
       by_project:
         state.earnings?.byProject.flatMap((p) =>
-          p.currency != null && p.earned_amount != null
+          p.earned_amount != null
             ? [
                 {
                   project_id: p.project_id,
                   project_name: p.project_name,
                   project_color: p.project_color,
-                  currency: p.currency,
                   earned_amount: p.earned_amount,
                   minutes: p.minutes,
                   mds: p.mds,

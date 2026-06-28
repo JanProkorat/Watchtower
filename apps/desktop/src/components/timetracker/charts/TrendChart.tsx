@@ -11,13 +11,14 @@ import {
 import dayjs from 'dayjs';
 import { useChartColors } from './chartTheme';
 import ChartTooltip from './ChartTooltip';
-import { formatDateCz, formatHours, formatMd, formatMonthCz } from '../../../util/format';
+import { formatDateCz, formatEarnings, formatHours, formatMd, formatMonthCz } from '../../../util/format';
 
 export interface TrendDatum {
   bucket: string;
   minutes: number;
   mds: number;
-  earned_by_currency: Record<string, number>;
+  /** Total CZK earned in this bucket (0 when no billable contract applies). */
+  earned: number;
 }
 
 export interface RateChangeMarker {
@@ -87,8 +88,8 @@ export default function TrendChart({ data, granularity, rateChanges }: Props) {
               { label: 'Hours', value: formatHours(d.minutes, 2) },
               { label: 'MD', value: formatMd(d.mds) },
             ];
-            for (const [cur, amt] of Object.entries(d.earned_by_currency)) {
-              rows.push({ label: cur, value: amt.toFixed(2) });
+            if (d.earned > 0) {
+              rows.push({ label: 'Earned', value: formatEarnings(d.earned) });
             }
             return <ChartTooltip title={formatBucketTooltip(String(label), granularity)} rows={rows} />;
           }}

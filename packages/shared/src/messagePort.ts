@@ -89,7 +89,8 @@ export interface OrchRunningInstance {
 export interface OrchTrendDatum {
   bucket: string;
   minutes: number;
-  earnedByCurrency: Record<string, number>;
+  /** Total CZK earned in this bucket (0 when no billable contract applies). */
+  earned: number;
 }
 
 export interface OrchByProjectDatum {
@@ -97,7 +98,6 @@ export interface OrchByProjectDatum {
   projectName: string;
   projectColor: string;
   isBillable: number;
-  currency: string | null;
   minutes: number;
   earnedAmount: number | null;
 }
@@ -106,7 +106,6 @@ export interface OrchEarningsByProject {
   project_id: number;
   project_name: string;
   project_color: string;
-  currency: string | null;
   minutes: number;
   earned_amount: number | null;
 }
@@ -115,8 +114,10 @@ export interface OrchEarningsResponse {
   billableMinutes: number;
   unbillableMinutes: number;
   timeOffMinutes: number;
-  totalEarned: Record<string, number>;
-  avgEffectiveHourlyRate: Record<string, number>;
+  /** Total CZK earned across all billable projects in the range. */
+  totalEarned: number;
+  /** Average CZK/h across billable projects (0 when no billable minutes). */
+  avgEffectiveHourlyRate: number;
   byProject: OrchEarningsByProject[];
 }
 
@@ -156,7 +157,6 @@ export interface OrchRateChangeMarker {
   effectiveFrom: string;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
-  currency: string;
 }
 
 export interface OrchDayOffInput {
@@ -196,7 +196,6 @@ export interface OrchTaskGridTask {
 }
 
 export interface OrchTaskGridEarningsRow {
-  currency: string;
   perDay: Record<number, number>;
   totalAmount: number;
 }

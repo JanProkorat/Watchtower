@@ -94,7 +94,8 @@ export interface TrendDatumPayload {
   bucket: string;
   minutes: number;
   mds: number;
-  earnedByCurrency: Record<string, number>;
+  /** Total CZK earned in this bucket (0 when no billable contract applies). */
+  earned: number;
 }
 
 export interface ByProjectDatumPayload {
@@ -102,7 +103,6 @@ export interface ByProjectDatumPayload {
   projectName: string;
   projectColor: string;
   isBillable: number;
-  currency: string | null;
   minutes: number;
   mds: number;
   earnedAmount: number | null;
@@ -112,7 +112,6 @@ export interface EarningsByProjectPayload {
   project_id: number;
   project_name: string;
   project_color: string;
-  currency: string | null;
   minutes: number;
   mds: number;
   earned_amount: number | null;
@@ -124,8 +123,10 @@ export interface EarningsResponsePayload {
   timeOffMinutes: number;
   billableMds: number;
   unbillableMds: number;
-  totalEarned: Record<string, number>;
-  avgEffectiveHourlyRate: Record<string, number>;
+  /** Total CZK earned across all billable projects in the range. */
+  totalEarned: number;
+  /** Average CZK/h across billable projects (0 when no billable minutes). */
+  avgEffectiveHourlyRate: number;
   byProject: EarningsByProjectPayload[];
 }
 
@@ -186,13 +187,12 @@ export interface DashboardActiveContractPayload {
   projectId: number;
   projectName: string;
   projectColor: string;
-  currency: string | null;
   contract: ContractReportRowPayload['contract'];
 }
 
 export interface DashboardOverviewResponsePayload {
-  today: { minutes: number; earned: Record<string, number> };
-  month: { minutes: number; earned: Record<string, number> };
+  today: { minutes: number; earned: number };
+  month: { minutes: number; earned: number };
   sprint: {
     /** ISO YYYY-MM-DD of the first day of the sprint window. */
     fromDate: string;
@@ -202,8 +202,8 @@ export interface DashboardOverviewResponsePayload {
     lengthDays: number;
     /** Sum of minutes across the sprint, respecting projectId filter. */
     totalMinutes: number;
-    /** Sprint-wide earned totals keyed by currency. */
-    totalEarned: Record<string, number>;
+    /** Sprint-wide earned total in CZK. */
+    totalEarned: number;
     /** Per-day list — exactly `lengthDays` entries. */
     days: DashboardSprintDayPayload[];
   };
@@ -249,7 +249,6 @@ export interface RateChangeMarkerPayload {
   effectiveFrom: string;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
-  currency: string;
 }
 
 export interface DayOffInputPayload {
@@ -291,7 +290,6 @@ export interface TaskGridTaskPayload {
 }
 
 export interface TaskGridEarningsRowPayload {
-  currency: string;
   perDay: Record<number, number>;
   totalAmount: number;
   /** workdays × MD rate target — what the user would earn working every workday. */
