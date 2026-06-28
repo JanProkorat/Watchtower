@@ -60,7 +60,11 @@ export function buildTaskGrid(
 
     dailyTotals[dayIdx]! += r.minutes;
     monthTotalMinutes += r.minutes;
-    if (r.earnedAmount != null) {
+    // Earnings gate on isBillable (not just earnedAmount != null): earnedAmount is
+    // resolved from any matching contract regardless of billability, so a non-billable
+    // project with a rate would otherwise inflate the grid totals past the Earnings/Reports
+    // tabs (earnings-summary.ts uses the same isBillable gate) and the desktop grid.
+    if (r.isBillable && r.earnedAmount != null) {
       dailyEarnings[dayIdx]! += r.earnedAmount;
       monthTotalCzk += r.earnedAmount;
     }

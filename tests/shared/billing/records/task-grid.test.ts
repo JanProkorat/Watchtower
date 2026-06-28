@@ -42,4 +42,18 @@ describe('buildTaskGrid', () => {
     expect(g.tasks[0].perDay[4]).toBe(20); // June 5
     expect(g.monthTotalMinutes).toBe(20);
   });
+
+  it('excludes non-billable earnings from totals but still counts the minutes', () => {
+    const rows = [
+      wl({ taskNumber: 'X-1', workDate: '2026-06-01', minutes: 60, earnedAmount: 1000, isBillable: true }),
+      // non-billable project with a resolved earnedAmount must NOT add to earnings
+      wl({ projectId: 2, taskNumber: 'Y-1', workDate: '2026-06-01', minutes: 30, earnedAmount: 500, isBillable: false }),
+    ];
+    const g = buildTaskGrid(rows, { month: '2026-06' });
+    expect(g.tasks).toHaveLength(2);          // both tasks present (minutes shown)
+    expect(g.dailyTotals[0]).toBe(90);        // 60 + 30 minutes
+    expect(g.monthTotalMinutes).toBe(90);
+    expect(g.dailyEarnings[0]).toBe(1000);    // only the billable 1000, not 1500
+    expect(g.monthTotalCzk).toBe(1000);
+  });
 });
