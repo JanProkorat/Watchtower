@@ -3,11 +3,13 @@ import { getSupabase } from '../lib/supabaseClient.js';
 import type { ContractRow, DayOffRow, ProjectRow } from '@watchtower/shared/billing/types.js';
 import {
   mapWorklogRow,
+  mapDayOffRow,
   loadCache,
   saveCache,
   type BillingDataset,
   type BillingStore,
   type RawWorklogRow,
+  type RawDayOffRow,
 } from './billingCache.js';
 import { fetchAllPaged, type PageResult } from './paginate.js';
 
@@ -22,6 +24,7 @@ export interface BillingHookResult {
   state: BillingState;
   lastUpdated: string | null;
   refresh(): void;
+  patchDaysOff(next: DayOffRow[]): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,7 +41,8 @@ export type BillingAction =
   | { type: 'CACHE_HIT'; dataset: BillingDataset }
   | { type: 'CACHE_MISS' }
   | { type: 'FETCH_SUCCESS'; dataset: BillingDataset }
-  | { type: 'FETCH_ERROR' };
+  | { type: 'FETCH_ERROR' }
+  | { type: 'PATCH_DAYS_OFF'; daysOff: DayOffRow[] };
 
 export function billingReducer(
   prev: BillingReducerState,
@@ -66,6 +70,8 @@ export function billingReducer(
         return { ...prev, state: 'cached' };
       }
       return { data: null, state: 'offline', lastUpdated: null };
+    case 'PATCH_DAYS_OFF':
+      return prev.data ? { ...prev, data: { ...prev.data, daysOff: action.daysOff } } : prev;
     default:
       return prev;
   }
@@ -101,7 +107,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
         'project_id,effective_from,end_date,rate_type,rate_amount,hours_per_day,md_limit',
       )
       .is('deleted_at', null),
-    supabase.from('days_off').select('date,kind').is('deleted_at', null),
+    supabase.from('days_off').select('date,kind,sync_id').is('deleted_at', null),
     supabase
       .from('projects')
       .select('id,name,color,kind,is_billable')
@@ -127,10 +133,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
     }),
   );
 
-  const daysOff: DayOffRow[] = (daysOffResult.data ?? []).map(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (r: any): DayOffRow => ({ date: r.date, kind: r.kind }),
-  );
+  const daysOff: DayOffRow[] = (daysOffResult.data ?? []).map((r) => mapDayOffRow(r as RawDayOffRow));
 
   const projects: ProjectRow[] = (projectsResult.data ?? []).map(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -214,6 +217,8 @@ export function useBilling(storeOverride?: BillingStore): BillingHookResult {
     })();
   }, [storeOverride, runFetch]);
 
+  const patchDaysOff = useCallback((next: DayOffRow[]) => dispatch({ type: 'PATCH_DAYS_OFF', daysOff: next }), [dispatch]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -245,5 +250,6 @@ export function useBilling(storeOverride?: BillingStore): BillingHookResult {
     state: bState.state,
     lastUpdated: bState.lastUpdated,
     refresh,
+    patchDaysOff,
   };
 }
