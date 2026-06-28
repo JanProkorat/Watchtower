@@ -123,7 +123,21 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
     }
   }
 
-  const sync = new SyncService({ db: dbHandle.raw, store: pg });
+  // Surface cycle outcomes: failures were previously swallowed (no onCycle), so
+  // a broken sync looked identical to an idle one (cursor just never advanced).
+  // Success is debug-gated to keep the steady state quiet.
+  const syncDebug = process.env.WATCHTOWER_SYNC_DEBUG === '1';
+  const sync = new SyncService({
+    db: dbHandle.raw,
+    store: pg,
+    onCycle: (r) => {
+      if (!r.ok) {
+        console.error('[sync] cycle failed:', r.error);
+      } else if (syncDebug && (r.push || r.pull)) {
+        console.debug('[sync] cycle ok:', { push: r.push, pull: r.pull });
+      }
+    },
+  });
   sync.start();
 
   // One-shot import of legacy TimeTracker data. Idempotent — the function
