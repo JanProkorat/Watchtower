@@ -4,8 +4,10 @@ export interface WorklogRow {
   syncId: string;
   workDate: string;          // YYYY-MM-DD
   minutes: number;           // raw tracked minutes
+  reportedMinutes: number | null; // billable-rounded override (null = use minutes)
   effectiveMinutes: number;  // derived: reported ?? minutes
   earnedAmount: number | null;
+  description: string | null;
   projectId: number;
   projectName: string;
   projectColor: string | null;
@@ -14,6 +16,17 @@ export interface WorklogRow {
   taskNumber: string | null;
   taskTitle: string | null;
   source: string | null;     // 'manual' | 'watchtower-auto' | 'jira-sync' | null
+}
+
+export interface TaskRow {
+  taskId: number;
+  taskNumber: string | null;
+  taskTitle: string;
+  projectId: number;
+  projectName: string;
+  projectColor: string | null;
+  projectKind: string;
+  isBillable: boolean;
 }
 
 export interface ContractRow {

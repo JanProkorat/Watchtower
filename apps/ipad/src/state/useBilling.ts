@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSupabase } from '../lib/supabaseClient.js';
-import type { ContractRow, DayOffRow, ProjectRow } from '@watchtower/shared/billing/types.js';
+import type { ContractRow, DayOffRow, ProjectRow, TaskRow } from '@watchtower/shared/billing/types.js';
 import {
   mapWorklogRow,
   mapDayOffRow,
+  mapTaskRow,
   loadCache,
   saveCache,
   type BillingDataset,
   type BillingStore,
   type RawWorklogRow,
   type RawDayOffRow,
+  type RawTaskRow,
 } from './billingCache.js';
 import { fetchAllPaged, type PageResult } from './paginate.js';
 
@@ -91,7 +93,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
       supabase
         .from('worklogs')
         .select(
-          'sync_id,work_date,minutes,effective_minutes,earned_amount,source,' +
+          'sync_id,work_date,minutes,effective_minutes,earned_amount,reported_minutes,description,source,' +
             'tasks(number,title,epics(projects(id,name,color,kind,is_billable)))',
         )
         .is('deleted_at', null)
@@ -99,19 +101,22 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
         .range(from, to) as unknown as PromiseLike<PageResult<RawWorklogRow>>,
   );
 
-  const [worklogsRaw, contractsResult, daysOffResult, projectsResult] = await Promise.all([
+  const tasksPromise = fetchAllPaged<RawTaskRow>(
+    (from, to) =>
+      supabase
+        .from('tasks')
+        .select('id,number,title,epics(projects(id,name,color,kind,is_billable))')
+        .is('deleted_at', null)
+        .order('id', { ascending: true })
+        .range(from, to) as unknown as PromiseLike<PageResult<RawTaskRow>>,
+  );
+
+  const [worklogsRaw, contractsResult, daysOffResult, projectsResult, tasksRaw] = await Promise.all([
     worklogsPromise,
-    supabase
-      .from('contracts')
-      .select(
-        'project_id,effective_from,end_date,rate_type,rate_amount,hours_per_day,md_limit',
-      )
-      .is('deleted_at', null),
+    /* contracts */ supabase.from('contracts').select('project_id,effective_from,end_date,rate_type,rate_amount,hours_per_day,md_limit').is('deleted_at', null),
     supabase.from('days_off').select('date,kind,sync_id').is('deleted_at', null),
-    supabase
-      .from('projects')
-      .select('id,name,color,kind,is_billable')
-      .is('deleted_at', null),
+    supabase.from('projects').select('id,name,color,kind,is_billable').is('deleted_at', null),
+    tasksPromise,
   ]);
 
   if (contractsResult.error) throw contractsResult.error;
@@ -140,11 +145,14 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
     (r: any): ProjectRow => ({ id: r.id, name: r.name, color: r.color ?? null }),
   );
 
+  const tasks: TaskRow[] = tasksRaw.map((r) => mapTaskRow(r));
+
   return {
     worklogs,
     contracts,
     daysOff,
     projects,
+    tasks,
     fetchedAt: new Date().toISOString(),
   };
 }

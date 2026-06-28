@@ -15,6 +15,7 @@ const EMPTY_DATASET: BillingDataset = {
   contracts: [],
   daysOff: [],
   projects: [],
+  tasks: [],
   fetchedAt: '2026-06-26T10:00:00.000Z',
 };
 

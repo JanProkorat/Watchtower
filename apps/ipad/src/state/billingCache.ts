@@ -1,4 +1,4 @@
-import type { WorklogRow, ContractRow, DayOffRow, ProjectRow } from '@watchtower/shared/billing/types.js';
+import type { WorklogRow, ContractRow, DayOffRow, ProjectRow, TaskRow } from '@watchtower/shared/billing/types.js';
 
 // ---------------------------------------------------------------------------
 // Dataset type
@@ -9,6 +9,7 @@ export interface BillingDataset {
   contracts: ContractRow[];
   daysOff: DayOffRow[];
   projects: ProjectRow[];
+  tasks: TaskRow[];
   fetchedAt: string; // ISO timestamp
 }
 
@@ -47,6 +48,8 @@ export type RawWorklogRow = {
   minutes: number;
   effective_minutes: number;
   earned_amount: number | null;
+  reported_minutes: number | null;
+  description: string | null;
   source: string | null;
   tasks: RawTask;
 };
@@ -59,8 +62,10 @@ export function mapWorklogRow(raw: RawWorklogRow): WorklogRow {
     syncId: raw.sync_id,
     workDate: raw.work_date,
     minutes: raw.minutes,
+    reportedMinutes: raw.reported_minutes ?? null,
     effectiveMinutes: raw.effective_minutes,
     earnedAmount: raw.earned_amount,
+    description: raw.description ?? null,
     projectId: proj?.id ?? 0,
     projectName: proj?.name ?? '',
     projectColor: proj?.color ?? null,
@@ -69,6 +74,31 @@ export function mapWorklogRow(raw: RawWorklogRow): WorklogRow {
     taskNumber: task?.number ?? null,
     taskTitle: task?.title ?? null,
     source: raw.source ?? null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Pure mapper — PostgREST embedded shape → TaskRow
+// ---------------------------------------------------------------------------
+
+export type RawTaskRow = {
+  id: number;
+  number: string | null;
+  title: string | null;
+  epics: { projects: RawProject | null } | null;
+};
+
+export function mapTaskRow(raw: RawTaskRow): TaskRow {
+  const proj = raw.epics?.projects ?? null;
+  return {
+    taskId: raw.id,
+    taskNumber: raw.number ?? null,
+    taskTitle: raw.title ?? '',
+    projectId: proj?.id ?? 0,
+    projectName: proj?.name ?? '',
+    projectColor: proj?.color ?? null,
+    projectKind: proj?.kind ?? '',
+    isBillable: proj?.is_billable ?? false,
   };
 }
 
@@ -99,6 +129,7 @@ export async function loadCache(store: BillingStore): Promise<BillingDataset | n
       Array.isArray(v?.contracts) &&
       Array.isArray(v?.daysOff) &&
       Array.isArray(v?.projects) &&
+      Array.isArray(v?.tasks) &&
       typeof v?.fetchedAt === 'string'
     ) {
       return v;

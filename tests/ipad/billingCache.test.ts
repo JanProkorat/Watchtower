@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   mapWorklogRow,
   mapDayOffRow,
+  mapTaskRow,
   loadCache,
   saveCache,
   type BillingDataset,
   type RawWorklogRow,
 } from '../../apps/ipad/src/state/billingCache.js';
+import type { RawTaskRow } from '../../apps/ipad/src/state/billingCache.js';
 import type { ContractRow, DayOffRow, ProjectRow, WorklogRow } from '@watchtower/shared/billing/types.js';
 
 // ---------------------------------------------------------------------------
@@ -144,6 +146,7 @@ describe('billing cache persistence', () => {
     contracts: [],
     daysOff: [],
     projects: [],
+    tasks: [],
     fetchedAt: '2026-06-26T12:00:00.000Z',
   };
 
@@ -176,8 +179,10 @@ describe('billing cache persistence', () => {
       syncId: 'x1',
       workDate: '2026-06-10',
       minutes: 120,
+      reportedMinutes: null,
       effectiveMinutes: 100,
       earnedAmount: 1000,
+      description: null,
       projectId: 3,
       projectName: 'Test',
       projectColor: null,
@@ -185,6 +190,7 @@ describe('billing cache persistence', () => {
       isBillable: true,
       taskNumber: null,
       taskTitle: null,
+      source: null,
     };
     const contract: ContractRow = {
       projectId: 3,
@@ -202,9 +208,53 @@ describe('billing cache persistence', () => {
       contracts: [contract],
       daysOff: [dayOff],
       projects: [project],
+      tasks: [],
       fetchedAt: '2026-06-26T14:00:00.000Z',
     };
     await saveCache(store, full);
     expect(await loadCache(store)).toEqual(full);
+  });
+});
+
+describe('mapWorklogRow — slice 2 fields', () => {
+  it('maps reported_minutes and description', () => {
+    const row = mapWorklogRow({
+      sync_id: 'w1', work_date: '2026-06-01', minutes: 120, effective_minutes: 90,
+      earned_amount: 150, reported_minutes: 90, description: 'fix bug', source: 'manual',
+      tasks: { number: 'X-1', title: 'T', epics: { projects: { id: 3, name: 'P', color: '#fff', kind: 'work', is_billable: true } } },
+    });
+    expect(row.reportedMinutes).toBe(90);
+    expect(row.description).toBe('fix bug');
+  });
+  it('defaults reported_minutes/description to null', () => {
+    const row = mapWorklogRow({
+      sync_id: 'w2', work_date: '2026-06-01', minutes: 60, effective_minutes: 60,
+      earned_amount: null, reported_minutes: null, description: null, source: null, tasks: null,
+    });
+    expect(row.reportedMinutes).toBeNull();
+    expect(row.description).toBeNull();
+  });
+});
+
+describe('mapTaskRow', () => {
+  it('flattens task → epic → project', () => {
+    const raw: RawTaskRow = {
+      id: 7, number: 'X-9', title: 'Task nine',
+      epics: { projects: { id: 3, name: 'Proj', color: '#abc', kind: 'work', is_billable: true } },
+    };
+    expect(mapTaskRow(raw)).toEqual({
+      taskId: 7, taskNumber: 'X-9', taskTitle: 'Task nine',
+      projectId: 3, projectName: 'Proj', projectColor: '#abc', projectKind: 'work', isBillable: true,
+    });
+  });
+});
+
+describe('loadCache — slice 2 shape guard', () => {
+  it('rejects a cache without a tasks array (forces refetch)', async () => {
+    const store = new Map<string, string>();
+    const legacy = { worklogs: [], contracts: [], daysOff: [], projects: [], fetchedAt: '2026-06-01T00:00:00Z' };
+    store.set('watchtower.ipad.billing.cache', JSON.stringify(legacy));
+    const adapter = { get: async (k: string) => store.get(k) ?? null, set: async () => {} };
+    expect(await loadCache(adapter)).toBeNull();
   });
 });
