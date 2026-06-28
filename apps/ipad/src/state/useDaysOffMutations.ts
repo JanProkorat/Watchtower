@@ -16,13 +16,29 @@ export function useDaysOffMutations({ daysOff, patchDaysOff }: Args) {
     async (date: string, kind: string) => {
       const prev = daysOff;
       const existing = prev.find((d) => d.date === date);
-      const syncId = existing?.syncId ?? crypto.randomUUID();
-      const now = new Date().toISOString();
-      const row: DayOffRow = { date, kind, syncId };
       setError(null);
       setPending(date);
-      patchDaysOff(applyDayOffWrite(prev, { type: 'set', row })); // optimistic
       try {
+        // Resolve sync_id. Reuse the cached row's id for a visible date. Otherwise the
+        // cache (non-deleted rows only) can't see a soft-deleted row for this date — so
+        // look it up INCLUDING tombstones and preserve that id. Minting a fresh id for a
+        // re-marked date would overwrite the row's sync_id on the date-PK upsert, and
+        // since the Mac sync keys on sync_id, that wedges convergence on both push/pull.
+        // Mint only when no row exists for the date at all.
+        let syncId = existing?.syncId;
+        if (!syncId) {
+          const { data: found, error: lookupErr } = await getSupabase()
+            .from('days_off')
+            .select('sync_id')
+            .eq('date', date)
+            .limit(1)
+            .maybeSingle();
+          if (lookupErr) throw lookupErr;
+          syncId = found?.sync_id ?? crypto.randomUUID();
+        }
+        const now = new Date().toISOString();
+        const row: DayOffRow = { date, kind, syncId };
+        patchDaysOff(applyDayOffWrite(prev, { type: 'set', row })); // optimistic (sync_id resolved)
         const { error: e } = await getSupabase()
           .from('days_off')
           .upsert(buildDayOffUpsert(date, kind, { syncId, now }), { onConflict: 'date' });
