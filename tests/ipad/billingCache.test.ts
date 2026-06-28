@@ -1,0 +1,202 @@
+import { describe, it, expect } from 'vitest';
+import {
+  mapWorklogRow,
+  loadCache,
+  saveCache,
+  type BillingDataset,
+  type RawWorklogRow,
+} from '../../apps/ipad/src/state/billingCache.js';
+import type { ContractRow, DayOffRow, ProjectRow, WorklogRow } from '@watchtower/shared/billing/types.js';
+
+// ---------------------------------------------------------------------------
+// In-memory store (same pattern as vncCreds.test.ts)
+// ---------------------------------------------------------------------------
+
+function memStore() {
+  const mem = new Map<string, string>();
+  return {
+    get: async (k: string) => mem.get(k) ?? null,
+    set: async (k: string, v: string) => { mem.set(k, v); },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// mapWorklogRow — full task + project
+// ---------------------------------------------------------------------------
+
+describe('mapWorklogRow', () => {
+  const fullRaw: RawWorklogRow = {
+    sync_id: 'abc-123',
+    work_date: '2026-06-01',
+    minutes: 480,
+    effective_minutes: 450,
+    earned_amount: 5000,
+    tasks: {
+      number: 'WT-42',
+      title: 'Fix billing bug',
+      epics: {
+        projects: {
+          id: 7,
+          name: 'Watchtower',
+          color: '#7c3aed',
+          kind: 'work',
+          is_billable: true,
+        },
+      },
+    },
+  };
+
+  it('maps all fields from an embedded PostgREST row', () => {
+    const row: WorklogRow = mapWorklogRow(fullRaw);
+    expect(row.syncId).toBe('abc-123');
+    expect(row.workDate).toBe('2026-06-01');
+    expect(row.minutes).toBe(480);
+    expect(row.effectiveMinutes).toBe(450);
+    expect(row.earnedAmount).toBe(5000);
+    expect(row.projectId).toBe(7);
+    expect(row.projectName).toBe('Watchtower');
+    expect(row.projectColor).toBe('#7c3aed');
+    expect(row.projectKind).toBe('work');
+    expect(row.isBillable).toBe(true);
+    expect(row.taskNumber).toBe('WT-42');
+    expect(row.taskTitle).toBe('Fix billing bug');
+  });
+
+  it('handles null tasks — project fields default to empty/0/false, task fields to null', () => {
+    const rawNoTask: RawWorklogRow = { ...fullRaw, tasks: null };
+    const row = mapWorklogRow(rawNoTask);
+    expect(row.projectId).toBe(0);
+    expect(row.projectName).toBe('');
+    expect(row.projectColor).toBeNull();
+    expect(row.projectKind).toBe('');
+    expect(row.isBillable).toBe(false);
+    expect(row.taskNumber).toBeNull();
+    expect(row.taskTitle).toBeNull();
+  });
+
+  it('handles tasks with null epics', () => {
+    const rawNullEpics: RawWorklogRow = {
+      ...fullRaw,
+      tasks: { number: 'WT-1', title: 'Orphan task', epics: null },
+    };
+    const row = mapWorklogRow(rawNullEpics);
+    expect(row.projectId).toBe(0);
+    expect(row.projectName).toBe('');
+    expect(row.taskNumber).toBe('WT-1');
+    expect(row.taskTitle).toBe('Orphan task');
+  });
+
+  it('handles tasks with null project inside epics', () => {
+    const rawNullProject: RawWorklogRow = {
+      ...fullRaw,
+      tasks: { number: 'WT-2', title: 'No proj task', epics: { projects: null } },
+    };
+    const row = mapWorklogRow(rawNullProject);
+    expect(row.projectId).toBe(0);
+    expect(row.isBillable).toBe(false);
+    expect(row.taskNumber).toBe('WT-2');
+  });
+
+  it('passes through earnedAmount', () => {
+    const rawEur: RawWorklogRow = { ...fullRaw, earned_amount: 200 };
+    const row = mapWorklogRow(rawEur);
+    expect(row.earnedAmount).toBe(200);
+  });
+
+  it('passes through null earnedAmount', () => {
+    const rawNull: RawWorklogRow = { ...fullRaw, earned_amount: null };
+    const row = mapWorklogRow(rawNull);
+    expect(row.earnedAmount).toBeNull();
+  });
+});
+
+describe('mapWorklogRow source', () => {
+  const base = {
+    sync_id: 's1', work_date: '2026-06-01', minutes: 60, effective_minutes: 60,
+    earned_amount: 1000,
+    tasks: { number: 'X-1', title: 'T', epics: { projects: { id: 1, name: 'P', color: '#fff', kind: 'work', is_billable: true } } },
+  };
+
+  it('maps the source field', () => {
+    expect(mapWorklogRow({ ...base, source: 'jira-sync' } as never).source).toBe('jira-sync');
+  });
+
+  it('defaults a missing source to null', () => {
+    expect(mapWorklogRow(base as never).source).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// loadCache / saveCache round-trip
+// ---------------------------------------------------------------------------
+
+describe('billing cache persistence', () => {
+  const sampleDataset: BillingDataset = {
+    worklogs: [],
+    contracts: [],
+    daysOff: [],
+    projects: [],
+    fetchedAt: '2026-06-26T12:00:00.000Z',
+  };
+
+  it('round-trips a BillingDataset through the store', async () => {
+    const store = memStore();
+    await saveCache(store, sampleDataset);
+    const loaded = await loadCache(store);
+    expect(loaded).toEqual(sampleDataset);
+  });
+
+  it('returns null when nothing is stored', async () => {
+    const store = { get: async () => null, set: async () => {} };
+    expect(await loadCache(store)).toBeNull();
+  });
+
+  it('returns null on malformed JSON', async () => {
+    const store = { get: async () => 'not json', set: async () => {} };
+    expect(await loadCache(store)).toBeNull();
+  });
+
+  it('returns null when required arrays are missing', async () => {
+    const bad = JSON.stringify({ worklogs: [], contracts: [] }); // missing daysOff, projects, fetchedAt
+    const store = { get: async () => bad, set: async () => {} };
+    expect(await loadCache(store)).toBeNull();
+  });
+
+  it('round-trips a dataset with populated worklogs and projects', async () => {
+    const store = memStore();
+    const worklog: WorklogRow = {
+      syncId: 'x1',
+      workDate: '2026-06-10',
+      minutes: 120,
+      effectiveMinutes: 100,
+      earnedAmount: 1000,
+      projectId: 3,
+      projectName: 'Test',
+      projectColor: null,
+      projectKind: 'work',
+      isBillable: true,
+      taskNumber: null,
+      taskTitle: null,
+    };
+    const contract: ContractRow = {
+      projectId: 3,
+      effectiveFrom: '2026-01-01',
+      endDate: null,
+      rateType: 'hourly',
+      rateAmount: 1000,
+      hoursPerDay: 8,
+      mdLimit: null,
+    };
+    const dayOff: DayOffRow = { date: '2026-06-09', kind: 'vacation' };
+    const project: ProjectRow = { id: 3, name: 'Test', color: null };
+    const full: BillingDataset = {
+      worklogs: [worklog],
+      contracts: [contract],
+      daysOff: [dayOff],
+      projects: [project],
+      fetchedAt: '2026-06-26T14:00:00.000Z',
+    };
+    await saveCache(store, full);
+    expect(await loadCache(store)).toEqual(full);
+  });
+});

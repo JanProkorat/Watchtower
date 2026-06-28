@@ -17,7 +17,8 @@ export interface TrendRow {
   minutes: number;
   /** Man-days for the bucket, using each worklog's contract hours_per_day. */
   mds: number;
-  earnedByCurrency: Record<string, number>;
+  /** Total CZK earned in this bucket (0 when no billable contract applies). */
+  earned: number;
 }
 
 export interface ByProjectRow {
@@ -25,7 +26,6 @@ export interface ByProjectRow {
   projectName: string;
   projectColor: string;
   isBillable: number;
-  currency: string | null;
   minutes: number;
   /** Man-days for the project, using its contract hours_per_day. */
   mds: number;
@@ -36,7 +36,6 @@ export interface EarningsByProjectRow {
   project_id: number;
   project_name: string;
   project_color: string;
-  currency: string | null;
   minutes: number;
   mds: number;
   earned_amount: number | null;
@@ -50,8 +49,10 @@ export interface EarningsResponse {
   billableMds: number;
   /** Unbillable minutes expressed as man-days (per-project hours_per_day). */
   unbillableMds: number;
-  totalEarned: Record<string, number>;
-  avgEffectiveHourlyRate: Record<string, number>;
+  /** Total CZK earned across all billable projects in the range. */
+  totalEarned: number;
+  /** Average CZK/h across billable projects (0 when no billable minutes). */
+  avgEffectiveHourlyRate: number;
   byProject: EarningsByProjectRow[];
 }
 
@@ -77,7 +78,6 @@ export interface RateChangeRow {
   effectiveFrom: string;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
-  currency: string;
 }
 
 const BUCKET_EXPR: Record<Granularity, string> = {
@@ -129,7 +129,6 @@ export class ReportsService {
     const earningsParams: unknown[] = [from, to];
     let earningsSql = `WITH ${PROJECT_RATE_PERIODS_CTE}
                        SELECT ${bucketExpr} AS bucket,
-                              rp.currency   AS currency,
                               ${SUM_EARNED} AS earned
                          FROM worklogs w
                          JOIN tasks t    ON t.id = w.task_id
@@ -145,27 +144,24 @@ export class ReportsService {
       earningsParams.push(projectId);
     }
     earningsSql += `
-                        GROUP BY bucket, rp.currency
+                        GROUP BY bucket
                         ORDER BY bucket ASC`;
 
     const earnings = this.db.prepare(earningsSql).all(...earningsParams) as Array<{
       bucket: string;
-      currency: string;
       earned: number;
     }>;
 
-    const earnedByBucket = new Map<string, Record<string, number>>();
+    const earnedByBucket = new Map<string, number>();
     for (const row of earnings) {
-      const bucket = earnedByBucket.get(row.bucket) ?? {};
-      bucket[row.currency] = row.earned;
-      earnedByBucket.set(row.bucket, bucket);
+      earnedByBucket.set(row.bucket, row.earned);
     }
 
     return totals.map((r) => ({
       bucket: r.bucket,
       minutes: r.minutes,
       mds: r.mds ?? 0,
-      earnedByCurrency: earnedByBucket.get(r.bucket) ?? {},
+      earned: earnedByBucket.get(r.bucket) ?? 0,
     }));
   }
 
@@ -183,12 +179,6 @@ export class ReportsService {
                 p.name          AS project_name,
                 p.color         AS project_color,
                 p.is_billable   AS is_billable,
-                (SELECT pr.currency
-                   FROM contracts pr
-                  WHERE pr.project_id = p.id
-                    AND pr.deleted_at IS NULL
-                  ORDER BY pr.effective_from DESC
-                  LIMIT 1)      AS currency,
                 COALESCE(SUM(${EFFECTIVE_MINUTES}), 0) AS minutes,
                 COALESCE(${SUM_MDS}, 0) AS mds,
                 CASE
@@ -212,7 +202,6 @@ export class ReportsService {
         project_name: string;
         project_color: string;
         is_billable: number;
-        currency: string | null;
         minutes: number;
         mds: number;
         earned_amount: number | null;
@@ -223,7 +212,6 @@ export class ReportsService {
       projectName: r.project_name,
       projectColor: r.project_color,
       isBillable: r.is_billable,
-      currency: r.currency,
       minutes: r.minutes,
       mds: r.mds,
       earnedAmount: r.earned_amount,
@@ -262,11 +250,10 @@ export class ReportsService {
 
     const earnedParams: unknown[] = [from, to];
     if (projectId !== undefined) earnedParams.push(projectId);
-    const earnedByCurrency = this.db
+    const earnedRow = this.db
       .prepare(
         `WITH ${PROJECT_RATE_PERIODS_CTE}
-         SELECT rp.currency AS currency,
-                ${SUM_EARNED} AS earned,
+         SELECT ${SUM_EARNED} AS earned,
                 SUM(${EFFECTIVE_MINUTES}) AS billable_minutes
            FROM worklogs w
            JOIN tasks t    ON t.id = w.task_id
@@ -276,10 +263,9 @@ export class ReportsService {
           WHERE w.work_date BETWEEN ? AND ?
             AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL
             AND p.is_billable = 1
-            AND rp.rate_amount IS NOT NULL${projectFilter}
-          GROUP BY rp.currency`,
+            AND rp.rate_amount IS NOT NULL${projectFilter}`,
       )
-      .all(...earnedParams) as Array<{ currency: string; earned: number; billable_minutes: number }>;
+      .get(...earnedParams) as { earned: number | null; billable_minutes: number | null };
 
     const byProjParams: unknown[] = [from, to];
     if (projectId !== undefined) byProjParams.push(projectId);
@@ -289,7 +275,6 @@ export class ReportsService {
          SELECT p.id           AS project_id,
                 p.name         AS project_name,
                 p.color        AS project_color,
-                MAX(rp.currency) AS currency,
                 SUM(${EFFECTIVE_MINUTES}) AS minutes,
                 ${SUM_MDS} AS mds,
                 ${SUM_EARNED} AS earned_amount
@@ -307,14 +292,9 @@ export class ReportsService {
       )
       .all(...byProjParams) as EarningsByProjectRow[];
 
-    const total_earned: Record<string, number> = {};
-    const avg_effective_hourly_rate: Record<string, number> = {};
-    for (const row of earnedByCurrency) {
-      total_earned[row.currency] = row.earned;
-      if (row.billable_minutes > 0) {
-        avg_effective_hourly_rate[row.currency] = row.earned / (row.billable_minutes / 60);
-      }
-    }
+    const totalEarned = earnedRow.earned ?? 0;
+    const billableMins = earnedRow.billable_minutes ?? 0;
+    const avgEffectiveHourlyRate = billableMins > 0 ? totalEarned / (billableMins / 60) : 0;
 
     return {
       billableMinutes: totals.billable_minutes ?? 0,
@@ -322,8 +302,8 @@ export class ReportsService {
       timeOffMinutes: totals.time_off_minutes ?? 0,
       billableMds: totals.billable_mds ?? 0,
       unbillableMds: totals.unbillable_mds ?? 0,
-      totalEarned: total_earned,
-      avgEffectiveHourlyRate: avg_effective_hourly_rate,
+      totalEarned,
+      avgEffectiveHourlyRate,
       byProject,
     };
   }
@@ -419,7 +399,6 @@ export class ReportsService {
                     pr.effective_from,
                     pr.rate_type,
                     pr.rate_amount,
-                    pr.currency,
                     ROW_NUMBER() OVER (
                       PARTITION BY pr.project_id ORDER BY pr.effective_from
                     ) AS rn
@@ -431,8 +410,7 @@ export class ReportsService {
                   p.color       AS project_color,
                   o.effective_from,
                   o.rate_type,
-                  o.rate_amount,
-                  o.currency
+                  o.rate_amount
              FROM ordered o
              JOIN projects p ON p.id = o.project_id
             WHERE o.rn > 1
@@ -447,7 +425,6 @@ export class ReportsService {
           effective_from: string;
           rate_type: 'hourly' | 'daily';
           rate_amount: number;
-          currency: string;
         }>
     ).map((r) => ({
       projectId: r.project_id,
@@ -456,7 +433,6 @@ export class ReportsService {
       effectiveFrom: r.effective_from,
       rateType: r.rate_type,
       rateAmount: r.rate_amount,
-      currency: r.currency,
     }));
   }
 }

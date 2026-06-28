@@ -17,13 +17,14 @@ export interface EarningsData {
   unbillable_minutes: number;
   billable_mds: number;
   unbillable_mds: number;
-  total_earned: Record<string, number>;
-  avg_effective_hourly_rate: Record<string, number>;
+  /** Total CZK earned across all billable projects in the range. */
+  total_earned: number;
+  /** Average CZK/h across billable projects (0 when no billable minutes). */
+  avg_effective_hourly_rate: number;
   by_project: {
     project_id: number;
     project_name: string;
     project_color: string;
-    currency: string;
     earned_amount: number;
     minutes: number;
     mds: number;
@@ -66,8 +67,6 @@ interface Props {
 
 export default function EarningsSummary({ data }: Props) {
   const c = useChartColors();
-  const currencies = Object.keys(data.total_earned);
-  const primaryCurrency = currencies[0];
   const totalBillable = data.billable_minutes;
   const totalUnbillable = data.unbillable_minutes;
   const totalAll = totalBillable + totalUnbillable;
@@ -79,19 +78,7 @@ export default function EarningsSummary({ data }: Props) {
         <Grid item xs={6} sm={3}>
           <MetricTile
             label="Total earned"
-            value={
-              primaryCurrency
-                ? formatEarnings(data.total_earned[primaryCurrency]!, primaryCurrency)
-                : '—'
-            }
-            helper={
-              currencies.length > 1
-                ? currencies
-                    .slice(1)
-                    .map((cur) => formatEarnings(data.total_earned[cur]!, cur))
-                    .join(', ')
-                : undefined
-            }
+            value={formatEarnings(data.total_earned)}
           />
         </Grid>
         <Grid item xs={6} sm={3}>
@@ -116,8 +103,8 @@ export default function EarningsSummary({ data }: Props) {
           <MetricTile
             label="Avg rate"
             value={
-              primaryCurrency && data.avg_effective_hourly_rate[primaryCurrency] != null
-                ? `${data.avg_effective_hourly_rate[primaryCurrency]!.toFixed(2)} ${primaryCurrency}/h`
+              data.avg_effective_hourly_rate > 0
+                ? `${data.avg_effective_hourly_rate.toFixed(2)} Kč/h`
                 : '—'
             }
           />
@@ -157,7 +144,7 @@ export default function EarningsSummary({ data }: Props) {
                       rows={[
                         {
                           label: 'Earned',
-                          value: formatEarnings(d.earned_amount, d.currency),
+                          value: formatEarnings(d.earned_amount),
                           color: d.project_color,
                         },
                         { label: 'Hours', value: formatHours(d.minutes, 2) },

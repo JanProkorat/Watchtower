@@ -9,6 +9,11 @@ export default defineConfig({
   root: __dirname,
   base: './',
   plugins: [react()],
+  // noVNC uses top-level await (H264 capability check). The build target below
+  // allows it for production, but the dev server's esbuild defaults to es2020
+  // and rejects TLA — align both the transform and dep-prebundle targets here.
+  esbuild: { target: 'es2022' },
+  optimizeDeps: { esbuildOptions: { target: 'es2022' } },
   resolve: {
     alias: {
       '@watchtower/shared': path.resolve(__dirname, '../../packages/shared/src'),

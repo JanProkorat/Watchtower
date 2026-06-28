@@ -28,7 +28,6 @@ function freshDb(): SqliteLike {
 const STANDARD_INPUT = {
   rateType: 'hourly' as const,
   rateAmount: 1600,
-  currency: 'CZK',
   hoursPerDay: 8,
 };
 

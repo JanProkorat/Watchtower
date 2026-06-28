@@ -45,7 +45,7 @@ version: v5.
 | `notifications` | Logged macOS notifications | `dismissed_at` set on click. |
 | `settings` | Key-value store (TEXT) | One row per setting key. Also holds the `timetracker_migration_status` marker. |
 | `projects` | TimeTracker — project | Ported verbatim from TT. `kind` ∈ `work` / `personal` / `time-off`; `folder_path` is what the launch bridge reads. |
-| `project_rates` | Per-project rate history (contracts) | Overlapping windows are caller-validated, not DB-enforced. |
+| `contracts` | Per-project rate history (contracts) | Overlapping windows are caller-validated, not DB-enforced. |
 | `epics` | Project → epics | Plain hierarchy. |
 | `tasks` | Epic → tasks | `number` is the Jira-key-ish suffix; `(epic_id, number)` unique. |
 | `worklogs` | Time entries | `(source, external_id)` unique — used by auto-imports to dedupe re-runs. `reported_minutes` is the billable-rounded variant of `minutes`. |

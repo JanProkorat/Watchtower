@@ -101,7 +101,6 @@ describe('pushAll', () => {
       effectiveFrom: '2026-01-01',
       rateType: 'hourly',
       rateAmount: 120,
-      currency: 'CZK',
       hoursPerDay: 8,
     });
     const epic = new EpicsRepo(db).create({ projectId: project.id, name: 'Billing Epic' });
@@ -119,15 +118,13 @@ describe('pushAll', () => {
     const { rows } = await store.query<{
       effective_minutes: number;
       resolved_rate: string;
-      rate_currency: string;
       earned_amount: string;
-    }>(`SELECT effective_minutes, resolved_rate, rate_currency, earned_amount
+    }>(`SELECT effective_minutes, resolved_rate, earned_amount
           FROM worklogs WHERE sync_id = $1`, [wlSyncId]);
 
     expect(rows).toHaveLength(1);
     expect(rows[0].effective_minutes).toBe(60);
     expect(Number(rows[0].resolved_rate)).toBe(120);
-    expect(rows[0].rate_currency).toBe('CZK');
     expect(Number(rows[0].earned_amount)).toBeCloseTo(120, 5);
   });
 
@@ -157,5 +154,45 @@ describe('pushAll', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].effective_minutes).toBe(60);
     expect(rows[0].earned_amount).toBeNull();
+  });
+
+  it('one row with an orphaned FK does not abort the whole table push (#111)', async () => {
+    if (!reachable || !store) return;
+    const db = freshSqlite();
+    const byName = (n: string) => SYNCED_TABLES.find((t) => t.name === n)!;
+
+    // Seed: project → epic → two tasks, each with a worklog.
+    const project = new ProjectsRepo(db).create({ name: 'Resilient P' });
+    const epic = new EpicsRepo(db).create({ projectId: project.id, name: 'Resilient E' });
+    const orphanTask = new TasksRepo(db).create({ epicId: epic.id, number: 'O-1', title: 'Orphan Task' });
+    const validTask = new TasksRepo(db).create({ epicId: epic.id, number: 'V-1', title: 'Valid Task' });
+    const orphanWl = new WorklogsRepo(db).create({ taskId: orphanTask.id, workDate: '2026-06-01', minutes: 30 });
+    const validWl = new WorklogsRepo(db).create({ taskId: validTask.id, workDate: '2026-06-02', minutes: 45 });
+
+    // Push the parents so their cursors advance past both tasks; worklogs stays untouched.
+    await pushTable(db, store, byName('projects'));
+    await pushTable(db, store, byName('epics'));
+    await pushTable(db, store, byName('tasks'));
+
+    // Orphan the FK: delete the orphan task from Postgres. The tasks cursor has
+    // already moved past it, so the upcoming pushAll won't re-create it — the
+    // orphaned worklog's `(SELECT id FROM tasks WHERE sync_id=…)` now yields NULL
+    // → not-null violation on task_id.
+    const orphanTaskSyncId = (db.prepare('SELECT sync_id FROM tasks WHERE id=?').get(orphanTask.id) as any).sync_id;
+    await store.query(`DELETE FROM tasks WHERE sync_id=$1`, [orphanTaskSyncId]);
+
+    const cursorBefore = getCursor(db, 'push', 'worklogs');
+
+    // Before the fix the orphan row threw and aborted the whole worklogs push.
+    await expect(pushAll(db, store)).resolves.toBeDefined();
+
+    const validWlSyncId = (db.prepare('SELECT sync_id FROM worklogs WHERE id=?').get(validWl.id) as any).sync_id;
+    const orphanWlSyncId = (db.prepare('SELECT sync_id FROM worklogs WHERE id=?').get(orphanWl.id) as any).sync_id;
+    const { rows: validRows } = await store.query(`SELECT sync_id FROM worklogs WHERE sync_id=$1`, [validWlSyncId]);
+    const { rows: orphanRows } = await store.query(`SELECT sync_id FROM worklogs WHERE sync_id=$1`, [orphanWlSyncId]);
+
+    expect(validRows).toHaveLength(1); // the valid row landed
+    expect(orphanRows).toHaveLength(0); // the orphan was skipped, not inserted
+    expect(getCursor(db, 'push', 'worklogs') > cursorBefore).toBe(true); // cursor advanced
   });
 });

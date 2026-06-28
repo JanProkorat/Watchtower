@@ -34,7 +34,7 @@ function addColumnIfMissing(db: SqliteLike, table: string, column: string, decl:
   }
 }
 
-const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
+export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
   {
     version: 1,
     up: (db) => {
@@ -321,6 +321,25 @@ const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }> = [
         platform      TEXT    NOT NULL DEFAULT 'ios',
         registered_at INTEGER NOT NULL
       )`);
+    },
+  },
+  {
+    version: 16,
+    up: (db) => {
+      // #108 CZK-only: drop the now-unused currency columns. No data migration —
+      // all existing contracts are CZK. DROP COLUMN (not a table rebuild) so there
+      // is no positional column-copy to misalign.
+      // Guards: SQLite has no DROP COLUMN IF EXISTS, so check PRAGMA first to
+      // keep this migration replay-safe (re-run after a partial migration recovery
+      // must not re-throw "no such column").
+      const contractCols = (db.prepare(`PRAGMA table_info(contracts)`).all() as Array<{ name: string }>).map((c) => c.name);
+      if (contractCols.includes('currency')) {
+        db.exec(`ALTER TABLE contracts DROP COLUMN currency`);
+      }
+      const projectCols = (db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>).map((c) => c.name);
+      if (projectCols.includes('currency')) {
+        db.exec(`ALTER TABLE projects DROP COLUMN currency`);
+      }
     },
   },
 ];

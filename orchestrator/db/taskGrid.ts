@@ -27,16 +27,15 @@ export interface TaskGridTask {
 }
 
 export interface TaskGridEarningsRow {
-  currency: string;
   /** day-of-month (1..31) → rounded earnings amount on that day. */
   perDay: Record<number, number>;
   totalAmount: number;
   /**
    * Capacity-based target: for each workday in the month and each billable
-   * project that contributed worklogs in this currency, sum the MD value of
-   * the rate active on that workday (daily → rate_amount, hourly →
-   * rate_amount × hours_per_day). Mirrors what the user would have earned
-   * if every workday in the month had been a full MD on this stack.
+   * project that contributed worklogs, sum the MD value of the rate active
+   * on that workday (daily → rate_amount, hourly → rate_amount ×
+   * hours_per_day). Mirrors what the user would have earned if every workday
+   * in the month had been a full MD on this stack.
    */
   expectedAmount: number;
 }
@@ -100,7 +99,6 @@ interface RateRow {
   end_date: string | null;
   rate_type: 'hourly' | 'daily';
   rate_amount: number;
-  currency: string;
   hours_per_day: number;
 }
 
@@ -299,7 +297,7 @@ export class TaskGridService {
     if (projectIds.length === 0) return [];
 
     const ratesSql = `
-      SELECT id, project_id, effective_from, end_date, rate_type, rate_amount, currency, hours_per_day
+      SELECT id, project_id, effective_from, end_date, rate_type, rate_amount, hours_per_day
         FROM contracts
        WHERE project_id IN (${projectIds.map(() => '?').join(',')})
          AND deleted_at IS NULL
@@ -324,15 +322,16 @@ export class TaskGridService {
       return null;
     }
 
-    // Currency → day → rounded amount, plus total. Earnings always use
+    // Accumulate earnings into a single CZK bucket. Earnings always use
     // reported_minutes (the billed value) regardless of the client's
-    // display toggle. We also track which projects fed into each currency
-    // so the capacity-based expected total is summed across exactly that
-    // project set (and not, say, all rate-having projects globally).
-    const byCurrency = new Map<
-      string,
-      { perDay: Record<number, number>; total: number; projects: Set<number> }
-    >();
+    // display toggle. We also track which projects contributed so the
+    // capacity-based expected total is summed across exactly that project
+    // set and not all rate-having projects globally.
+    const czk = {
+      perDay: {} as Record<number, number>,
+      total: 0,
+      projects: new Set<number>(),
+    };
     for (const w of worklogs) {
       if (!billableByProject.get(w.project_id)) continue;
       const rate = findRateForDate(w.project_id, w.work_date);
@@ -345,56 +344,41 @@ export class TaskGridService {
           : (hours / rate.hours_per_day) * rate.rate_amount;
       const day = Number(w.work_date.slice(8, 10));
 
-      const bucket = byCurrency.get(rate.currency) ?? {
-        perDay: {},
-        total: 0,
-        projects: new Set<number>(),
-      };
       // Sum as floats during accumulation, round at the end so per-day reads
       // stay consistent with the displayed total.
-      bucket.perDay[day] = (bucket.perDay[day] ?? 0) + amount;
-      bucket.total += amount;
-      bucket.projects.add(w.project_id);
-      byCurrency.set(rate.currency, bucket);
+      czk.perDay[day] = (czk.perDay[day] ?? 0) + amount;
+      czk.total += amount;
+      czk.projects.add(w.project_id);
     }
 
-    // Expected (capacity-based) amount per currency: workdays × MD rate,
-    // summed across the projects that produced worklogs in this currency.
-    // Per-day rate lookup so a contract that changes mid-month still
-    // produces a faithful target. If a project's rate is missing on a
-    // workday or has a different currency on that workday, it does not
-    // contribute to *this* currency's expected — the MD lands in whichever
-    // currency the active rate carries.
-    const expectedByCurrency = new Map<string, number>();
-    for (const [currency, bucket] of byCurrency) {
-      for (const projectId of bucket.projects) {
-        for (const date of workdays) {
-          const rate = findRateForDate(projectId, date);
-          if (!rate || rate.currency !== currency) continue;
-          const md =
-            rate.rate_type === 'daily'
-              ? rate.rate_amount
-              : rate.rate_amount * rate.hours_per_day;
-          expectedByCurrency.set(currency, (expectedByCurrency.get(currency) ?? 0) + md);
-        }
+    if (czk.projects.size === 0) return [];
+
+    // Expected (capacity-based) total: workdays × MD rate, summed across
+    // all projects that contributed worklogs. Per-day rate lookup so a
+    // contract that changes mid-month produces a faithful target.
+    let expectedAmount = 0;
+    for (const projectId of czk.projects) {
+      for (const date of workdays) {
+        const rate = findRateForDate(projectId, date);
+        if (!rate) continue;
+        const md =
+          rate.rate_type === 'daily'
+            ? rate.rate_amount
+            : rate.rate_amount * rate.hours_per_day;
+        expectedAmount += md;
       }
     }
 
-    const out: TaskGridEarningsRow[] = [];
-    for (const [currency, bucket] of byCurrency) {
-      const perDayRounded: Record<number, number> = {};
-      for (const [day, val] of Object.entries(bucket.perDay)) {
-        perDayRounded[Number(day)] = Math.round(val);
-      }
-      out.push({
-        currency,
+    const perDayRounded: Record<number, number> = {};
+    for (const [day, val] of Object.entries(czk.perDay)) {
+      perDayRounded[Number(day)] = Math.round(val);
+    }
+    return [
+      {
         perDay: perDayRounded,
-        totalAmount: Math.round(bucket.total),
-        expectedAmount: Math.round(expectedByCurrency.get(currency) ?? 0),
-      });
-    }
-    // Stable order: alphabetical by currency code (CZK before EUR before USD).
-    out.sort((a, b) => a.currency.localeCompare(b.currency));
-    return out;
+        totalAmount: Math.round(czk.total),
+        expectedAmount: Math.round(expectedAmount),
+      },
+    ];
   }
 }

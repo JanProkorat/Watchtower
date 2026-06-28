@@ -37,7 +37,6 @@ export const PROJECT_RATE_PERIODS_CTE = `
            pr.effective_from,
            pr.rate_type,
            pr.rate_amount,
-           pr.currency,
            pr.hours_per_day,
            LEAD(pr.effective_from) OVER (
              PARTITION BY pr.project_id ORDER BY pr.effective_from

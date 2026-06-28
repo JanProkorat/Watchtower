@@ -434,7 +434,7 @@ export function WorklogCellPopover({
                             color="text.secondary"
                             sx={{ fontVariantNumeric: 'tabular-nums' }}
                           >
-                            {formatEarnings(earned, rate.currency)}
+                            {formatEarnings(earned)}
                           </Typography>
                         )}
                         <Tooltip

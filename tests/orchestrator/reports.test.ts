@@ -78,8 +78,8 @@ describe('ReportsService', () => {
       });
       const rows = reports.trend('2026-01-01', '2026-12-31', 'month');
       expect(rows).toEqual([
-        { bucket: '2026-04', minutes: 60, mds: 60 / 60 / 8, earnedByCurrency: {} },
-        { bucket: '2026-05', minutes: 120, mds: 120 / 60 / 8, earnedByCurrency: {} },
+        { bucket: '2026-04', minutes: 60, mds: 60 / 60 / 8, earned: 0 },
+        { bucket: '2026-05', minutes: 120, mds: 120 / 60 / 8, earned: 0 },
       ]);
     });
 
@@ -93,7 +93,6 @@ describe('ReportsService', () => {
         effectiveFrom: '2026-05-01',
         rateType: 'daily',
         rateAmount: 4000,
-        currency: 'CZK',
         hoursPerDay: 6,
       });
       worklogs.create({ taskId: task.id, workDate: '2026-05-04', minutes: 360 });
@@ -126,14 +125,13 @@ describe('ReportsService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'hourly',
         rateAmount: 1600,
-        currency: 'CZK',
       });
       // Make the project billable (the verbatim TT schema column is_billable
       // isn't auto-set by repo.create when kind=work in non-default seeds,
       // so set it explicitly here).
       db.prepare(`UPDATE projects SET is_billable = 1 WHERE id = ?`).run(project.id);
       const rows = reports.trend('2026-05-01', '2026-05-31', 'day');
-      expect(rows[0]?.earnedByCurrency).toEqual({ CZK: 1600 });
+      expect(rows[0]?.earned).toBe(1600);
     });
   });
 
@@ -158,7 +156,7 @@ describe('ReportsService', () => {
 
       const trendA = reports.trend('2026-05-01', '2026-05-31', 'day', a.id);
       expect(trendA).toEqual([
-        { bucket: '2026-05-05', minutes: 60, mds: 60 / 60 / 8, earnedByCurrency: {} },
+        { bucket: '2026-05-05', minutes: 60, mds: 60 / 60 / 8, earned: 0 },
       ]);
 
       const byProjA = reports.byProject('2026-05-01', '2026-05-31', a.id);
@@ -245,14 +243,12 @@ describe('ReportsService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'hourly',
         rateAmount: 1000,
-        currency: 'CZK',
       });
       rates.create({
         projectId: project.id,
         effectiveFrom: '2026-05-15',
         rateType: 'hourly',
         rateAmount: 1500,
-        currency: 'CZK',
       });
       const rows = reports.rateChanges('2026-01-01', '2026-12-31');
       expect(rows.map((r) => r.effectiveFrom)).toEqual(['2026-05-15']);
@@ -269,7 +265,6 @@ describe('ReportsService', () => {
         effectiveFrom: '2024-01-01',
         rateType: 'hourly',
         rateAmount: 1000,
-        currency: 'CZK',
         mdLimit: 100,
       });
       rates.create({
@@ -277,7 +272,6 @@ describe('ReportsService', () => {
         effectiveFrom: '2024-01-01',
         rateType: 'hourly',
         rateAmount: 1000,
-        currency: 'CZK',
       });
       const rows = reports.contracts();
       // Only the one with an explicit limit shows up.

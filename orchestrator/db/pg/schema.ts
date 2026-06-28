@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS projects (
   kind              TEXT NOT NULL DEFAULT 'work' CHECK (kind IN ('work','time_off')),
   rate_type         TEXT NOT NULL DEFAULT 'hourly' CHECK (rate_type IN ('hourly','daily')),
   rate_amount       NUMERIC,
-  currency          TEXT NOT NULL DEFAULT 'USD',
   hours_per_day     NUMERIC NOT NULL DEFAULT 8,
   is_default        BOOLEAN NOT NULL DEFAULT false,
   folder_path       TEXT,
@@ -112,7 +111,6 @@ CREATE TABLE IF NOT EXISTS contracts (
   effective_from DATE NOT NULL,
   rate_type      TEXT NOT NULL CHECK (rate_type IN ('hourly','daily')),
   rate_amount    NUMERIC NOT NULL CHECK (rate_amount >= 0),
-  currency       TEXT NOT NULL,
   hours_per_day  NUMERIC NOT NULL DEFAULT 8 CHECK (hours_per_day > 0),
   end_date       DATE,
   md_limit       NUMERIC CHECK (md_limit IS NULL OR md_limit > 0),
@@ -157,7 +155,6 @@ CREATE INDEX IF NOT EXISTS idx_sync_conflicts_table ON sync_conflicts(table_name
 const WORKLOGS_BILLING = `
 ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS effective_minutes INTEGER;
 ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS resolved_rate     NUMERIC;
-ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS rate_currency     TEXT;
 ALTER TABLE worklogs ADD COLUMN IF NOT EXISTS earned_amount     NUMERIC;
 `;
 
@@ -199,6 +196,14 @@ DO $$ BEGIN
   END IF;
 END $$;`,
       ),
+    ],
+  },
+  {
+    version: 5,
+    up: [
+      `ALTER TABLE contracts DROP COLUMN IF EXISTS currency;`,
+      `ALTER TABLE projects DROP COLUMN IF EXISTS currency;`,
+      `ALTER TABLE worklogs DROP COLUMN IF EXISTS rate_currency;`,
     ],
   },
 ];

@@ -9,7 +9,6 @@ export interface ProjectRateRow {
   effectiveFrom: string;
   rateType: RateType;
   rateAmount: number;
-  currency: string;
   hoursPerDay: number;
   endDate: string | null;
   mdLimit: number | null;
@@ -21,7 +20,6 @@ export interface ProjectRateInput {
   effectiveFrom: string;
   rateType: RateType;
   rateAmount: number;
-  currency: string;
   hoursPerDay?: number;
   endDate?: string | null;
   mdLimit?: number | null;
@@ -33,7 +31,6 @@ type DbRow = {
   effective_from: string;
   rate_type: RateType;
   rate_amount: number;
-  currency: string;
   hours_per_day: number;
   end_date: string | null;
   md_limit: number | null;
@@ -47,7 +44,6 @@ function toRow(r: DbRow): ProjectRateRow {
     effectiveFrom: r.effective_from,
     rateType: r.rate_type,
     rateAmount: r.rate_amount,
-    currency: r.currency,
     hoursPerDay: r.hours_per_day,
     endDate: r.end_date,
     mdLimit: r.md_limit,
@@ -82,7 +78,7 @@ export class ProjectRatesRepo {
   listForProject(projectId: number): ProjectRateRow[] {
     const rows = this.db
       .prepare(
-        `SELECT id, project_id, effective_from, rate_type, rate_amount, currency,
+        `SELECT id, project_id, effective_from, rate_type, rate_amount,
                 hours_per_day, end_date, md_limit, created_at
            FROM contracts
           WHERE project_id = ?
@@ -96,7 +92,7 @@ export class ProjectRatesRepo {
   get(id: number): ProjectRateRow | null {
     const row = this.db
       .prepare(
-        `SELECT id, project_id, effective_from, rate_type, rate_amount, currency,
+        `SELECT id, project_id, effective_from, rate_type, rate_amount,
                 hours_per_day, end_date, md_limit, created_at
            FROM contracts WHERE id = ? AND deleted_at IS NULL`,
       )
@@ -109,7 +105,7 @@ export class ProjectRatesRepo {
     const today = asOf ?? todayStr();
     const row = this.db
       .prepare(
-        `SELECT id, project_id, effective_from, rate_type, rate_amount, currency,
+        `SELECT id, project_id, effective_from, rate_type, rate_amount,
                 hours_per_day, end_date, md_limit, created_at
            FROM contracts
           WHERE project_id = ?
@@ -131,16 +127,15 @@ export class ProjectRatesRepo {
       const info = this.db
         .prepare(
           `INSERT INTO contracts
-             (project_id, effective_from, rate_type, rate_amount, currency,
+             (project_id, effective_from, rate_type, rate_amount,
               hours_per_day, end_date, md_limit, sync_id, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           input.projectId,
           input.effectiveFrom,
           input.rateType,
           input.rateAmount,
-          input.currency,
           input.hoursPerDay ?? 8,
           input.endDate ?? null,
           input.mdLimit ?? null,
@@ -174,7 +169,6 @@ export class ProjectRatesRepo {
       if (input.endDate !== undefined) push('end_date', input.endDate);
       if (input.rateType !== undefined) push('rate_type', input.rateType);
       if (input.rateAmount !== undefined) push('rate_amount', input.rateAmount);
-      if (input.currency !== undefined) push('currency', input.currency);
       if (input.hoursPerDay !== undefined) push('hours_per_day', input.hoursPerDay);
       if (input.mdLimit !== undefined) push('md_limit', input.mdLimit);
       push('updated_at', nowIso());

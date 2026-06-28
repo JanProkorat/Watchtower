@@ -61,7 +61,7 @@ describe('soft-delete invisibility + cascade', () => {
     const e = epics.create({ projectId: p.id, name: 'E' });
     const t = tasks.create({ epicId: e.id, number: 'N1', title: 'T' });
     const w = worklogs.create({ taskId: t.id, workDate: '2026-01-01', minutes: 60 });
-    const c = rates.create({ projectId: p.id, effectiveFrom: '2026-01-01', rateType: 'hourly', rateAmount: 100, currency: 'CZK' });
+    const c = rates.create({ projectId: p.id, effectiveFrom: '2026-01-01', rateType: 'hourly', rateAmount: 100 });
     return { p, e, t, w, c };
   }
 

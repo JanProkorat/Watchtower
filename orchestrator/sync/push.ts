@@ -43,7 +43,15 @@ export async function pushTable(db: SqliteLike, store: PgStore, table: SyncTable
   for (const rawRow of rows) {
     // Merge derived (Postgres-only) values computed from the SQLite state.
     const row = deriver ? { ...rawRow, ...deriver(rawRow) } : rawRow;
-    await upsertRow(store, table, row, fk);
+    // Resilience: a single bad row (e.g. a worklog whose task_sync_id resolves
+    // to no Postgres task → not-null violation on the FK) must not abort the
+    // whole table and stall the cursor. Skip it and keep going; the LWW guard
+    // and deriver merge above are untouched.
+    try {
+      await upsertRow(store, table, row, fk);
+    } catch (err) {
+      console.warn(`[push] ${table.name} upsert failed for sync_id=${String(rawRow['sync_id'])}, skipping:`, err);
+    }
     const u = String(rawRow['updated_at']);
     if (u > maxSeen) maxSeen = u;
   }
