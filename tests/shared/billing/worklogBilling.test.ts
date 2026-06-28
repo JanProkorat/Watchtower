@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeWorklogBilling, type ContractLite } from '../../orchestrator/db/worklogBilling.js';
+import { computeWorklogBilling, type ContractLite } from '@watchtower/shared/billing/worklogBilling.js';
 
 const hourly = (effectiveFrom: string, rateAmount: number): ContractLite =>
   ({ effectiveFrom, rateType: 'hourly', rateAmount, hoursPerDay: 8 });
