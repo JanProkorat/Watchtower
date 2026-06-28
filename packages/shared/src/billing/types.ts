@@ -13,6 +13,7 @@ export interface WorklogRow {
   isBillable: boolean;
   taskNumber: string | null;
   taskTitle: string | null;
+  source: string | null;     // 'manual' | 'watchtower-auto' | 'jira-sync' | null
 }
 
 export interface ContractRow {
