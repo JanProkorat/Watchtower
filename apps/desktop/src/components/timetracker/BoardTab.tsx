@@ -198,6 +198,9 @@ export function BoardTab({ active }: Props) {
   const authFailed =
     lastSyncResult?.authFailed ?? snapshot?.lastSyncResult?.authFailed ?? false;
   const showSignIn = !auth?.cookiePresent || authFailed;
+  const syncWarning =
+    lastSyncResult?.warning ?? snapshot?.lastSyncResult?.warning ?? null;
+
   // Empty state #1 — no projects have a board URL configured. Tell the user
   // where to set it and stop here; nothing else on this screen is useful
   // until at least one project has a URL.
@@ -292,6 +295,8 @@ export function BoardTab({ active }: Props) {
       </Stack>
 
       {syncError && <Alert severity="error">{syncError}</Alert>}
+
+      {syncWarning && <Alert severity="warning">{syncWarning}</Alert>}
 
       {unrouted.length > 0 && (
         <Alert severity="warning" icon={<WarningAmberIcon fontSize="small" />}>

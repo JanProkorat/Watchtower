@@ -386,6 +386,9 @@ export interface WorklogViewPayload {
 export interface EpicInputPayload {
   projectId: number;
   name: string;
+  /** Substring matched against the linked Jira epic's name during board-sync
+   *  routing. Empty/null opts this epic out of substring routing. */
+  shortcut?: string | null;
   description?: string | null;
   status?: 'planned' | 'active' | 'done';
   jiraEpicKey?: string | null;
@@ -396,6 +399,9 @@ export interface EpicViewPayload {
   id: number;
   projectId: number;
   name: string;
+  /** Substring matched against the linked Jira epic's name during board-sync
+   *  routing. NULL → this epic doesn't participate in shortcut routing. */
+  shortcut: string | null;
   description: string | null;
   status: 'planned' | 'active' | 'done';
   displayOrder: number;
@@ -713,6 +719,12 @@ export interface BoardSyncResultPayload {
   authFailed?: boolean;
   /** Top-level fatal error (config/auth/network). Per-card failures don't set this. */
   error?: string;
+  /**
+   * Non-fatal advisory shown to the user when the sync succeeded but degraded
+   * (e.g. a quickFilter couldn't be applied and the board fell back to its
+   * base filter). Absent when there is nothing to warn about.
+   */
+  warning?: string;
 }
 
 export interface ClaudeSettingsReadPayload {
