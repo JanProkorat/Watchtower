@@ -17,20 +17,7 @@ function addDays(date: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/**
- * Mirrors dashboardOverview.ts:heatmap30d + computeStats.
- *
- * window = [today-(windowDays-1), today] inclusive; days has one entry per
- * date, zero-filled, using raw `minutes` (sum per date).
- */
-export function activityHeatmap(
-  rows: WorklogRow[],
-  opts: { today: string; windowDays?: number },
-): HeatmapResult {
-  const windowDays = opts.windowDays ?? 30;
-  const fromDate = addDays(opts.today, -(windowDays - 1));
-  const toDate = opts.today;
-
+function buildHeatmap(rows: WorklogRow[], fromDate: string, toDate: string): HeatmapResult {
   // Aggregate raw minutes per date (mirrors SQL SUM(w.minutes) GROUP BY work_date).
   const grouped = new Map<string, number>();
   for (const row of rows) {
@@ -39,29 +26,29 @@ export function activityHeatmap(
     }
   }
 
-  // Zero-fill the full window (mirrors the for-loop in heatmap30d).
+  // Zero-fill the inclusive [fromDate, toDate] window.
   const days: { date: string; minutes: number }[] = [];
-  for (let i = 0; i < windowDays; i++) {
-    const date = addDays(fromDate, i);
-    days.push({ date, minutes: grouped.get(date) ?? 0 });
+  let cursor = fromDate;
+  while (cursor <= toDate) {
+    days.push({ date: cursor, minutes: grouped.get(cursor) ?? 0 });
+    cursor = addDays(cursor, 1);
   }
-
-  // computeStats mirror — uses windowDays instead of hardcoded 30.
+  const windowDays = days.length;
   const map = new Map(days.map((d) => [d.date, d.minutes]));
 
   const activeDays = days.filter((d) => d.minutes > 0).length;
   const totalMinutes = days.reduce((acc, d) => acc + d.minutes, 0);
-  const weeklyAvgMinutes = Math.round((totalMinutes / windowDays) * 7);
+  const weeklyAvgMinutes = windowDays > 0 ? Math.round((totalMinutes / windowDays) * 7) : 0;
 
-  // currentStreak: walk backward from today while minutes>0 (cap = windowDays).
-  let cursor = toDate;
+  // currentStreak: walk backward from toDate while minutes > 0.
+  let streakCursor = toDate;
   let currentStreak = 0;
-  while (map.has(cursor) && (map.get(cursor) ?? 0) > 0) {
+  while (map.has(streakCursor) && (map.get(streakCursor) ?? 0) > 0) {
     currentStreak++;
-    cursor = addDays(cursor, -1);
+    streakCursor = addDays(streakCursor, -1);
   }
 
-  // longestStreak: longest run of minutes>0 in the window.
+  // longestStreak: longest run of minutes > 0 in the window.
   let longestStreak = 0;
   let run = 0;
   for (const d of days) {
@@ -73,7 +60,7 @@ export function activityHeatmap(
     }
   }
 
-  // busiestDay: first date with max minutes>0; null if none.
+  // busiestDay: first date with max minutes > 0; null if none.
   let busiestDay: string | null = null;
   let busiestMinutes = 0;
   for (const d of days) {
@@ -87,4 +74,25 @@ export function activityHeatmap(
     days,
     stats: { currentStreak, longestStreak, activeDays, weeklyAvgMinutes, busiestDay },
   };
+}
+
+/**
+ * Mirrors dashboardOverview.ts:heatmap30d + computeStats.
+ * window = [today-(windowDays-1), today] inclusive.
+ */
+export function activityHeatmap(
+  rows: WorklogRow[],
+  opts: { today: string; windowDays?: number },
+): HeatmapResult {
+  const windowDays = opts.windowDays ?? 30;
+  const fromDate = addDays(opts.today, -(windowDays - 1));
+  return buildHeatmap(rows, fromDate, opts.today);
+}
+
+/** Range-scoped variant for the Reports tab: window = [from, to] inclusive. */
+export function activityHeatmapRange(
+  rows: WorklogRow[],
+  opts: { from: string; to: string },
+): HeatmapResult {
+  return buildHeatmap(rows, opts.from, opts.to);
 }

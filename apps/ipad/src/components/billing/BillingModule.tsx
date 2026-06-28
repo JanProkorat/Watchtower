@@ -4,8 +4,9 @@ import { BillingLogin } from './BillingLogin.js';
 import { DashboardView } from './DashboardView.js';
 import { EarningsMonthView } from './EarningsMonthView.js';
 import { ProjectDetailView } from './ProjectDetailView.js';
+import { ReportsView } from './ReportsView.js';
 
-type BillingTab = 'dashboard' | 'earnings';
+type BillingTab = 'dashboard' | 'earnings' | 'reports';
 
 const TAB_STYLE_BASE: React.CSSProperties = {
   padding: '8px 18px',
@@ -88,6 +89,16 @@ export function BillingModule(): JSX.Element {
         >
           Výdělky
         </button>
+        <button
+          style={{
+            ...TAB_STYLE_BASE,
+            backgroundColor: activeTab === 'reports' ? '#2d2857' : 'transparent',
+            color: activeTab === 'reports' ? '#a89cf0' : '#9ca3af',
+          }}
+          onClick={() => { setActiveTab('reports'); setSelectedProject(null); }}
+        >
+          Reporty
+        </button>
 
         {/* Spacer + sign-out */}
         <div style={{ flex: 1 }} />
@@ -106,11 +117,9 @@ export function BillingModule(): JSX.Element {
 
       {/* Tab content */}
       <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-        {activeTab === 'dashboard' ? (
-          <DashboardView />
-        ) : (
-          <EarningsMonthView onOpenProject={(id) => setSelectedProject(id)} />
-        )}
+        {activeTab === 'dashboard' && <DashboardView />}
+        {activeTab === 'earnings' && <EarningsMonthView onOpenProject={(id) => setSelectedProject(id)} />}
+        {activeTab === 'reports' && <ReportsView onOpenProject={(id) => setSelectedProject(id)} />}
       </div>
     </div>
   );
