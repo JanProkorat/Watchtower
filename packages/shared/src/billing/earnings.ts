@@ -2,7 +2,7 @@ import type { WorklogRow, ProjectEarning } from './types.js';
 export type { ProjectEarning } from './types.js';
 
 const inMonth = (workDate: string, month: string) => workDate.slice(0, 7) === month;
-const isCzkEarned = (r: WorklogRow) => r.rateCurrency === 'CZK' && r.earnedAmount != null;
+const isCzkEarned = (r: WorklogRow) => r.earnedAmount != null;
 
 export function aggregateMonthEarnings(rows: WorklogRow[], month: string) {
   const byProject = new Map<number, ProjectEarning>();

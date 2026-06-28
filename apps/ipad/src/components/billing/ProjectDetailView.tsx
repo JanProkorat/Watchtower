@@ -170,7 +170,7 @@ export function ProjectDetailView({
   // Month totals
   const totalMinutes = monthWorklogs.reduce((s, w) => s + w.minutes, 0);
   const totalEarned = monthWorklogs.reduce(
-    (s, w) => s + (w.rateCurrency === 'CZK' && w.earnedAmount != null ? w.earnedAmount : 0),
+    (s, w) => s + (w.earnedAmount != null ? w.earnedAmount : 0),
     0,
   );
 
@@ -445,7 +445,7 @@ export function ProjectDetailView({
               ledgerRows.map((w, i) => {
                 const isLast = i === ledgerRows.length - 1;
                 const earned =
-                  w.rateCurrency === 'CZK' && w.earnedAmount != null
+                  w.earnedAmount != null
                     ? w.earnedAmount
                     : 0;
                 return (

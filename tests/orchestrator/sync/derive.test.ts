@@ -61,7 +61,6 @@ describe('createWorklogDeriver', () => {
     // 120 minutes @ 100 CZK/hour = 200 CZK
     expect(result.effective_minutes).toBe(120);
     expect(result.resolved_rate).toBe(100);
-    expect(result.rate_currency).toBe('CZK');
     expect(result.earned_amount).toBeCloseTo(200, 5);
   });
 
@@ -118,7 +117,6 @@ describe('createWorklogDeriver', () => {
 
     expect(result.effective_minutes).toBe(60);
     expect(result.resolved_rate).toBeNull();
-    expect(result.rate_currency).toBeNull();
     expect(result.earned_amount).toBeNull();
   });
 

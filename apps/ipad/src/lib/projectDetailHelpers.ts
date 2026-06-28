@@ -70,9 +70,9 @@ export function rollupEarningsByContract(
 
   return sorted.map((contract) => {
     // Sum CZK earnedAmount from worklogs assigned to this contract.
+    // All earnings are CZK — currency field was removed in #108.
     let earnedCzk = 0;
     for (const wl of worklogs) {
-      if (wl.rateCurrency !== 'CZK') continue;
       if (wl.earnedAmount == null) continue;
       const assigned = assignWorklogToContract(wl.workDate, contracts);
       if (assigned === contract) {

@@ -4,7 +4,7 @@ import type { WorklogRow } from '../../../packages/shared/src/billing/types.js';
 
 const wl = (o: Partial<WorklogRow>): WorklogRow => ({
   syncId: Math.random().toString(36).slice(2), workDate: '2026-06-01', minutes: 60, effectiveMinutes: 60,
-  earnedAmount: 1500, rateCurrency: 'CZK', projectId: 1, projectName: 'A', projectColor: null,
+  earnedAmount: 1500, projectId: 1, projectName: 'A', projectColor: null,
   projectKind: 'work', isBillable: true, taskNumber: null, taskTitle: null, ...o,
 });
 
@@ -21,18 +21,18 @@ describe('aggregateMonthEarnings', () => {
     expect(r.perProject.map(p => [p.name, p.earnedCzk])).toEqual([['A', 3000], ['B', 500]]);
   });
 
-  it('ignores non-CZK and null earned rows for totalCzk but still counts minutes', () => {
+  it('ignores null earned rows for totalCzk but still counts minutes', () => {
     const rows = [
-      wl({ earnedAmount: 1000, rateCurrency: 'CZK' }),
-      wl({ earnedAmount: 50, rateCurrency: 'EUR' }),
-      wl({ earnedAmount: null, rateCurrency: null }),
+      wl({ earnedAmount: 1000 }),
+      wl({ earnedAmount: 50 }),
+      wl({ earnedAmount: null }),
     ];
-    expect(aggregateMonthEarnings(rows, '2026-06').totalCzk).toBe(1000);
+    expect(aggregateMonthEarnings(rows, '2026-06').totalCzk).toBe(1050);
   });
 
-  it('includes project in perProject with minutes counted even when all rows are non-CZK', () => {
+  it('includes project in perProject with minutes counted even when earnedAmount is null', () => {
     const rows = [
-      wl({ projectId: 1, projectName: 'A', earnedAmount: 50, rateCurrency: 'EUR', minutes: 45 }),
+      wl({ projectId: 1, projectName: 'A', earnedAmount: null, minutes: 45 }),
     ];
     const r = aggregateMonthEarnings(rows, '2026-06');
     expect(r.totalCzk).toBe(0);
@@ -40,15 +40,15 @@ describe('aggregateMonthEarnings', () => {
     expect(r.perProject[0]).toMatchObject({ name: 'A', minutes: 45, earnedCzk: 0 });
   });
 
-  it('counts all minutes for a project with mixed CZK and non-CZK rows', () => {
+  it('counts all minutes and sums all earned amounts for a project', () => {
     const rows = [
-      wl({ projectId: 1, projectName: 'Alpha', earnedAmount: 1500, rateCurrency: 'CZK', minutes: 60 }),
-      wl({ projectId: 1, projectName: 'Alpha', earnedAmount: 50, rateCurrency: 'EUR', minutes: 30 }),
+      wl({ projectId: 1, projectName: 'Alpha', earnedAmount: 1500, minutes: 60 }),
+      wl({ projectId: 1, projectName: 'Alpha', earnedAmount: 50, minutes: 30 }),
     ];
     const r = aggregateMonthEarnings(rows, '2026-06');
-    expect(r.totalCzk).toBe(1500);
+    expect(r.totalCzk).toBe(1550);
     expect(r.perProject).toHaveLength(1);
-    expect(r.perProject[0]).toMatchObject({ name: 'Alpha', minutes: 90, earnedCzk: 1500 });
+    expect(r.perProject[0]).toMatchObject({ name: 'Alpha', minutes: 90, earnedCzk: 1550 });
   });
 });
 
@@ -65,8 +65,8 @@ describe('trailingMonths', () => {
 
   it('ignores a CZK row outside the n-month window', () => {
     const rows = [
-      wl({ workDate: '2026-03-15', earnedAmount: 9999, rateCurrency: 'CZK' }), // outside 3-month window ending 2026-06
-      wl({ workDate: '2026-06-01', earnedAmount: 200, rateCurrency: 'CZK' }),
+      wl({ workDate: '2026-03-15', earnedAmount: 9999 }), // outside 3-month window ending 2026-06
+      wl({ workDate: '2026-06-01', earnedAmount: 200 }),
     ];
     const r = trailingMonths(rows, '2026-06', 3);
     expect(r.find(e => e.month === '2026-03')).toBeUndefined();

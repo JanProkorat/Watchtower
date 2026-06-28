@@ -118,15 +118,13 @@ describe('pushAll', () => {
     const { rows } = await store.query<{
       effective_minutes: number;
       resolved_rate: string;
-      rate_currency: string;
       earned_amount: string;
-    }>(`SELECT effective_minutes, resolved_rate, rate_currency, earned_amount
+    }>(`SELECT effective_minutes, resolved_rate, earned_amount
           FROM worklogs WHERE sync_id = $1`, [wlSyncId]);
 
     expect(rows).toHaveLength(1);
     expect(rows[0].effective_minutes).toBe(60);
     expect(Number(rows[0].resolved_rate)).toBe(120);
-    expect(rows[0].rate_currency).toBe('CZK');
     expect(Number(rows[0].earned_amount)).toBeCloseTo(120, 5);
   });
 

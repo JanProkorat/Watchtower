@@ -201,4 +201,15 @@ END $$;`,
       ),
     ],
   },
+  {
+    version: 5,
+    up: [
+      // #108 CZK-only: currency columns are no longer written by the sync layer.
+      // Add DEFAULT 'CZK' so inserts that omit the column succeed. The columns
+      // themselves will be dropped in a follow-up migration once all sync clients
+      // are updated.
+      `ALTER TABLE contracts ALTER COLUMN currency SET DEFAULT 'CZK';`,
+      `ALTER TABLE projects ALTER COLUMN currency SET DEFAULT 'CZK';`,
+    ],
+  },
 ];

@@ -112,7 +112,7 @@ describe('pullAll', () => {
 
   it('pulls a worklog carrying Postgres-only derived billing columns without writing them to SQLite', async () => {
     // Regression test: the worklogs table has Postgres-only derived columns
-    // (effective_minutes, resolved_rate, rate_currency, earned_amount) flagged
+    // (effective_minutes, resolved_rate, earned_amount) flagged
     // `derived: true` — they exist in Postgres but not in SQLite. Before the
     // pull.ts fix, pullAll SELECTed them from PG and tried to INSERT them into
     // SQLite, throwing "table worklogs has no column named effective_minutes".
