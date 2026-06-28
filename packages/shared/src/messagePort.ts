@@ -295,6 +295,9 @@ export interface OrchWorklogView {
 export interface OrchEpicInput {
   projectId: number;
   name: string;
+  /** Substring matched against the linked Jira epic's name during board-sync
+   *  routing. Empty/null opts this epic out of substring routing. */
+  shortcut?: string | null;
   description?: string | null;
   status?: 'planned' | 'active' | 'done';
   jiraEpicKey?: string | null;
@@ -305,6 +308,9 @@ export interface OrchEpicView {
   id: number;
   projectId: number;
   name: string;
+  /** Substring matched against the linked Jira epic's name during board-sync
+   *  routing. NULL → this epic doesn't participate in shortcut routing. */
+  shortcut: string | null;
   description: string | null;
   status: 'planned' | 'active' | 'done';
   displayOrder: number;

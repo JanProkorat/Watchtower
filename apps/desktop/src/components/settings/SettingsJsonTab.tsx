@@ -272,13 +272,11 @@ export function SettingsJsonTab() {
                 spellCheck={false}
                 error={Boolean(parseError)}
                 helperText={parseError ?? ' '}
-                slotProps={{
-                  input: {
-                    sx: {
-                      fontFamily: 'Menlo, Monaco, monospace',
-                      fontSize: 12.5,
-                      lineHeight: 1.55,
-                    },
+                InputProps={{
+                  sx: {
+                    fontFamily: 'Menlo, Monaco, monospace',
+                    fontSize: 12.5,
+                    lineHeight: 1.55,
                   },
                 }}
               />

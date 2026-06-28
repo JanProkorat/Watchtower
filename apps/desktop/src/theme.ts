@@ -133,3 +133,5 @@ export const lightTheme = createTheme({
     },
   },
 });
+
+export type ThemeMode = 'dark' | 'light';

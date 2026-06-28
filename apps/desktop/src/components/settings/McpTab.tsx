@@ -406,7 +406,7 @@ export function McpTab() {
                     setDraft(draftFromServer(p.name, p.config));
                   }}
                   sx={{ minWidth: 240 }}
-                  slotProps={{ select: { displayEmpty: true } }}
+                  SelectProps={{ displayEmpty: true }}
                 >
                   <MenuItem value="" disabled>
                     From preset…
@@ -447,7 +447,7 @@ export function McpTab() {
                       value={draft.name}
                       onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                       sx={{ flex: 1 }}
-                      slotProps={{ input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } } }}
+                      InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } }}
                     />
                     <TextField
                       label="Transport"
@@ -471,7 +471,7 @@ export function McpTab() {
                         size="small"
                         value={draft.command}
                         onChange={(e) => setDraft({ ...draft, command: e.target.value })}
-                        slotProps={{ input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } } }}
+                        InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } }}
                       />
                       <TextField
                         label="Args (one per line)"
@@ -480,7 +480,7 @@ export function McpTab() {
                         onChange={(e) => setDraft({ ...draft, args: e.target.value })}
                         multiline
                         minRows={3}
-                        slotProps={{ input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 12.5 } } }}
+                        InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 12.5 } }}
                       />
                       <TextField
                         label="Env (KEY=value, one per line)"
@@ -489,7 +489,7 @@ export function McpTab() {
                         onChange={(e) => setDraft({ ...draft, envText: e.target.value })}
                         multiline
                         minRows={2}
-                        slotProps={{ input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 12.5 } } }}
+                        InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 12.5 } }}
                       />
                     </>
                   ) : (
@@ -499,7 +499,7 @@ export function McpTab() {
                         size="small"
                         value={draft.url}
                         onChange={(e) => setDraft({ ...draft, url: e.target.value })}
-                        slotProps={{ input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } } }}
+                        InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } }}
                       />
                       <TextField
                         label="Headers (KEY=value, one per line)"
@@ -508,7 +508,7 @@ export function McpTab() {
                         onChange={(e) => setDraft({ ...draft, headersText: e.target.value })}
                         multiline
                         minRows={2}
-                        slotProps={{ input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 12.5 } } }}
+                        InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 12.5 } }}
                       />
                     </>
                   )}

@@ -102,7 +102,7 @@ export function NewInstanceModal({ open, defaultCwd, onClose, onSpawn }: Props) 
               onKeyDown={(e) => {
                 if (e.key === 'Enter') submit();
               }}
-              slotProps={{ input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } } }}
+              InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } }}
             />
             <Button variant="outlined" onClick={browse} sx={{ flexShrink: 0 }}>
               Browse…

@@ -60,14 +60,12 @@ export function AgentsTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search agents…"
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
           }}
           sx={{ minWidth: 240 }}
         />
