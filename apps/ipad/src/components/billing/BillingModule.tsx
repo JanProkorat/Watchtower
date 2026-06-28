@@ -5,48 +5,22 @@ import { DashboardView } from './DashboardView.js';
 import { EarningsMonthView } from './EarningsMonthView.js';
 import { ProjectDetailView } from './ProjectDetailView.js';
 import { ReportsView } from './ReportsView.js';
-
-type BillingTab = 'dashboard' | 'earnings' | 'reports';
-
-const TAB_STYLE_BASE: React.CSSProperties = {
-  padding: '8px 18px',
-  borderRadius: 8,
-  border: 'none',
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: 'pointer',
-  fontFamily: 'system-ui, sans-serif',
-  letterSpacing: 0.2,
-};
+import { BillingNav, type BillingSection } from './BillingNav.js';
 
 export function BillingModule(): JSX.Element {
   const { status, signIn, signOut } = useSupabaseAuth();
-  const [activeTab, setActiveTab] = useState<BillingTab>('dashboard');
+  const [section, setSection] = useState<BillingSection>('dashboard');
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
 
   if (status === 'loading') {
     return (
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#9ca3af',
-          fontSize: 15,
-          fontFamily: 'system-ui, sans-serif',
-        }}
-      >
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 15, fontFamily: 'system-ui, sans-serif' }}>
         Načítání…
       </div>
     );
   }
+  if (status === 'out') return <BillingLogin signIn={signIn} />;
 
-  if (status === 'out') {
-    return <BillingLogin signIn={signIn} />;
-  }
-
-  // status === 'in'
   if (selectedProject !== null) {
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'auto' }}>
@@ -55,72 +29,24 @@ export function BillingModule(): JSX.Element {
     );
   }
 
+  const openProject = (id: number) => setSelectedProject(id);
+  const select = (s: BillingSection) => { setSection(s); setSelectedProject(null); };
+
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
-      {/* Tab bar */}
-      <div
-        style={{
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '10px 16px',
-          borderBottom: '1px solid #2e3038',
-          backgroundColor: '#13141a',
-        }}
-      >
-        <button
-          style={{
-            ...TAB_STYLE_BASE,
-            backgroundColor: activeTab === 'dashboard' ? '#2d2857' : 'transparent',
-            color: activeTab === 'dashboard' ? '#a89cf0' : '#9ca3af',
-          }}
-          onClick={() => { setActiveTab('dashboard'); setSelectedProject(null); }}
-        >
-          Přehled
-        </button>
-        <button
-          style={{
-            ...TAB_STYLE_BASE,
-            backgroundColor: activeTab === 'earnings' ? '#2d2857' : 'transparent',
-            color: activeTab === 'earnings' ? '#a89cf0' : '#9ca3af',
-          }}
-          onClick={() => { setActiveTab('earnings'); setSelectedProject(null); }}
-        >
-          Výdělky
-        </button>
-        <button
-          style={{
-            ...TAB_STYLE_BASE,
-            backgroundColor: activeTab === 'reports' ? '#2d2857' : 'transparent',
-            color: activeTab === 'reports' ? '#a89cf0' : '#9ca3af',
-          }}
-          onClick={() => { setActiveTab('reports'); setSelectedProject(null); }}
-        >
-          Reporty
-        </button>
-
-        {/* Spacer + sign-out */}
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={() => void signOut()}
-          style={{
-            ...TAB_STYLE_BASE,
-            backgroundColor: 'transparent',
-            color: '#6b7280',
-            fontSize: 12,
-          }}
-        >
-          Odhlásit
-        </button>
-      </div>
-
-      {/* Tab content */}
+    <div style={{ flex: 1, display: 'flex', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
+      <BillingNav active={section} onSelect={select} onSignOut={() => void signOut()} />
       <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-        {activeTab === 'dashboard' && <DashboardView />}
-        {activeTab === 'earnings' && <EarningsMonthView onOpenProject={(id) => setSelectedProject(id)} />}
-        {activeTab === 'reports' && <ReportsView onOpenProject={(id) => setSelectedProject(id)} />}
+        {section === 'dashboard' && <DashboardView />}
+        {section === 'earnings' && <EarningsMonthView onOpenProject={openProject} />}
+        {section === 'reports' && <ReportsView onOpenProject={openProject} />}
+        {section === 'records-list' && <Placeholder label="Seznam (Task 6)" />}
+        {section === 'records-grid' && <Placeholder label="Mřížka (Task 7)" />}
+        {section === 'records-timeoff' && <Placeholder label="Volno (Task 8)" />}
       </div>
     </div>
   );
+}
+
+function Placeholder({ label }: { label: string }): JSX.Element {
+  return <div style={{ padding: 24, color: '#8B88A6', fontFamily: 'system-ui, sans-serif' }}>{label}</div>;
 }
