@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabaseClient.js';
+import { getSupabase } from '../lib/supabaseClient.js';
 import type { ContractRow, DayOffRow, ProjectRow } from '@watchtower/shared/billing/types.js';
 import {
   mapWorklogRow,
@@ -7,7 +7,9 @@ import {
   saveCache,
   type BillingDataset,
   type BillingStore,
+  type RawWorklogRow,
 } from './billingCache.js';
+import { fetchAllPaged, type PageResult } from './paginate.js';
 
 // ---------------------------------------------------------------------------
 // Public hook return type
@@ -74,14 +76,25 @@ export function billingReducer(
 // ---------------------------------------------------------------------------
 
 async function fetchBillingDataset(): Promise<BillingDataset> {
-  const [worklogsResult, contractsResult, daysOffResult, projectsResult] = await Promise.all([
-    supabase
-      .from('worklogs')
-      .select(
-        'sync_id,work_date,minutes,effective_minutes,earned_amount,' +
-          'tasks(number,title,epics(projects(id,name,color,kind,is_billable)))',
-      )
-      .is('deleted_at', null),
+  const supabase = getSupabase();
+  // Worklog history exceeds PostgREST's 1000-row "Max rows" cap, so page through
+  // it; an unpaginated fetch silently returns only the first 1000 rows. A stable
+  // unique-key order keeps .range() pages from skipping or duplicating rows.
+  const worklogsPromise = fetchAllPaged<RawWorklogRow>(
+    (from, to) =>
+      supabase
+        .from('worklogs')
+        .select(
+          'sync_id,work_date,minutes,effective_minutes,earned_amount,' +
+            'tasks(number,title,epics(projects(id,name,color,kind,is_billable)))',
+        )
+        .is('deleted_at', null)
+        .order('sync_id', { ascending: true })
+        .range(from, to) as unknown as PromiseLike<PageResult<RawWorklogRow>>,
+  );
+
+  const [worklogsRaw, contractsResult, daysOffResult, projectsResult] = await Promise.all([
+    worklogsPromise,
     supabase
       .from('contracts')
       .select(
@@ -95,13 +108,11 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
       .is('deleted_at', null),
   ]);
 
-  if (worklogsResult.error) throw worklogsResult.error;
   if (contractsResult.error) throw contractsResult.error;
   if (daysOffResult.error) throw daysOffResult.error;
   if (projectsResult.error) throw projectsResult.error;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const worklogs = (worklogsResult.data ?? []).map((r: any) => mapWorklogRow(r));
+  const worklogs = worklogsRaw.map((r) => mapWorklogRow(r));
 
   const contracts: ContractRow[] = (contractsResult.data ?? []).map(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabaseClient.js';
+import { getSupabase } from '../lib/supabaseClient.js';
 
 // ---------------------------------------------------------------------------
 // Pure helper — maps a Supabase auth error to a Czech user-facing message.
@@ -41,6 +41,7 @@ export function useSupabaseAuth(): SupabaseAuthState {
   const [status, setStatus] = useState<AuthStatus>('loading');
 
   useEffect(() => {
+    const supabase = getSupabase();
     // Resolve existing session on mount.
     supabase.auth.getSession().then(({ data }) => {
       const s = data.session ?? null;
@@ -58,13 +59,13 @@ export function useSupabaseAuth(): SupabaseAuthState {
   }, []);
 
   const signIn = async (email: string, password: string): Promise<{ error?: string }> => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await getSupabase().auth.signInWithPassword({ email, password });
     if (error) return { error: authErrorMessage(error) };
     return {};
   };
 
   const signOut = async (): Promise<void> => {
-    await supabase.auth.signOut();
+    await getSupabase().auth.signOut();
   };
 
   return { session, status, signIn, signOut };
