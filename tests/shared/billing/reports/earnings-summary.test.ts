@@ -5,7 +5,7 @@ import type { WorklogRow } from '../../../../packages/shared/src/billing/types.j
 function wl(over: Partial<WorklogRow>): WorklogRow {
   return {
     syncId: 's', workDate: '2026-06-01', minutes: 60, effectiveMinutes: 60,
-    earnedAmount: 1000, rateCurrency: 'CZK', projectId: 1, projectName: 'P1',
+    earnedAmount: 1000, projectId: 1, projectName: 'P1',
     projectColor: '#fff', projectKind: 'work', isBillable: true,
     taskNumber: null, taskTitle: null, ...over,
   };
@@ -32,10 +32,10 @@ describe('earningsSummary', () => {
     expect(earningsSummary(rows, { from: '2026-06-01', to: '2026-06-30' }).avgEffectiveHourlyRateCzk).toBeNull();
   });
 
-  it('excludes time_off from billable/unbillable and non-CZK from earnings', () => {
+  it('excludes time_off from billable/unbillable and rows with no earned amount from earnings', () => {
     const rows = [
       wl({ projectKind: 'time_off', isBillable: false, effectiveMinutes: 480 }),
-      wl({ rateCurrency: 'EUR', earnedAmount: 300, effectiveMinutes: 60 }),
+      wl({ earnedAmount: null, effectiveMinutes: 60 }),
     ];
     const r = earningsSummary(rows, { from: '2026-06-01', to: '2026-06-30' });
     expect(r.unbillableMinutes).toBe(0);

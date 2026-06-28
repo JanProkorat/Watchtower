@@ -5,7 +5,7 @@ import type { WorklogRow } from '../../../../packages/shared/src/billing/types.j
 function wl(over: Partial<WorklogRow>): WorklogRow {
   return {
     syncId: 's', workDate: '2026-06-01', minutes: 60, effectiveMinutes: 60,
-    earnedAmount: 1000, rateCurrency: 'CZK', projectId: 1, projectName: 'P1',
+    earnedAmount: 1000, projectId: 1, projectName: 'P1',
     projectColor: '#fff', projectKind: 'work', isBillable: true,
     taskNumber: null, taskTitle: null, ...over,
   };

@@ -26,7 +26,7 @@ export interface BillingStore {
 // Pure mapper — PostgREST embedded shape → WorklogRow
 //
 // Embedded select:
-//   worklogs?select=sync_id,work_date,minutes,effective_minutes,earned_amount,
+//   worklogs?select=sync_id,work_date,minutes,effective_minutes,earned_amount,source,
 //                   tasks(number,title,epics(projects(id,name,color,kind,is_billable)))
 // ---------------------------------------------------------------------------
 
@@ -47,6 +47,7 @@ export type RawWorklogRow = {
   minutes: number;
   effective_minutes: number;
   earned_amount: number | null;
+  source: string | null;
   tasks: RawTask;
 };
 
@@ -67,6 +68,7 @@ export function mapWorklogRow(raw: RawWorklogRow): WorklogRow {
     isBillable: proj?.is_billable ?? false,
     taskNumber: task?.number ?? null,
     taskTitle: task?.title ?? null,
+    source: raw.source ?? null,
   };
 }
 

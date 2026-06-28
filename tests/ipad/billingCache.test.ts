@@ -110,6 +110,22 @@ describe('mapWorklogRow', () => {
   });
 });
 
+describe('mapWorklogRow source', () => {
+  const base = {
+    sync_id: 's1', work_date: '2026-06-01', minutes: 60, effective_minutes: 60,
+    earned_amount: 1000,
+    tasks: { number: 'X-1', title: 'T', epics: { projects: { id: 1, name: 'P', color: '#fff', kind: 'work', is_billable: true } } },
+  };
+
+  it('maps the source field', () => {
+    expect(mapWorklogRow({ ...base, source: 'jira-sync' } as never).source).toBe('jira-sync');
+  });
+
+  it('defaults a missing source to null', () => {
+    expect(mapWorklogRow(base as never).source).toBeNull();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // loadCache / saveCache round-trip
 // ---------------------------------------------------------------------------

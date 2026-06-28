@@ -1,6 +1,7 @@
 import type { WorklogRow, ProjectEarning } from '../types.js';
 
-const isCzkEarned = (r: WorklogRow) => r.rateCurrency === 'CZK' && r.earnedAmount != null;
+// Post-#108 the app is CZK-only (rate_currency dropped); every earned amount is CZK.
+const isCzkEarned = (r: WorklogRow) => r.earnedAmount != null;
 
 export interface EarningsSummaryResult {
   totalCzk: number;

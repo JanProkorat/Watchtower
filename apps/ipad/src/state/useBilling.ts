@@ -85,7 +85,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
       supabase
         .from('worklogs')
         .select(
-          'sync_id,work_date,minutes,effective_minutes,earned_amount,' +
+          'sync_id,work_date,minutes,effective_minutes,earned_amount,source,' +
             'tasks(number,title,epics(projects(id,name,color,kind,is_billable)))',
         )
         .is('deleted_at', null)
