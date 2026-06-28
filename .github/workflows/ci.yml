@@ -1,0 +1,40 @@
+name: CI
+
+# Typecheck + test gate. Added after an iPad-billing type break merged "green":
+# vitest strips types (esbuild) so the suite passed, and the only prior PR check
+# was GitGuardian (secret scanning) — no tsc ran. See docs note typecheck-not-in-ci.
+#
+# `typecheck:ci` deliberately excludes apps/desktop, which carries pre-existing
+# type drift (MUI v6 slotProps, browserStub IPC generics, etc.). Re-include it
+# once that drift is fixed (tracked follow-up).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (shared + transport + electron + orchestrator + ipad)
+        run: npm run typecheck:ci
+
+      - name: Test
+        run: npm test
