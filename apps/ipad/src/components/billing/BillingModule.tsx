@@ -48,7 +48,7 @@ export function BillingModule(): JSX.Element {
   // status === 'in'
   if (selectedProject !== null) {
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'auto' }}>
         <ProjectDetailView projectId={selectedProject} onBack={() => setSelectedProject(null)} />
       </div>
     );
