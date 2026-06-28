@@ -34,17 +34,16 @@ function installStub(): void {
       'Spawn/kill/IPC calls will be ignored. Launch with `npm run dev` to get a real app window.',
   );
 
-  const stub: WatchtowerBridge = {
-    async invoke<T extends IpcRequest['kind']>(
-      kind: T,
-      _payload: Extract<IpcRequest, { kind: T }>['payload'],
-    ): Promise<Extract<IpcResponse, { kind: T }>['payload']> {
-      type Out = Extract<IpcResponse, { kind: T }>['payload'];
+  // Cast through unknown: TypeScript cannot verify the discriminated-union generic
+  // signatures structurally (TS2719), but the runtime behaviour is correct for
+  // a no-op stub.
+  const stub = {
+    async invoke(kind: string, _payload: unknown): Promise<unknown> {
       switch (kind) {
         case 'ping':
-          return { now: Date.now(), main: Date.now(), orch: Date.now() } as Out;
+          return { now: Date.now(), main: Date.now(), orch: Date.now() };
         case 'listInstances':
-          return { instances: [] } as Out;
+          return { instances: [] };
         case 'spawnInstance':
           // Returning an instanceId would make the renderer activate a tab
           // that has no matching <Tab /> child — MUI's Tabs validator
@@ -53,21 +52,18 @@ function installStub(): void {
           return {
             instanceId: null,
             error: 'Running in browser preview — launch the Watchtower app to spawn real claude instances.',
-          } as Out;
+          };
         case 'chooseDirectory':
           // No native picker in plain browser. Returning null cancels the spawn flow.
-          return { path: null } as Out;
+          return { path: null };
         default:
-          return { ok: true } as Out;
+          return { ok: true };
       }
     },
-    on<T extends IpcPush['kind']>(
-      _kind: T,
-      _handler: (payload: Extract<IpcPush, { kind: T }>['payload']) => void,
-    ): () => void {
+    on(_kind: string, _handler: unknown): () => void {
       return () => undefined;
     },
-  };
+  } as unknown as WatchtowerBridge;
 
   Object.defineProperty(window, 'watchtower', { value: stub, configurable: true });
 }

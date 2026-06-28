@@ -66,14 +66,12 @@ export function SkillsTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search skills…"
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
           }}
           sx={{ minWidth: 240 }}
         />

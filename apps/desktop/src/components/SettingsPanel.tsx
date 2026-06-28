@@ -182,7 +182,7 @@ export function SettingsPanel() {
             value={quietMs}
             onChange={(e) => setQuietMs(e.target.value)}
             onBlur={() => void onQuietBlur()}
-            slotProps={{ input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } } }}
+            InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } }}
             sx={{ maxWidth: 200 }}
           />
         </SettingRow>
@@ -197,7 +197,7 @@ export function SettingsPanel() {
             value={defaultCwd}
             onChange={(e) => setDefaultCwd(e.target.value)}
             onBlur={() => void onCwdBlur()}
-            slotProps={{ input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } } }}
+            InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 13 } }}
           />
         </SettingRow>
 

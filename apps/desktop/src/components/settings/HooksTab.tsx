@@ -387,9 +387,7 @@ export function HooksTab() {
                               setAdding((a) => ({ ...a, [event]: { ...draft, matcher: e.target.value } }))
                             }
                             placeholder="Write|Edit|MultiEdit"
-                            slotProps={{
-                              input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 12 } },
-                            }}
+                            InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 12 } }}
                           />
                           <TextField
                             label="Command"
@@ -400,9 +398,7 @@ export function HooksTab() {
                             }
                             multiline
                             minRows={2}
-                            slotProps={{
-                              input: { sx: { fontFamily: 'Menlo, monospace', fontSize: 12 } },
-                            }}
+                            InputProps={{ sx: { fontFamily: 'Menlo, monospace', fontSize: 12 } }}
                           />
                           <Stack direction="row" spacing={1} justifyContent="flex-end">
                             <Button
@@ -443,9 +439,7 @@ export function HooksTab() {
                               }));
                             }}
                             sx={{ minWidth: 200 }}
-                            slotProps={{
-                              select: { displayEmpty: true },
-                            }}
+                            SelectProps={{ displayEmpty: true }}
                           >
                             <MenuItem value="" disabled>
                               From template…

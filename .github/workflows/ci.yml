@@ -4,9 +4,7 @@ name: CI
 # vitest strips types (esbuild) so the suite passed, and the only prior PR check
 # was GitGuardian (secret scanning) — no tsc ran. See docs note typecheck-not-in-ci.
 #
-# `typecheck:ci` deliberately excludes apps/desktop, which carries pre-existing
-# type drift (MUI v6 slotProps, browserStub IPC generics, etc.). Re-include it
-# once that drift is fixed (tracked follow-up).
+# `typecheck:ci` covers all packages including apps/desktop (type errors fixed in #121).
 
 on:
   pull_request:
@@ -33,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck (shared + transport + electron + orchestrator + ipad)
+      - name: Typecheck (shared + transport + electron + orchestrator + desktop + ipad)
         run: npm run typecheck:ci
 
       - name: Test
