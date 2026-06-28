@@ -6,6 +6,9 @@ import { EarningsMonthView } from './EarningsMonthView.js';
 import { ProjectDetailView } from './ProjectDetailView.js';
 import { ReportsView } from './ReportsView.js';
 import { BillingNav, type BillingSection } from './BillingNav.js';
+import { WorklogListView } from './records/WorklogListView.js';
+import { TaskGridView } from './records/TaskGridView.js';
+import { TimeOffView } from './records/TimeOffView.js';
 
 export function BillingModule(): JSX.Element {
   const { status, signIn, signOut } = useSupabaseAuth();
@@ -39,14 +42,10 @@ export function BillingModule(): JSX.Element {
         {section === 'dashboard' && <DashboardView />}
         {section === 'earnings' && <EarningsMonthView onOpenProject={openProject} />}
         {section === 'reports' && <ReportsView onOpenProject={openProject} />}
-        {section === 'records-list' && <Placeholder label="Seznam (Task 6)" />}
-        {section === 'records-grid' && <Placeholder label="Mřížka (Task 7)" />}
-        {section === 'records-timeoff' && <Placeholder label="Volno (Task 8)" />}
+        {section === 'records-list' && <WorklogListView />}
+        {section === 'records-grid' && <TaskGridView />}
+        {section === 'records-timeoff' && <TimeOffView />}
       </div>
     </div>
   );
-}
-
-function Placeholder({ label }: { label: string }): JSX.Element {
-  return <div style={{ padding: 24, color: '#8B88A6', fontFamily: 'system-ui, sans-serif' }}>{label}</div>;
 }
