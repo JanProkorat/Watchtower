@@ -35,7 +35,6 @@ describe('createWorklogDeriver', () => {
       effectiveFrom: '2026-01-01',
       rateType: 'hourly',
       rateAmount: 100,
-      currency: 'CZK',
       hoursPerDay: 8,
     });
     const worklog = new WorklogsRepo(db).create({
@@ -77,7 +76,6 @@ describe('createWorklogDeriver', () => {
       effectiveFrom: '2026-01-01',
       rateType: 'hourly',
       rateAmount: 60,
-      currency: 'EUR',
       hoursPerDay: 8,
     });
     const worklog = new WorklogsRepo(db).create({
@@ -136,7 +134,6 @@ describe('createWorklogDeriver', () => {
       effectiveFrom: '2027-01-01',
       rateType: 'hourly',
       rateAmount: 50,
-      currency: 'USD',
     });
 
     const taskRow = db.prepare('SELECT sync_id FROM tasks WHERE id = ?').get(task.id) as { sync_id: string };
@@ -165,7 +162,6 @@ describe('createWorklogDeriver', () => {
       effectiveFrom: '2026-01-01',
       rateType: 'daily',
       rateAmount: 800,
-      currency: 'CZK',
       hoursPerDay: 8,
     });
 

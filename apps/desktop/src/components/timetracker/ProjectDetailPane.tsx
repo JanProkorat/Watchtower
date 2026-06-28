@@ -64,7 +64,7 @@ function formatRate(c: ContractViewPayload): string {
     maximumFractionDigits: 2,
   });
   const unit = c.rateType === 'hourly' ? '/ hr' : '/ MD';
-  return `${amount} ${c.currency} ${unit}`;
+  return `${amount} Kč ${unit}`;
 }
 
 /**

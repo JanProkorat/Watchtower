@@ -317,7 +317,6 @@ export interface ContractInputPayload {
   effectiveFrom: string;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
-  currency: string;
   hoursPerDay?: number;
   endDate?: string | null;
   mdLimit?: number | null;
@@ -330,7 +329,6 @@ export interface ContractViewPayload {
   endDate: string | null;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
-  currency: string;
   hoursPerDay: number;
   mdLimit: number | null;
   createdAt: string;

@@ -351,7 +351,6 @@ describe('DashboardOverviewService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'daily',
         rateAmount: 12000,
-        currency: 'CZK',
         endDate: '2026-06-30',
         mdLimit: 115,
       });
@@ -360,7 +359,6 @@ describe('DashboardOverviewService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'hourly',
         rateAmount: 1500,
-        currency: 'EUR',
         mdLimit: 50,
       });
 
@@ -391,7 +389,6 @@ describe('DashboardOverviewService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'daily',
         rateAmount: 1,
-        currency: 'CZK',
         endDate: '2026-12-31',
         mdLimit: 10,
       });
@@ -412,7 +409,6 @@ describe('DashboardOverviewService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'hourly',
         rateAmount: 100,
-        currency: 'CZK',
         // No endDate, no mdLimit → excluded.
       });
 
@@ -433,7 +429,6 @@ describe('DashboardOverviewService', () => {
           effectiveFrom: '2026-01-01',
           rateType: 'daily',
           rateAmount: 10000,
-          currency: 'CZK',
           endDate: '2026-12-31',
           mdLimit: 100,
         });
@@ -462,7 +457,6 @@ describe('DashboardOverviewService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'daily',
         rateAmount: 1,
-        currency: 'CZK',
         endDate: '2026-12-31',
         mdLimit: 1,
       });
@@ -471,7 +465,6 @@ describe('DashboardOverviewService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'daily',
         rateAmount: 1,
-        currency: 'CZK',
         endDate: '2026-12-31',
         mdLimit: 10_000,
       });
@@ -482,7 +475,6 @@ describe('DashboardOverviewService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'daily',
         rateAmount: 1,
-        currency: 'CZK',
         mdLimit: 100,
       });
       rates.create({
@@ -490,7 +482,6 @@ describe('DashboardOverviewService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'daily',
         rateAmount: 1,
-        currency: 'CZK',
         mdLimit: 100,
       });
 
@@ -516,7 +507,6 @@ describe('DashboardOverviewService', () => {
         effectiveFrom: '2026-01-01',
         rateType: 'daily',
         rateAmount: 10000,
-        currency: 'CZK',
         endDate: '2026-12-31',
         mdLimit: 100,
         hoursPerDay: 8,

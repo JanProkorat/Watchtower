@@ -219,7 +219,6 @@ export interface OrchContractInput {
   effectiveFrom: string;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
-  currency: string;
   hoursPerDay?: number;
   endDate?: string | null;
   mdLimit?: number | null;
@@ -232,7 +231,6 @@ export interface OrchContractView {
   endDate: string | null;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
-  currency: string;
   hoursPerDay: number;
   mdLimit: number | null;
   createdAt: string;

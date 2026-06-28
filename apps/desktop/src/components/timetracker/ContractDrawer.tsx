@@ -44,7 +44,6 @@ interface Draft {
   endDate: string;
   rateType: 'hourly' | 'daily';
   rateAmount: string;
-  currency: string;
   hoursPerDay: string;
   mdLimit: string;
 }
@@ -66,7 +65,6 @@ function emptyDraft(): Draft {
     endDate: '',
     rateType: 'hourly',
     rateAmount: '',
-    currency: 'CZK',
     hoursPerDay: '8',
     mdLimit: '',
   };
@@ -78,7 +76,6 @@ function draftOf(c: ContractViewPayload): Draft {
     endDate: c.endDate ?? '',
     rateType: c.rateType,
     rateAmount: c.rateAmount.toString(),
-    currency: c.currency,
     hoursPerDay: c.hoursPerDay.toString(),
     mdLimit: c.mdLimit != null ? c.mdLimit.toString() : '',
   };
@@ -129,7 +126,6 @@ export function ContractDrawer({ open, contract, projectId, onClose, onSubmit, o
         effectiveFrom: draft.effectiveFrom,
         rateType: draft.rateType,
         rateAmount: rateAmountNum,
-        currency: draft.currency.trim().toUpperCase(),
         hoursPerDay: hoursPerDayNum,
         endDate: draft.endDate || null,
         mdLimit,
@@ -230,18 +226,6 @@ export function ContractDrawer({ open, contract, projectId, onClose, onSubmit, o
               <MenuItem value="hourly">Hourly</MenuItem>
               <MenuItem value="daily">Daily (MD)</MenuItem>
             </TextField>
-            <TextField
-              select
-              label="Currency"
-              size="small"
-              value={draft.currency}
-              onChange={(e) => setDraft({ ...draft, currency: e.target.value })}
-              sx={{ flex: 1 }}
-            >
-              <MenuItem value="CZK">CZK</MenuItem>
-              <MenuItem value="EUR">EUR</MenuItem>
-              <MenuItem value="USD">USD</MenuItem>
-            </TextField>
           </Stack>
 
           <Stack direction="row" spacing={2}>
@@ -255,7 +239,7 @@ export function ContractDrawer({ open, contract, projectId, onClose, onSubmit, o
               required
               sx={{ flex: 1 }}
               helperText={
-                draft.rateType === 'hourly' ? `${draft.currency} per hour` : `${draft.currency} per MD`
+                draft.rateType === 'hourly' ? 'Kč per hour' : 'Kč per MD'
               }
             />
             <TextField

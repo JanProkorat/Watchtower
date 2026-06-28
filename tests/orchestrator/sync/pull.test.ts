@@ -125,7 +125,6 @@ describe('pullAll', () => {
       effectiveFrom: '2026-01-01',
       rateType: 'hourly',
       rateAmount: 100,
-      currency: 'CZK',
       hoursPerDay: 8,
     });
     const epic = new EpicsRepo(db).create({ projectId: project.id, name: 'Billed E' });
