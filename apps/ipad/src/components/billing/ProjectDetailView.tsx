@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useBilling } from '../../state/useBilling.js';
 import { formatCzk, formatHours, formatDateCz } from '../../lib/czFormat.js';
 import { czechMonthLabel } from '../../lib/monthHelpers.js';
@@ -6,6 +7,9 @@ import {
   activeContract,
   rateLabel,
 } from '../../lib/projectDetailHelpers.js';
+import { useContractMutations } from '../../state/useContractMutations.js';
+import { canEdit, type ContractWriteInput } from '../../state/billingWrites.js';
+import type { ContractRow } from '@watchtower/shared/billing/types.js';
 
 // ---------------------------------------------------------------------------
 // Design tokens (same palette as DashboardView / EarningsMonthView)
@@ -21,6 +25,7 @@ const C = {
   violetBg: '#2d2857',
   cyan: '#22D3EE',
   green: '#34d399',
+  red: '#f87171',
 } as const;
 
 const MONO: React.CSSProperties = {
@@ -86,6 +91,109 @@ function Spinner(): JSX.Element {
 }
 
 // ---------------------------------------------------------------------------
+// ContractDrawer — bottom-sheet for add / edit / delete
+// ---------------------------------------------------------------------------
+
+function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete }: {
+  title: string;
+  projectId: number;
+  initial?: ContractRow;
+  onClose(): void;
+  onSubmit(input: ContractWriteInput): Promise<void>;
+  onDelete?(): Promise<void>;
+}): JSX.Element {
+  const [effectiveFrom, setEffectiveFrom] = useState(initial?.effectiveFrom ?? new Date().toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState(initial?.endDate ?? '');
+  const [rateType, setRateType] = useState<'hourly' | 'daily'>(initial?.rateType ?? 'hourly');
+  const [rateAmount, setRateAmount] = useState(initial ? String(initial.rateAmount) : '');
+  const [hoursPerDay, setHoursPerDay] = useState(initial ? String(initial.hoursPerDay) : '8');
+  const [mdLimit, setMdLimit] = useState(initial?.mdLimit != null ? String(initial.mdLimit) : '');
+  const [saving, setSaving] = useState(false);
+
+  const rate = Number(rateAmount.replace(',', '.'));
+  const hpd = Number(hoursPerDay.replace(',', '.'));
+  const md = mdLimit.trim() === '' ? null : Number(mdLimit.replace(',', '.'));
+  const valid =
+    effectiveFrom !== '' &&
+    Number.isFinite(rate) && rate >= 0 &&
+    Number.isFinite(hpd) && hpd > 0 &&
+    (md === null || (Number.isFinite(md) && md >= 0));
+  const canSubmit = valid && !saving;
+
+  const field: React.CSSProperties = { background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' };
+  const label: React.CSSProperties = { fontSize: 12, color: C.muted, marginBottom: 4 };
+
+  async function submit() {
+    setSaving(true);
+    try {
+      await onSubmit({
+        projectId,
+        effectiveFrom,
+        endDate: endDate.trim() === '' ? null : endDate,
+        rateType,
+        rateAmount: rate,
+        hoursPerDay: hpd,
+        mdLimit: md,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.ground, borderTopLeftRadius: 16, borderTopRightRadius: 16, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14, borderTop: `1px solid ${C.border}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={label}>Platné od</div>
+            <input type="date" style={field} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={label}>Platné do (volitelné)</div>
+            <input type="date" style={field} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+        </div>
+        <div>
+          <div style={label}>Typ sazby</div>
+          <select value={rateType} onChange={(e) => setRateType(e.target.value as 'hourly' | 'daily')} style={field}>
+            <option value="hourly">Hodinová</option>
+            <option value="daily">Denní</option>
+          </select>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={label}>Sazba</div>
+            <input style={field} inputMode="decimal" value={rateAmount} onChange={(e) => setRateAmount(e.target.value)} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={label}>Hodin/den</div>
+            <input style={field} inputMode="decimal" value={hoursPerDay} onChange={(e) => setHoursPerDay(e.target.value)} />
+          </div>
+        </div>
+        <div>
+          <div style={label}>MD limit (volitelné)</div>
+          <input style={field} inputMode="decimal" value={mdLimit} onChange={(e) => setMdLimit(e.target.value)} />
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          {onDelete && (
+            <button type="button" onClick={async () => { setSaving(true); try { await onDelete!(); } finally { setSaving(false); } }} disabled={saving} style={{ ...field, width: 'auto', color: C.red, cursor: 'pointer' }}>Smazat</button>
+          )}
+          <div style={{ flex: 1 }} />
+          <button type="button" onClick={onClose} style={{ ...field, width: 'auto', cursor: 'pointer' }}>Zrušit</button>
+          <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...field, width: 'auto', background: canSubmit ? C.violet : C.border, color: '#fff', border: 'none', cursor: canSubmit ? 'pointer' : 'default' }}>
+            {saving ? 'Ukládám…' : 'Uložit'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // ProjectDetailView — main export
 // ---------------------------------------------------------------------------
 
@@ -96,10 +204,22 @@ export function ProjectDetailView({
   projectId: number;
   onBack: () => void;
 }): JSX.Element {
-  const { data, state } = useBilling();
+  const { data, state, patchContracts, patchWorklogs } = useBilling();
 
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
+
+  // Editing is only allowed when dataset is fresh (live).
+  const editable = canEdit(state);
+
+  // All worklogs and contracts (needed by the mutations hook even during loading).
+  const allWorklogsAll = data?.worklogs ?? [];
+  const allContractsAll = data?.contracts ?? [];
+
+  const { createContract, updateContract, deleteContract, error: contractError } =
+    useContractMutations({ contracts: allContractsAll, worklogs: allWorklogsAll, patchContracts, patchWorklogs });
+
+  const [drawer, setDrawer] = useState<{ mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; contract: ContractRow }>({ mode: 'closed' });
 
   // Loading with no data
   if (state === 'loading' && data == null) {
@@ -311,9 +431,62 @@ export function ProjectDetailView({
         </div>
 
         {/* ---- Rate history table ---- */}
-        {contractPeriods.length > 0 && (
-          <div>
-            <SectionHeader title="Historie sazeb" />
+        <div>
+          {/* Section header row: title + optional "+ Přidat sazbu" button */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 0.8,
+                color: C.muted,
+                textTransform: 'uppercase',
+              }}
+            >
+              Historie sazeb
+            </div>
+            {editable && (
+              <button
+                type="button"
+                onClick={() => setDrawer({ mode: 'create' })}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: C.violet,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  padding: '2px 0',
+                }}
+              >
+                + Přidat sazbu
+              </button>
+            )}
+          </div>
+
+          {/* Overlap / mutation error */}
+          {contractError && (
+            <div style={{ color: C.red, fontSize: 12, padding: '4px 0', marginBottom: 4 }}>
+              {contractError}
+            </div>
+          )}
+
+          {contractPeriods.length === 0 ? (
+            <div
+              style={{
+                background: C.surface,
+                border: `1px solid ${C.border}`,
+                borderRadius: 12,
+                padding: '24px 16px',
+                textAlign: 'center',
+                fontSize: 13,
+                color: C.muted,
+              }}
+            >
+              žádné sazby
+            </div>
+          ) : (
             <div
               style={{
                 background: C.surface,
@@ -331,7 +504,8 @@ export function ProjectDetailView({
 
                 return (
                   <div
-                    key={`${contract.effectiveFrom}-${contract.endDate ?? 'open'}-${contract.rateAmount}`}
+                    key={contract.syncId}
+                    onClick={() => editable && setDrawer({ mode: 'edit', contract })}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -339,6 +513,7 @@ export function ProjectDetailView({
                       padding: '12px 16px',
                       borderBottom: isLast ? 'none' : `1px solid ${C.border}`,
                       background: isActive ? C.violetBg + '66' : 'transparent',
+                      cursor: editable ? 'pointer' : 'default',
                     }}
                   >
                     {/* Active indicator */}
@@ -390,12 +565,17 @@ export function ProjectDetailView({
                     >
                       {formatCzk(earnedCzk)}
                     </div>
+
+                    {/* Edit chevron hint when editable */}
+                    {editable && (
+                      <div style={{ color: C.muted, fontSize: 14, flexShrink: 0 }}>›</div>
+                    )}
                   </div>
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* ---- Worklog ledger (current month) ---- */}
         <div>
@@ -543,6 +723,28 @@ export function ProjectDetailView({
           </div>
         </div>
       </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Contract drawers                                                      */}
+      {/* ------------------------------------------------------------------ */}
+      {drawer.mode === 'create' && (
+        <ContractDrawer
+          title="Nová sazba"
+          projectId={projectId}
+          onClose={() => setDrawer({ mode: 'closed' })}
+          onSubmit={async (input) => { await createContract(input); setDrawer({ mode: 'closed' }); }}
+        />
+      )}
+      {drawer.mode === 'edit' && (
+        <ContractDrawer
+          title="Upravit sazbu"
+          projectId={projectId}
+          initial={drawer.contract}
+          onClose={() => setDrawer({ mode: 'closed' })}
+          onSubmit={async (input) => { await updateContract(drawer.contract.syncId, input); setDrawer({ mode: 'closed' }); }}
+          onDelete={async () => { await deleteContract(drawer.contract.syncId); setDrawer({ mode: 'closed' }); }}
+        />
+      )}
     </div>
   );
 }

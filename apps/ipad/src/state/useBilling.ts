@@ -6,6 +6,7 @@ import {
   mapDayOffRow,
   mapTaskRow,
   mapEpicRow,
+  mapContractRow,
   loadCache,
   saveCache,
   type BillingDataset,
@@ -14,6 +15,7 @@ import {
   type RawDayOffRow,
   type RawTaskRow,
   type RawEpicRow,
+  type RawContractRow,
 } from './billingCache.js';
 import { fetchAllPaged, type PageResult } from './paginate.js';
 
@@ -31,6 +33,7 @@ export interface BillingHookResult {
   patchDaysOff(next: DayOffRow[]): void;
   patchWorklogs(next: WorklogRow[]): void;
   patchTasks(next: TaskRow[]): void;
+  patchContracts(next: ContractRow[]): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +53,8 @@ export type BillingAction =
   | { type: 'FETCH_ERROR' }
   | { type: 'PATCH_DAYS_OFF'; daysOff: DayOffRow[] }
   | { type: 'PATCH_WORKLOGS'; worklogs: WorklogRow[] }
-  | { type: 'PATCH_TASKS'; tasks: TaskRow[] };
+  | { type: 'PATCH_TASKS'; tasks: TaskRow[] }
+  | { type: 'PATCH_CONTRACTS'; contracts: ContractRow[] };
 
 export function billingReducer(
   prev: BillingReducerState,
@@ -84,6 +88,8 @@ export function billingReducer(
       return prev.data ? { ...prev, data: { ...prev.data, worklogs: action.worklogs } } : prev;
     case 'PATCH_TASKS':
       return prev.data ? { ...prev, data: { ...prev.data, tasks: action.tasks } } : prev;
+    case 'PATCH_CONTRACTS':
+      return prev.data ? { ...prev, data: { ...prev.data, contracts: action.contracts } } : prev;
     default:
       return prev;
   }
@@ -133,7 +139,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
 
   const [worklogsRaw, contractsResult, daysOffResult, projectsResult, tasksRaw, epicsRaw] = await Promise.all([
     worklogsPromise,
-    /* contracts */ supabase.from('contracts').select('project_id,effective_from,end_date,rate_type,rate_amount,hours_per_day,md_limit').is('deleted_at', null),
+    /* contracts */ supabase.from('contracts').select('sync_id,project_id,effective_from,end_date,rate_type,rate_amount,hours_per_day,md_limit').is('deleted_at', null),
     supabase.from('days_off').select('date,kind,sync_id').is('deleted_at', null),
     supabase.from('projects').select('id,name,color,kind,is_billable').is('deleted_at', null),
     tasksPromise,
@@ -146,18 +152,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
 
   const worklogs = worklogsRaw.map((r) => mapWorklogRow(r));
 
-  const contracts: ContractRow[] = (contractsResult.data ?? []).map(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (r: any): ContractRow => ({
-      projectId: r.project_id,
-      effectiveFrom: r.effective_from,
-      endDate: r.end_date ?? null,
-      rateType: r.rate_type,
-      rateAmount: r.rate_amount,
-      hoursPerDay: r.hours_per_day,
-      mdLimit: r.md_limit ?? null,
-    }),
-  );
+  const contracts: ContractRow[] = (contractsResult.data ?? []).map((r) => mapContractRow(r as RawContractRow));
 
   const daysOff: DayOffRow[] = (daysOffResult.data ?? []).map((r) => mapDayOffRow(r as RawDayOffRow));
 
@@ -252,6 +247,7 @@ export function useBilling(storeOverride?: BillingStore): BillingHookResult {
   const patchDaysOff = useCallback((next: DayOffRow[]) => dispatch({ type: 'PATCH_DAYS_OFF', daysOff: next }), [dispatch]);
   const patchWorklogs = useCallback((next: WorklogRow[]) => dispatch({ type: 'PATCH_WORKLOGS', worklogs: next }), [dispatch]);
   const patchTasks = useCallback((next: TaskRow[]) => dispatch({ type: 'PATCH_TASKS', tasks: next }), [dispatch]);
+  const patchContracts = useCallback((next: ContractRow[]) => dispatch({ type: 'PATCH_CONTRACTS', contracts: next }), [dispatch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -287,5 +283,6 @@ export function useBilling(storeOverride?: BillingStore): BillingHookResult {
     patchDaysOff,
     patchWorklogs,
     patchTasks,
+    patchContracts,
   };
 }

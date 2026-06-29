@@ -302,3 +302,115 @@ export function applyTaskWrite(tasks: TaskRow[], change: TaskChange): TaskRow[] 
 export function canEditTask(status: string): boolean {
   return status !== 'done';
 }
+
+// --- Contract write-back (slice 3b) ---------------------------------------
+
+export interface ContractWriteInput {
+  projectId: number;
+  effectiveFrom: string;
+  endDate: string | null;
+  rateType: 'hourly' | 'daily';
+  rateAmount: number;
+  hoursPerDay: number;
+  mdLimit: number | null;
+}
+
+export interface ContractInsertRow {
+  sync_id: string;
+  project_id: number;
+  effective_from: string;
+  rate_type: 'hourly' | 'daily';
+  rate_amount: number;
+  hours_per_day: number;
+  end_date: string | null;
+  md_limit: number | null;
+  deleted_at: null;
+  updated_at: string;
+}
+
+export interface ContractUpdateRow {
+  effective_from: string;
+  rate_type: 'hourly' | 'daily';
+  rate_amount: number;
+  hours_per_day: number;
+  end_date: string | null;
+  md_limit: number | null;
+  updated_at: string;
+}
+
+export function buildContractInsert(input: ContractWriteInput, opts: { syncId: string; now: string }): ContractInsertRow {
+  return {
+    sync_id: opts.syncId,
+    project_id: input.projectId,
+    effective_from: input.effectiveFrom,
+    rate_type: input.rateType,
+    rate_amount: input.rateAmount,
+    hours_per_day: input.hoursPerDay,
+    end_date: input.endDate,
+    md_limit: input.mdLimit,
+    deleted_at: null,
+    updated_at: opts.now,
+  };
+}
+
+export function buildContractUpdate(input: ContractWriteInput, opts: { now: string }): ContractUpdateRow {
+  return {
+    effective_from: input.effectiveFrom,
+    rate_type: input.rateType,
+    rate_amount: input.rateAmount,
+    hours_per_day: input.hoursPerDay,
+    end_date: input.endDate,
+    md_limit: input.mdLimit,
+    updated_at: opts.now,
+  };
+}
+
+export function buildContractEndDateUpdate(endDate: string, now: string): { end_date: string; updated_at: string } {
+  return { end_date: endDate, updated_at: now };
+}
+
+export function buildContractDelete(now: string): { deleted_at: string; updated_at: string } {
+  return { deleted_at: now, updated_at: now };
+}
+
+export function buildOptimisticContractRow(input: ContractWriteInput, syncId: string): ContractRow {
+  return {
+    syncId,
+    projectId: input.projectId,
+    effectiveFrom: input.effectiveFrom,
+    endDate: input.endDate,
+    rateType: input.rateType,
+    rateAmount: input.rateAmount,
+    hoursPerDay: input.hoursPerDay,
+    mdLimit: input.mdLimit,
+  };
+}
+
+export type ContractChange =
+  | { type: 'upsert'; row: ContractRow }
+  | { type: 'remove'; syncId: string };
+
+export function applyContractWrite(contracts: ContractRow[], change: ContractChange): ContractRow[] {
+  if (change.type === 'remove') {
+    return contracts.filter((c) => c.syncId !== change.syncId);
+  }
+  const without = contracts.filter((c) => c.syncId !== change.row.syncId);
+  return [...without, change.row];
+}
+
+/**
+ * Recompute effectiveMinutes/earnedAmount for the given project's worklogs using
+ * the provided contract set (cache-only display rebill). Other projects' worklogs
+ * pass through unchanged. Mirrors the Mac deriver via the shared formula.
+ */
+export function rebillProjectWorklogs(worklogs: WorklogRow[], projectId: number, contracts: ContractRow[]): WorklogRow[] {
+  return worklogs.map((w) => {
+    if (w.projectId !== projectId) return w;
+    const billing = computeDerivedForWrite(contracts, projectId, {
+      minutes: w.minutes,
+      reportedMinutes: w.reportedMinutes,
+      workDate: w.workDate,
+    });
+    return { ...w, effectiveMinutes: billing.effectiveMinutes, earnedAmount: billing.earnedAmount };
+  });
+}

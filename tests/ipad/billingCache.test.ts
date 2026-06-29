@@ -196,6 +196,7 @@ describe('billing cache persistence', () => {
       source: null,
     };
     const contract: ContractRow = {
+      syncId: 'c-test',
       projectId: 3,
       effectiveFrom: '2026-01-01',
       endDate: null,
@@ -304,5 +305,21 @@ describe('loadCache — slice 3a shape guard', () => {
     store.set('watchtower.ipad.billing.cache', JSON.stringify(legacy));
     const adapter = { get: async (k: string) => store.get(k) ?? null, set: async () => {} };
     expect(await loadCache(adapter)).toBeNull();
+  });
+});
+
+import { mapContractRow } from '../../apps/ipad/src/state/billingCache.js';
+import type { RawContractRow } from '../../apps/ipad/src/state/billingCache.js';
+
+describe('mapContractRow', () => {
+  it('maps a raw contract row incl. syncId, nullable end_date/md_limit', () => {
+    const raw: RawContractRow = {
+      sync_id: 'c1', project_id: 3, effective_from: '2026-01-01', end_date: null,
+      rate_type: 'hourly', rate_amount: 100, hours_per_day: 8, md_limit: null,
+    };
+    expect(mapContractRow(raw)).toEqual({
+      syncId: 'c1', projectId: 3, effectiveFrom: '2026-01-01', endDate: null,
+      rateType: 'hourly', rateAmount: 100, hoursPerDay: 8, mdLimit: null,
+    });
   });
 });

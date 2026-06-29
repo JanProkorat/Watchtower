@@ -2,6 +2,7 @@ import type { SqliteLike } from '../db/migrations.js';
 import type { PgStore } from '../db/pg/pool.js';
 import { SYNCED_TABLES, toSqliteValue, type SyncTable } from './schema.js';
 import { getCursor, setCursor } from './cursor.js';
+import { markWorklogsForRebill } from '../db/rebill.js';
 
 // Parent-before-child so a child's FK target exists locally when it lands.
 const PULL_ORDER = ['projects', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'];
@@ -20,7 +21,7 @@ export async function pullTable(
   db: SqliteLike,
   store: PgStore,
   table: SyncTable,
-): Promise<{ pulled: number; conflicts: number }> {
+): Promise<{ pulled: number; conflicts: number; touchedFkIds: number[] }> {
   const cursor = getCursor(db, 'pull', table.name);
   const fk = fkSource(table);
 
@@ -40,6 +41,7 @@ export async function pullTable(
 
   let pulled = 0;
   let conflicts = 0;
+  const touchedFkIds: number[] = [];
   let maxSeen = cursor;
 
   for (const remote of rows) {
@@ -102,11 +104,12 @@ export async function pullTable(
       upsertLocal(db, table, remote, fk, localFkId);
     }
     pulled++;
+    if (localFkId != null) touchedFkIds.push(localFkId);
     if (remoteUpdated > maxSeen) maxSeen = remoteUpdated;
   }
 
   if (maxSeen > cursor) setCursor(db, 'pull', table.name, maxSeen);
-  return { pulled, conflicts };
+  return { pulled, conflicts, touchedFkIds };
 }
 
 /**
@@ -122,8 +125,8 @@ export async function pullTable(
 export async function pullAll(
   db: SqliteLike,
   store: PgStore,
-): Promise<Record<string, { pulled: number; conflicts: number }>> {
-  const out: Record<string, { pulled: number; conflicts: number }> = {};
+): Promise<Record<string, { pulled: number; conflicts: number; touchedFkIds: number[] }>> {
+  const out: Record<string, { pulled: number; conflicts: number; touchedFkIds: number[] }> = {};
   const byName = new Map(SYNCED_TABLES.map((t) => [t.name, t]));
   for (const name of PULL_ORDER) {
     const tableDesc = byName.get(name);
@@ -136,6 +139,14 @@ export async function pullAll(
   // not to PULL_ORDER.
   for (const t of SYNCED_TABLES) {
     if (!(t.name in out)) throw new Error(`pullAll: ${t.name} missing from PULL_ORDER — add it`);
+  }
+  // Self-heal: a foreign contract change (pulled from another writer, e.g. the
+  // iPad) must re-bill that project's worklogs so the next push re-derives their
+  // earned_amount. Whole-project rebill (earliest date) — simplest and correct.
+  const contractProjects = new Set(out.contracts?.touchedFkIds ?? []);
+  const nowIso = new Date().toISOString();
+  for (const projectId of contractProjects) {
+    markWorklogsForRebill(db, projectId, '0001-01-01', nowIso);
   }
   return out;
 }

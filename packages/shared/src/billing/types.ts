@@ -35,6 +35,7 @@ export interface TaskRow {
 }
 
 export interface ContractRow {
+  syncId: string;
   projectId: number;
   effectiveFrom: string;     // YYYY-MM-DD
   endDate: string | null;

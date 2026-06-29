@@ -12,7 +12,7 @@ function wl(over: Partial<WorklogRow>): WorklogRow {
 }
 function ct(over: Partial<ContractRow>): ContractRow {
   return {
-    projectId: 1, effectiveFrom: '2026-01-01', endDate: null, rateType: 'hourly',
+    syncId: 'c-test', projectId: 1, effectiveFrom: '2026-01-01', endDate: null, rateType: 'hourly',
     rateAmount: 1000, hoursPerDay: 8, mdLimit: null, ...over,
   };
 }

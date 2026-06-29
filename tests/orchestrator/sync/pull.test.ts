@@ -154,6 +154,32 @@ describe('pullAll', () => {
     expect(pulled.work_date).toBe('2026-06-01');
   });
 
+  it('rebills a project\'s worklogs when a foreign contract change is pulled', async () => {
+    if (!reachable || !store) return;
+    const db = freshSqlite();
+    // Local project → epic → task → worklog, pushed to Postgres.
+    const proj = new ProjectsRepo(db).create({ name: 'Rebill P' });
+    const epic = new EpicsRepo(db).create({ projectId: proj.id, name: 'E' });
+    const task = new TasksRepo(db).create({ epicId: epic.id, number: 'R-1', title: 'T' });
+    new WorklogsRepo(db).create({ taskId: task.id, workDate: '2026-06-01', minutes: 60 });
+    await pushAll(db, store);
+    const projSyncId = (db.prepare(`SELECT sync_id FROM projects WHERE id=?`).get(proj.id) as any).sync_id;
+    const wlBefore = db.prepare(`SELECT updated_at FROM worklogs LIMIT 1`).get() as any;
+
+    // A foreign contract appears in Postgres (newer than the pull cursor).
+    await store.query(
+      `INSERT INTO contracts (sync_id, project_id, effective_from, rate_type, rate_amount, hours_per_day, updated_at)
+       VALUES ('remote-contract-1', (SELECT id FROM projects WHERE sync_id=$1), '2026-01-01', 'hourly', 100, 8, now() + interval '1 minute')`,
+      [projSyncId],
+    );
+
+    const res = await pullAll(db, store);
+    expect(res.contracts.pulled).toBe(1);
+    expect(res.contracts.touchedFkIds).toContain(proj.id);
+    const wlAfter = db.prepare(`SELECT updated_at FROM worklogs LIMIT 1`).get() as any;
+    expect(wlAfter.updated_at > wlBefore.updated_at).toBe(true); // markWorklogsForRebill bumped it
+  });
+
   it('date columns round-trip exactly through push→pull (contracts effective_from, days_off date)', async () => {
     // Regression: node-postgres parses DATE OID 1082 as a JS Date at local
     // midnight. toISOString() then converts to UTC, shifting the date back by

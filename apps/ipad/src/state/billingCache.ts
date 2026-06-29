@@ -130,6 +130,34 @@ export function mapDayOffRow(raw: RawDayOffRow): DayOffRow {
 }
 
 // ---------------------------------------------------------------------------
+// Pure mapper — PostgREST raw contracts row → ContractRow
+// ---------------------------------------------------------------------------
+
+export type RawContractRow = {
+  sync_id: string;
+  project_id: number;
+  effective_from: string;
+  end_date: string | null;
+  rate_type: 'hourly' | 'daily';
+  rate_amount: number;
+  hours_per_day: number;
+  md_limit: number | null;
+};
+
+export function mapContractRow(raw: RawContractRow): ContractRow {
+  return {
+    syncId: raw.sync_id,
+    projectId: raw.project_id,
+    effectiveFrom: raw.effective_from,
+    endDate: raw.end_date ?? null,
+    rateType: raw.rate_type,
+    rateAmount: raw.rate_amount,
+    hoursPerDay: raw.hours_per_day,
+    mdLimit: raw.md_limit ?? null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Cache persistence — key for Capacitor Preferences
 // ---------------------------------------------------------------------------
 

@@ -3,7 +3,7 @@ import { contractBurn } from '../../../packages/shared/src/billing/contracts.js'
 import type { WorklogRow, ContractRow, ProjectRow } from '../../../packages/shared/src/billing/types.js';
 
 const contract = (o: Partial<ContractRow> = {}): ContractRow => ({
-  projectId: 1, effectiveFrom: '2026-06-01', endDate: '2026-06-30', rateType: 'hourly',
+  syncId: 'c-test', projectId: 1, effectiveFrom: '2026-06-01', endDate: '2026-06-30', rateType: 'hourly',
   rateAmount: 1500, hoursPerDay: 8, mdLimit: 20, ...o,
 });
 const wl = (workDate: string, effectiveMinutes: number, projectId = 1): WorklogRow => ({
