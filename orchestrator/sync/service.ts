@@ -6,7 +6,7 @@ import { pullAll } from './pull.js';
 export interface SyncCycleResult {
   ok: boolean;
   push?: Record<string, number>;
-  pull?: Record<string, { pulled: number; conflicts: number }>;
+  pull?: Record<string, { pulled: number; conflicts: number; touchedFkIds: number[] }>;
   error?: string;
 }
 
