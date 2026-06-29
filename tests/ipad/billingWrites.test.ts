@@ -54,7 +54,7 @@ describe('canEdit', () => {
 });
 
 const contract = (projectId: number): ContractRow => ({
-  projectId, effectiveFrom: '2026-01-01', endDate: null, rateType: 'hourly', rateAmount: 100, hoursPerDay: 8, mdLimit: null,
+  syncId: 'c-test', projectId, effectiveFrom: '2026-01-01', endDate: null, rateType: 'hourly', rateAmount: 100, hoursPerDay: 8, mdLimit: null,
 });
 const task: TaskRow = { taskId: 7, syncId: 'task-sync', epicId: 1, taskNumber: 'X-9', taskTitle: 'T', status: 'open', estimatedMinutes: null, description: null, projectId: 3, projectName: 'P', projectColor: '#abc', projectKind: 'work', isBillable: true };
 const input = { taskId: 7, workDate: '2026-06-01', minutes: 120, reportedMinutes: 90, description: 'note' };

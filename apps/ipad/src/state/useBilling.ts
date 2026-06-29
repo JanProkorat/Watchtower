@@ -6,6 +6,7 @@ import {
   mapDayOffRow,
   mapTaskRow,
   mapEpicRow,
+  mapContractRow,
   loadCache,
   saveCache,
   type BillingDataset,
@@ -14,6 +15,7 @@ import {
   type RawDayOffRow,
   type RawTaskRow,
   type RawEpicRow,
+  type RawContractRow,
 } from './billingCache.js';
 import { fetchAllPaged, type PageResult } from './paginate.js';
 
@@ -133,7 +135,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
 
   const [worklogsRaw, contractsResult, daysOffResult, projectsResult, tasksRaw, epicsRaw] = await Promise.all([
     worklogsPromise,
-    /* contracts */ supabase.from('contracts').select('project_id,effective_from,end_date,rate_type,rate_amount,hours_per_day,md_limit').is('deleted_at', null),
+    /* contracts */ supabase.from('contracts').select('sync_id,project_id,effective_from,end_date,rate_type,rate_amount,hours_per_day,md_limit').is('deleted_at', null),
     supabase.from('days_off').select('date,kind,sync_id').is('deleted_at', null),
     supabase.from('projects').select('id,name,color,kind,is_billable').is('deleted_at', null),
     tasksPromise,
@@ -146,18 +148,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
 
   const worklogs = worklogsRaw.map((r) => mapWorklogRow(r));
 
-  const contracts: ContractRow[] = (contractsResult.data ?? []).map(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (r: any): ContractRow => ({
-      projectId: r.project_id,
-      effectiveFrom: r.effective_from,
-      endDate: r.end_date ?? null,
-      rateType: r.rate_type,
-      rateAmount: r.rate_amount,
-      hoursPerDay: r.hours_per_day,
-      mdLimit: r.md_limit ?? null,
-    }),
-  );
+  const contracts: ContractRow[] = (contractsResult.data ?? []).map((r) => mapContractRow(r as RawContractRow));
 
   const daysOff: DayOffRow[] = (daysOffResult.data ?? []).map((r) => mapDayOffRow(r as RawDayOffRow));
 

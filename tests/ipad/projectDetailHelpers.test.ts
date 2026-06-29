@@ -13,6 +13,7 @@ import type { ContractRow, WorklogRow } from '@watchtower/shared/billing/types.j
 
 function makeContract(overrides: Partial<ContractRow> & { effectiveFrom: string }): ContractRow {
   return {
+    syncId: overrides.syncId ?? 'c-test',
     projectId: 1,
     effectiveFrom: overrides.effectiveFrom,
     endDate: overrides.endDate ?? null,
