@@ -5,7 +5,7 @@ import {
   type BillingAction,
 } from '../../apps/ipad/src/state/useBilling.js';
 import type { BillingDataset } from '../../apps/ipad/src/state/billingCache.js';
-import type { WorklogRow, TaskRow } from '@watchtower/shared/billing/types.js';
+import type { WorklogRow, TaskRow, ContractRow } from '@watchtower/shared/billing/types.js';
 
 // ---------------------------------------------------------------------------
 // Pure billingReducer — no DOM, no React, no mocks
@@ -148,6 +148,22 @@ describe('billingReducer — PATCH_WORKLOGS', () => {
   it('is a no-op when there is no data', () => {
     const start = { data: null, state: 'offline' as const, lastUpdated: null };
     expect(billingReducer(start, { type: 'PATCH_WORKLOGS', worklogs: [wl('a')] })).toBe(start);
+  });
+});
+
+describe('billingReducer — PATCH_CONTRACTS', () => {
+  const ct = (syncId: string): ContractRow => ({
+    syncId, projectId: 1, effectiveFrom: '2026-01-01', endDate: null,
+    rateType: 'hourly', rateAmount: 100, hoursPerDay: 8, mdLimit: null,
+  });
+  it('swaps contracts in the existing dataset', () => {
+    const start = { data: { worklogs: [], contracts: [ct('a')], daysOff: [], projects: [], tasks: [], epics: [], fetchedAt: 'x' }, state: 'fresh' as const, lastUpdated: 'x' };
+    const next = billingReducer(start, { type: 'PATCH_CONTRACTS', contracts: [ct('a'), ct('b')] });
+    expect(next.data?.contracts.map((c) => c.syncId)).toEqual(['a', 'b']);
+  });
+  it('is a no-op when there is no data', () => {
+    const start = { data: null, state: 'offline' as const, lastUpdated: null };
+    expect(billingReducer(start, { type: 'PATCH_CONTRACTS', contracts: [ct('a')] })).toBe(start);
   });
 });
 
