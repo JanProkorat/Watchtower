@@ -3,6 +3,7 @@ import { getSupabase } from '../lib/supabaseClient.js';
 import { contractsOverlap } from '@watchtower/shared/billing/contracts-overlap.js';
 import { previousDay } from '@watchtower/shared/billing/date-helpers.js';
 import type { ContractRow, WorklogRow } from '@watchtower/shared/billing/types.js';
+import { formatDateCz } from '../lib/czFormat.js';
 import {
   buildContractInsert,
   buildContractUpdate,
@@ -50,26 +51,32 @@ export function useContractMutations({ contracts, worklogs, patchContracts, patc
   );
 
   const overlapMsg = (c: ContractRow) =>
-    `Sazba se překrývá s obdobím od ${c.effectiveFrom}${c.endDate ? ` do ${c.endDate}` : ''}`;
+    `Sazba se překrývá s obdobím od ${formatDateCz(c.effectiveFrom)}${c.endDate ? ` do ${formatDateCz(c.endDate)}` : ''}`;
 
   const createContract = useCallback(
     async (input: ContractWriteInput) => {
       const prevC = contracts;
       const prevW = worklogs;
-      const conflict = findOverlap(input, null);
-      if (conflict) { setError(overlapMsg(conflict)); return; }
       const syncId = crypto.randomUUID();
       const now = new Date().toISOString();
       // Auto-close a prior open-ended contract on the same project starting earlier.
       const prior = contracts.find(
         (c) => c.projectId === input.projectId && c.endDate === null && c.effectiveFrom < input.effectiveFrom,
       );
+      const closedPrior = prior ? { ...prior, endDate: previousDay(input.effectiveFrom) } : null;
+      // Guard against the POST-auto-close projection so the prior we're about to close
+      // doesn't false-trip the overlap check; any other overlapping contract still blocks.
+      const projected = closedPrior ? contracts.map((c) => (c.syncId === prior!.syncId ? closedPrior : c)) : contracts;
+      const conflict = projected.find(
+        (c) => c.projectId === input.projectId && contractsOverlap(c.effectiveFrom, c.endDate, input.effectiveFrom, input.endDate),
+      ) ?? null;
+      if (conflict) { setError(overlapMsg(conflict)); return; }
+      setError(null);
       let nextContracts = contracts;
-      if (prior) {
-        nextContracts = applyContractWrite(nextContracts, { type: 'upsert', row: { ...prior, endDate: previousDay(input.effectiveFrom) } });
+      if (closedPrior) {
+        nextContracts = applyContractWrite(nextContracts, { type: 'upsert', row: closedPrior });
       }
       nextContracts = applyContractWrite(nextContracts, { type: 'upsert', row: buildOptimisticContractRow(input, syncId) });
-      setError(null);
       setPending(syncId);
       applyOptimistic(nextContracts, input.projectId);
       try {
@@ -87,7 +94,7 @@ export function useContractMutations({ contracts, worklogs, patchContracts, patc
         setPending(null);
       }
     },
-    [contracts, worklogs, findOverlap, applyOptimistic, patchContracts, patchWorklogs],
+    [contracts, worklogs, applyOptimistic, patchContracts, patchWorklogs],
   );
 
   const updateContract = useCallback(
