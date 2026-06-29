@@ -236,4 +236,19 @@ DO $$ BEGIN
 END $$;`,
     ],
   },
+  {
+    version: 8,
+    up: [
+      // Write-back slice 3a: allow authenticated INSERT/UPDATE on tasks (soft-delete
+      // is an UPDATE). Mirrors v6/v7: idempotent + role-guarded so plain Postgres
+      // (dev/test, no `authenticated` role) still applies cleanly.
+      `ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS write_authenticated ON tasks;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE POLICY write_authenticated ON tasks FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  END IF;
+END $$;`,
+    ],
+  },
 ];
