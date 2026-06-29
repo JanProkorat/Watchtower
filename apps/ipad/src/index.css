@@ -9,7 +9,9 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  background-color: #0e0f12;
+  /* Near-black base — stays solid so there's no white flash before #root paints
+     its ambient gradient. Matches `baseBg` in theme/glass.ts. */
+  background-color: #0b0c11;
 }
 
 /* The viewport is edge-to-edge (viewport-fit=cover in index.html), so inset the
@@ -18,7 +20,14 @@ body {
    strips show #root's dark background, keeping the look edge-to-edge. */
 #root {
   height: 100%;
-  background-color: #0e0f12;
+  /* Ambient lit background — faint purple TL / cyan TR / teal BR glow over
+     near-black. Keep in sync with `ambientBackground` in theme/glass.ts. The
+     glass chrome (rail, tab strip, banners) floats over this. */
+  background:
+    radial-gradient(60% 55% at 4% 0%, rgba(124, 109, 240, 0.34), transparent 60%),
+    radial-gradient(70% 65% at 100% 8%, rgba(77, 208, 225, 0.22), transparent 55%),
+    radial-gradient(85% 85% at 88% 100%, rgba(26, 188, 156, 0.26), transparent 55%),
+    #0b0c11;
   padding-top: env(safe-area-inset-top);
   padding-right: env(safe-area-inset-right);
   padding-bottom: env(safe-area-inset-bottom);

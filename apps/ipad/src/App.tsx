@@ -20,6 +20,7 @@ import { BillingArea } from './components/billing/BillingArea.js';
 import { AuthBlockBanner } from './components/AuthBlockBanner.js';
 import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
+import { text } from './theme/glass.js';
 
 // ---------------------------------------------------------------------------
 // Capacitor Preferences store (same helper as before)
@@ -214,9 +215,11 @@ function Shell({ connection }: ShellProps) {
         width: '100%',
         height: '100%',
         overflow: 'hidden',
-        backgroundColor: '#0e0f12',
+        // Transparent so the ambient lit #root background (index.css) shows
+        // through — the glass chrome floats over it. Token from theme/glass.ts.
+        backgroundColor: 'transparent',
         fontFamily: 'system-ui, sans-serif',
-        color: '#e5e7eb',
+        color: text.primary,
       }}
     >
       {/* Auth-block banner — only visible when instances view is active and
