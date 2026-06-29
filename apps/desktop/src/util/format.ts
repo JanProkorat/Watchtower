@@ -1,5 +1,7 @@
 import dayjs from 'dayjs';
 
+export { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
+
 export const CZ_DATE_FORMAT = 'D. M. YYYY';
 export const CZ_DATE_FORMAT_SHORT = 'D. M.';
 export const CZ_MONTH_FORMAT = 'MMMM YYYY';
@@ -136,23 +138,6 @@ export function formatMinutesReadable(total: number, hoursPerDay = 8): string {
   return `${md.toFixed(1)} MD`;
 }
 
-// Bare numbers are hours ("1" → 60, "1.5" → 90). Comma also accepted as decimal.
-// Explicit forms still work: "1h 30m", "30m", "1:30".
-export function parseMinutes(input: string): number {
-  const trimmed = input.trim().toLowerCase().replace(',', '.');
-  if (!trimmed) return NaN;
-  if (/^\d+(\.\d+)?$/.test(trimmed)) {
-    const hours = Number(trimmed);
-    return Math.round(hours * 60);
-  }
-  const colon = trimmed.match(/^(\d+):(\d{1,2})$/);
-  if (colon) return Number(colon[1]) * 60 + Number(colon[2]);
-  const hm = trimmed.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+)\s*m)?$/);
-  if (hm && (hm[1] || hm[2])) {
-    return Math.round(Number(hm[1] ?? 0) * 60) + Number(hm[2] ?? 0);
-  }
-  return NaN;
-}
 
 export function buildTaskUrl(baseUrl: string | null | undefined, number: string): string | null {
   if (!baseUrl) return null;

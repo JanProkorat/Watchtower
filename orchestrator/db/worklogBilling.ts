@@ -1,51 +1,8 @@
-// Per-worklog billing, mirroring orchestrator/db/reportsSql.ts SUM_EARNED.
-// Pure (no I/O) so it is unit-testable; used by the sync push to write the
-// Postgres-only derived columns. Do NOT re-derive — keep in lockstep with
-// reportsSql's hourly/daily formula and LEAD-based rate window.
-
-export interface ContractLite {
-  effectiveFrom: string;          // 'YYYY-MM-DD'
-  rateType: 'hourly' | 'daily';
-  rateAmount: number;
-  hoursPerDay: number;
-}
-
-export interface WorklogBilling {
-  effectiveMinutes: number;
-  resolvedRate: number | null;
-  earnedAmount: number | null;
-}
-
-/**
- * Resolve the contract whose window contains `workDate`: the latest contract
- * with `effectiveFrom <= workDate`, upper-bounded by the next contract's
- * `effectiveFrom` (the LEAD semantics in PROJECT_RATE_PERIODS_CTE). Returns
- * null when no contract starts on or before the date.
- */
-function resolveContract(workDate: string, contracts: ContractLite[]): ContractLite | null {
-  let best: ContractLite | null = null;
-  for (const c of contracts) {
-    if (c.effectiveFrom <= workDate && (best === null || c.effectiveFrom > best.effectiveFrom)) {
-      best = c;
-    }
-  }
-  return best;
-}
-
-export function computeWorklogBilling(input: {
-  minutes: number;
-  reportedMinutes: number | null;
-  workDate: string;
-  contracts: ContractLite[];
-}): WorklogBilling {
-  const effectiveMinutes = input.reportedMinutes ?? input.minutes;
-  const c = resolveContract(input.workDate, input.contracts);
-  if (!c) {
-    return { effectiveMinutes, resolvedRate: null, earnedAmount: null };
-  }
-  const earnedAmount =
-    c.rateType === 'hourly'
-      ? (effectiveMinutes * c.rateAmount) / 60
-      : (effectiveMinutes / 60 / c.hoursPerDay) * c.rateAmount;
-  return { effectiveMinutes, resolvedRate: c.rateAmount, earnedAmount };
-}
+// Moved to @watchtower/shared/billing/worklogBilling so the iPad write path and
+// the Mac sync push share one formula. This shim keeps existing import sites
+// (orchestrator/sync/derive.ts) unchanged.
+export {
+  computeWorklogBilling,
+  type ContractLite,
+  type WorklogBilling,
+} from '@watchtower/shared/billing/worklogBilling.js';

@@ -5,6 +5,7 @@ import {
   type BillingAction,
 } from '../../apps/ipad/src/state/useBilling.js';
 import type { BillingDataset } from '../../apps/ipad/src/state/billingCache.js';
+import type { WorklogRow } from '@watchtower/shared/billing/types.js';
 
 // ---------------------------------------------------------------------------
 // Pure billingReducer — no DOM, no React, no mocks
@@ -15,6 +16,7 @@ const EMPTY_DATASET: BillingDataset = {
   contracts: [],
   daysOff: [],
   projects: [],
+  tasks: [],
   fetchedAt: '2026-06-26T10:00:00.000Z',
 };
 
@@ -129,5 +131,22 @@ describe('billingReducer', () => {
     s = dispatch(s, { type: 'CACHE_MISS' });
     s = dispatch(s, { type: 'FETCH_ERROR' });
     expect(s.state).toBe('offline');
+  });
+});
+
+describe('billingReducer — PATCH_WORKLOGS', () => {
+  const wl = (syncId: string): WorklogRow => ({
+    syncId, workDate: '2026-06-01', minutes: 60, reportedMinutes: null, effectiveMinutes: 60,
+    earnedAmount: null, description: null, projectId: 1, projectName: 'P', projectColor: null,
+    projectKind: 'work', isBillable: true, taskNumber: null, taskTitle: null, source: 'manual',
+  });
+  it('swaps worklogs in the existing dataset', () => {
+    const start = { data: { worklogs: [wl('a')], contracts: [], daysOff: [], projects: [], tasks: [], fetchedAt: 'x' }, state: 'fresh' as const, lastUpdated: 'x' };
+    const next = billingReducer(start, { type: 'PATCH_WORKLOGS', worklogs: [wl('a'), wl('b')] });
+    expect(next.data?.worklogs.map((w) => w.syncId)).toEqual(['a', 'b']);
+  });
+  it('is a no-op when there is no data', () => {
+    const start = { data: null, state: 'offline' as const, lastUpdated: null };
+    expect(billingReducer(start, { type: 'PATCH_WORKLOGS', worklogs: [wl('a')] })).toBe(start);
   });
 });

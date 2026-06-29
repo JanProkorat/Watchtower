@@ -221,4 +221,19 @@ DO $$ BEGIN
 END $$;`,
     ],
   },
+  {
+    version: 7,
+    up: [
+      // Write-back slice 2: allow authenticated INSERT/UPDATE on worklogs (soft-delete
+      // is an UPDATE). Mirrors v6/v4: idempotent + role-guarded so plain Postgres
+      // (dev/test, no `authenticated` role) still applies cleanly.
+      `ALTER TABLE worklogs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS write_authenticated ON worklogs;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE POLICY write_authenticated ON worklogs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  END IF;
+END $$;`,
+    ],
+  },
 ];
