@@ -1,0 +1,1493 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Watchtower iPad — Liquid Glass prototype</title>
+<!--
+  Watchtower iPad app — Liquid Glass redesign prototype (all surfaces).
+  Self-contained static mockup. Open in a browser; click the contents links to jump.
+  Glass tokens mirror docs/superpowers/specs/2026-06-25-ipad-liquid-glass-redesign-design.md
+  and apps/ipad/src/components/billing/reports/tokens.ts. Presentation only.
+-->
+<style>
+  :root{
+    /* ambient + base */
+    --base:#0b0c11;
+    /* glass fills */
+    --glass-fill:rgba(48,52,76,.34);
+    --glass-strong:rgba(56,60,86,.55);
+    --data-fill:rgba(14,15,23,.62);      /* near-solid inner panel for dense data legibility */
+    --hair:1px solid rgba(255,255,255,.15);
+    --hair-soft:1px solid rgba(255,255,255,.10);
+    --hi:inset 0 1px 0 rgba(255,255,255,.30);
+    --hi-soft:inset 0 1px 0 rgba(255,255,255,.20);
+    --shadow:0 18px 44px rgba(0,0,0,.5);
+    --shadow-card:0 10px 28px rgba(0,0,0,.38);
+    /* accents */
+    --accent:#7c6df0; --accent-2:#a89cf0; --accent-3:#c9bdff;
+    --violet:#A78BFA; --violet-bg:rgba(168,156,240,.22);
+    --cyan:#4dd0e1; --cyan-2:#22D3EE;
+    --teal:#1abc9c; --blue:#2980b9;
+    --amber:#f5a524; --green:#34d399; --red:#f87171;
+    /* text */
+    --text:#e5e7eb; --text-2:#c2c9d8; --muted:#9aa1ab; --dim:#5a6072;
+    --cta:linear-gradient(135deg,#8b7cf2,#6d5fe0);
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+    --ui:system-ui,-apple-system,Segoe UI,sans-serif;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:#06070b;color:var(--text);font-family:var(--ui);
+    padding:28px clamp(14px,4vw,56px) 80px;line-height:1.45;}
+  h1{font-size:24px;font-weight:700;margin:0 0 4px;letter-spacing:.2px}
+  .lede{color:var(--muted);font-size:13.5px;max-width:760px;margin:0 0 22px}
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 30px;padding:14px 16px;border-radius:14px;
+    background:var(--glass-fill);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
+    border:var(--hair-soft);}
+  .toc a{font-size:12px;color:var(--text-2);text-decoration:none;padding:5px 11px;border-radius:8px;
+    background:rgba(255,255,255,.06);border:var(--hair-soft);white-space:nowrap}
+  .toc a:hover{background:var(--violet-bg);color:#fff}
+  .toc .grp{flex-basis:100%;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:6px}
+
+  /* a surface = a titled section with a device-framed stage */
+  .surface{margin:0 0 34px}
+  .surface > h2{font-size:15px;font-weight:650;margin:0 0 2px;color:#f0f1f5}
+  .surface > h2 .tag{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--accent-3);background:var(--violet-bg);padding:2px 8px;border-radius:999px;margin-left:8px;vertical-align:middle}
+  .surface > .cap{font-size:12px;color:var(--muted);margin:0 0 10px;max-width:760px}
+
+  /* stage: the iPad viewport with the ambient lit background */
+  .stage{position:relative;border-radius:22px;overflow:hidden;min-height:300px;
+    background:
+      radial-gradient(60% 55% at 4% 0%, rgba(124,109,240,.34), transparent 60%),
+      radial-gradient(70% 65% at 100% 8%, rgba(77,208,225,.22), transparent 55%),
+      radial-gradient(85% 85% at 88% 100%, rgba(26,188,156,.26), transparent 55%),
+      var(--base);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);padding:18px}
+  .stage.lg{min-height:440px}
+  .stage.row{display:flex;gap:18px;flex-wrap:wrap}
+  .stage.row > *{flex:1 1 280px}
+
+  /* ---- glass primitives ---- */
+  .glass{background:var(--glass-fill);backdrop-filter:blur(34px) saturate(1.8) brightness(1.18);
+    -webkit-backdrop-filter:blur(34px) saturate(1.8) brightness(1.18);
+    border:var(--hair);box-shadow:var(--shadow),var(--hi)}
+  .card{background:var(--glass-fill);backdrop-filter:blur(28px) saturate(1.7) brightness(1.14);
+    -webkit-backdrop-filter:blur(28px) saturate(1.7) brightness(1.14);
+    border:var(--hair-soft);box-shadow:var(--shadow-card),var(--hi-soft);border-radius:16px;padding:14px 16px}
+  .card h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;font-weight:600}
+
+  /* content header bar (sticky title strip inside a module) */
+  .hbar{display:flex;align-items:center;gap:12px;height:46px;padding:0 16px;border-radius:13px;margin-bottom:14px;
+    background:var(--glass-fill);backdrop-filter:blur(28px) saturate(1.7);-webkit-backdrop-filter:blur(28px) saturate(1.7);
+    border:var(--hair-soft);box-shadow:var(--hi-soft)}
+  .hbar .title{font-size:15px;font-weight:600;color:#f4f4f8}
+  .hbar .sp{flex:1}
+  .hbar .ghost{font-size:12px;color:var(--muted);padding:6px 12px;border-radius:9px;background:rgba(255,255,255,.06);border:var(--hair-soft)}
+
+  /* tiny inline pieces */
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
+  .chip{font-size:10px;font-weight:600;letter-spacing:.04em;padding:2px 8px;border-radius:999px;border:var(--hair-soft)}
+  .chip.amber{color:#fcd9a0;background:rgba(120,82,8,.40);border-color:rgba(245,165,36,.45)}
+  .chip.muted{color:var(--muted);background:rgba(255,255,255,.05)}
+  .badge{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+    padding:1px 6px;border-radius:5px;border:var(--hair-soft);background:rgba(255,255,255,.04)}
+  .mono{font-family:var(--mono)}
+  .vio{color:var(--violet)} .cy{color:var(--cyan-2)} .mut{color:var(--muted)} .am{color:var(--amber)}
+
+  /* CTA + secondary buttons + fields */
+  .cta{height:38px;padding:0 16px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;
+    font-size:12.5px;font-weight:600;color:#fff;background:var(--cta);border:none;
+    box-shadow:0 8px 22px rgba(124,109,240,.40),inset 0 1px 0 rgba(255,255,255,.32)}
+  .btn{height:36px;padding:0 14px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;
+    font-size:12px;color:var(--text-2);background:rgba(255,255,255,.08);border:var(--hair-soft)}
+  .btn.sm{height:30px;padding:0 11px;font-size:11.5px}
+  .btn.danger{color:#fca5a5;background:rgba(110,24,24,.32);border-color:rgba(248,113,113,.4)}
+  .field{height:38px;border-radius:11px;padding:0 12px;display:flex;align-items:center;font-size:11.5px;color:#d7dbe6;
+    background:rgba(255,255,255,.07);border:var(--hair-soft)}
+  .field.bad{border-color:rgba(248,113,113,.55)}
+  .seg{display:inline-flex;gap:4px;padding:3px;border-radius:10px;background:rgba(255,255,255,.05);border:var(--hair-soft)}
+  .seg b{font-size:11.5px;font-weight:500;color:var(--muted);padding:5px 11px;border-radius:7px;cursor:default}
+  .seg b.on{color:#fff;background:var(--violet-bg);box-shadow:var(--hi-soft);font-weight:600}
+
+  /* rail (frosted, floating) */
+  .rail{position:absolute;top:14px;left:14px;bottom:14px;width:200px;border-radius:20px;padding:12px 10px;
+    display:flex;flex-direction:column;gap:4px;background:var(--glass-fill);
+    backdrop-filter:blur(34px) saturate(1.8) brightness(1.18);-webkit-backdrop-filter:blur(34px) saturate(1.8) brightness(1.18);
+    border:var(--hair);box-shadow:var(--shadow),var(--hi)}
+  .rail .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 12px;margin-bottom:4px;border-bottom:var(--hair-soft)}
+  .rail .brand b{font-size:14px;font-weight:600;color:#f0f1f5}
+  .rail .logo{width:26px;height:26px;border-radius:8px;background:conic-gradient(from 200deg,#4dd0e1,#1abc9c,#2980b9,#4dd0e1)}
+  .nav{display:flex;align-items:center;gap:11px;height:38px;padding:0 11px;border-radius:11px;font-size:12.5px;color:#aab2c4}
+  .nav svg{width:17px;height:17px;opacity:.9;flex-shrink:0}
+  .nav.on{color:#fff;background:var(--violet-bg);box-shadow:var(--hi-soft),0 0 0 1px rgba(168,156,240,.30)}
+  .nav.on svg{color:var(--accent-3)}
+  .nav.dis{color:var(--dim)}
+  .nav.sub{height:32px;padding-left:30px;font-size:12px;gap:9px}
+  .nav.sub svg{width:15px;height:15px}
+  .nav .end{margin-left:auto;display:flex;align-items:center}
+  .bell{position:relative;width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#9ca3af}
+  .bell svg{width:19px;height:19px}
+  .bell .ct{position:absolute;top:3px;right:3px;min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:#dc2626;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+  /* tab strip */
+  .tabs{display:flex;align-items:center;gap:8px;padding:0 8px;height:38px;border-radius:14px;
+    background:var(--glass-fill);backdrop-filter:blur(34px) saturate(1.8) brightness(1.18);
+    -webkit-backdrop-filter:blur(34px) saturate(1.8) brightness(1.18);border:var(--hair);box-shadow:0 14px 34px rgba(0,0,0,.4),var(--hi-soft)}
+  .tab{font-size:11px;color:var(--text-2);padding:6px 12px;border-radius:10px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .tab .pd{width:6px;height:6px;border-radius:50%;background:#6b7488}
+  .tab.act{color:#fff;background:rgba(255,255,255,.20);box-shadow:var(--hi)}
+  .tab.act .pd{background:var(--accent-2);box-shadow:0 0 8px var(--accent-2)}
+  .tab.attn .pd{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .tab .plus{margin-left:auto}
+
+  /* connection pill */
+  .pill{display:inline-flex;align-items:center;gap:7px;font-size:11px;color:#9be7c0;padding:7px 13px;border-radius:999px;
+    background:rgba(26,90,66,.34);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
+    border:1px solid rgba(120,230,180,.32);box-shadow:0 6px 18px rgba(0,0,0,.35)}
+  .pill .g{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+
+  /* status banners */
+  .banner{display:flex;align-items:center;gap:9px;padding:11px 14px;border-radius:13px;font-size:11.5px;font-weight:500;
+    backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);
+    box-shadow:0 8px 22px rgba(0,0,0,.35),var(--hi-soft)}
+  .banner .d{width:8px;height:8px;border-radius:50%}
+  .b-amber{background:rgba(120,82,8,.40);border:1px solid rgba(245,165,36,.45);color:#fcd9a0}
+  .b-amber .d{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .b-red{background:rgba(110,24,24,.40);border:1px solid rgba(248,113,113,.45);color:#fca5a5}
+  .b-red .d{background:var(--red);box-shadow:0 0 8px var(--red)}
+  .b-blue{background:rgba(20,52,92,.45);border:1px solid rgba(96,165,250,.45);color:#bcd6ff}
+  .b-blue .d{background:#60a5fa;box-shadow:0 0 8px #60a5fa}
+  /* toasts: banners float in a corner, overlaying content (never push layout) */
+  .toaststack{position:absolute;top:16px;right:16px;width:300px;display:flex;flex-direction:column;gap:10px;z-index:6}
+  .toast{box-shadow:0 18px 46px rgba(0,0,0,.55),var(--hi-soft)}
+  .toast .x{margin-left:auto;opacity:.65;font-size:14px;padding-left:10px;align-self:flex-start;line-height:1.1}
+  .toast .tt{display:flex;flex-direction:column;gap:2px}
+  .toast .tt small{opacity:.8;font-weight:400}
+
+  /* glass modal + drawer (bottom sheet) + scrim */
+  .scrim{position:absolute;inset:0;background:rgba(6,7,11,.45);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+    display:flex;align-items:flex-end;justify-content:center;border-radius:22px}
+  .scrim.center{align-items:center}
+  .modal{width:300px;border-radius:22px;padding:20px;background:var(--glass-strong);
+    backdrop-filter:blur(40px) saturate(1.9) brightness(1.1);-webkit-backdrop-filter:blur(40px) saturate(1.9) brightness(1.1);
+    border:1px solid rgba(255,255,255,.20);box-shadow:0 30px 80px rgba(0,0,0,.55),var(--hi)}
+  .modal h4,.drawer h4{margin:0 0 4px;font-size:15px;color:#f4f4f8;font-weight:600}
+  .modal .sub{margin:0 0 14px;font-size:11px;color:#aeb6c8}
+  .drawer{width:min(520px,92%);margin-bottom:0;border-radius:20px 20px 0 0;padding:20px;background:var(--glass-strong);
+    backdrop-filter:blur(40px) saturate(1.9) brightness(1.1);-webkit-backdrop-filter:blur(40px) saturate(1.9) brightness(1.1);
+    border:1px solid rgba(255,255,255,.20);border-bottom:none;box-shadow:0 -20px 60px rgba(0,0,0,.5),var(--hi)}
+  .drawer .dh{display:flex;align-items:center;margin-bottom:14px}
+  .drawer .dh .x{margin-left:auto;color:var(--muted);font-size:16px}
+  .drawer .frow{display:flex;gap:10px}
+  .drawer .frow > *{flex:1}
+  .drawer label{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:block;margin:2px 0 5px}
+  .drawer .foot{display:flex;align-items:center;gap:9px;margin-top:16px}
+  .drawer .foot .sp{flex:1}
+
+  /* KPI tile */
+  .kpi{display:flex;gap:3px;flex-direction:column}
+  .kpi .lbl{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .kpi .big{font-size:22px;font-weight:700;color:#f4f4f8;line-height:1.1}
+  .kpi .cz{font-size:12.5px;color:var(--violet)}
+
+  /* progress / burn bar */
+  .bar{height:8px;border-radius:999px;background:rgba(8,9,14,.6);overflow:hidden;position:relative;border:var(--hair-soft)}
+  .bar > i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#8b7cf2,#6d5fe0)}
+  .bar > i.over{background:linear-gradient(90deg,#f5a524,#e0892f)}
+
+  /* generic list rows inside a glass card */
+  .rows{display:flex;flex-direction:column}
+  .lrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:var(--hair-soft);font-size:12.5px}
+  .lrow:last-child{border-bottom:none}
+  .lrow .sp{flex:1}
+  .lrow .rk{width:18px;text-align:right;color:var(--muted);font-size:11px}
+  .lrow .nm{color:var(--text-2)}
+  .lrow .chev{color:var(--muted);font-size:14px}
+  .ubar{height:3px;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+
+  /* dense data panel (ledger / grid) — near-solid inner for legibility per spec */
+  .data{background:var(--data-fill);border:var(--hair-soft);border-radius:12px;overflow:hidden}
+  table.led{width:100%;border-collapse:collapse;font-size:11.5px}
+  table.led th{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;
+    text-align:right;padding:9px 12px;border-bottom:var(--hair-soft)}
+  table.led th:first-child,table.led td:first-child{text-align:left}
+  table.led td{padding:8px 12px;border-bottom:var(--hair-soft);color:var(--text-2)}
+  table.led tr:last-child td{border-bottom:none}
+  table.led tfoot td{font-weight:700;background:rgba(255,255,255,.04);border-top:1px solid rgba(255,255,255,.12)}
+
+  /* month grid (task × day) — desktop TaskGridView parity */
+  .mwrap{overflow-x:auto;max-height:340px;overflow-y:auto}
+  table.mgrid{border-collapse:separate;border-spacing:0;font-size:11px;width:100%}
+  table.mgrid th,table.mgrid td{border-right:1px solid rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.05);padding:4px 1px;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;color:var(--text-2)}
+  table.mgrid thead th{position:sticky;top:0;z-index:2;background:#14151d;color:var(--muted);font-weight:600}
+  table.mgrid .uk{position:sticky;left:0;z-index:3;text-align:left;min-width:146px;max-width:146px;overflow:hidden;text-overflow:ellipsis;background:#101019}
+  table.mgrid td.uk{display:flex;align-items:center;gap:7px}
+  table.mgrid thead .uk{z-index:4}
+  table.mgrid .sig{position:sticky;left:146px;z-index:3;text-align:right;min-width:46px;background:#101019;border-right:2px solid rgba(255,255,255,.14);font-weight:600}
+  table.mgrid thead .sig{z-index:4}
+  table.mgrid .day{min-width:21px;width:auto}
+  .dnum{font-size:10px;color:var(--text-2);line-height:1.15}
+  .ddow{font-size:7px;text-transform:uppercase;letter-spacing:.2px;color:var(--muted)}
+  /* non-working / status tints (per cell) */
+  .t-we{background:rgba(150,160,190,.13)}
+  .t-hol{background:rgba(168,156,240,.20)}
+  .t-vac{background:rgba(34,211,238,.16)}
+  .t-sick{background:rgba(248,113,113,.16)}
+  .t-today{box-shadow:inset 0 0 0 1.5px rgba(168,156,240,.7)}
+  table.mgrid tfoot td{position:sticky;background:#161620;font-weight:700;border-top:1px solid rgba(255,255,255,.12)}
+  table.mgrid tfoot tr.tot td{bottom:27px}
+  table.mgrid tfoot tr.earn td{bottom:0}
+  table.mgrid tfoot td.uk,table.mgrid tfoot td.sig{z-index:3}
+
+  /* charts */
+  .bars{display:flex;align-items:flex-end;gap:4px;height:120px}
+  .bars > i{flex:1;border-radius:3px 3px 0 0;background:rgba(124,109,240,.45)}
+  .bars > i.on{background:linear-gradient(180deg,#a89cf0,#7c6df0)}
+  .bars > i.mark{border-left:2px dashed var(--cyan-2)}
+  .heat{display:flex;flex-wrap:wrap;gap:3px}
+  .heat .c{width:13px;height:13px;border-radius:3px;background:rgba(255,255,255,.06)}
+  .heat .c.l1{background:rgba(124,109,240,.30)} .heat .c.l2{background:rgba(124,109,240,.50)}
+  .heat .c.l3{background:rgba(124,109,240,.72)} .heat .c.l4{background:#8b7cf2}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--muted);margin-top:10px}
+  .legend b{color:var(--violet);font-weight:700}
+
+  /* calendar (time-off) */
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .cal .h{font-size:10px;color:var(--muted);text-align:center;padding-bottom:2px}
+  .cal .d{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-2);background:rgba(255,255,255,.04)}
+  .cal .d.we{color:var(--muted)}
+  .cal .d.vac{background:var(--cyan-2);color:#06121a;font-weight:600}
+  .cal .d.sick{background:var(--red);color:#1a0606;font-weight:600}
+  .cal .d.other{background:var(--amber);color:#1a1206;font-weight:600}
+  .cal .d.hol{background:transparent;border:1px dashed rgba(168,156,240,.6);color:var(--accent-3)}
+
+  /* donut */
+  .donut-wrap{display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+  /* small project color swatches reused everywhere */
+  .sw{width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block}
+
+  .footnote{color:var(--dim);font-size:11.5px;margin-top:30px;border-top:var(--hair-soft);padding-top:14px}
+</style>
+</head>
+<body>
+<h1>Watchtower iPad — Liquid Glass prototype</h1>
+<p class="lede">Every iPad surface in the approved <b>frosted-floating</b> glass language: frosted chrome floating over a lit ambient background, purple/cyan accents, glass cards and drawers. Dense data (ledgers, grids) keep a near-solid inner panel for legibility; charts sit on glass frames. Czech UI throughout. Presentation only — no behaviour change.</p>
+<nav class="toc">
+  <span class="grp">Shell</span>
+  <a href="#s-rail">Rail</a>
+  <a href="#s-tabs">Tab strip + pill</a>
+  <a href="#s-spawn">Spawn modal</a>
+  <a href="#s-banners">Status toasts</a>
+  <a href="#s-notif">Notification hub</a>
+  <a href="#s-wake">Wake button</a>
+  <span class="grp">Fakturace — shell</span>
+  <a href="#s-login">Login</a>
+  <a href="#s-billhdr">Header + loading</a>
+  <span class="grp">Přehled / Výdělky</span>
+  <a href="#s-dash">Dashboard</a>
+  <a href="#s-earn">Earnings</a>
+  <a href="#s-detail">Project detail</a>
+  <a href="#s-drawer-contract">Contract drawer</a>
+  <span class="grp">Reporty</span>
+  <a href="#s-reports">Reports</a>
+  <span class="grp">Záznamy</span>
+  <a href="#s-rec-list">Worklogs + drawer</a>
+  <a href="#s-rec-grid">Task grid</a>
+  <a href="#s-rec-tasks">Tasks + drawer</a>
+  <a href="#s-rec-timeoff">Time off</a>
+</nav>
+<section class="surface" id="s-rail">
+  <h2>Rail — frosted floating glass <span class="tag">shell</span></h2>
+  <p class="cap">Floating glass rail: brand + primary modules at top, expandable Fakturace sub-routes, and a bottom utility cluster (notification bell with count + collapse toggle) separated by a hairline divider. Active = purple wash + glow dot.</p>
+  <div class="stage lg">
+    <div class="rail">
+      <div class="brand"><div class="logo"></div><b>Watchtower</b></div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 21H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h6zm2 0h6c1.1 0 2-.9 2-2v-7h-8zm8-11V5c0-1.1-.9-2-2-2h-6v7z"/></svg>Přehled</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.89-2-2-2m0 14H4V8h16z"/></svg>Instance</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7v2H8v2h8v-2h-2v-2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m0 14H3V5h18z"/></svg>Vzdálený&nbsp;Mac</div>
+      <div class="nav on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8z"/></svg>Fakturace<span class="end"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8l-6 6 1.41 1.42L12 10.83l4.59 4.59L18 14z"/></svg></span></div>
+      <div class="nav sub on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 14V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2m-9-1c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3"/></svg>Výdělky</div>
+      <div class="nav sub">Reporty</div>
+      <div class="nav sub">Seznam</div>
+      <div class="nav sub">Mřížka</div>
+      <div class="nav sub">Úkoly</div>
+      <div class="nav sub">Volno</div>
+      <div class="nav dis"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6"/></svg>Nastavení</div>
+      <div style="flex:1"></div>
+      <div style="border-top:1px solid rgba(255,255,255,.10);margin-top:6px;padding-top:8px;display:flex;align-items:center;gap:6px">
+        <div class="nav" style="flex:1"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2m6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1z"/></svg>Upozornění<span class="end"><span style="min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">3</span></span></div>
+        <div title="Sbalit panel" style="width:30px;height:30px;flex-shrink:0;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#8e96a8;background:rgba(255,255,255,.06)"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="surface" id="s-tabs">
+  <h2>Tab strip + spojení <span class="tag">shell</span></h2>
+  <p class="cap">Frosted tab strip s aktivní instancí (fialová), klidovou, instancí s upozorněním a tlačítkem +. Pill „Připojeno" v pravém dolním rohu indikuje stav WebSocket spojení.</p>
+  <div class="stage lg" style="min-height:300px">
+    <div class="tabs" style="position:absolute;top:18px;left:18px;right:18px">
+      <div class="tab act"><span class="pd"></span>Watchtower</div>
+      <div class="tab">PPS&nbsp;tech</div>
+      <div class="tab attn"><span class="pd"></span>capacity&nbsp;⚠</div>
+      <div class="tab plus">+</div>
+    </div>
+    <div class="pill" style="position:absolute;bottom:16px;right:16px">
+      <span class="g"></span>Připojeno
+    </div>
+  </div>
+</section>
+
+<section class="surface" id="s-spawn">
+  <h2>Spawn modal <span class="tag">shell</span></h2>
+  <p class="cap">Modální dialog pro spuštění nové instance — výběr projektu nebo ad-hoc složky. Scrim rozmaže obsah za oknem.</p>
+  <div class="stage lg">
+    <div class="scrim center">
+      <div class="modal">
+        <h4>Nová instance</h4>
+        <p class="sub">Vyberte projekt nebo obnovte ukončenou instanci</p>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+          <div class="field">Watchtower&nbsp;·&nbsp;~/Projects/Watchtower</div>
+          <div class="field">PPS technology&nbsp;·&nbsp;~/Green&nbsp;Code/technology</div>
+          <div class="field" style="color:#8b93a6">Ad-hoc složka…</div>
+        </div>
+        <div class="cta">Spustit</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="surface" id="s-banners">
+  <h2>Stavové toasty <span class="tag">shell</span></h2>
+  <p class="cap">Všechny stavové bannery (auth, připojování, odpojení) se zobrazují jako plovoucí toasty vpravo nahoře a stohují se dolů — překrývají obsah, nikdy ho neposouvají. Trvalé stavy (auth, odpojení) zůstávají s křížkem; přechodné (připojování / připojeno) samy zmizí. Připojovací pill vpravo dole zůstává nezávislý.</p>
+  <div class="stage lg">
+    <!-- faint content behind, to show the toasts overlay rather than push -->
+    <div style="position:absolute;inset:0 0 0 0;padding:24px 28px;color:#5a6072;font-size:12px;line-height:1.9;opacity:.5;white-space:pre">Přehled · červen 2026
+96,5 h  ·  72 375 Kč
+Top projekty, smlouvy, aktivita…</div>
+    <div class="toaststack">
+      <div class="banner b-amber toast">
+        <span class="d"></span>
+        <span class="tt">Instance čeká na přihlášení<small>PPS technology · otevřít v prohlížeči</small></span>
+        <span class="x">✕</span>
+      </div>
+      <div class="banner b-red toast">
+        <span class="d"></span>
+        <span class="tt">Odpojeno<small>obnovuji připojení…</small></span>
+        <span class="x">✕</span>
+      </div>
+      <div class="banner b-blue toast">
+        <span class="d"></span>
+        Připojuji…
+      </div>
+    </div>
+    <div class="pill" style="position:absolute;bottom:16px;right:16px"><span class="g"></span>Připojeno</div>
+  </div>
+</section>
+
+<section class="surface" id="s-notif">
+  <h2>Notifikační popover <span class="tag">shell</span></h2>
+  <p class="cap">Plovoucí glass panel s přehledem upozornění — instance, stav a čas. Otevírá se z ikonky zvonku v railu.</p>
+  <div class="stage lg">
+    <div class="glass" style="position:absolute;top:16px;left:16px;width:320px;border-radius:16px;padding:14px">
+      <div style="display:flex;align-items:center;margin-bottom:10px">
+        <span style="font-weight:600;font-size:13px">Upozornění</span>
+        <span class="sp"></span>
+        <span class="mut" style="font-size:16px;cursor:default">✕</span>
+      </div>
+      <div class="rows">
+        <div class="lrow">
+          <span class="dot" style="background:var(--amber);box-shadow:0 0 7px var(--amber)"></span>
+          <span class="nm">PPS technology</span>
+          <span class="sp"></span>
+          <span class="mut" style="font-size:11.5px">čeká na vstup</span>
+          <span class="mut" style="font-size:11px;margin-left:6px">2 min</span>
+        </div>
+        <div class="lrow">
+          <span class="dot" style="background:var(--green);box-shadow:0 0 7px var(--green)"></span>
+          <span class="nm">Watchtower</span>
+          <span class="sp"></span>
+          <span class="mut" style="font-size:11.5px">dokončeno</span>
+          <span class="mut" style="font-size:11px;margin-left:6px">8 min</span>
+        </div>
+        <div class="lrow">
+          <span class="dot" style="background:var(--red);box-shadow:0 0 7px var(--red)"></span>
+          <span class="nm">fitness-platform</span>
+          <span class="sp"></span>
+          <span class="mut" style="font-size:11.5px">potřebuje pozornost</span>
+          <span class="mut" style="font-size:11px;margin-left:6px">14 min</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="surface" id="s-wake">
+  <h2>WakeButton stavy <span class="tag">shell</span></h2>
+  <p class="cap">Tři stavy WakeButton z hlavičky Vzdálený Mac: klidový, odesílání WoL paketu, potvrzení probuzení.</p>
+  <div class="stage row">
+    <div class="card" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+      <span class="mut" style="font-size:10px;letter-spacing:.06em;text-transform:uppercase">Idle</span>
+      <div class="btn">Probudit Mac</div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+      <span class="mut" style="font-size:10px;letter-spacing:.06em;text-transform:uppercase">Odesílání</span>
+      <div class="btn" style="opacity:.45">Budím…</div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+      <span class="mut" style="font-size:10px;letter-spacing:.06em;text-transform:uppercase">Hotovo</span>
+      <div class="pill" style="background:rgba(20,70,46,.42);border-color:rgba(52,211,153,.38);color:#a7f3d0">
+        <span style="width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);display:inline-block"></span>
+        Mac probuzen
+      </div>
+    </div>
+  </div>
+</section>
+<!-- FRAGMENT: billing shell — login modal + module header/loading state -->
+<!-- No html/head/body/style. Compose only classes defined in _header.part.html. -->
+
+<section class="surface" id="s-login">
+  <h2>Přihlášení do Fakturace <span class="tag">billing</span></h2>
+  <p class="cap">Modal přihlášení překrývá obsah modulu, pokud uživatel není autentizovaný. Scrim rozmazává pozadí.</p>
+  <div class="stage">
+    <div class="scrim center">
+      <div class="modal">
+        <h4 class="vio">Přihlášení</h4>
+        <p class="sub">Zadejte přihlašovací údaje k fakturačnímu účtu.</p>
+        <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:14px">
+          <div class="field">vy@firma.cz</div>
+          <div class="field bad">••••••••</div>
+        </div>
+        <div class="banner b-red" style="margin-bottom:16px">
+          <span class="d"></span>
+          Nesprávné přihlašovací údaje
+        </div>
+        <div class="cta" style="width:100%">Přihlásit</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="surface" id="s-billhdr">
+  <h2>Záhlaví a načítání Výdělků <span class="tag">billing</span></h2>
+  <p class="cap">Lepkavá lišta (.hbar) sedí nad každou sekcí Fakturace — název modulu je dynamický (aktuální podsekce). Níže: stav načítání dat po přihlášení.</p>
+  <div class="stage lg">
+    <div class="hbar">
+      <span class="title">Výdělky</span>
+      <span class="chip amber">OFFLINE</span>
+      <div class="sp"></div>
+      <div class="ghost">Odhlásit</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;height:220px">
+      <span class="mut">Načítání…</span>
+    </div>
+  </div>
+</section>
+<section class="surface" id="s-dash">
+  <h2>Dashboard <span class="tag">přehled</span></h2>
+  <p class="cap">Souhrnný přehled výdělků, aktivních kontraktů, top projektů a aktivity za posledních 30 dní.</p>
+  <div class="stage lg" style="display:flex;flex-direction:column;gap:14px">
+
+    <!-- header bar -->
+    <div class="hbar">
+      <span class="title">Přehled</span>
+      <span class="mut" style="font-size:11px">aktualizováno před 3 min</span>
+      <div class="sp"></div>
+      <div class="ghost">Obnovit</div>
+    </div>
+
+    <!-- KPI tiles -->
+    <div style="display:flex;gap:14px">
+      <div class="card kpi">
+        <span class="lbl">Dnes</span>
+        <span class="big">6,5 h</span>
+        <span class="cz">4&nbsp;875&nbsp;Kč</span>
+      </div>
+      <div class="card kpi">
+        <span class="lbl">Sprint</span>
+        <span class="big">28,0 h</span>
+        <span class="cz">21&nbsp;000&nbsp;Kč</span>
+      </div>
+      <div class="card kpi">
+        <span class="lbl">Tento měsíc</span>
+        <span class="big">96,5 h</span>
+        <span class="cz">72&nbsp;375&nbsp;Kč</span>
+      </div>
+    </div>
+
+    <!-- active contracts -->
+    <div class="card" style="display:flex;flex-direction:column;gap:10px">
+      <!-- contract 1 — Watchtower, on track -->
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+          <span class="dot" style="background:#4dd0e1"></span>
+          <span style="font-size:12.5px;color:var(--text-2);font-weight:500">Watchtower</span>
+          <div class="sp"></div>
+          <span class="mut" style="font-size:11px">zbývá 8 prac. dní</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px">
+          <span style="font-size:11.5px;color:var(--muted)">12,40&nbsp;/&nbsp;20&nbsp;MD</span>
+        </div>
+        <div class="bar"><i style="width:62%"></i></div>
+      </div>
+      <!-- contract 2 — PPS technology, overrun projection -->
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+          <span class="dot" style="background:#1abc9c"></span>
+          <span style="font-size:12.5px;color:var(--text-2);font-weight:500">PPS technology</span>
+          <div class="sp"></div>
+          <span class="mut" style="font-size:11px">zbývá 8 prac. dní</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px">
+          <span class="am" style="font-size:11.5px">19,80&nbsp;/&nbsp;20&nbsp;MD · projekce 21,3</span>
+        </div>
+        <div class="bar"><i class="over" style="width:99%"></i></div>
+      </div>
+    </div>
+
+    <!-- top projects -->
+    <div class="card">
+      <h3>Top projekty — červen</h3>
+      <div class="rows">
+        <div class="lrow">
+          <span class="rk">1</span>
+          <span class="dot" style="background:#4dd0e1"></span>
+          <span class="nm">Watchtower</span>
+          <div class="sp"></div>
+          <span class="mut">32,0 h</span>
+          <span class="vio" style="margin-left:10px">24&nbsp;000&nbsp;Kč</span>
+        </div>
+        <div class="ubar" style="width:80%;margin-bottom:2px"></div>
+        <div class="lrow">
+          <span class="rk">2</span>
+          <span class="dot" style="background:#1abc9c"></span>
+          <span class="nm">PPS technology</span>
+          <div class="sp"></div>
+          <span class="mut">28,5 h</span>
+          <span class="vio" style="margin-left:10px">21&nbsp;375&nbsp;Kč</span>
+        </div>
+        <div class="lrow">
+          <span class="rk">3</span>
+          <span class="dot" style="background:#2980b9"></span>
+          <span class="nm">Greencode interní</span>
+          <div class="sp"></div>
+          <span class="mut">22,0 h</span>
+          <span class="vio" style="margin-left:10px">16&nbsp;500&nbsp;Kč</span>
+        </div>
+        <div class="lrow">
+          <span class="rk">4</span>
+          <span class="dot" style="background:#a89cf0"></span>
+          <span class="nm">Fitness platforma</span>
+          <div class="sp"></div>
+          <span class="mut">14,0 h</span>
+          <span class="vio" style="margin-left:10px">10&nbsp;500&nbsp;Kč</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- activity heatmap -->
+    <div class="card">
+      <h3>Aktivita — 30 dní</h3>
+      <div class="heat">
+        <div class="c l2"></div>
+        <div class="c l1"></div>
+        <div class="c l3"></div>
+        <div class="c"></div>
+        <div class="c l4"></div>
+        <div class="c l2"></div>
+        <div class="c l1"></div>
+        <div class="c l3"></div>
+        <div class="c l4"></div>
+        <div class="c l2"></div>
+        <div class="c"></div>
+        <div class="c l1"></div>
+        <div class="c l2"></div>
+        <div class="c l3"></div>
+        <div class="c l4"></div>
+        <div class="c l3"></div>
+        <div class="c l1"></div>
+        <div class="c l2"></div>
+        <div class="c"></div>
+        <div class="c l4"></div>
+        <div class="c l3"></div>
+        <div class="c l2"></div>
+        <div class="c l4"></div>
+        <div class="c l1"></div>
+        <div class="c"></div>
+        <div class="c l3"></div>
+        <div class="c l2"></div>
+        <div class="c l4"></div>
+        <div class="c l1"></div>
+        <div class="c l3"></div>
+      </div>
+      <div class="legend">
+        <span><b>5</b> dní v řadě</span>
+        <span>nejdelší <b>11</b></span>
+        <span>aktivní dny <b>22</b></span>
+        <span>průměr/týden <b>28 h</b></span>
+      </div>
+    </div>
+
+  </div>
+</section>
+<!-- ═══════════════════════════════════════════════════════════════
+     frag-4-earnings-detail.html  |  tag: fakturace
+     Surfaces: s-earn · s-detail · s-drawer-contract
+     No html/head/body/style — shared sheet in _header.part.html
+     ═══════════════════════════════════════════════════════════════ -->
+
+<!-- ── 1. Earnings month ──────────────────────────────────────── -->
+<section class="surface" id="s-earn">
+  <h2>Výdělky — měsíční přehled <span class="tag">fakturace</span></h2>
+  <p class="cap">Přehled celkových výdělků za vybraný měsíc: hero součet, sloupcový vývoj za 8 měsíců a rozpis podle projektů.</p>
+  <div class="stage lg" style="display:flex;flex-direction:column;gap:14px">
+
+    <!-- month picker -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:14px">
+      <div class="btn sm">‹</div>
+      <b style="font-size:18px;color:#f4f4f8">červen 2026</b>
+      <div class="btn sm">›</div>
+    </div>
+
+    <!-- hero total -->
+    <div class="card" style="text-align:center">
+      <div class="lbl" style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Celkem výdělky</div>
+      <div class="mono vio" style="font-size:40px;font-weight:700;letter-spacing:-1px">72&nbsp;375&nbsp;Kč</div>
+    </div>
+
+    <!-- trailing bars -->
+    <div class="card">
+      <h3>Posledních 8 měsíců</h3>
+      <div class="bars">
+        <i style="height:38%"></i>
+        <i style="height:52%"></i>
+        <i style="height:44%"></i>
+        <i style="height:61%"></i>
+        <i style="height:55%"></i>
+        <i style="height:70%"></i>
+        <i style="height:65%"></i>
+        <i class="on" style="height:82%"></i>
+      </div>
+      <div style="display:flex;gap:4px;margin-top:6px">
+        <span style="flex:1;font-size:9px;text-align:center" class="mut">lis</span>
+        <span style="flex:1;font-size:9px;text-align:center" class="mut">pro</span>
+        <span style="flex:1;font-size:9px;text-align:center" class="mut">led</span>
+        <span style="flex:1;font-size:9px;text-align:center" class="mut">úno</span>
+        <span style="flex:1;font-size:9px;text-align:center" class="mut">bře</span>
+        <span style="flex:1;font-size:9px;text-align:center" class="mut">dub</span>
+        <span style="flex:1;font-size:9px;text-align:center" class="mut">kvě</span>
+        <span style="flex:1;font-size:9px;text-align:center" class="mut">čvn</span>
+      </div>
+    </div>
+
+    <!-- per-project list -->
+    <div class="card">
+      <h3>Podle projektů</h3>
+      <div class="rows">
+        <div class="lrow">
+          <span class="dot" style="background:#a89cf0"></span>
+          <span class="nm">PPS technology</span>
+          <span class="sp"></span>
+          <span class="mut" style="font-size:11px">28,0 h</span>
+          <span class="vio mono" style="margin-left:8px">42&nbsp;000&nbsp;Kč</span>
+          <span class="chev">›</span>
+        </div>
+        <div class="ubar"></div>
+        <div class="lrow">
+          <span class="dot" style="background:#4dd0e1"></span>
+          <span class="nm">Greencode interní</span>
+          <span class="sp"></span>
+          <span class="mut" style="font-size:11px">16,5 h</span>
+          <span class="vio mono" style="margin-left:8px">19&nbsp;800&nbsp;Kč</span>
+          <span class="chev">›</span>
+        </div>
+        <div class="lrow">
+          <span class="dot" style="background:#1abc9c"></span>
+          <span class="nm">Fitness platform</span>
+          <span class="sp"></span>
+          <span class="mut" style="font-size:11px">7,5 h</span>
+          <span class="vio mono" style="margin-left:8px">10&nbsp;575&nbsp;Kč</span>
+          <span class="chev">›</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── 2. Project detail drill-down ──────────────────────────── -->
+<section class="surface" id="s-detail">
+  <h2>Detail projektu — PPS technology <span class="tag">fakturace</span></h2>
+  <p class="cap">Rozklik projektu: aktuální sazba, statistiky měsíce, historie sazeb a výkaz pracovních záznamů.</p>
+  <div class="stage lg" style="display:flex;flex-direction:column;gap:14px">
+
+    <!-- back nav -->
+    <div><div class="btn sm">‹ Výdělky</div></div>
+
+    <!-- project header -->
+    <div class="card">
+      <div style="font-size:22px;font-weight:700;color:#f4f4f8;margin-bottom:12px">PPS technology</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div class="kpi">
+          <span class="lbl">Sazba</span>
+          <span class="big vio" style="font-size:16px">1&nbsp;500&nbsp;Kč/h</span>
+        </div>
+        <div class="kpi">
+          <span class="lbl">Tento měsíc</span>
+          <span class="big cy" style="font-size:16px">28,0 h</span>
+        </div>
+        <div class="kpi">
+          <span class="lbl">Výdělek</span>
+          <span class="big vio" style="font-size:16px">42&nbsp;000&nbsp;Kč</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- rate history -->
+    <div class="card">
+      <div style="display:flex;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0">Historie sazeb</h3>
+        <span class="sp"></span>
+        <div class="btn sm">+ Přidat sazbu</div>
+      </div>
+      <div class="rows">
+        <!-- active rate -->
+        <div class="lrow" style="background:rgba(168,156,240,.12);border-radius:8px;padding:9px 8px">
+          <span class="dot" style="background:#a89cf0"></span>
+          <span class="nm">1. 1. 2026 – nyní</span>
+          <span class="sp"></span>
+          <span class="mono vio" style="font-size:12px">1&nbsp;500&nbsp;Kč/h</span>
+          <span class="vio mono" style="margin-left:8px;font-size:12px">42&nbsp;000&nbsp;Kč</span>
+          <span class="chev">›</span>
+        </div>
+        <!-- inactive rate -->
+        <div class="lrow">
+          <span class="dot" style="background:#5a6072"></span>
+          <span class="mut">1. 6. 2025 – 31. 12. 2025</span>
+          <span class="sp"></span>
+          <span class="mono mut" style="font-size:12px">1&nbsp;350&nbsp;Kč/h</span>
+          <span class="mut mono" style="margin-left:8px;font-size:12px">30&nbsp;375&nbsp;Kč</span>
+          <span class="chev">›</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- worklog ledger -->
+    <div class="data">
+      <table class="led">
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <th>Úkol</th>
+            <th>Hodiny</th>
+            <th>Výdělek</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2. 6. 2026</td>
+            <td><span class="mono cy">TEH-481</span></td>
+            <td style="text-align:right"><span class="mono">3,0 h</span></td>
+            <td style="text-align:right"><span class="mono vio">4&nbsp;500&nbsp;Kč</span></td>
+          </tr>
+          <tr>
+            <td>5. 6. 2026</td>
+            <td><span class="mono cy">TEH-492</span></td>
+            <td style="text-align:right"><span class="mono">6,5 h</span></td>
+            <td style="text-align:right"><span class="mono vio">9&nbsp;750&nbsp;Kč</span></td>
+          </tr>
+          <tr>
+            <td>11. 6. 2026</td>
+            <td><span class="mono cy">TEH-507</span></td>
+            <td style="text-align:right"><span class="mono">8,0 h</span></td>
+            <td style="text-align:right"><span class="mono vio">12&nbsp;000&nbsp;Kč</span></td>
+          </tr>
+          <tr>
+            <td>18. 6. 2026</td>
+            <td><span class="mono cy">TEH-519</span></td>
+            <td style="text-align:right"><span class="mono">10,5 h</span></td>
+            <td style="text-align:right"><span class="mono vio">15&nbsp;750&nbsp;Kč</span></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2">Celkem</td>
+            <td style="text-align:right"><span class="mono cy">28,0 h</span></td>
+            <td style="text-align:right"><span class="mono vio">42&nbsp;000&nbsp;Kč</span></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── 3. Contract drawer (bottom sheet) ──────────────────────── -->
+<section class="surface" id="s-drawer-contract">
+  <h2>Drawer — upravit sazbu <span class="tag">fakturace</span></h2>
+  <p class="cap">Bottom sheet pro vytvoření nebo úpravu sazby: období, typ, výše, MD limit. Spodní lišta s destruktivní akcí, zrušením a uložením.</p>
+  <div class="stage" style="min-height:520px">
+
+    <div class="scrim">
+      <div class="drawer">
+
+        <!-- drawer header -->
+        <div class="dh">
+          <h4>Upravit sazbu</h4>
+          <span class="x">✕</span>
+        </div>
+
+        <!-- date range -->
+        <div class="frow" style="margin-bottom:12px">
+          <div>
+            <label>Platné od</label>
+            <div class="field">1. 1. 2026</div>
+          </div>
+          <div>
+            <label>Platné do (volitelné)</label>
+            <div class="field mut">—</div>
+          </div>
+        </div>
+
+        <!-- rate type -->
+        <div style="margin-bottom:12px">
+          <label>Typ sazby</label>
+          <div class="seg">
+            <b class="on">Hodinová</b>
+            <b>Denní</b>
+          </div>
+        </div>
+
+        <!-- rate + hours per day -->
+        <div class="frow" style="margin-bottom:12px">
+          <div>
+            <label>Sazba</label>
+            <div class="field mono">1 500</div>
+          </div>
+          <div>
+            <label>Hodin/den</label>
+            <div class="field mono">8</div>
+          </div>
+        </div>
+
+        <!-- MD limit -->
+        <div style="margin-bottom:4px">
+          <label>MD limit (volitelné)</label>
+          <div class="field mono">20</div>
+        </div>
+
+        <!-- footer actions -->
+        <div class="foot">
+          <div class="btn danger">Smazat</div>
+          <div class="sp"></div>
+          <div class="btn">Zrušit</div>
+          <div class="cta">Uložit</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</section>
+<section class="surface" id="s-reports">
+  <h2>Reporty <span class="tag">reporty</span></h2>
+  <p class="cap">Přehled výdělků a aktivity: trend, rozdělení příjmů, projektový donut a heatmapa aktivních dnů.</p>
+  <div class="stage lg" style="display:flex;flex-direction:column;gap:14px">
+
+    <!-- Filter bar -->
+    <div class="hbar" style="height:auto;flex-wrap:wrap;padding:10px 14px;gap:10px">
+      <div class="seg">
+        <b>7 dní</b>
+        <b>30 dní</b>
+        <b class="on">Tento měsíc</b>
+        <b>Tento rok</b>
+        <b>Vše</b>
+      </div>
+      <div class="seg">
+        <b>Den</b>
+        <b class="on">Týden</b>
+        <b>Měsíc</b>
+      </div>
+      <div class="sp"></div>
+      <div class="field" style="max-width:180px">Všechny projekty</div>
+    </div>
+
+    <!-- Trend card -->
+    <div class="card">
+      <h3>Trend</h3>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span style="font-size:12px;color:var(--text-2);font-weight:500">Tento měsíc</span>
+        <span class="mut" style="font-size:10px">·</span>
+        <span style="font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums">96,5 h</span>
+        <span class="mut" style="font-size:10px">·</span>
+        <span class="vio" style="font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums">72&nbsp;375&nbsp;Kč</span>
+        <span class="mut" style="margin-left:4px;font-size:10px">+11 % vs. minulý měsíc</span>
+      </div>
+      <div class="bars">
+        <!-- 14 bars across ~4 months of weeks; .on = current week, .mark = rate-change week -->
+        <i style="height:28%"></i>
+        <i style="height:41%"></i>
+        <i style="height:35%"></i>
+        <i style="height:56%"></i>
+        <i style="height:48%"></i>
+        <i class="mark" style="height:53%"></i>
+        <i style="height:62%"></i>
+        <i style="height:70%"></i>
+        <i style="height:74%"></i>
+        <i style="height:67%"></i>
+        <i style="height:80%"></i>
+        <i class="on" style="height:90%"></i>
+        <i style="height:60%"></i>
+        <i style="height:32%"></i>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)">
+          <span style="display:inline-block;width:10px;height:2px;border-left:2px dashed var(--cyan-2)"></span>
+          změna sazby
+        </span>
+      </div>
+    </div>
+
+    <!-- Earnings summary card -->
+    <div class="card">
+      <h3>Výdělky</h3>
+
+      <!-- Four KPI mini tiles -->
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div class="card kpi" style="flex:1 1 110px">
+          <span class="lbl">Celkem vyděláno</span>
+          <span class="big vio" style="font-variant-numeric:tabular-nums">72&nbsp;375&nbsp;Kč</span>
+        </div>
+        <div class="card kpi" style="flex:1 1 110px">
+          <span class="lbl">Účtovatelné</span>
+          <span class="big" style="font-variant-numeric:tabular-nums">68&nbsp;000&nbsp;Kč</span>
+        </div>
+        <div class="card kpi" style="flex:1 1 110px">
+          <span class="lbl">Neúčtovatelné</span>
+          <span class="big mut" style="font-variant-numeric:tabular-nums">4&nbsp;375&nbsp;Kč</span>
+        </div>
+        <div class="card kpi" style="flex:1 1 110px">
+          <span class="lbl">Prům. sazba</span>
+          <span class="big" style="font-variant-numeric:tabular-nums">1&nbsp;480&nbsp;Kč/h</span>
+        </div>
+      </div>
+
+      <!-- Per-project breakdown with proportional ubar under top project -->
+      <div class="rows">
+        <div class="lrow" style="flex-direction:column;align-items:stretch;gap:6px;padding-bottom:10px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="sw" style="background:#4dd0e1"></span>
+            <span class="nm">Fitness platforma</span>
+            <span class="sp"></span>
+            <span class="vio" style="font-size:12px;font-variant-numeric:tabular-nums">38&nbsp;500&nbsp;Kč</span>
+          </div>
+          <!-- proportional bar: 38500/72375 ≈ 53% -->
+          <div class="bar" style="height:5px">
+            <i style="width:53%;background:linear-gradient(90deg,#4dd0e1,#22D3EE)"></i>
+          </div>
+        </div>
+        <div class="lrow" style="flex-direction:column;align-items:stretch;gap:6px;padding-bottom:10px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="sw" style="background:#1abc9c"></span>
+            <span class="nm">Watchtower dev</span>
+            <span class="sp"></span>
+            <span class="vio" style="font-size:12px;font-variant-numeric:tabular-nums">22&nbsp;750&nbsp;Kč</span>
+          </div>
+          <!-- 22750/72375 ≈ 31% -->
+          <div class="bar" style="height:5px">
+            <i style="width:31%;background:linear-gradient(90deg,#1abc9c,#34d399)"></i>
+          </div>
+        </div>
+        <div class="lrow" style="flex-direction:column;align-items:stretch;gap:6px;border-bottom:none;padding-bottom:2px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="sw" style="background:#a89cf0"></span>
+            <span class="nm">Interní / osobní</span>
+            <span class="sp"></span>
+            <span class="mut" style="font-size:12px;font-variant-numeric:tabular-nums">11&nbsp;125&nbsp;Kč</span>
+          </div>
+          <!-- 11125/72375 ≈ 15% -->
+          <div class="bar" style="height:5px">
+            <i style="width:15%;background:linear-gradient(90deg,#a89cf0,#c9bdff)"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Project donut card -->
+    <div class="card">
+      <h3>Podle projektů</h3>
+      <div class="donut-wrap">
+
+        <!-- SVG donut (left)
+          Circumference = 2π × 15.9 ≈ 99.9
+          We start at the top via transform="rotate(-90 21 21)".
+          Each segment: stroke-dasharray="arc gap" where arc + gap = 99.9
+          stroke-dashoffset = -(cumulative arc of previous segments)
+          Segment 1 (cyan,  45%): arc=44.9, offset=0
+          Segment 2 (teal,  35%): arc=35.0, offset=-(44.9)
+          Segment 3 (violet,20%): arc=20.0, offset=-(44.9+35.0)=-(79.9)
+        -->
+        <div style="position:relative;width:150px;height:150px;flex-shrink:0">
+          <svg width="150" height="150" viewBox="0 0 42 42" style="display:block" aria-hidden="true">
+            <circle cx="21" cy="21" r="15.9" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="6"/>
+            <circle cx="21" cy="21" r="15.9" fill="none"
+              stroke="#4dd0e1" stroke-width="6"
+              stroke-dasharray="44.9 55"
+              stroke-dashoffset="0"
+              stroke-linecap="butt"
+              transform="rotate(-90 21 21)"/>
+            <circle cx="21" cy="21" r="15.9" fill="none"
+              stroke="#1abc9c" stroke-width="6"
+              stroke-dasharray="35 64.9"
+              stroke-dashoffset="-44.9"
+              stroke-linecap="butt"
+              transform="rotate(-90 21 21)"/>
+            <circle cx="21" cy="21" r="15.9" fill="none"
+              stroke="#a89cf0" stroke-width="6"
+              stroke-dasharray="19 80.9"
+              stroke-dashoffset="-79.9"
+              stroke-linecap="butt"
+              transform="rotate(-90 21 21)"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+            <span style="font-size:15px;font-weight:700;color:#f4f4f8;line-height:1.15;font-variant-numeric:tabular-nums">96,5 h</span>
+            <span class="mut" style="font-size:10px;letter-spacing:.04em">celkem</span>
+          </div>
+        </div>
+
+        <!-- Legend (right) -->
+        <div style="display:flex;flex-direction:column;gap:11px;flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+            <span class="sw" style="background:#4dd0e1;border-radius:2px"></span>
+            <span style="color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Fitness platforma</span>
+            <span class="sp"></span>
+            <span class="mut" style="white-space:nowrap;font-variant-numeric:tabular-nums">43,4 h</span>
+            <span style="color:var(--cyan);font-size:10.5px;font-weight:600;width:30px;text-align:right;font-variant-numeric:tabular-nums">45 %</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+            <span class="sw" style="background:#1abc9c;border-radius:2px"></span>
+            <span style="color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Watchtower dev</span>
+            <span class="sp"></span>
+            <span class="mut" style="white-space:nowrap;font-variant-numeric:tabular-nums">33,8 h</span>
+            <span style="color:var(--teal);font-size:10.5px;font-weight:600;width:30px;text-align:right;font-variant-numeric:tabular-nums">35 %</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+            <span class="sw" style="background:#a89cf0;border-radius:2px"></span>
+            <span style="color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Interní / osobní</span>
+            <span class="sp"></span>
+            <span class="mut" style="white-space:nowrap;font-variant-numeric:tabular-nums">19,3 h</span>
+            <span class="vio" style="font-size:10.5px;font-weight:600;width:30px;text-align:right;font-variant-numeric:tabular-nums">20 %</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity card -->
+    <div class="card">
+      <h3>Aktivita</h3>
+      <div class="heat">
+        <!-- 28 cells: simulate a realistic month of activity patterns -->
+        <span class="c"></span>
+        <span class="c l1"></span>
+        <span class="c l2"></span>
+        <span class="c l3"></span>
+        <span class="c l4"></span>
+        <span class="c l3"></span>
+        <span class="c"></span>
+        <span class="c l1"></span>
+        <span class="c l2"></span>
+        <span class="c l4"></span>
+        <span class="c l3"></span>
+        <span class="c l2"></span>
+        <span class="c l1"></span>
+        <span class="c"></span>
+        <span class="c l2"></span>
+        <span class="c l3"></span>
+        <span class="c l4"></span>
+        <span class="c l3"></span>
+        <span class="c l2"></span>
+        <span class="c l1"></span>
+        <span class="c"></span>
+        <span class="c l3"></span>
+        <span class="c l4"></span>
+        <span class="c l4"></span>
+        <span class="c l3"></span>
+        <span class="c l2"></span>
+        <span class="c l1"></span>
+        <span class="c l2"></span>
+      </div>
+      <div class="legend">
+        <span><b>5</b> dní v řadě</span>
+        <span>aktivní dny <b>22</b></span>
+        <span>průměr/týden <b>28 h</b></span>
+      </div>
+    </div>
+
+  </div>
+</section>
+<!-- ═══════════════════════════════════════════════════════════════
+     ZÁZNAMY — four surfaces: seznam · mřížka · úkoly · volno
+     Fragment only — no html/head/body/style. Classes from _header.part.html.
+     ═══════════════════════════════════════════════════════════════ -->
+
+<!-- ─── 1. SEZNAM — worklog list ─────────────────────────────────── -->
+<section class="surface" id="s-rec-list">
+  <h2>Seznam <span class="tag">záznamy</span></h2>
+  <p class="cap">Worklog list — day groups with billable-rounding indicator, month picker, and project filter.</p>
+
+  <div class="stage lg">
+    <!-- month bar -->
+    <div class="hbar" style="height:auto;flex-wrap:wrap;gap:10px;padding:10px 16px">
+      <button class="btn sm">‹</button>
+      <b style="font-size:14px;color:#f4f4f8">červen 2026</b>
+      <button class="btn sm">›</button>
+      <button class="btn sm">Dnes</button>
+      <span class="sp"></span>
+      <div class="field" style="max-width:170px">Všechny projekty</div>
+      <button class="cta" style="height:34px">+ Přidat</button>
+    </div>
+
+    <!-- day group 1 -->
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin:14px 2px 6px">
+      <b style="font-size:13px;color:#f4f4f8">29. 6. 2026</b>
+      <span class="mut" style="font-size:12px">8,0&nbsp;h</span>
+    </div>
+
+    <div class="card" style="padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+      <span class="dot" style="background:#a89cf0"></span>
+      <span class="mono mut" style="font-size:11px">TEH-481</span>
+      <span style="font-size:12.5px;color:#d7dbe6;flex:1">Oprava handleru pro NC výjimky</span>
+      <span class="badge">jira</span>
+      <span style="font-size:12.5px;color:#f4f4f8;font-variant-numeric:tabular-nums">2,5&nbsp;h</span>
+    </div>
+
+    <div class="card" style="padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+      <span class="dot" style="background:#4dd0e1"></span>
+      <span class="mono mut" style="font-size:11px">TEH-502</span>
+      <span style="font-size:12.5px;color:#d7dbe6;flex:1">Watchtower — pull sync + self-heal</span>
+      <span class="badge">watchtower</span>
+      <span style="font-size:12.5px;color:#f4f4f8;font-variant-numeric:tabular-nums">3,5&nbsp;h <span class="mut">→ 3,0</span></span>
+    </div>
+
+    <div class="card" style="padding:8px 12px;display:flex;align-items:center;gap:10px">
+      <span class="dot" style="background:#1abc9c"></span>
+      <span class="mono mut" style="font-size:11px">—</span>
+      <span style="font-size:12.5px;color:#d7dbe6;flex:1">Standup + plánování sprintu</span>
+      <span class="badge">manual</span>
+      <span style="font-size:12.5px;color:#f4f4f8;font-variant-numeric:tabular-nums">2,0&nbsp;h</span>
+    </div>
+
+    <!-- day group 2 -->
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin:16px 2px 6px">
+      <b style="font-size:13px;color:#f4f4f8">26. 6. 2026</b>
+      <span class="mut" style="font-size:12px">6,5&nbsp;h</span>
+    </div>
+
+    <div class="card" style="padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+      <span class="dot" style="background:#a89cf0"></span>
+      <span class="mono mut" style="font-size:11px">TEH-475</span>
+      <span style="font-size:12.5px;color:#d7dbe6;flex:1">Rate history drawer — delete + overlap error</span>
+      <span class="badge">jira</span>
+      <span style="font-size:12.5px;color:#f4f4f8;font-variant-numeric:tabular-nums">4,0&nbsp;h</span>
+    </div>
+
+    <div class="card" style="padding:8px 12px;display:flex;align-items:center;gap:10px">
+      <span class="dot" style="background:#2980b9"></span>
+      <span class="mono mut" style="font-size:11px">PPS-119</span>
+      <span style="font-size:12.5px;color:#d7dbe6;flex:1">Code review — billing module refactor</span>
+      <span class="badge">jira</span>
+      <span style="font-size:12.5px;color:#f4f4f8;font-variant-numeric:tabular-nums">2,5&nbsp;h</span>
+    </div>
+  </div>
+
+  <!-- worklog drawer — separate stage so the scrim sits correctly -->
+  <p class="cap" style="margin-top:10px">Drawer — nový / editace záznamu (bottom sheet).</p>
+  <div class="stage lg">
+    <div class="scrim">
+      <div class="drawer">
+        <div class="dh">
+          <h4>Nový záznam</h4>
+          <span class="x">✕</span>
+        </div>
+
+        <label>Úkol</label>
+        <div class="field" style="margin-bottom:8px">Hledat úkol…</div>
+
+        <!-- two selectable task rows -->
+        <div class="card" style="padding:7px 11px;margin-bottom:5px;display:flex;align-items:center;gap:9px;border:2px solid #a89cf0">
+          <span class="dot" style="background:#a89cf0"></span>
+          <span class="mono mut" style="font-size:11px">TEH-481</span>
+          <span style="font-size:12px;color:#d7dbe6">Oprava handleru pro NC výjimky</span>
+        </div>
+        <div class="card" style="padding:7px 11px;margin-bottom:12px;display:flex;align-items:center;gap:9px">
+          <span class="dot" style="background:#4dd0e1"></span>
+          <span class="mono mut" style="font-size:11px">TEH-502</span>
+          <span style="font-size:12px;color:#d7dbe6">Watchtower — pull sync</span>
+        </div>
+
+        <label>Datum</label>
+        <div class="field" style="margin-bottom:10px">29. 6. 2026</div>
+
+        <div class="frow" style="margin-bottom:10px">
+          <div>
+            <label>Čas (1,5 / 1:30)</label>
+            <div class="field">2,5</div>
+          </div>
+          <div>
+            <label>Vykázáno (volitelné)</label>
+            <div class="field">2,0</div>
+          </div>
+        </div>
+
+        <label>Popis</label>
+        <div class="field" style="margin-bottom:10px">Implementace overlap guard…</div>
+
+        <div class="mut" style="font-size:11.5px;margin-bottom:4px">Výdělek: 3&nbsp;000&nbsp;Kč</div>
+
+        <div class="foot">
+          <button class="btn danger">Smazat</button>
+          <span class="sp"></span>
+          <button class="btn">Zrušit</button>
+          <button class="cta">Uložit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 2. MŘÍŽKA — task grid ────────────────────────────────────── -->
+<section class="surface" id="s-rec-grid">
+  <h2>Mřížka úkolů <span class="tag">záznamy</span></h2>
+  <p class="cap">Měsíční mřížka jako v desktopové aplikaci: sloupec na každý den s popiskem dne v týdnu, plovoucí skleněná lišta, lepivý sloupec úkolu + Σ a lepivé součty dole (hodiny + výdělek). Nepracovní dny jsou zvýrazněné — víkend, svátek, dovolená, nemoc. Dnešek má fialový rámeček. (Zvýraznění dnů je ilustrativní.)</p>
+  <div class="stage lg">
+    <div class="hbar" style="height:auto;flex-wrap:wrap;gap:10px">
+      <div class="btn sm">‹</div><b style="min-width:120px;text-align:center">červen 2026</b><div class="btn sm">›</div>
+      <div class="btn sm">Dnes</div>
+      <div class="sp"></div>
+      <div class="seg"><b class="on">Vykázáno</b><b>Odpracováno</b></div>
+      <div class="field" style="max-width:170px">Všechny projekty</div>
+    </div>
+    <div class="legend" style="margin:0 2px 10px">
+      <span><span class="sw" style="background:rgba(150,160,190,.45)"></span> víkend</span>
+      <span><span class="sw" style="background:#a89cf0"></span> svátek</span>
+      <span><span class="sw" style="background:#22D3EE"></span> dovolená</span>
+      <span><span class="sw" style="background:#f87171"></span> nemoc</span>
+      <span><span class="sw" style="box-shadow:inset 0 0 0 1.5px #a89cf0"></span> dnes</span>
+    </div>
+    <div class="data mwrap">
+      <table class="mgrid">
+        <thead>
+          <tr>
+            <th class="uk" style="text-align:left">Úkol</th>
+            <th class="sig">Σ&nbsp;h</th>
+            <th class="day"><div class="dnum">1</div><div class="ddow">Po</div></th><th class="day"><div class="dnum">2</div><div class="ddow">Út</div></th><th class="day"><div class="dnum">3</div><div class="ddow">St</div></th><th class="day"><div class="dnum">4</div><div class="ddow">Čt</div></th><th class="day t-hol"><div class="dnum">5</div><div class="ddow">Pá</div></th><th class="day t-we"><div class="dnum">6</div><div class="ddow" style="color:#c9bdff">So</div></th><th class="day t-we"><div class="dnum">7</div><div class="ddow" style="color:#c9bdff">Ne</div></th><th class="day"><div class="dnum">8</div><div class="ddow">Po</div></th><th class="day"><div class="dnum">9</div><div class="ddow">Út</div></th><th class="day"><div class="dnum">10</div><div class="ddow">St</div></th><th class="day t-vac"><div class="dnum">11</div><div class="ddow">Čt</div></th><th class="day t-vac"><div class="dnum">12</div><div class="ddow">Pá</div></th><th class="day t-we"><div class="dnum">13</div><div class="ddow" style="color:#c9bdff">So</div></th><th class="day t-we"><div class="dnum">14</div><div class="ddow" style="color:#c9bdff">Ne</div></th><th class="day"><div class="dnum">15</div><div class="ddow">Po</div></th><th class="day"><div class="dnum">16</div><div class="ddow">Út</div></th><th class="day"><div class="dnum">17</div><div class="ddow">St</div></th><th class="day"><div class="dnum">18</div><div class="ddow">Čt</div></th><th class="day"><div class="dnum">19</div><div class="ddow">Pá</div></th><th class="day t-we"><div class="dnum">20</div><div class="ddow" style="color:#c9bdff">So</div></th><th class="day t-we"><div class="dnum">21</div><div class="ddow" style="color:#c9bdff">Ne</div></th><th class="day"><div class="dnum">22</div><div class="ddow">Po</div></th><th class="day t-sick"><div class="dnum">23</div><div class="ddow">Út</div></th><th class="day"><div class="dnum">24</div><div class="ddow">St</div></th><th class="day"><div class="dnum">25</div><div class="ddow">Čt</div></th><th class="day"><div class="dnum">26</div><div class="ddow">Pá</div></th><th class="day t-we"><div class="dnum">27</div><div class="ddow" style="color:#c9bdff">So</div></th><th class="day t-we"><div class="dnum">28</div><div class="ddow" style="color:#c9bdff">Ne</div></th><th class="day t-today"><div class="dnum">29</div><div class="ddow">Po</div></th><th class="day"><div class="dnum">30</div><div class="ddow">Út</div></th>
+          </tr>
+        </thead>
+        <tbody>
+      <tr>
+        <td class="uk"><span class="dot" style="background:#a89cf0;width:7px;height:7px"></span><span class="mono mut" style="font-size:11px">TEH‑481</span> Oprava handleru</td>
+        <td class="sig vio">22<span class="mut" style="font-weight:400"> / 12</span></td>
+        <td class="day ">1</td><td class="day ">1,5</td><td class="day " style="color:var(--dim)"></td><td class="day ">2,5</td><td class="day t-hol" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day ">1,5</td><td class="day ">2</td><td class="day " style="color:var(--dim)"></td><td class="day t-vac" style="color:var(--dim)"></td><td class="day t-vac" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day ">2</td><td class="day " style="color:var(--dim)"></td><td class="day ">3</td><td class="day ">0,5</td><td class="day ">1</td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day ">2,5</td><td class="day t-sick" style="color:var(--dim)"></td><td class="day ">0,5</td><td class="day ">1</td><td class="day " style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day  t-today">3</td><td class="day " style="color:var(--dim)"></td>
+      </tr>
+      <tr>
+        <td class="uk"><span class="dot" style="background:#4dd0e1;width:7px;height:7px"></span><span class="mono mut" style="font-size:11px">TEH‑502</span> Pull sync self‑heal</td>
+        <td class="sig vio">28<span class="mut" style="font-weight:400"> / 16</span></td>
+        <td class="day " style="color:var(--dim)"></td><td class="day ">2</td><td class="day ">2,5</td><td class="day " style="color:var(--dim)"></td><td class="day t-hol" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day ">2</td><td class="day ">2,5</td><td class="day ">3</td><td class="day t-vac" style="color:var(--dim)"></td><td class="day t-vac" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day ">2,5</td><td class="day ">3</td><td class="day " style="color:var(--dim)"></td><td class="day ">1</td><td class="day ">1,5</td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day ">3</td><td class="day t-sick" style="color:var(--dim)"></td><td class="day " style="color:var(--dim)"></td><td class="day ">1,5</td><td class="day ">2</td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day  t-today">0,5</td><td class="day ">1</td>
+      </tr>
+      <tr>
+        <td class="uk"><span class="dot" style="background:#2980b9;width:7px;height:7px"></span><span class="mono mut" style="font-size:11px">PPS‑119</span> Billing refactor CR</td>
+        <td class="sig vio">19<span class="mut" style="font-weight:400"> / 10</span></td>
+        <td class="day ">2</td><td class="day " style="color:var(--dim)"></td><td class="day ">3</td><td class="day ">0,5</td><td class="day t-hol" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day " style="color:var(--dim)"></td><td class="day ">3</td><td class="day ">0,5</td><td class="day t-vac" style="color:var(--dim)"></td><td class="day t-vac" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day " style="color:var(--dim)"></td><td class="day ">0,5</td><td class="day ">1</td><td class="day " style="color:var(--dim)"></td><td class="day ">2</td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day " style="color:var(--dim)"></td><td class="day t-sick" style="color:var(--dim)"></td><td class="day ">1,5</td><td class="day " style="color:var(--dim)"></td><td class="day ">2,5</td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day  t-today">1</td><td class="day ">1,5</td>
+      </tr>
+      <tr>
+        <td class="uk"><span class="dot" style="background:#1abc9c;width:7px;height:7px"></span><span class="mono mut" style="font-size:11px">—</span> Manuální čas</td>
+        <td class="sig vio">22</td>
+        <td class="day ">2,5</td><td class="day ">3</td><td class="day " style="color:var(--dim)"></td><td class="day ">1</td><td class="day t-hol" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day ">3</td><td class="day " style="color:var(--dim)"></td><td class="day ">1</td><td class="day t-vac" style="color:var(--dim)"></td><td class="day t-vac" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day ">0,5</td><td class="day " style="color:var(--dim)"></td><td class="day ">1,5</td><td class="day ">2</td><td class="day " style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day ">1</td><td class="day t-sick" style="color:var(--dim)"></td><td class="day ">2</td><td class="day ">2,5</td><td class="day " style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day t-we" style="color:var(--dim)"></td><td class="day  t-today" style="color:var(--dim)"></td><td class="day ">2</td>
+      </tr>
+        </tbody>
+        <tfoot>
+          <tr class="tot">
+            <td class="uk" style="text-align:left">Celkem (h)</td>
+            <td class="sig vio">91</td>
+            <td class="day">5,5</td><td class="day">6,5</td><td class="day">5,5</td><td class="day">4</td><td class="day t-hol"></td><td class="day t-we"></td><td class="day t-we"></td><td class="day">6,5</td><td class="day">7,5</td><td class="day">4,5</td><td class="day t-vac"></td><td class="day t-vac"></td><td class="day t-we"></td><td class="day t-we"></td><td class="day">5</td><td class="day">3,5</td><td class="day">5,5</td><td class="day">3,5</td><td class="day">4,5</td><td class="day t-we"></td><td class="day t-we"></td><td class="day">6,5</td><td class="day t-sick"></td><td class="day">4</td><td class="day">5</td><td class="day">4,5</td><td class="day t-we"></td><td class="day t-we"></td><td class="day t-today">4,5</td><td class="day">4,5</td>
+          </tr>
+          <tr class="earn">
+            <td class="uk" style="text-align:left">Výdělek</td>
+            <td class="sig vio">136&nbsp;500&nbsp;Kč</td>
+            <td class="day" style="font-size:10px">8k</td><td class="day" style="font-size:10px">10k</td><td class="day" style="font-size:10px">8k</td><td class="day" style="font-size:10px">6k</td><td class="day t-hol" style="font-size:10px"></td><td class="day t-we" style="font-size:10px"></td><td class="day t-we" style="font-size:10px"></td><td class="day" style="font-size:10px">10k</td><td class="day" style="font-size:10px">11k</td><td class="day" style="font-size:10px">7k</td><td class="day t-vac" style="font-size:10px"></td><td class="day t-vac" style="font-size:10px"></td><td class="day t-we" style="font-size:10px"></td><td class="day t-we" style="font-size:10px"></td><td class="day" style="font-size:10px">8k</td><td class="day" style="font-size:10px">5k</td><td class="day" style="font-size:10px">8k</td><td class="day" style="font-size:10px">5k</td><td class="day" style="font-size:10px">7k</td><td class="day t-we" style="font-size:10px"></td><td class="day t-we" style="font-size:10px"></td><td class="day" style="font-size:10px">10k</td><td class="day t-sick" style="font-size:10px"></td><td class="day" style="font-size:10px">6k</td><td class="day" style="font-size:10px">8k</td><td class="day" style="font-size:10px">7k</td><td class="day t-we" style="font-size:10px"></td><td class="day t-we" style="font-size:10px"></td><td class="day t-today" style="font-size:10px">7k</td><td class="day" style="font-size:10px">7k</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 3. ÚKOLY — task list + task drawer ───────────────────────── -->
+<section class="surface" id="s-rec-tasks">
+  <h2>Úkoly <span class="tag">záznamy</span></h2>
+  <p class="cap">Task list with status chips — plus a new-task drawer at bottom.</p>
+
+  <div class="stage">
+    <!-- control bar -->
+    <div class="hbar" style="height:auto;flex-wrap:wrap;gap:10px;padding:10px 16px;margin-bottom:14px">
+      <div class="field" style="flex:1">Hledat úkol…</div>
+      <button class="cta" style="height:34px">+ Přidat úkol</button>
+    </div>
+
+    <!-- task list -->
+    <div class="rows">
+      <div class="card" style="padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        <span class="dot" style="background:#a89cf0"></span>
+        <span class="mono mut" style="font-size:11px">TEH-481</span>
+        <span style="font-size:12.5px;color:#d7dbe6;flex:1">Oprava handleru pro NC výjimky</span>
+        <span class="chip muted">Otevřený</span>
+      </div>
+      <div class="card" style="padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        <span class="dot" style="background:#4dd0e1"></span>
+        <span class="mono mut" style="font-size:11px">TEH-502</span>
+        <span style="font-size:12.5px;color:#d7dbe6;flex:1">Watchtower — pull sync + self-heal</span>
+        <span class="chip" style="color:var(--violet);background:rgba(168,156,240,.18);border-color:rgba(168,156,240,.4)">Probíhá</span>
+      </div>
+      <div class="card" style="padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        <span class="dot" style="background:#2980b9"></span>
+        <span class="mono mut" style="font-size:11px">PPS-119</span>
+        <span style="font-size:12.5px;color:#d7dbe6;flex:1">Billing module refactor — code review</span>
+        <span class="chip" style="color:var(--violet);background:rgba(168,156,240,.28);border-color:rgba(168,156,240,.55)">K akceptaci</span>
+      </div>
+      <div class="card" style="padding:8px 12px;display:flex;align-items:center;gap:10px">
+        <span class="dot" style="background:#1abc9c"></span>
+        <span class="mono mut" style="font-size:11px">TEH-475</span>
+        <span style="font-size:12.5px;color:#d7dbe6;flex:1">Rate history drawer — delete + overlap</span>
+        <span class="chip muted">Hotovo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- task drawer -->
+  <p class="cap" style="margin-top:10px">Drawer — nový úkol.</p>
+  <div class="stage lg">
+    <div class="scrim">
+      <div class="drawer">
+        <div class="dh">
+          <h4>Nový úkol</h4>
+          <span class="x">✕</span>
+        </div>
+
+        <label>Epik</label>
+        <div class="field" style="margin-bottom:10px">PPS technology ▸ Sprint 24</div>
+
+        <div class="frow" style="margin-bottom:10px">
+          <div>
+            <label>Číslo</label>
+            <div class="field">TEH-512</div>
+          </div>
+          <div>
+            <label>Stav</label>
+            <div class="seg">
+              <b class="on">Otevřený</b>
+              <b>Probíhá</b>
+            </div>
+          </div>
+        </div>
+
+        <label>Název</label>
+        <div class="field" style="margin-bottom:10px">Oprava NC handleru</div>
+
+        <label>Odhad (h)</label>
+        <div class="field" style="margin-bottom:10px">1,5</div>
+
+        <label>Popis (volitelné)</label>
+        <div class="field" style="margin-bottom:4px">Volitelný popis úkolu…</div>
+
+        <div class="foot">
+          <button class="btn danger">Smazat</button>
+          <span class="sp"></span>
+          <button class="btn">Zrušit</button>
+          <button class="cta">Uložit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 4. VOLNO — time off ──────────────────────────────────────── -->
+<section class="surface" id="s-rec-timeoff">
+  <h2>Volno <span class="tag">záznamy</span></h2>
+  <p class="cap">Month calendar for vacation, sick, other and holidays — plus a quick day-off picker and upcoming list.</p>
+
+  <div class="stage lg">
+    <!-- control + legend bar -->
+    <div class="hbar" style="height:auto;flex-wrap:wrap;gap:10px;padding:10px 16px;margin-bottom:14px">
+      <button class="btn sm">‹</button>
+      <button class="btn sm">Dnes</button>
+      <button class="btn sm">›</button>
+      <span class="sp"></span>
+      <!-- legend -->
+      <div style="display:inline-flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted)">
+        <span style="display:flex;align-items:center;gap:5px"><span class="sw" style="background:#22D3EE"></span>Dovolená</span>
+        <span style="display:flex;align-items:center;gap:5px"><span class="sw" style="background:#f87171"></span>Nemoc</span>
+        <span style="display:flex;align-items:center;gap:5px"><span class="sw" style="background:#f5a524"></span>Jiné</span>
+        <span style="display:flex;align-items:center;gap:5px"><span class="sw" style="background:transparent;border:1px dashed rgba(168,156,240,.7)"></span>Svátek</span>
+      </div>
+    </div>
+
+    <!-- calendar card -->
+    <div class="card" style="margin-bottom:12px">
+      <h3>červen 2026</h3>
+      <div class="cal">
+        <!-- weekday headers: Po Út St Čt Pá So Ne -->
+        <div class="h">Po</div><div class="h">Út</div><div class="h">St</div>
+        <div class="h">Čt</div><div class="h">Pá</div><div class="h">So</div><div class="h">Ne</div>
+
+        <!-- week 1: 1–7 June, starts Monday -->
+        <div class="d">1</div><div class="d">2</div><div class="d">3</div>
+        <div class="d">4</div><div class="d">5</div><div class="d we">6</div><div class="d we">7</div>
+
+        <!-- week 2: 8–14 -->
+        <div class="d">8</div><div class="d">9</div><div class="d">10</div>
+        <div class="d">11</div><div class="d vac">12</div><div class="d we">13</div><div class="d we">14</div>
+
+        <!-- week 3: 15–21 -->
+        <div class="d vac">15</div><div class="d vac">16</div><div class="d vac">17</div>
+        <div class="d hol">18</div><div class="d">19</div><div class="d we">20</div><div class="d we">21</div>
+
+        <!-- week 4: 22–28 -->
+        <div class="d">22</div><div class="d sick">23</div><div class="d">24</div>
+        <div class="d other">25</div><div class="d">26</div><div class="d we">27</div><div class="d we">28</div>
+
+        <!-- week 5: 29–30 -->
+        <div class="d">29</div><div class="d">30</div>
+      </div>
+    </div>
+
+    <!-- day-off picker bar -->
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:var(--hair-soft);flex-wrap:wrap">
+      <span class="mut" style="font-size:12.5px;min-width:80px">12. 6. 2026</span>
+      <div class="btn" style="background:#22D3EE;color:#06121a;border:none;font-size:12px;height:32px;padding:0 12px;border-radius:10px;cursor:default">Dovolená</div>
+      <div class="btn" style="background:#f87171;color:#1a0404;border:none;font-size:12px;height:32px;padding:0 12px;border-radius:10px;cursor:default">Nemoc</div>
+      <div class="btn" style="background:#f5a524;color:#1a1206;border:none;font-size:12px;height:32px;padding:0 12px;border-radius:10px;cursor:default">Jiné</div>
+      <button class="btn sm">Smazat</button>
+      <button class="btn sm">Zrušit</button>
+    </div>
+
+    <!-- upcoming list -->
+    <div style="margin-top:12px">
+      <div class="mut" style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px">Nadcházející</div>
+      <div class="card" style="padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        <span class="sw" style="background:#22D3EE"></span>
+        <span style="font-size:12.5px;color:#f4f4f8">12. – 17. 6. 2026</span>
+        <span class="mut" style="font-size:12px;flex:1">Dovolená</span>
+      </div>
+      <div class="card" style="padding:9px 12px;display:flex;align-items:center;gap:10px">
+        <span class="sw" style="background:#f5a524"></span>
+        <span style="font-size:12.5px;color:#f4f4f8">25. 6. 2026</span>
+        <span class="mut" style="font-size:12px;flex:1">Jiné — osobní den</span>
+      </div>
+    </div>
+  </div>
+</section>
+<p class="footnote">Liquid Glass redesign prototype · all iPad surfaces · spec: <code>docs/superpowers/specs/2026-06-25-ipad-liquid-glass-redesign-design.md</code> · tokens to live in <code>apps/ipad/src/theme/glass.ts</code>. CSS approximation of native Liquid Glass — dark only, Czech UI, presentation only.</p>
+</body>
+</html>
