@@ -8,6 +8,7 @@ import { ReportsView } from './ReportsView.js';
 import { BillingNav, type BillingSection } from './BillingNav.js';
 import { WorklogListView } from './records/WorklogListView.js';
 import { TaskGridView } from './records/TaskGridView.js';
+import { TaskListView } from './records/TaskListView.js';
 import { TimeOffView } from './records/TimeOffView.js';
 
 export function BillingModule(): JSX.Element {
@@ -44,6 +45,7 @@ export function BillingModule(): JSX.Element {
         {section === 'reports' && <ReportsView onOpenProject={openProject} />}
         {section === 'records-list' && <WorklogListView />}
         {section === 'records-grid' && <TaskGridView />}
+        {section === 'records-tasks' && <TaskListView />}
         {section === 'records-timeoff' && <TimeOffView />}
       </div>
     </div>

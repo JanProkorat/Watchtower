@@ -4,7 +4,7 @@ import { C } from './reports/tokens.js';
 
 export type BillingSection =
   | 'dashboard' | 'earnings' | 'reports'
-  | 'records-list' | 'records-grid' | 'records-timeoff';
+  | 'records-list' | 'records-grid' | 'records-tasks' | 'records-timeoff';
 
 const STORAGE_KEY = 'watchtower.ipad.billing.nav.expanded';
 
@@ -22,6 +22,7 @@ const TOP: { id: BillingSection; label: string }[] = [
 const RECORDS: { id: BillingSection; label: string }[] = [
   { id: 'records-list', label: 'Seznam' },
   { id: 'records-grid', label: 'Mřížka' },
+  { id: 'records-tasks', label: 'Úkoly' },
   { id: 'records-timeoff', label: 'Volno' },
 ];
 
