@@ -200,3 +200,85 @@ describe('canEditTask', () => {
     expect(canEditTask('in_progress')).toBe(true);
   });
 });
+
+import {
+  buildContractInsert, buildContractUpdate, buildContractEndDateUpdate, buildContractDelete,
+  buildOptimisticContractRow, applyContractWrite, rebillProjectWorklogs,
+} from '../../apps/ipad/src/state/billingWrites.js';
+import type { ContractRow as ContractRowT, WorklogRow as WorklogRowT } from '@watchtower/shared/billing/types.js';
+
+const cInput = { projectId: 3, effectiveFrom: '2026-01-01', endDate: null, rateType: 'hourly' as const, rateAmount: 100, hoursPerDay: 8, mdLimit: null };
+
+describe('buildContractInsert', () => {
+  it('shapes a full insert row (sync_id, project_id, tombstone clear, stamped updated_at)', () => {
+    expect(buildContractInsert(cInput, { syncId: 'c1', now: '2026-06-29T10:00:00.000Z' })).toEqual({
+      sync_id: 'c1', project_id: 3, effective_from: '2026-01-01', rate_type: 'hourly',
+      rate_amount: 100, hours_per_day: 8, end_date: null, md_limit: null,
+      deleted_at: null, updated_at: '2026-06-29T10:00:00.000Z',
+    });
+  });
+});
+
+describe('buildContractUpdate', () => {
+  it('shapes an update row WITHOUT sync_id/project_id', () => {
+    const row = buildContractUpdate({ ...cInput, rateAmount: 150 }, { now: '2026-06-29T10:00:00.000Z' });
+    expect(row).not.toHaveProperty('sync_id');
+    expect(row).not.toHaveProperty('project_id');
+    expect(row).toEqual({
+      effective_from: '2026-01-01', rate_type: 'hourly', rate_amount: 150, hours_per_day: 8,
+      end_date: null, md_limit: null, updated_at: '2026-06-29T10:00:00.000Z',
+    });
+  });
+});
+
+describe('buildContractEndDateUpdate', () => {
+  it('shapes the auto-close write', () => {
+    expect(buildContractEndDateUpdate('2025-12-31', '2026-06-29T10:00:00.000Z')).toEqual({ end_date: '2025-12-31', updated_at: '2026-06-29T10:00:00.000Z' });
+  });
+});
+
+describe('buildContractDelete', () => {
+  it('soft-deletes', () => {
+    expect(buildContractDelete('2026-06-29T10:00:00.000Z')).toEqual({ deleted_at: '2026-06-29T10:00:00.000Z', updated_at: '2026-06-29T10:00:00.000Z' });
+  });
+});
+
+describe('buildOptimisticContractRow', () => {
+  it('builds a ContractRow from input + syncId', () => {
+    expect(buildOptimisticContractRow(cInput, 'c1')).toEqual({
+      syncId: 'c1', projectId: 3, effectiveFrom: '2026-01-01', endDate: null,
+      rateType: 'hourly', rateAmount: 100, hoursPerDay: 8, mdLimit: null,
+    });
+  });
+});
+
+describe('applyContractWrite', () => {
+  const base: ContractRowT = buildOptimisticContractRow(cInput, 'c1');
+  it('upsert replaces by syncId', () => {
+    const edited = { ...base, rateAmount: 150 };
+    expect(applyContractWrite([base], { type: 'upsert', row: edited })).toEqual([edited]);
+  });
+  it('remove filters by syncId', () => {
+    expect(applyContractWrite([base], { type: 'remove', syncId: 'c1' })).toEqual([]);
+  });
+});
+
+describe('rebillProjectWorklogs', () => {
+  const wl = (syncId: string, projectId: number): WorklogRowT => ({
+    syncId, workDate: '2026-06-01', minutes: 60, reportedMinutes: null, effectiveMinutes: 60,
+    earnedAmount: 0, description: null, projectId, projectName: 'P', projectColor: null,
+    projectKind: 'work', isBillable: true, taskNumber: null, taskTitle: null, source: 'manual',
+  });
+  const contract: ContractRowT = buildOptimisticContractRow(cInput, 'c1'); // hourly 100 from 2026-01-01
+  it('recomputes earnedAmount only for the project worklogs', () => {
+    const result = rebillProjectWorklogs([wl('a', 3), wl('b', 9)], 3, [contract]);
+    const a = result.find((w) => w.syncId === 'a')!;
+    const b = result.find((w) => w.syncId === 'b')!;
+    expect(a.earnedAmount).toBeCloseTo(100); // 60min * 100/60
+    expect(b.earnedAmount).toBe(0);          // untouched (different project)
+  });
+  it('null earnedAmount when no contract covers the project', () => {
+    const result = rebillProjectWorklogs([wl('a', 3)], 3, []);
+    expect(result[0].earnedAmount).toBeNull();
+  });
+});
