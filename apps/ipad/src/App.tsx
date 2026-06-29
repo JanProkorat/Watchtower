@@ -11,12 +11,12 @@ import { useActiveTerminal } from './state/useActiveTerminal.js';
 import { useAuthBlock } from './state/useAuthBlock.js';
 import { useAttention } from './state/useAttention.js';
 import { registerForPush } from './state/pushRegistration.js';
-import { Rail, type RailModule } from './components/Rail.js';
+import { Rail, type RailModule, type BillingSection } from './components/Rail.js';
 import { TabStrip } from './components/TabStrip.js';
 import { TerminalView } from './components/TerminalView.js';
 import { SpawnModal } from './components/SpawnModal.js';
 import { RemoteMacView } from './components/RemoteMacView.js';
-import { BillingModule } from './components/billing/BillingModule.js';
+import { BillingArea } from './components/billing/BillingArea.js';
 import { AuthBlockBanner } from './components/AuthBlockBanner.js';
 import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
@@ -153,7 +153,8 @@ interface ShellProps {
 }
 
 function Shell({ connection }: ShellProps) {
-  const [activeModule, setActiveModule] = useState<RailModule>('instances');
+  const [activeModule, setActiveModule] = useState<RailModule>('dashboard');
+  const [billingSection, setBillingSection] = useState<BillingSection>('earnings');
   const { activeId, setActiveId } = useActiveTerminal();
   const { items: attention, ackedIds, acknowledge } = useAttention();
   const [hubOpen, setHubOpen] = useState(false);
@@ -168,6 +169,12 @@ function Shell({ connection }: ShellProps) {
     setActiveId(id);
     if (id) acknowledge(id);
   }, [setActiveId, acknowledge]);
+
+  // Rail child tap: switch to billing and route to the chosen sub-section.
+  const selectBilling = useCallback((tab: BillingSection) => {
+    setActiveModule('billing');
+    setBillingSection(tab);
+  }, []);
 
   // Register for push notifications once on mount (iOS only; no-op on web).
   useEffect(() => {
@@ -226,7 +233,9 @@ function Shell({ connection }: ShellProps) {
         {/* Shared left rail — active across all modules */}
         <Rail
           active={activeModule}
+          billingSection={billingSection}
           onSelect={setActiveModule}
+          onSelectBillingTab={selectBilling}
           notificationCount={attention.length}
           onOpenNotifications={() => setHubOpen(true)}
         />
@@ -234,8 +243,8 @@ function Shell({ connection }: ShellProps) {
         {/* Module content */}
         {activeModule === 'instances' ? (
           <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} connection={connection} />
-        ) : activeModule === 'billing' ? (
-          <BillingModule />
+        ) : activeModule === 'dashboard' || activeModule === 'billing' ? (
+          <BillingArea module={activeModule} section={billingSection} />
         ) : (
           <RemoteMacView connection={connection} />
         )}
