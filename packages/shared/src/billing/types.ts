@@ -20,8 +20,13 @@ export interface WorklogRow {
 
 export interface TaskRow {
   taskId: number;
+  syncId: string;
+  epicId: number;
   taskNumber: string | null;
   taskTitle: string;
+  status: string;
+  estimatedMinutes: number | null;
+  description: string | null;
   projectId: number;
   projectName: string;
   projectColor: string | null;
@@ -41,7 +46,9 @@ export interface ContractRow {
 
 export interface DayOffRow { date: string; kind: string; syncId: string }
 
-export interface ProjectRow { id: number; name: string; color: string | null }
+export interface ProjectRow { id: number; name: string; color: string | null; kind: string; isBillable: boolean }
+
+export interface EpicRow { epicId: number; name: string; projectId: number; status: string }
 
 export interface ProjectEarning {
   projectId: number;

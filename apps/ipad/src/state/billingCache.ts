@@ -1,4 +1,4 @@
-import type { WorklogRow, ContractRow, DayOffRow, ProjectRow, TaskRow } from '@watchtower/shared/billing/types.js';
+import type { WorklogRow, ContractRow, DayOffRow, ProjectRow, TaskRow, EpicRow } from '@watchtower/shared/billing/types.js';
 
 // ---------------------------------------------------------------------------
 // Dataset type
@@ -10,6 +10,7 @@ export interface BillingDataset {
   daysOff: DayOffRow[];
   projects: ProjectRow[];
   tasks: TaskRow[];
+  epics: EpicRow[];
   fetchedAt: string; // ISO timestamp
 }
 
@@ -83,8 +84,13 @@ export function mapWorklogRow(raw: RawWorklogRow): WorklogRow {
 
 export type RawTaskRow = {
   id: number;
+  sync_id: string;
+  epic_id: number;
   number: string | null;
   title: string | null;
+  status: string;
+  estimated_minutes: number | null;
+  description: string | null;
   epics: { projects: RawProject | null } | null;
 };
 
@@ -92,14 +98,25 @@ export function mapTaskRow(raw: RawTaskRow): TaskRow {
   const proj = raw.epics?.projects ?? null;
   return {
     taskId: raw.id,
+    syncId: raw.sync_id,
+    epicId: raw.epic_id,
     taskNumber: raw.number ?? null,
     taskTitle: raw.title ?? '',
+    status: raw.status,
+    estimatedMinutes: raw.estimated_minutes ?? null,
+    description: raw.description ?? null,
     projectId: proj?.id ?? 0,
     projectName: proj?.name ?? '',
     projectColor: proj?.color ?? null,
     projectKind: proj?.kind ?? '',
     isBillable: proj?.is_billable ?? false,
   };
+}
+
+export type RawEpicRow = { id: number; name: string; project_id: number; status: string };
+
+export function mapEpicRow(raw: RawEpicRow): EpicRow {
+  return { epicId: raw.id, name: raw.name, projectId: raw.project_id, status: raw.status };
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +147,7 @@ export async function loadCache(store: BillingStore): Promise<BillingDataset | n
       Array.isArray(v?.daysOff) &&
       Array.isArray(v?.projects) &&
       Array.isArray(v?.tasks) &&
+      Array.isArray(v?.epics) &&
       typeof v?.fetchedAt === 'string'
     ) {
       return v;

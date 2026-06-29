@@ -5,7 +5,7 @@ import {
   type BillingAction,
 } from '../../apps/ipad/src/state/useBilling.js';
 import type { BillingDataset } from '../../apps/ipad/src/state/billingCache.js';
-import type { WorklogRow } from '@watchtower/shared/billing/types.js';
+import type { WorklogRow, TaskRow } from '@watchtower/shared/billing/types.js';
 
 // ---------------------------------------------------------------------------
 // Pure billingReducer — no DOM, no React, no mocks
@@ -148,5 +148,22 @@ describe('billingReducer — PATCH_WORKLOGS', () => {
   it('is a no-op when there is no data', () => {
     const start = { data: null, state: 'offline' as const, lastUpdated: null };
     expect(billingReducer(start, { type: 'PATCH_WORKLOGS', worklogs: [wl('a')] })).toBe(start);
+  });
+});
+
+describe('billingReducer — PATCH_TASKS', () => {
+  const tk = (syncId: string): TaskRow => ({
+    taskId: 1, syncId, epicId: 1, taskNumber: 'T-1', taskTitle: 'T', status: 'open',
+    estimatedMinutes: null, description: null, projectId: 1, projectName: 'P',
+    projectColor: null, projectKind: 'work', isBillable: true,
+  });
+  it('swaps tasks in the existing dataset', () => {
+    const start = { data: { worklogs: [], contracts: [], daysOff: [], projects: [], tasks: [tk('a')], epics: [], fetchedAt: 'x' }, state: 'fresh' as const, lastUpdated: 'x' };
+    const next = billingReducer(start, { type: 'PATCH_TASKS', tasks: [tk('a'), tk('b')] });
+    expect(next.data?.tasks.map((t) => t.syncId)).toEqual(['a', 'b']);
+  });
+  it('is a no-op when there is no data', () => {
+    const start = { data: null, state: 'offline' as const, lastUpdated: null };
+    expect(billingReducer(start, { type: 'PATCH_TASKS', tasks: [tk('a')] })).toBe(start);
   });
 });

@@ -31,3 +31,17 @@ describe('PG_MIGRATIONS v7 — worklogs write policy', () => {
     expect(sql).toContain("rolname = 'authenticated'");
   });
 });
+
+describe('PG_MIGRATIONS v8 — tasks write policy', () => {
+  it('adds a version-8 migration', () => {
+    expect(PG_MIGRATIONS.find((m) => m.version === 8)).toBeDefined();
+  });
+  it('creates a guarded write_authenticated policy for tasks (FOR ALL)', () => {
+    const sql = PG_MIGRATIONS.find((m) => m.version === 8)!.up.join('\n');
+    expect(sql).toContain('tasks');
+    expect(sql).toContain('write_authenticated');
+    expect(sql).toContain('FOR ALL TO authenticated');
+    expect(sql).toContain('DROP POLICY IF EXISTS write_authenticated ON tasks');
+    expect(sql).toContain("rolname = 'authenticated'");
+  });
+});
