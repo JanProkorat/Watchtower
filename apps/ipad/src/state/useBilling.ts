@@ -30,6 +30,7 @@ export interface BillingHookResult {
   refresh(): void;
   patchDaysOff(next: DayOffRow[]): void;
   patchWorklogs(next: WorklogRow[]): void;
+  patchTasks(next: TaskRow[]): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,7 +49,8 @@ export type BillingAction =
   | { type: 'FETCH_SUCCESS'; dataset: BillingDataset }
   | { type: 'FETCH_ERROR' }
   | { type: 'PATCH_DAYS_OFF'; daysOff: DayOffRow[] }
-  | { type: 'PATCH_WORKLOGS'; worklogs: WorklogRow[] };
+  | { type: 'PATCH_WORKLOGS'; worklogs: WorklogRow[] }
+  | { type: 'PATCH_TASKS'; tasks: TaskRow[] };
 
 export function billingReducer(
   prev: BillingReducerState,
@@ -80,6 +82,8 @@ export function billingReducer(
       return prev.data ? { ...prev, data: { ...prev.data, daysOff: action.daysOff } } : prev;
     case 'PATCH_WORKLOGS':
       return prev.data ? { ...prev, data: { ...prev.data, worklogs: action.worklogs } } : prev;
+    case 'PATCH_TASKS':
+      return prev.data ? { ...prev, data: { ...prev.data, tasks: action.tasks } } : prev;
     default:
       return prev;
   }
@@ -247,6 +251,7 @@ export function useBilling(storeOverride?: BillingStore): BillingHookResult {
 
   const patchDaysOff = useCallback((next: DayOffRow[]) => dispatch({ type: 'PATCH_DAYS_OFF', daysOff: next }), [dispatch]);
   const patchWorklogs = useCallback((next: WorklogRow[]) => dispatch({ type: 'PATCH_WORKLOGS', worklogs: next }), [dispatch]);
+  const patchTasks = useCallback((next: TaskRow[]) => dispatch({ type: 'PATCH_TASKS', tasks: next }), [dispatch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -281,5 +286,6 @@ export function useBilling(storeOverride?: BillingStore): BillingHookResult {
     refresh,
     patchDaysOff,
     patchWorklogs,
+    patchTasks,
   };
 }
