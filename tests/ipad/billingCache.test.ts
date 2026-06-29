@@ -3,10 +3,12 @@ import {
   mapWorklogRow,
   mapDayOffRow,
   mapTaskRow,
+  mapEpicRow,
   loadCache,
   saveCache,
   type BillingDataset,
   type RawWorklogRow,
+  type RawEpicRow,
 } from '../../apps/ipad/src/state/billingCache.js';
 import type { RawTaskRow } from '../../apps/ipad/src/state/billingCache.js';
 import type { ContractRow, DayOffRow, ProjectRow, WorklogRow } from '@watchtower/shared/billing/types.js';
@@ -147,6 +149,7 @@ describe('billing cache persistence', () => {
     daysOff: [],
     projects: [],
     tasks: [],
+    epics: [],
     fetchedAt: '2026-06-26T12:00:00.000Z',
   };
 
@@ -202,13 +205,14 @@ describe('billing cache persistence', () => {
       mdLimit: null,
     };
     const dayOff: DayOffRow = { date: '2026-06-09', kind: 'vacation' };
-    const project: ProjectRow = { id: 3, name: 'Test', color: null };
+    const project: ProjectRow = { id: 3, name: 'Test', color: null, kind: 'work', isBillable: true };
     const full: BillingDataset = {
       worklogs: [worklog],
       contracts: [contract],
       daysOff: [dayOff],
       projects: [project],
       tasks: [],
+      epics: [],
       fetchedAt: '2026-06-26T14:00:00.000Z',
     };
     await saveCache(store, full);
@@ -239,11 +243,13 @@ describe('mapWorklogRow — slice 2 fields', () => {
 describe('mapTaskRow', () => {
   it('flattens task → epic → project', () => {
     const raw: RawTaskRow = {
-      id: 7, number: 'X-9', title: 'Task nine',
+      id: 7, sync_id: 't-1', epic_id: 5, number: 'X-9', title: 'Task nine',
+      status: 'open', estimated_minutes: null, description: null,
       epics: { projects: { id: 3, name: 'Proj', color: '#abc', kind: 'work', is_billable: true } },
     };
     expect(mapTaskRow(raw)).toEqual({
-      taskId: 7, taskNumber: 'X-9', taskTitle: 'Task nine',
+      taskId: 7, syncId: 't-1', epicId: 5, taskNumber: 'X-9', taskTitle: 'Task nine',
+      status: 'open', estimatedMinutes: null, description: null,
       projectId: 3, projectName: 'Proj', projectColor: '#abc', projectKind: 'work', isBillable: true,
     });
   });
@@ -253,6 +259,48 @@ describe('loadCache — slice 2 shape guard', () => {
   it('rejects a cache without a tasks array (forces refetch)', async () => {
     const store = new Map<string, string>();
     const legacy = { worklogs: [], contracts: [], daysOff: [], projects: [], fetchedAt: '2026-06-01T00:00:00Z' };
+    store.set('watchtower.ipad.billing.cache', JSON.stringify(legacy));
+    const adapter = { get: async (k: string) => store.get(k) ?? null, set: async () => {} };
+    expect(await loadCache(adapter)).toBeNull();
+  });
+});
+
+describe('mapEpicRow', () => {
+  it('maps a raw epic row', () => {
+    const raw: RawEpicRow = { id: 5, name: 'Sprint 1', project_id: 3, status: 'active' };
+    expect(mapEpicRow(raw)).toEqual({ epicId: 5, name: 'Sprint 1', projectId: 3, status: 'active' });
+  });
+});
+
+describe('mapTaskRow — slice 3a fields', () => {
+  it('maps syncId/epicId/status/estimatedMinutes/description', () => {
+    const raw: RawTaskRow = {
+      id: 7, sync_id: 't-sync', epic_id: 5, number: 'X-9', title: 'Task nine',
+      status: 'in_progress', estimated_minutes: 120, description: 'do it',
+      epics: { projects: { id: 3, name: 'Proj', color: '#abc', kind: 'work', is_billable: true } },
+    };
+    expect(mapTaskRow(raw)).toEqual({
+      taskId: 7, syncId: 't-sync', epicId: 5, taskNumber: 'X-9', taskTitle: 'Task nine',
+      status: 'in_progress', estimatedMinutes: 120, description: 'do it',
+      projectId: 3, projectName: 'Proj', projectColor: '#abc', projectKind: 'work', isBillable: true,
+    });
+  });
+  it('defaults estimatedMinutes/description to null and status to empty', () => {
+    const raw: RawTaskRow = {
+      id: 8, sync_id: 's8', epic_id: 1, number: null, title: null,
+      status: 'open', estimated_minutes: null, description: null, epics: null,
+    };
+    const r = mapTaskRow(raw);
+    expect(r.estimatedMinutes).toBeNull();
+    expect(r.description).toBeNull();
+    expect(r.taskTitle).toBe('');
+  });
+});
+
+describe('loadCache — slice 3a shape guard', () => {
+  it('rejects a cache without an epics array (forces refetch)', async () => {
+    const store = new Map<string, string>();
+    const legacy = { worklogs: [], contracts: [], daysOff: [], projects: [], tasks: [], fetchedAt: '2026-06-01T00:00:00Z' };
     store.set('watchtower.ipad.billing.cache', JSON.stringify(legacy));
     const adapter = { get: async (k: string) => store.get(k) ?? null, set: async () => {} };
     expect(await loadCache(adapter)).toBeNull();
