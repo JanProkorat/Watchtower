@@ -6,6 +6,11 @@ import {
   buildOptimisticWorklogRow, buildEditedWorklogRow, applyWorklogWrite,
 } from '../../apps/ipad/src/state/billingWrites.js';
 import type { ContractRow, TaskRow, WorklogRow } from '@watchtower/shared/billing/types.js';
+import {
+  buildTaskInsert, buildTaskUpdate, buildTaskDelete,
+  buildOptimisticTaskRow, buildEditedTaskRow, applyTaskWrite, canEditTask,
+} from '../../apps/ipad/src/state/billingWrites.js';
+import type { ProjectRow, TaskRow as TaskRowT } from '@watchtower/shared/billing/types.js';
 
 describe('buildDayOffUpsert', () => {
   it('shapes a full upsert row with tombstone cleared + stamped updated_at', () => {
@@ -51,7 +56,7 @@ describe('canEdit', () => {
 const contract = (projectId: number): ContractRow => ({
   projectId, effectiveFrom: '2026-01-01', endDate: null, rateType: 'hourly', rateAmount: 100, hoursPerDay: 8, mdLimit: null,
 });
-const task: TaskRow = { taskId: 7, taskNumber: 'X-9', taskTitle: 'T', projectId: 3, projectName: 'P', projectColor: '#abc', projectKind: 'work', isBillable: true };
+const task: TaskRow = { taskId: 7, syncId: 'task-sync', epicId: 1, taskNumber: 'X-9', taskTitle: 'T', status: 'open', estimatedMinutes: null, description: null, projectId: 3, projectName: 'P', projectColor: '#abc', projectKind: 'work', isBillable: true };
 const input = { taskId: 7, workDate: '2026-06-01', minutes: 120, reportedMinutes: 90, description: 'note' };
 
 describe('computeDerivedForWrite', () => {
@@ -120,5 +125,78 @@ describe('applyWorklogWrite', () => {
   });
   it('remove filters by syncId', () => {
     expect(applyWorklogWrite([base], { type: 'remove', syncId: 'w1' })).toEqual([]);
+  });
+});
+
+const project: ProjectRow = { id: 3, name: 'Proj', color: '#abc', kind: 'work', isBillable: true };
+const taskInput = { epicId: 5, number: 'X-9', title: 'Nine', status: 'open', estimatedMinutes: 120, description: 'note' };
+
+describe('buildTaskInsert', () => {
+  it('shapes a full insert row (sync_id, epic_id, status, tombstone clear, stamped updated_at; no jira_* / created_at)', () => {
+    expect(buildTaskInsert(taskInput, { syncId: 't1', now: '2026-06-29T10:00:00.000Z' })).toEqual({
+      sync_id: 't1', epic_id: 5, number: 'X-9', title: 'Nine', status: 'open',
+      estimated_minutes: 120, description: 'note', deleted_at: null, updated_at: '2026-06-29T10:00:00.000Z',
+    });
+  });
+});
+
+describe('buildTaskUpdate', () => {
+  it('shapes an update row WITHOUT sync_id; includes epic_id (reparent) + stamped updated_at', () => {
+    const row = buildTaskUpdate(taskInput, { now: '2026-06-29T10:00:00.000Z' });
+    expect(row).not.toHaveProperty('sync_id');
+    expect(row).toEqual({
+      epic_id: 5, number: 'X-9', title: 'Nine', status: 'open',
+      estimated_minutes: 120, description: 'note', updated_at: '2026-06-29T10:00:00.000Z',
+    });
+  });
+});
+
+describe('buildTaskDelete', () => {
+  it('soft-deletes via deleted_at + updated_at', () => {
+    expect(buildTaskDelete('2026-06-29T10:00:00.000Z')).toEqual({ deleted_at: '2026-06-29T10:00:00.000Z', updated_at: '2026-06-29T10:00:00.000Z' });
+  });
+});
+
+describe('buildOptimisticTaskRow', () => {
+  it('builds a denormalized TaskRow from input + picked project', () => {
+    expect(buildOptimisticTaskRow(taskInput, { syncId: 't1', taskId: 0, project })).toEqual({
+      taskId: 0, syncId: 't1', epicId: 5, taskNumber: 'X-9', taskTitle: 'Nine', status: 'open',
+      estimatedMinutes: 120, description: 'note', projectId: 3, projectName: 'Proj',
+      projectColor: '#abc', projectKind: 'work', isBillable: true,
+    });
+  });
+});
+
+describe('buildEditedTaskRow', () => {
+  it('preserves taskId/syncId, updates mutable fields + project refs', () => {
+    const existing: TaskRowT = buildOptimisticTaskRow(taskInput, { syncId: 't1', taskId: 42, project });
+    const edited = buildEditedTaskRow(existing, { ...taskInput, title: 'Renamed', status: 'in_progress' }, project);
+    expect(edited.taskId).toBe(42);
+    expect(edited.syncId).toBe('t1');
+    expect(edited.taskTitle).toBe('Renamed');
+    expect(edited.status).toBe('in_progress');
+  });
+});
+
+describe('applyTaskWrite', () => {
+  const base: TaskRowT = buildOptimisticTaskRow(taskInput, { syncId: 't1', taskId: 42, project });
+  it('upsert replaces by syncId', () => {
+    const edited = { ...base, taskTitle: 'X' };
+    expect(applyTaskWrite([base], { type: 'upsert', row: edited })).toEqual([edited]);
+  });
+  it('upsert adds a new syncId', () => {
+    const other = { ...base, syncId: 't2' };
+    expect(applyTaskWrite([base], { type: 'upsert', row: other }).map((t) => t.syncId).sort()).toEqual(['t1', 't2']);
+  });
+  it('remove filters by syncId', () => {
+    expect(applyTaskWrite([base], { type: 'remove', syncId: 't1' })).toEqual([]);
+  });
+});
+
+describe('canEditTask', () => {
+  it('locks done tasks', () => {
+    expect(canEditTask('done')).toBe(false);
+    expect(canEditTask('open')).toBe(true);
+    expect(canEditTask('in_progress')).toBe(true);
   });
 });

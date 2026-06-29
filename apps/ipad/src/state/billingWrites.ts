@@ -1,4 +1,4 @@
-import type { DayOffRow, WorklogRow, ContractRow, TaskRow } from '@watchtower/shared/billing/types.js';
+import type { DayOffRow, WorklogRow, ContractRow, TaskRow, ProjectRow } from '@watchtower/shared/billing/types.js';
 import { computeWorklogBilling, type ContractLite, type WorklogBilling } from '@watchtower/shared/billing/worklogBilling.js';
 import type { BillingState } from './useBilling.js';
 
@@ -183,4 +183,122 @@ export function applyWorklogWrite(worklogs: WorklogRow[], change: WorklogChange)
   }
   const without = worklogs.filter((w) => w.syncId !== change.row.syncId);
   return [...without, change.row];
+}
+
+// --- Task write-back (slice 3a) -------------------------------------------
+
+export interface TaskWriteInput {
+  epicId: number;
+  number: string;
+  title: string;
+  status: string;
+  estimatedMinutes: number | null;
+  description: string | null;
+}
+
+export interface TaskInsertRow {
+  sync_id: string;
+  epic_id: number;
+  number: string;
+  title: string;
+  status: string;
+  estimated_minutes: number | null;
+  description: string | null;
+  deleted_at: null;
+  updated_at: string;
+}
+
+export interface TaskUpdateRow {
+  epic_id: number;
+  number: string;
+  title: string;
+  status: string;
+  estimated_minutes: number | null;
+  description: string | null;
+  updated_at: string;
+}
+
+export function buildTaskInsert(input: TaskWriteInput, opts: { syncId: string; now: string }): TaskInsertRow {
+  return {
+    sync_id: opts.syncId,
+    epic_id: input.epicId,
+    number: input.number,
+    title: input.title,
+    status: input.status,
+    estimated_minutes: input.estimatedMinutes,
+    description: input.description,
+    deleted_at: null,
+    updated_at: opts.now,
+  };
+}
+
+export function buildTaskUpdate(input: TaskWriteInput, opts: { now: string }): TaskUpdateRow {
+  return {
+    epic_id: input.epicId,
+    number: input.number,
+    title: input.title,
+    status: input.status,
+    estimated_minutes: input.estimatedMinutes,
+    description: input.description,
+    updated_at: opts.now,
+  };
+}
+
+export function buildTaskDelete(now: string): { deleted_at: string; updated_at: string } {
+  return { deleted_at: now, updated_at: now };
+}
+
+export function buildOptimisticTaskRow(
+  input: TaskWriteInput,
+  opts: { syncId: string; taskId: number; project: ProjectRow },
+): TaskRow {
+  return {
+    taskId: opts.taskId,
+    syncId: opts.syncId,
+    epicId: input.epicId,
+    taskNumber: input.number,
+    taskTitle: input.title,
+    status: input.status,
+    estimatedMinutes: input.estimatedMinutes,
+    description: input.description,
+    projectId: opts.project.id,
+    projectName: opts.project.name,
+    projectColor: opts.project.color,
+    projectKind: opts.project.kind,
+    isBillable: opts.project.isBillable,
+  };
+}
+
+export function buildEditedTaskRow(existing: TaskRow, input: TaskWriteInput, project: ProjectRow): TaskRow {
+  return {
+    ...existing,
+    epicId: input.epicId,
+    taskNumber: input.number,
+    taskTitle: input.title,
+    status: input.status,
+    estimatedMinutes: input.estimatedMinutes,
+    description: input.description,
+    projectId: project.id,
+    projectName: project.name,
+    projectColor: project.color,
+    projectKind: project.kind,
+    isBillable: project.isBillable,
+  };
+}
+
+export type TaskChange =
+  | { type: 'upsert'; row: TaskRow }
+  | { type: 'remove'; syncId: string };
+
+export function applyTaskWrite(tasks: TaskRow[], change: TaskChange): TaskRow[] {
+  if (change.type === 'remove') {
+    return tasks.filter((t) => t.syncId !== change.syncId);
+  }
+  const without = tasks.filter((t) => t.syncId !== change.row.syncId);
+  return [...without, change.row];
+}
+
+/** The orchestrator locks done tasks (assertTaskNotDone); the iPad mirrors it. */
+export function canEditTask(status: string): boolean {
+  return status !== 'done';
 }
