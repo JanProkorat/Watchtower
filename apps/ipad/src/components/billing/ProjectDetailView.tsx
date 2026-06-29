@@ -125,16 +125,19 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
 
   async function submit() {
     setSaving(true);
-    await onSubmit({
-      projectId,
-      effectiveFrom,
-      endDate: endDate.trim() === '' ? null : endDate,
-      rateType,
-      rateAmount: rate,
-      hoursPerDay: hpd,
-      mdLimit: md,
-    });
-    setSaving(false);
+    try {
+      await onSubmit({
+        projectId,
+        effectiveFrom,
+        endDate: endDate.trim() === '' ? null : endDate,
+        rateType,
+        rateAmount: rate,
+        hoursPerDay: hpd,
+        mdLimit: md,
+      });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -177,11 +180,11 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
           {onDelete && (
-            <button onClick={async () => { setSaving(true); await onDelete(); }} disabled={saving} style={{ ...field, width: 'auto', color: C.red, cursor: 'pointer' }}>Smazat</button>
+            <button type="button" onClick={async () => { setSaving(true); try { await onDelete!(); } finally { setSaving(false); } }} disabled={saving} style={{ ...field, width: 'auto', color: C.red, cursor: 'pointer' }}>Smazat</button>
           )}
           <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{ ...field, width: 'auto', cursor: 'pointer' }}>Zrušit</button>
-          <button onClick={submit} disabled={!canSubmit} style={{ ...field, width: 'auto', background: canSubmit ? C.violet : C.border, color: '#fff', border: 'none', cursor: canSubmit ? 'pointer' : 'default' }}>
+          <button type="button" onClick={onClose} style={{ ...field, width: 'auto', cursor: 'pointer' }}>Zrušit</button>
+          <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...field, width: 'auto', background: canSubmit ? C.violet : C.border, color: '#fff', border: 'none', cursor: canSubmit ? 'pointer' : 'default' }}>
             {saving ? 'Ukládám…' : 'Uložit'}
           </button>
         </div>
@@ -444,6 +447,7 @@ export function ProjectDetailView({
             </div>
             {editable && (
               <button
+                type="button"
                 onClick={() => setDrawer({ mode: 'create' })}
                 style={{
                   background: 'none',
@@ -500,7 +504,7 @@ export function ProjectDetailView({
 
                 return (
                   <div
-                    key={`${contract.effectiveFrom}-${contract.endDate ?? 'open'}-${contract.rateAmount}`}
+                    key={contract.syncId}
                     onClick={() => editable && setDrawer({ mode: 'edit', contract })}
                     style={{
                       display: 'flex',
