@@ -14,6 +14,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -23,6 +24,7 @@ import type {
   EpicWithProjectPayload,
   TaskByNumberPayload,
 } from '@watchtower/shared/ipcContract.js';
+import { glassSurface } from '../theme/glass.js';
 
 const MEETINGS_DEFAULT_TASK_KEY = 'meetings.default_task_id';
 
@@ -56,6 +58,7 @@ function SettingRow({
 }
 
 export function SettingsPanel() {
+  const theme = useTheme();
   const [saved, setSaved] = useState<Saved>({
     quietMs: '90000',
     defaultCwd: '~/Projects',
@@ -168,7 +171,8 @@ export function SettingsPanel() {
   };
 
   return (
-    <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
+    // glassSurface: singleton panel that fills the General tab viewport
+    <Box sx={{ p: 4, height: '100%', overflow: 'auto', ...glassSurface(theme, { elevation: 1 }) }}>
       <Typography variant="h5" sx={{ mb: 3 }}>
         Settings
       </Typography>

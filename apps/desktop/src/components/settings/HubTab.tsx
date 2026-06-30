@@ -3,11 +3,14 @@ import {
   Box, Stack, Typography, TextField, Switch, FormControlLabel, Button, Alert,
   MenuItem,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { useHubConfig } from '../../state/useHubConfig.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import type { HubConfig } from '@watchtower/shared/hubConfig.js';
+import { glassSurface } from '../../theme/glass.js';
 
 export function HubTab() {
+  const theme = useTheme();
   const { config, loading, error, save } = useHubConfig();
   const { showError } = useToast();
   const [draft, setDraft] = useState<HubConfig | null>(null);
@@ -28,10 +31,16 @@ export function HubTab() {
     }
   };
 
-  if (loading) return <Box sx={{ p: 3 }}><Typography>Loading…</Typography></Box>;
+  if (loading) return (
+    // glassSurface: singleton panel filling the Hub tab viewport
+    <Box sx={{ p: 3, flex: 1, ...glassSurface(theme, { elevation: 1 }) }}>
+      <Typography>Loading…</Typography>
+    </Box>
+  );
 
   return (
-    <Box sx={{ p: 3, maxWidth: 560, width: '100%' }}>
+    // glassSurface: singleton panel filling the Hub tab viewport
+    <Box sx={{ p: 3, maxWidth: 560, width: '100%', ...glassSurface(theme, { elevation: 1 }) }}>
       <Stack spacing={2}>
         <Typography variant="h6">Messaging hub</Typography>
         <Typography variant="body2" color="text.secondary">

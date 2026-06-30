@@ -14,12 +14,14 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import SaveIcon from '@mui/icons-material/Save';
 import RestoreIcon from '@mui/icons-material/Restore';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import { useClaudeSettings, type SettingsScope } from '../../state/useClaudeSettings.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
+import { glassSurface } from '../../theme/glass.js';
 
 const PROJECT_PATH_STORAGE_KEY = 'watchtower.settings.json.projectPath';
 
@@ -41,6 +43,7 @@ function parseDraft(content: string): ParsedDraft {
 }
 
 export function SettingsJsonTab() {
+  const theme = useTheme();
   const [scope, setScope] = useState<SettingsScope>('global');
   const [projectPath, setProjectPath] = useState<string>(() => {
     try {
@@ -199,7 +202,8 @@ export function SettingsJsonTab() {
       </Stack>
 
       {/* ── Body ─────────────────────────────────────────────────── */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+      {/* glassSurface: singleton content panel that fills the JSON tab viewport */}
+      <Box sx={{ flex: 1, overflow: 'auto', p: 2, ...glassSurface(theme, { elevation: 1 }) }}>
         {showProjectRequired && (
           <Alert severity="info" sx={{ mb: 2 }}>
             Choose a project folder to read its <code>.claude/settings.json</code>.
