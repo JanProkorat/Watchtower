@@ -5,11 +5,20 @@ import { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
 import type { TaskRow, EpicRow, ProjectRow } from '@watchtower/shared/billing/types.js';
 import { canEdit, canEditTask, type TaskWriteInput } from '../../../state/billingWrites.js';
 import { C } from '../reports/tokens.js';
+import { glassPanel, glassCard, ctaGradient, ctaGlow, glassFillStrong } from '../../../theme/glass.js';
 
 const STATUS_LABEL: Record<string, string> = {
   open: 'Otevřený', in_progress: 'Probíhá', to_accept: 'K akceptaci', done: 'Hotovo',
 };
 const STATUS_OPTIONS = ['open', 'in_progress', 'to_accept', 'done'];
+
+// Status chip styles — preserves the status→color/label mapping (open/done muted, in_progress/to_accept violet).
+function statusChipStyle(status: string): React.CSSProperties {
+  const base: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', padding: '2px 8px', borderRadius: 999, flexShrink: 0 };
+  if (status === 'in_progress') return { ...base, color: C.violet, background: 'rgba(168,156,240,0.18)', border: '1px solid rgba(168,156,240,0.40)' };
+  if (status === 'to_accept') return { ...base, color: C.violet, background: 'rgba(168,156,240,0.28)', border: '1px solid rgba(168,156,240,0.55)' };
+  return { ...base, color: C.muted, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' };
+}
 
 type DrawerState = { mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; task: TaskRow };
 
@@ -34,10 +43,10 @@ export function TaskListView(): JSX.Element {
   }, [tasks, query]);
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', background: C.ground, minHeight: '100%', color: C.text }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: C.ground, borderBottom: `1px solid ${C.border}`, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <input placeholder="Hledat úkol…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 140, background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 10px', fontSize: 13, fontFamily: 'inherit' }} />
-        {editable && <button onClick={() => setDrawer({ mode: 'create' })} style={{ background: C.violet, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>+ Přidat úkol</button>}
+    <div style={{ fontFamily: 'system-ui, sans-serif', background: 'transparent', minHeight: '100%', color: C.text }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+        <input placeholder="Hledat úkol…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 140, background: 'rgba(255,255,255,0.07)', color: '#d7dbe6', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 11, padding: '0 12px', height: 34, fontSize: 12, fontFamily: 'inherit', outline: 'none' }} />
+        {editable && <button onClick={() => setDrawer({ mode: 'create' })} style={{ height: 34, padding: '0 16px', borderRadius: 11, border: 'none', background: ctaGradient, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: ctaGlow }}>+ Přidat úkol</button>}
       </div>
       {!editable && <div style={{ padding: '6px 16px', fontSize: 12, color: C.muted }}>jen pro čtení offline</div>}
       {error && <div style={{ padding: '6px 16px', fontSize: 12, color: C.red }}>{error}</div>}
@@ -49,12 +58,12 @@ export function TaskListView(): JSX.Element {
             key={t.syncId}
             onClick={() => editable && setDrawer({ mode: 'edit', task: t })}
             disabled={!editable}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 12px', textAlign: 'left', cursor: editable ? 'pointer' : 'default', fontFamily: 'inherit', color: C.text, width: '100%' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, ...glassCard(10), border: '1px solid rgba(255,255,255,0.10)', padding: '8px 12px', textAlign: 'left', cursor: editable ? 'pointer' : 'default', fontFamily: 'inherit', color: C.text, width: '100%' }}
           >
             {t.projectColor && <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.projectColor, flexShrink: 0 }} />}
-            {t.taskNumber && <span style={{ fontFamily: 'monospace', fontSize: 12, color: C.muted, flexShrink: 0 }}>{t.taskNumber}</span>}
-            <span style={{ flex: 1, fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.taskTitle || '(bez názvu)'}</span>
-            <span style={{ fontSize: 10, color: t.status === 'done' ? C.muted : C.violet, border: `1px solid ${C.border}`, borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>{STATUS_LABEL[t.status] ?? t.status}</span>
+            {t.taskNumber && <span style={{ fontFamily: 'monospace', fontSize: 11, color: C.muted, flexShrink: 0 }}>{t.taskNumber}</span>}
+            <span style={{ flex: 1, fontSize: 12.5, color: '#d7dbe6', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.taskTitle || '(bez názvu)'}</span>
+            <span style={statusChipStyle(t.status)}>{STATUS_LABEL[t.status] ?? t.status}</span>
           </button>
         ))}
       </div>
@@ -106,8 +115,8 @@ function TaskDrawer({ title, epics, projects, initial, readOnly, onClose, onSubm
   const estimateValid = estimate === null || (Number.isFinite(estimate) && estimate > 0);
   const canSubmit = !readOnly && epicId != null && number.trim() !== '' && title2.trim() !== '' && estimateValid && !saving;
 
-  const field: React.CSSProperties = { background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' };
-  const label: React.CSSProperties = { fontSize: 12, color: C.muted, marginBottom: 4 };
+  const field: React.CSSProperties = { background: 'rgba(255,255,255,0.07)', color: '#d7dbe6', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 11, padding: '8px 12px', fontSize: 14, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', outline: 'none' };
+  const label: React.CSSProperties = { fontSize: 10, letterSpacing: '0.05em', textTransform: 'uppercase', color: C.muted, marginBottom: 5 };
 
   // Epics grouped by project for the picker.
   const grouped = projects
@@ -129,10 +138,10 @@ function TaskDrawer({ title, epics, projects, initial, readOnly, onClose, onSubm
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.ground, borderTopLeftRadius: 16, borderTopRightRadius: 16, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14, borderTop: `1px solid ${C.border}` }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(6,7,11,0.45)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...glassPanel({ radius: 20, fill: glassFillStrong, blur: 40, saturate: 1.9, brightness: 1.1 }), borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: '1px solid rgba(255,255,255,0.20)', borderBottom: 'none', boxShadow: '0 -20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.30)', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#f4f4f8' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
 
@@ -167,21 +176,21 @@ function TaskDrawer({ title, epics, projects, initial, readOnly, onClose, onSubm
         </div>
         <div>
           <div style={label}>Odhad (h, volitelné — např. 1,5)</div>
-          <input disabled={readOnly} style={{ ...field, borderColor: estimateStr && !estimateValid ? C.red : C.border }} value={estimateStr} onChange={(e) => setEstimateStr(e.target.value)} />
+          <input disabled={readOnly} style={{ ...field, borderColor: estimateStr && !estimateValid ? C.red : 'rgba(255,255,255,0.10)' }} value={estimateStr} onChange={(e) => setEstimateStr(e.target.value)} />
         </div>
         <div>
           <div style={label}>Popis (volitelné)</div>
           <input disabled={readOnly} style={field} value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 4, alignItems: 'center' }}>
           {onDelete && !readOnly && (
-            <button onClick={async () => { setSaving(true); await onDelete(); }} disabled={saving} style={{ ...field, width: 'auto', color: C.red, cursor: 'pointer' }}>Smazat</button>
+            <button onClick={async () => { setSaving(true); await onDelete(); }} disabled={saving} style={{ height: 36, padding: '0 14px', borderRadius: 10, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', color: '#fca5a5', background: 'rgba(110,24,24,0.32)', border: '1px solid rgba(248,113,113,0.40)', display: 'inline-flex', alignItems: 'center' }}>Smazat</button>
           )}
           <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{ ...field, width: 'auto', cursor: 'pointer' }}>Zrušit</button>
+          <button onClick={onClose} style={{ height: 36, padding: '0 14px', borderRadius: 10, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', color: '#c2c9d8', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)', display: 'inline-flex', alignItems: 'center' }}>Zrušit</button>
           {!readOnly && (
-            <button onClick={submit} disabled={!canSubmit} style={{ ...field, width: 'auto', background: canSubmit ? C.violet : C.border, color: '#fff', border: 'none', cursor: canSubmit ? 'pointer' : 'default' }}>
+            <button onClick={submit} disabled={!canSubmit} style={{ height: 38, padding: '0 16px', borderRadius: 11, border: 'none', background: canSubmit ? ctaGradient : 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'default', fontFamily: 'inherit', boxShadow: canSubmit ? ctaGlow : 'none', display: 'inline-flex', alignItems: 'center' }}>
               {saving ? 'Ukládám…' : 'Uložit'}
             </button>
           )}
