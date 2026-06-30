@@ -1,5 +1,6 @@
 // apps/ipad/src/components/billing/reports/ReportsFilterBar.tsx
 import { C } from './tokens.js';
+import { glassPanel, accentWash, accent, text } from '../../../theme/glass.js';
 import type { Preset } from '../../../state/useReportsFilters.js';
 import { clampGranularity } from '../../../state/useReportsFilters.js';
 import type { Granularity } from '@watchtower/shared/billing/reports/buckets.js';
@@ -35,14 +36,15 @@ function pill(active: boolean, disabled = false): React.CSSProperties {
   return {
     padding: '5px 12px',
     borderRadius: 7,
-    border: 'none',
+    border: active ? '1px solid rgba(168,156,240,0.30)' : '1px solid transparent',
     fontSize: 13,
     fontWeight: 600,
     fontFamily: 'inherit',
     cursor: disabled ? 'default' : 'pointer',
     opacity: disabled ? 0.35 : 1,
-    background: active ? C.violetBg : 'transparent',
-    color: active ? C.violet : C.muted,
+    background: active ? accentWash : 'transparent',
+    color: active ? accent : text.muted,
+    transition: 'background 0.15s, color 0.15s',
   };
 }
 
@@ -57,8 +59,12 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
         position: 'sticky',
         top: 0,
         zIndex: 10,
-        background: C.ground,
-        borderBottom: `1px solid ${C.border}`,
+        ...glassPanel({ radius: 13 }),
+        borderLeft: 'none',
+        borderRight: 'none',
+        borderTop: 'none',
+        borderRadius: 0,
+        borderBottom: '1px solid rgba(255,255,255,0.10)',
         padding: '10px 16px',
         display: 'flex',
         flexWrap: 'wrap',
@@ -74,7 +80,7 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
         ))}
       </div>
 
-      <div style={{ width: 1, height: 18, background: C.border }} />
+      <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.12)' }} />
 
       <div style={{ display: 'flex', gap: 4 }}>
         {GRANS.map((g) => {
@@ -98,13 +104,15 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
         value={projectId ?? ''}
         onChange={(e) => props.onProject(e.target.value === '' ? undefined : Number(e.target.value))}
         style={{
-          background: C.surface,
+          background: 'rgba(48,52,76,0.40)',
           color: C.text,
-          border: `1px solid ${C.border}`,
+          border: '1px solid rgba(255,255,255,0.12)',
           borderRadius: 7,
           padding: '5px 10px',
           fontSize: 13,
           fontFamily: 'inherit',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
         }}
       >
         <option value="">Všechny projekty</option>

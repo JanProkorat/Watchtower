@@ -1,4 +1,5 @@
 import { C } from './tokens.js';
+import { glassCard, text } from '../../../theme/glass.js';
 import type { ProjectBreakdownSlice } from '@watchtower/shared/billing/reports/breakdown.js';
 import { formatHours } from '../../../lib/czFormat.js';
 
@@ -11,7 +12,7 @@ const FALLBACK = ['#A78BFA', '#22D3EE', '#fbbf24', '#f87171', '#34d399', '#f472b
 
 export function ProjectDonut({ slices, onOpenProject }: ProjectDonutProps): JSX.Element {
   if (slices.length === 0) {
-    return <div style={{ fontSize: 13, color: C.muted, padding: '8px 0' }}>žádná data</div>;
+    return <div style={{ fontSize: 13, color: text.muted, padding: '8px 0' }}>žádná data</div>;
   }
 
   const totalMinutes = slices.reduce((acc, s) => acc + s.minutes, 0);
@@ -24,9 +25,7 @@ export function ProjectDonut({ slices, onOpenProject }: ProjectDonutProps): JSX.
   return (
     <div
       style={{
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        borderRadius: 12,
+        ...glassCard(12),
         padding: '16px',
         display: 'flex',
         flexWrap: 'wrap',
@@ -69,8 +68,8 @@ export function ProjectDonut({ slices, onOpenProject }: ProjectDonutProps): JSX.
             pointerEvents: 'none',
           }}
         >
-          <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{formatHours(totalMinutes)}</div>
-          <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>celkem</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: text.primary }}>{formatHours(totalMinutes)}</div>
+          <div style={{ fontSize: 10, color: text.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>celkem</div>
         </div>
       </div>
 
@@ -82,11 +81,11 @@ export function ProjectDonut({ slices, onOpenProject }: ProjectDonutProps): JSX.
             style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
           >
             <div style={{ width: 10, height: 10, borderRadius: 2, background: s.drawColor, flexShrink: 0 }} />
-            <div style={{ flex: 1, fontSize: 13, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ flex: 1, fontSize: 13, color: text.primary, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {s.name || '(bez názvu)'}
             </div>
-            <div style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>{formatHours(s.minutes)}</div>
-            <div style={{ fontSize: 12, color: C.muted, width: 38, textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 12, color: text.muted, flexShrink: 0 }}>{formatHours(s.minutes)}</div>
+            <div style={{ fontSize: 12, color: text.muted, width: 38, textAlign: 'right', flexShrink: 0 }}>
               {Math.round(s.share * 100)} %
             </div>
           </div>
