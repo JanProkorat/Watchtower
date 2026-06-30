@@ -17,10 +17,10 @@ import { TerminalView } from './components/TerminalView.js';
 import { SpawnModal } from './components/SpawnModal.js';
 import { RemoteMacView } from './components/RemoteMacView.js';
 import { BillingArea } from './components/billing/BillingArea.js';
-import { AuthBlockBanner } from './components/AuthBlockBanner.js';
 import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
-import { text } from './theme/glass.js';
+import { ToastStack, type ToastItem } from './components/ToastStack.js';
+import { text, glassPanel, glassFillStrong, statusGlass, ctaGradient, ctaGlow, accent } from './theme/glass.js';
 
 // ---------------------------------------------------------------------------
 // Capacitor Preferences store (same helper as before)
@@ -41,18 +41,10 @@ const NON_LIVE_STATUSES = new Set(['finished', 'crashed', 'suspended']);
 // InstancesModule — the instances view content (Rail lives in Shell now)
 // ---------------------------------------------------------------------------
 
-function InstancesModule({ activeId, setActiveId, ackedIds, connection }: { activeId: string | null; setActiveId: (id: string | null) => void; ackedIds: ReadonlySet<string>; connection: Connection }) {
-  const { status } = useConnection();
+function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string | null; setActiveId: (id: string | null) => void; ackedIds: ReadonlySet<string> }) {
   const { instances } = useInstances();
   const { projects } = useProjects();
   const [spawnOpen, setSpawnOpen] = useState(false);
-
-  // Once we've had a live connection, any later non-connected state is a
-  // *reconnect*. Tracking this lets the banner stay steady (one message, one
-  // colour) for the whole reconnect instead of flipping connecting↔disconnected.
-  const [everConnected, setEverConnected] = useState(false);
-  useEffect(() => { if (status === 'connected') setEverConnected(true); }, [status]);
-  const disconnected = status !== 'connected';
 
   const nonLiveInstances = instances.filter((i) => NON_LIVE_STATUSES.has(i.status));
 
@@ -72,33 +64,8 @@ function InstancesModule({ activeId, setActiveId, ackedIds, connection }: { acti
         overflow: 'hidden',
       }}
     >
-      {/* Connection banner — stays visible for the whole reconnect (shown for
-          both 'connecting' and 'disconnected'), so it doesn't blink. One steady
-          message/colour once a live connection has been lost. */}
-      {disconnected && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            flexShrink: 0,
-            backgroundColor: everConnected ? '#3b1f1f' : '#1e3a5f',
-            borderBottom: `1px solid ${everConnected ? '#7f1d1d' : '#2563eb'}`,
-            color: everConnected ? '#fca5a5' : '#93c5fd',
-            fontSize: 13,
-            fontWeight: 500,
-            padding: '6px 16px',
-            textAlign: 'center',
-            letterSpacing: 0.2,
-          }}
-        >
-          {everConnected ? 'Mac odpojen – obnovuji připojení…' : 'Připojuji k Macu…'}
-          {connection.mac && (
-            <div style={{ marginTop: 8 }}>
-              <WakeButton connection={connection} />
-            </div>
-          )}
-        </div>
-      )}
+      {/* Connection status is surfaced as a top-right toast at the Shell level
+          (overlay, never pushes this content) — see ToastStack in Shell. */}
 
       {/* TabStrip + terminal body */}
       <TabStrip
@@ -121,7 +88,7 @@ function InstancesModule({ activeId, setActiveId, ackedIds, connection }: { acti
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
-              color: '#4b5563',
+              color: text.dim,
               fontSize: 15,
               fontWeight: 500,
               letterSpacing: 0.2,
@@ -160,7 +127,13 @@ function Shell({ connection }: ShellProps) {
   const { items: attention, ackedIds, acknowledge } = useAttention();
   const [hubOpen, setHubOpen] = useState(false);
   const { blockedIds } = useAuthBlock();
-  const { bridge } = useConnection();
+  const { bridge, status } = useConnection();
+
+  // Once we've had a live connection, any later non-connected state is a
+  // *reconnect* — keep the status toast steady (one message/colour) instead of
+  // flickering connecting↔disconnected.
+  const [everConnected, setEverConnected] = useState(false);
+  useEffect(() => { if (status === 'connected') setEverConnected(true); }, [status]);
 
   // Select (focus) an instance and mark it seen — clears its tab ⚠️ and drops
   // it from the bell count. Used by the hub, push taps, and tab taps.
@@ -204,10 +177,46 @@ function Shell({ connection }: ShellProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Mac-connection status + auth-block surface as top-right toasts that OVERLAY
+  // content (never push layout). Only the Mac-dependent modules show the
+  // connection toast/pill — billing has its own (Supabase) status elsewhere.
+  const macModule = activeModule === 'instances' || activeModule === 'remote';
+  const toasts: ToastItem[] = [];
+  if (activeModule === 'instances' && blockedIds.size > 0) {
+    toasts.push({
+      id: 'auth',
+      state: 'authBlock',
+      title: 'Mac čeká na přihlášení',
+      subtitle: 'otevřete obrazovku Macu a dokončete přihlášení',
+      action: (
+        <button
+          onClick={() => setActiveModule('remote')}
+          style={{
+            padding: '6px 12px', borderRadius: 9, border: 'none',
+            background: ctaGradient, color: '#fff', fontSize: 12, fontWeight: 600,
+            boxShadow: ctaGlow, cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Otevřít obrazovku Macu
+        </button>
+      ),
+    });
+  }
+  if (macModule && status !== 'connected') {
+    toasts.push({
+      id: 'conn',
+      state: everConnected ? 'disconnected' : 'connecting',
+      title: everConnected ? 'Mac odpojen' : 'Připojuji k Macu…',
+      subtitle: everConnected ? 'obnovuji připojení…' : undefined,
+      action: connection.mac ? <WakeButton connection={connection} /> : undefined,
+    });
+  }
+
   return (
     <div
       style={{
-        // Column: optional auth-block banner on top, then the rail + content row.
+        // A column: the rail + content row. Status banners are now top-right
+        // toasts (overlay, never push), so there's no in-flow banner row.
         // The outer #root (index.css) already applies the safe-area insets, so this
         // fills #root's content box and never sits under the iOS status bar.
         display: 'flex',
@@ -222,15 +231,6 @@ function Shell({ connection }: ShellProps) {
         color: text.primary,
       }}
     >
-      {/* Auth-block banner — only visible when instances view is active and
-          at least one instance is blocked waiting for browser auth. */}
-      {activeModule === 'instances' && (
-        <AuthBlockBanner
-          blockedIds={blockedIds}
-          onOpen={() => setActiveModule('remote')}
-        />
-      )}
-
       {/* Content row: shared left rail + module content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, position: 'relative' }}>
         {/* Shared left rail — active across all modules */}
@@ -245,7 +245,7 @@ function Shell({ connection }: ShellProps) {
 
         {/* Module content */}
         {activeModule === 'instances' ? (
-          <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} connection={connection} />
+          <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} />
         ) : activeModule === 'dashboard' || activeModule === 'billing' ? (
           <BillingArea module={activeModule} section={billingSection} />
         ) : (
@@ -259,6 +259,33 @@ function Shell({ connection }: ShellProps) {
             onClose={() => setHubOpen(false)}
             onSelect={(id) => { setActiveModule('instances'); selectInstance(id); setHubOpen(false); }}
           />
+        )}
+
+        {/* Floating status toasts — overlay, never push content */}
+        <ToastStack items={toasts} />
+
+        {/* Connected pill — bottom-right, only on Mac-dependent modules */}
+        {macModule && status === 'connected' && (
+          <div
+            style={{
+              ...statusGlass('connected').panel,
+              position: 'absolute',
+              bottom: 16,
+              right: 16,
+              zIndex: 40,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              padding: '7px 13px',
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 500,
+              color: '#9be7c0',
+            }}
+          >
+            <span style={statusGlass('connected').dot} />
+            Připojeno
+          </div>
         )}
       </div>
     </div>
@@ -321,16 +348,22 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
       style={{
         fontFamily: 'system-ui, sans-serif',
         padding: 24,
-        backgroundColor: '#0e0f12',
-        color: '#e5e7eb',
+        // Transparent over the ambient lit #root (index.css); the form floats
+        // as a glass card.
+        background: 'transparent',
+        color: text.primary,
         minHeight: '100%',
         boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20, color: '#c4b8ff' }}>
+      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 18, color: '#c9bdff', letterSpacing: 0.2 }}>
         Watchtower
       </h1>
-      <div style={{ display: 'grid', gap: 10, maxWidth: 360 }}>
+      <div style={{ ...glassPanel({ radius: 18 }), display: 'grid', gap: 10, width: '100%', maxWidth: 380, padding: 20 }}>
         <input
           placeholder="Mac LAN host"
           value={form.host}
@@ -350,8 +383,8 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
           onChange={(e) => setForm({ ...form, token: e.target.value })}
           style={inputStyle}
         />
-        <div style={{ borderTop: '1px solid #2e3038', margin: '6px 0', paddingTop: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#9ca3af', marginBottom: 8 }}>Probuzení (Wake-on-LAN)</div>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.10)', margin: '6px 0', paddingTop: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: text.muted, marginBottom: 8 }}>Probuzení (Wake-on-LAN)</div>
           <div style={{ display: 'grid', gap: 10 }}>
             <input placeholder="MAC adresa (AA:BB:CC:DD:EE:FF)" value={form.mac}
               onChange={(e) => setForm({ ...form, mac: e.target.value })} style={inputStyle} />
@@ -369,10 +402,11 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
           disabled={connecting}
           style={{
             padding: '10px 0',
-            borderRadius: 8,
+            borderRadius: 12,
             border: 'none',
-            backgroundColor: connecting ? '#4b4a72' : '#7c6df0',
-            color: connecting ? '#9ca3af' : '#fff',
+            background: connecting ? 'rgba(124,109,240,0.35)' : ctaGradient,
+            boxShadow: connecting ? 'none' : ctaGlow,
+            color: connecting ? text.muted : '#fff',
             fontSize: 15,
             fontWeight: 600,
             cursor: connecting ? 'not-allowed' : 'pointer',
@@ -385,9 +419,9 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
             role="alert"
             style={{
               padding: '8px 12px',
-              borderRadius: 8,
-              backgroundColor: '#2d1515',
-              border: '1px solid #7f1d1d',
+              borderRadius: 10,
+              background: 'rgba(110,24,24,0.32)',
+              border: '1px solid rgba(248,113,113,0.40)',
               color: '#fca5a5',
               fontSize: 13,
             }}
@@ -402,10 +436,10 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
 
 const inputStyle: React.CSSProperties = {
   padding: '10px 12px',
-  borderRadius: 8,
-  border: '1px solid #2e3038',
-  backgroundColor: '#1a1b1f',
-  color: '#e5e7eb',
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.13)',
+  backgroundColor: 'rgba(255,255,255,0.07)',
+  color: text.primary,
   fontSize: 14,
   fontFamily: 'system-ui, sans-serif',
   outline: 'none',
