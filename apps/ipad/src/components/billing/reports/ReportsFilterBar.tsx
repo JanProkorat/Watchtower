@@ -1,6 +1,6 @@
 // apps/ipad/src/components/billing/reports/ReportsFilterBar.tsx
 import { C } from './tokens.js';
-import { glassPanel, accentWash, accent, text } from '../../../theme/glass.js';
+import { glassCard, accentWash, accent, text } from '../../../theme/glass.js';
 import type { Preset } from '../../../state/useReportsFilters.js';
 import { clampGranularity } from '../../../state/useReportsFilters.js';
 import type { Granularity } from '@watchtower/shared/billing/reports/buckets.js';
@@ -56,16 +56,8 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
   return (
     <div
       style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        ...glassPanel({ radius: 13 }),
-        borderLeft: 'none',
-        borderRight: 'none',
-        borderTop: 'none',
-        borderRadius: 0,
-        borderBottom: '1px solid rgba(255,255,255,0.10)',
-        padding: '10px 16px',
+        ...glassCard(12),
+        padding: '10px 14px',
         display: 'flex',
         flexWrap: 'wrap',
         alignItems: 'center',

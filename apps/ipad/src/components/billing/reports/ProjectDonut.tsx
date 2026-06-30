@@ -73,20 +73,27 @@ export function ProjectDonut({ slices, onOpenProject }: ProjectDonutProps): JSX.
         </div>
       </div>
 
-      <div style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Legend doubles as a horizontal breakdown — the proportional bar fills
+          the otherwise-empty width so the wide card reads intentionally. */}
+      <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', gap: 14 }}>
         {colored.map((s) => (
           <div
             key={s.projectId}
             onClick={() => onOpenProject(s.projectId)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 6, cursor: 'pointer' }}
           >
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: s.drawColor, flexShrink: 0 }} />
-            <div style={{ flex: 1, fontSize: 13, color: text.primary, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {s.name || '(bez názvu)'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: s.drawColor, flexShrink: 0 }} />
+              <div style={{ flex: 1, fontSize: 13, color: text.primary, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {s.name || '(bez názvu)'}
+              </div>
+              <div style={{ fontSize: 12.5, color: text.secondary, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{formatHours(s.minutes)}</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: text.primary, width: 46, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                {Math.round(s.share * 100)} %
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: text.muted, flexShrink: 0 }}>{formatHours(s.minutes)}</div>
-            <div style={{ fontSize: 12, color: text.muted, width: 38, textAlign: 'right', flexShrink: 0 }}>
-              {Math.round(s.share * 100)} %
+            <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+              <div style={{ width: `${Math.max(2, s.share * 100)}%`, height: '100%', borderRadius: 999, background: s.drawColor }} />
             </div>
           </div>
         ))}

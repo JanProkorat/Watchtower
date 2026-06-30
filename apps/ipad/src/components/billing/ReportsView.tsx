@@ -71,18 +71,18 @@ export function ReportsView({ onOpenProject }: { onOpenProject(id: number): void
 
   return (
     <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', background: 'transparent', minHeight: '100%', color: C.text }}>
-      <ReportsFilterBar
-        preset={f.preset}
-        granularity={f.granularity}
-        projectId={f.projectId}
-        projects={projects}
-        from={f.from}
-        to={f.to}
-        onPreset={f.setPreset}
-        onGranularity={f.setGranularity}
-        onProject={f.setProjectId}
-      />
       <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <ReportsFilterBar
+          preset={f.preset}
+          granularity={f.granularity}
+          projectId={f.projectId}
+          projects={projects}
+          from={f.from}
+          to={f.to}
+          onPreset={f.setPreset}
+          onGranularity={f.setGranularity}
+          onProject={f.setProjectId}
+        />
         <Section title="Trend">
           <TrendChart series={trend} markers={markers} from={f.from} to={f.to} granularity={f.granularity} />
         </Section>
