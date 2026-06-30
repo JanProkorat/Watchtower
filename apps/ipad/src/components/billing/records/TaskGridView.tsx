@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useBilling } from '../../../state/useBilling.js';
 import { buildTaskGrid } from '@watchtower/shared/billing/records/task-grid.js';
 import { addMonths, czechMonthLabel } from '../../../lib/monthHelpers.js';
-import { formatHours, formatCzk } from '../../../lib/czFormat.js';
-import { czechHolidays } from '@watchtower/shared/billing/workdays.js';
+import { formatCzk } from '../../../lib/czFormat.js';
+import { czechHolidays, workdayDates } from '@watchtower/shared/billing/workdays.js';
 import { C } from '../reports/tokens.js';
 import { glassPanel, dataPanelFill } from '../../../theme/glass.js';
 
@@ -50,6 +50,30 @@ export function TaskGridView(): JSX.Element {
     return { isWeekend, isToday, kind };
   });
 
+  // Capacity + expected targets for the footer "total / target" (matches the
+  // desktop grid): workdays = Mon-Fri minus Czech holidays minus user days off;
+  // capacity = workdays × 8h; expected = Σ over workdays × each billable project
+  // that contributed worklogs, of the MD rate active that day (daily →
+  // rateAmount, hourly → rateAmount × hoursPerDay).
+  const contracts = data?.contracts ?? [];
+  const monthStart = `${month}-01`;
+  const monthEnd = `${month}-${String(g.daysInMonth).padStart(2, '0')}`;
+  const daysOffSet = new Set(daysOff.filter((d) => d.date >= monthStart && d.date <= monthEnd).map((d) => d.date));
+  const workdays = workdayDates(monthStart, monthEnd, daysOffSet);
+  const capacityMinutes = workdays.length * 8 * 60;
+  const filteredWl = projectId === undefined ? worklogs : worklogs.filter((w) => w.projectId === projectId);
+  const billableProjectIds = [...new Set(filteredWl.filter((w) => w.isBillable && w.projectId).map((w) => w.projectId))];
+  let expectedCzk = 0;
+  for (const date of workdays) {
+    for (const pid of billableProjectIds) {
+      const c = contracts.find((k) => k.projectId === pid && k.effectiveFrom <= date && (k.endDate == null || date <= k.endDate));
+      if (c) expectedCzk += c.rateType === 'daily' ? c.rateAmount : c.rateAmount * c.hoursPerDay;
+    }
+  }
+  expectedCzk = Math.round(expectedCzk);
+  const hrsVal = (min: number): string => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 }).format(min / 60);
+  const czkVal = (czk: number): string => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(czk);
+
   const btn: React.CSSProperties = { background: 'rgba(255,255,255,0.08)', color: '#c2c9d8', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0 14px', height: 30, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
   const cellBase: React.CSSProperties = { width: CELL, minWidth: CELL, textAlign: 'center', fontSize: 11, borderLeft: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' };
   const nameCol: React.CSSProperties = { position: 'sticky', left: 0, zIndex: 1, background: '#101019', minWidth: 180, maxWidth: 180, paddingRight: 8 };
@@ -60,6 +84,10 @@ export function TaskGridView(): JSX.Element {
   const FOOT_H = 28; // footer row height (drives the stacked bottom offsets)
   const overTint = (bg: string | undefined, base: string): string =>
     bg ? `linear-gradient(${bg}, ${bg}), ${base}` : base;
+  // Sum (Σ) column — now sits right after the task name, frozen left alongside it.
+  const NAME_W = 180;
+  const SIG_W = 120;
+  const sigCol: React.CSSProperties = { position: 'sticky', left: NAME_W, minWidth: SIG_W, width: SIG_W, textAlign: 'right', paddingRight: 10, whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.10)', borderBottom: '1px solid rgba(255,255,255,0.05)' };
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', background: 'transparent', height: '100%', minHeight: 0, color: C.text, display: 'flex', flexDirection: 'column' }}>
@@ -93,6 +121,7 @@ export function TaskGridView(): JSX.Element {
               <thead>
                 <tr>
                   <th style={{ ...nameCol, top: 0, textAlign: 'left', fontSize: 11, color: C.muted, fontWeight: 600, background: HEAD_BG, padding: '6px 8px 6px 0', zIndex: 4 }}>Úkol</th>
+                  <th style={{ ...sigCol, top: 0, zIndex: 4, color: C.muted, fontWeight: 600, background: HEAD_BG }}>Σ</th>
                   {dayHeaders.map((d, i) => {
                     const meta = dayMeta[i]!;
                     const bg = dayTint(meta);
@@ -105,7 +134,6 @@ export function TaskGridView(): JSX.Element {
                       </th>
                     );
                   })}
-                  <th style={{ ...cellBase, position: 'sticky', top: 0, zIndex: 3, minWidth: 56, width: 56, color: C.muted, fontWeight: 600, background: HEAD_BG }}>Σ</th>
                 </tr>
               </thead>
               <tbody>
@@ -120,13 +148,13 @@ export function TaskGridView(): JSX.Element {
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#c2c9d8' }}>{t.taskTitle ?? ''}</span>
                         </div>
                       </td>
+                      <td style={{ ...sigCol, background: '#101019', zIndex: 1, fontWeight: 700, color: C.violet, fontSize: 12 }}>{hrs(rowTotal)}</td>
                       {t.perDay.map((min, i) => {
                         const meta = dayMeta[i]!;
                         const bg = dayTint(meta);
                         const todayStyle: React.CSSProperties = meta.isToday ? { boxShadow: 'inset 0 0 0 1.5px rgba(168,156,240,0.7)' } : {};
                         return <td key={i} style={{ ...cellBase, padding: '5px 0', background: bg, color: min ? '#c2c9d8' : '#5a6072', ...todayStyle }}>{hrs(min)}</td>;
                       })}
-                      <td style={{ ...cellBase, minWidth: 56, width: 56, fontWeight: 700, color: C.violet }}>{hrs(rowTotal)}</td>
                     </tr>
                   );
                 })}
@@ -141,19 +169,25 @@ export function TaskGridView(): JSX.Element {
                     footer-row above Výdělek (bottom: FOOT_H vs 0). */}
                 <tr>
                   <td style={{ ...nameCol, position: 'sticky', left: 0, bottom: FOOT_H, zIndex: 3, height: FOOT_H, fontSize: 11, color: C.muted, fontWeight: 700, background: FOOT_BG, borderTop: '1px solid rgba(255,255,255,0.12)' }}>Celkem (h)</td>
+                  <td style={{ ...sigCol, bottom: FOOT_H, zIndex: 3, height: FOOT_H, background: FOOT_BG, borderTop: '1px solid rgba(255,255,255,0.12)', fontSize: 11 }}>
+                    <b style={{ color: C.violet }}>{hrsVal(g.monthTotalMinutes)}</b>
+                    <span style={{ color: C.muted, fontWeight: 400 }}> / {hrsVal(capacityMinutes)}</span>
+                  </td>
                   {g.dailyTotals.map((min, i) => {
                     const bg = dayTint(dayMeta[i]!);
                     return <td key={i} style={{ ...cellBase, position: 'sticky', bottom: FOOT_H, zIndex: 2, height: FOOT_H, background: overTint(bg, FOOT_BG), color: C.violet, fontWeight: 600, borderTop: '1px solid rgba(255,255,255,0.12)' }}>{hrs(min)}</td>;
                   })}
-                  <td style={{ ...cellBase, position: 'sticky', bottom: FOOT_H, zIndex: 2, height: FOOT_H, minWidth: 56, width: 56, color: C.violet, fontWeight: 700, background: FOOT_BG, borderTop: '1px solid rgba(255,255,255,0.12)' }}>{formatHours(g.monthTotalMinutes)}</td>
                 </tr>
                 <tr>
                   <td style={{ ...nameCol, position: 'sticky', left: 0, bottom: 0, zIndex: 3, height: FOOT_H, fontSize: 11, color: C.muted, fontWeight: 700, background: FOOT_BG }}>Výdělek</td>
+                  <td style={{ ...sigCol, bottom: 0, zIndex: 3, height: FOOT_H, background: FOOT_BG, fontSize: 11 }}>
+                    <b style={{ color: C.violet }}>{formatCzk(g.monthTotalCzk)}</b>
+                    <span style={{ color: C.muted, fontWeight: 400 }}> / {czkVal(expectedCzk)}</span>
+                  </td>
                   {g.dailyEarnings.map((czk, i) => {
                     const bg = dayTint(dayMeta[i]!);
                     return <td key={i} style={{ ...cellBase, position: 'sticky', bottom: 0, zIndex: 2, height: FOOT_H, background: overTint(bg, FOOT_BG), color: czk ? '#c2c9d8' : '#5a6072', fontSize: 10 }}>{czk ? Math.round(czk) : ''}</td>;
                   })}
-                  <td style={{ ...cellBase, position: 'sticky', bottom: 0, zIndex: 2, height: FOOT_H, minWidth: 56, width: 56, color: C.violet, fontWeight: 700, background: FOOT_BG }}>{formatCzk(g.monthTotalCzk)}</td>
                 </tr>
               </tfoot>
             </table>
