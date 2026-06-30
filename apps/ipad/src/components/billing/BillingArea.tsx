@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSupabaseAuth } from '../../state/useSupabaseAuth.js';
 import type { BillingSection } from '../Rail.js';
+import { glassPanel, text } from '../../theme/glass.js';
 import { BillingLogin } from './BillingLogin.js';
 import { DashboardView } from './DashboardView.js';
 import { EarningsMonthView } from './EarningsMonthView.js';
@@ -43,7 +44,7 @@ export function BillingArea({ module, section }: Props): JSX.Element {
 
   if (status === 'loading') {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 15, fontFamily: 'system-ui, sans-serif' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: text.muted, fontSize: 15, fontFamily: 'system-ui, sans-serif' }}>
         Načítání…
       </div>
     );
@@ -56,30 +57,40 @@ export function BillingArea({ module, section }: Props): JSX.Element {
     : SECTION_TITLES[module === 'dashboard' ? 'dashboard' : section];
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
-      {/* Content header — section title + sign-out (replaces the old nav footer). */}
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden', background: 'transparent' }}>
+      {/* Content header — frosted sticky bar (Liquid Glass hbar). */}
       <div
         style={{
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          height: 44,
+          gap: 12,
+          height: 46,
           padding: '0 16px',
-          borderBottom: '1px solid #2e3038',
-          background: '#13141a',
+          margin: '0 0 0 0',
+          ...glassPanel({ radius: 13, blur: 28, saturate: 1.7, brightness: 1.18,
+            border: '1px solid rgba(255,255,255,0.10)',
+            shadow: 'inset 0 1px 0 rgba(255,255,255,0.30)' }),
         }}
       >
-        <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: 0.2, color: '#e5e7eb', fontFamily: 'system-ui, sans-serif' }}>
+        <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: 0.2, color: '#f4f4f8', fontFamily: 'system-ui, sans-serif' }}>
           {title}
         </span>
+        <div style={{ flex: 1 }} />
         <button
           onClick={() => void signOut()}
           title="Odhlásit"
           style={{
-            border: 'none', background: 'transparent', color: '#6b7280', cursor: 'pointer',
-            fontSize: 13, fontWeight: 600, fontFamily: 'system-ui, sans-serif', padding: '6px 8px',
-            borderRadius: 8, WebkitTapHighlightColor: 'transparent',
+            border: '1px solid rgba(255,255,255,0.10)',
+            background: 'rgba(255,255,255,0.06)',
+            color: text.muted,
+            cursor: 'pointer',
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: 'system-ui, sans-serif',
+            padding: '6px 12px',
+            borderRadius: 9,
+            WebkitTapHighlightColor: 'transparent',
           }}
         >
           Odhlásit

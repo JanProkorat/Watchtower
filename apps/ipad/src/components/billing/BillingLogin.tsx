@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { SupabaseAuthState } from '../../state/useSupabaseAuth.js';
+import { glassPanel, glassFillStrong, ctaGradient, ctaGlow, text } from '../../theme/glass.js';
 
 interface Props {
   signIn: SupabaseAuthState['signIn'];
@@ -31,15 +32,13 @@ export function BillingLogin({ signIn }: Props): JSX.Element {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#0e0f12',
+        background: 'transparent',
       }}
     >
       <div
         style={{
           width: 320,
-          backgroundColor: '#1a1b1f',
-          border: '1px solid #2e3038',
-          borderRadius: 12,
+          ...glassPanel({ radius: 22, fill: glassFillStrong, blur: 40, saturate: 1.9, brightness: 1.1 }),
           padding: 28,
           display: 'flex',
           flexDirection: 'column',
@@ -82,8 +81,8 @@ export function BillingLogin({ signIn }: Props): JSX.Element {
             style={{
               padding: '8px 12px',
               borderRadius: 8,
-              backgroundColor: '#2d1515',
-              border: '1px solid #7f1d1d',
+              background: 'rgba(110,24,24,0.32)',
+              border: '1px solid rgba(248,113,113,0.40)',
               color: '#fca5a5',
               fontSize: 13,
               fontFamily: 'system-ui, sans-serif',
@@ -100,8 +99,9 @@ export function BillingLogin({ signIn }: Props): JSX.Element {
             padding: '10px 0',
             borderRadius: 8,
             border: 'none',
-            backgroundColor: busy ? '#4b4a72' : '#7c6df0',
-            color: busy ? '#9ca3af' : '#fff',
+            background: busy ? 'rgba(124,109,240,0.35)' : ctaGradient,
+            boxShadow: busy ? 'none' : ctaGlow,
+            color: busy ? text.muted : '#fff',
             fontSize: 15,
             fontWeight: 600,
             cursor: busy ? 'not-allowed' : 'pointer',
@@ -117,9 +117,9 @@ export function BillingLogin({ signIn }: Props): JSX.Element {
 
 const inputStyle: React.CSSProperties = {
   padding: '10px 12px',
-  borderRadius: 8,
-  border: '1px solid #2e3038',
-  backgroundColor: '#13141a',
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.10)',
+  background: 'rgba(255,255,255,0.07)',
   color: '#e5e7eb',
   fontSize: 14,
   fontFamily: 'system-ui, sans-serif',

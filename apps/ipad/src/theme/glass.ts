@@ -100,6 +100,29 @@ export function glassPanel(opts: GlassPanelOpts = {}): CSSProperties {
   };
 }
 
+/**
+ * Lighter frosted card for content surfaces — KPI / contract / summary tiles,
+ * list cards, and chart frames. Softer blur + shadow than the chrome panel so
+ * data sits calmly on it.
+ */
+export function glassCard(radius = 16): CSSProperties {
+  return glassPanel({
+    radius,
+    blur: 28,
+    saturate: 1.7,
+    brightness: 1.14,
+    border: '1px solid rgba(255,255,255,0.10)',
+    shadow: '0 10px 28px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.20)',
+  });
+}
+
+/**
+ * Near-solid fill for DENSE data panels (worklog ledger, task grid). Dense
+ * numbers stay legible over the ambient background instead of being frosted —
+ * apply this to the table/grid wrapper, not the card frame around it.
+ */
+export const dataPanelFill = 'rgba(14,15,23,0.62)';
+
 // ── Status (banners / pill) ──────────────────────────────────────────────────
 
 export type StatusState = 'connected' | 'connecting' | 'disconnected' | 'authBlock';
