@@ -53,10 +53,17 @@ export function TaskGridView(): JSX.Element {
   const btn: React.CSSProperties = { background: 'rgba(255,255,255,0.08)', color: '#c2c9d8', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0 14px', height: 30, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
   const cellBase: React.CSSProperties = { width: CELL, minWidth: CELL, textAlign: 'center', fontSize: 11, borderLeft: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' };
   const nameCol: React.CSSProperties = { position: 'sticky', left: 0, zIndex: 1, background: '#101019', minWidth: 180, maxWidth: 180, paddingRight: 8 };
+  // Sticky header/footer cells must be opaque so scrolling rows don't bleed
+  // through — layer any day tint over the solid header/footer fill.
+  const HEAD_BG = '#14151d';
+  const FOOT_BG = '#161620';
+  const FOOT_H = 28; // footer row height (drives the stacked bottom offsets)
+  const overTint = (bg: string | undefined, base: string): string =>
+    bg ? `linear-gradient(${bg}, ${bg}), ${base}` : base;
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', background: 'transparent', minHeight: '100%', color: C.text, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 11, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+    <div style={{ fontFamily: 'system-ui, sans-serif', background: 'transparent', height: '100%', minHeight: 0, color: C.text, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flexShrink: 0, zIndex: 11, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
         <button style={btn} onClick={() => setMonth(addMonths(month, -1))}>‹</button>
         <div style={{ fontSize: 14, fontWeight: 600, minWidth: 130, textAlign: 'center', color: '#f4f4f8' }}>{czechMonthLabel(month)}</div>
         <button style={btn} onClick={() => setMonth(addMonths(month, 1))}>›</button>
@@ -69,7 +76,7 @@ export function TaskGridView(): JSX.Element {
       </div>
 
       {/* legend — matches the prototype's non-working-day key */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 11, color: C.muted, padding: '10px 16px 0' }}>
+      <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 11, color: C.muted, padding: '10px 16px 0' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(150,160,190,0.45)', display: 'inline-block' }} />víkend</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#a89cf0', display: 'inline-block' }} />svátek</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#22D3EE', display: 'inline-block' }} />dovolená</span>
@@ -80,25 +87,25 @@ export function TaskGridView(): JSX.Element {
       {g.tasks.length === 0 ? (
         <div style={{ padding: 24, color: C.muted, fontSize: 14 }}>žádné záznamy pro tento měsíc</div>
       ) : (
-        <div style={{ margin: '12px 16px', borderRadius: 12, overflow: 'hidden', background: dataPanelFill, border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh' }}>
-            <table style={{ borderCollapse: 'collapse', fontSize: 12, color: C.text }}>
+        <div style={{ flex: 1, minHeight: 0, margin: '12px 16px', borderRadius: 12, overflow: 'hidden', background: dataPanelFill, border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', height: '100%' }}>
+            <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 12, color: C.text, height: '100%' }}>
               <thead>
                 <tr>
-                  <th style={{ ...nameCol, textAlign: 'left', fontSize: 11, color: C.muted, fontWeight: 600, background: '#14151d', padding: '6px 8px 6px 0', zIndex: 2 }}>Úkol</th>
+                  <th style={{ ...nameCol, top: 0, textAlign: 'left', fontSize: 11, color: C.muted, fontWeight: 600, background: HEAD_BG, padding: '6px 8px 6px 0', zIndex: 4 }}>Úkol</th>
                   {dayHeaders.map((d, i) => {
                     const meta = dayMeta[i]!;
                     const bg = dayTint(meta);
                     const todayStyle: React.CSSProperties = meta.isToday ? { boxShadow: 'inset 0 0 0 1.5px rgba(168,156,240,0.7)' } : {};
                     const weColor = meta.isWeekend ? '#c9bdff' : undefined;
                     return (
-                      <th key={d} style={{ ...cellBase, background: bg, ...todayStyle, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
+                      <th key={d} style={{ ...cellBase, position: 'sticky', top: 0, zIndex: 3, background: overTint(bg, HEAD_BG), ...todayStyle, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
                         <div style={{ fontSize: 10, color: weColor ?? '#c2c9d8', lineHeight: 1.15 }}>{d}</div>
                         <div style={{ fontSize: 7, textTransform: 'uppercase', letterSpacing: '0.2px', color: weColor ?? C.muted }}>{DOW_ABBR[(new Date(Date.UTC(yr, mo - 1, d)).getUTCDay() + 6) % 7]!}</div>
                       </th>
                     );
                   })}
-                  <th style={{ ...cellBase, minWidth: 56, width: 56, color: C.muted, fontWeight: 600, background: '#14151d' }}>Σ</th>
+                  <th style={{ ...cellBase, position: 'sticky', top: 0, zIndex: 3, minWidth: 56, width: 56, color: C.muted, fontWeight: 600, background: HEAD_BG }}>Σ</th>
                 </tr>
               </thead>
               <tbody>
@@ -123,23 +130,30 @@ export function TaskGridView(): JSX.Element {
                     </tr>
                   );
                 })}
+                {/* Filler — absorbs leftover height so the pinned footer sits at
+                    the very bottom even when there are only a few task rows. */}
+                <tr aria-hidden>
+                  <td colSpan={g.daysInMonth + 2} style={{ height: '100%', padding: 0, border: 'none', background: 'transparent' }} />
+                </tr>
               </tbody>
               <tfoot>
-                <tr style={{ position: 'sticky', bottom: 27 }}>
-                  <td style={{ ...nameCol, fontSize: 11, color: C.muted, fontWeight: 700, paddingTop: 8, background: '#161620', borderTop: '1px solid rgba(255,255,255,0.12)' }}>Celkem (h)</td>
+                {/* Pinned to the bottom; only the tbody scrolls. Celkem sits one
+                    footer-row above Výdělek (bottom: FOOT_H vs 0). */}
+                <tr>
+                  <td style={{ ...nameCol, position: 'sticky', left: 0, bottom: FOOT_H, zIndex: 3, height: FOOT_H, fontSize: 11, color: C.muted, fontWeight: 700, background: FOOT_BG, borderTop: '1px solid rgba(255,255,255,0.12)' }}>Celkem (h)</td>
                   {g.dailyTotals.map((min, i) => {
                     const bg = dayTint(dayMeta[i]!);
-                    return <td key={i} style={{ ...cellBase, background: bg ?? '#161620', paddingTop: 8, color: C.violet, fontWeight: 600, borderTop: '1px solid rgba(255,255,255,0.12)' }}>{hrs(min)}</td>;
+                    return <td key={i} style={{ ...cellBase, position: 'sticky', bottom: FOOT_H, zIndex: 2, height: FOOT_H, background: overTint(bg, FOOT_BG), color: C.violet, fontWeight: 600, borderTop: '1px solid rgba(255,255,255,0.12)' }}>{hrs(min)}</td>;
                   })}
-                  <td style={{ ...cellBase, minWidth: 56, width: 56, paddingTop: 8, color: C.violet, fontWeight: 700, background: '#161620', borderTop: '1px solid rgba(255,255,255,0.12)' }}>{formatHours(g.monthTotalMinutes)}</td>
+                  <td style={{ ...cellBase, position: 'sticky', bottom: FOOT_H, zIndex: 2, height: FOOT_H, minWidth: 56, width: 56, color: C.violet, fontWeight: 700, background: FOOT_BG, borderTop: '1px solid rgba(255,255,255,0.12)' }}>{formatHours(g.monthTotalMinutes)}</td>
                 </tr>
-                <tr style={{ position: 'sticky', bottom: 0 }}>
-                  <td style={{ ...nameCol, fontSize: 11, color: C.muted, fontWeight: 700, background: '#161620' }}>Výdělek</td>
+                <tr>
+                  <td style={{ ...nameCol, position: 'sticky', left: 0, bottom: 0, zIndex: 3, height: FOOT_H, fontSize: 11, color: C.muted, fontWeight: 700, background: FOOT_BG }}>Výdělek</td>
                   {g.dailyEarnings.map((czk, i) => {
                     const bg = dayTint(dayMeta[i]!);
-                    return <td key={i} style={{ ...cellBase, background: bg ?? '#161620', color: czk ? '#c2c9d8' : '#5a6072', fontSize: 10 }}>{czk ? Math.round(czk) : ''}</td>;
+                    return <td key={i} style={{ ...cellBase, position: 'sticky', bottom: 0, zIndex: 2, height: FOOT_H, background: overTint(bg, FOOT_BG), color: czk ? '#c2c9d8' : '#5a6072', fontSize: 10 }}>{czk ? Math.round(czk) : ''}</td>;
                   })}
-                  <td style={{ ...cellBase, minWidth: 56, width: 56, color: C.violet, fontWeight: 700, background: '#161620' }}>{formatCzk(g.monthTotalCzk)}</td>
+                  <td style={{ ...cellBase, position: 'sticky', bottom: 0, zIndex: 2, height: FOOT_H, minWidth: 56, width: 56, color: C.violet, fontWeight: 700, background: FOOT_BG }}>{formatCzk(g.monthTotalCzk)}</td>
                 </tr>
               </tfoot>
             </table>

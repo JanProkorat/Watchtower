@@ -46,9 +46,11 @@ export function BillingArea({ module, section }: Props): JSX.Element {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden', background: 'transparent' }}>
-      {/* Module content. The dashboard owns its own scroll (pull-to-refresh),
-          so we don't double-scroll it here; other sections scroll in this wrapper. */}
-      <div style={{ flex: 1, overflow: module === 'dashboard' ? 'hidden' : 'auto', minHeight: 0 }}>
+      {/* Module content. The dashboard (pull-to-refresh) and the task grid
+          (sticky header + pinned footer) own their own scroll and fill the
+          height, so we don't double-scroll those here; other sections scroll
+          in this wrapper. */}
+      <div style={{ flex: 1, overflow: module === 'dashboard' || section === 'records-grid' ? 'hidden' : 'auto', minHeight: 0 }}>
         {selectedProject !== null ? (
           <ProjectDetailView projectId={selectedProject} onBack={() => setSelectedProject(null)} />
         ) : module === 'dashboard' ? (
