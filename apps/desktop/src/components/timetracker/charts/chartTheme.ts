@@ -27,7 +27,7 @@ export function useChartColors(): ChartColors {
     accent: theme.palette.secondary.main,
     positive: theme.palette.success.main,
     warning: theme.palette.warning.main,
-    tooltipBg: theme.palette.background.paper,
+    tooltipBg: theme.palette.mode === 'dark' ? '#1c2030' : '#ffffff',
     tooltipBorder: theme.palette.divider,
     sequential: [
       theme.palette.primary.main,
