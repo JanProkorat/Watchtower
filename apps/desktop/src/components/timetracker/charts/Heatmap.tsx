@@ -148,7 +148,10 @@ export default function Heatmap({
     return 4;
   }
 
-  const baseEmpty = alpha(theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.06 : 0.08);
+  // Phase D: bumped from 0.06/0.08 to 0.12/0.13 so empty cells stay visible
+  // over the now-translucent glass background (the old alpha was calibrated
+  // for a solid dark/light canvas; vibrancy reduces perceived contrast).
+  const baseEmpty = alpha(theme.palette.text.primary, theme.palette.mode === 'dark' ? 0.12 : 0.13);
   const colorForLevel = (level: number) => {
     if (level === 0) return baseEmpty;
     const stops = [0.18, 0.36, 0.62, 0.95];
