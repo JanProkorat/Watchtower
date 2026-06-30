@@ -33,14 +33,14 @@ export function HubTab() {
 
   if (loading) return (
     // glassSurface: singleton panel filling the Hub tab viewport
-    <Box sx={{ p: 3, flex: 1, ...glassSurface(theme, { elevation: 1 }) }}>
+    <Box sx={{ p: 3, flex: 1, overflow: 'auto', ...glassSurface(theme, { elevation: 1 }) }}>
       <Typography>Loading…</Typography>
     </Box>
   );
 
   return (
-    // glassSurface: singleton panel filling the Hub tab viewport
-    <Box sx={{ p: 3, maxWidth: 560, width: '100%', ...glassSurface(theme, { elevation: 1 }) }}>
+    // glassSurface: singleton panel filling the Hub tab viewport; flex:1 stretches to fill the tab
+    <Box sx={{ p: 3, flex: 1, overflow: 'auto', ...glassSurface(theme, { elevation: 1 }) }}>
       <Stack spacing={2}>
         <Typography variant="h6">Messaging hub</Typography>
         <Typography variant="body2" color="text.secondary">
