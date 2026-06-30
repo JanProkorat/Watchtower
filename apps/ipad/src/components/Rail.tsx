@@ -1,5 +1,6 @@
 // apps/ipad/src/components/Rail.tsx
 import { useEffect, useState } from 'react';
+import { glassPanel, accentWash, accentIcon, text } from '../theme/glass.js';
 
 // Mirrors the desktop ModuleRail: same glyphs, the same Watchtower logo, and
 // collapse/expand. Top-level modules are Přehled (dashboard) / Instance /
@@ -73,6 +74,7 @@ const WORKLOGS_D = 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.5
 const GRID_D = 'M20 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m0 2v3H5V5zm-5 14h-5v-9h5zM5 10h3v9H5zm12 9v-9h3v9z';
 const TASKS_D = 'M22 7h-9v2h9zm0 8h-9v2h9zM5.54 11 2 7.46l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41zm0 8L2 15.46l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41z';
 const TIMEOFF_D = 'm21 19.57-1.427 1.428-6.442-6.442 1.43-1.428zM13.12 3c-2.58 0-5.16.98-7.14 2.95l-.01.01c-3.95 3.95-3.95 10.36 0 14.31l14.3-14.31C18.3 3.99 15.71 3 13.12 3M6.14 17.27C5.4 16.03 5 14.61 5 13.12c0-.93.16-1.82.46-2.67.19 1.91.89 3.79 2.07 5.44zm2.84-2.84C7.63 12.38 7.12 9.93 7.6 7.6c.58-.12 1.16-.18 1.75-.18 1.8 0 3.55.55 5.08 1.56zm1.47-8.97c.85-.3 1.74-.46 2.67-.46 1.49 0 2.91.4 4.15 1.14l-1.39 1.39c-1.65-1.18-3.52-1.88-5.43-2.07';
+const BELL_D = 'M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2m6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1z';
 
 function WatchtowerLogo({ size = 28 }: { size?: number }) {
   return (
@@ -109,6 +111,9 @@ const BILLING_TABS: { id: BillingSection; label: string; d: string }[] = [
   { id: 'records-tasks', label: 'Úkoly', d: TASKS_D },
   { id: 'records-timeoff', label: 'Volno', d: TIMEOFF_D },
 ];
+
+// Active item ring — translucent purple outline
+const ACTIVE_RING = 'inset 0 1px 0 rgba(255,255,255,0.20), 0 0 0 1px rgba(168,156,240,0.30)';
 
 export function Rail({
   active,
@@ -156,13 +161,19 @@ export function Rail({
     }
   }
 
+  // Frosted glass panel that floats over the ambient background.
+  // Outer margin (13px top/left/bottom) lets the ambient gradient show around it.
+  const railPanel = glassPanel({ radius: 20 });
+
   return (
     <div
       style={{
+        // Outer gutter so the glass rail floats clear of the screen edges
+        margin: '13px 0 13px 13px',
         width: expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH,
         flexShrink: 0,
-        backgroundColor: '#13141a',
-        borderRight: '1px solid #2e3038',
+        // Glass surface — replaces the old solid #13141a background + hard border
+        ...railPanel,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'stretch',
@@ -184,7 +195,8 @@ export function Rail({
           height: 56,
           paddingLeft: expanded ? 8 : 0,
           marginBottom: 4,
-          borderBottom: '1px solid #2e3038',
+          // Hairline divider using the glass spec colour (rgba white)
+          borderBottom: '1px solid rgba(255,255,255,0.10)',
           flexShrink: 0,
         }}
       >
@@ -195,7 +207,7 @@ export function Rail({
               fontSize: 15,
               fontWeight: 600,
               letterSpacing: 0.2,
-              color: '#e5e7eb',
+              color: text.primary,
               whiteSpace: 'nowrap',
               fontFamily: 'system-ui, sans-serif',
             }}
@@ -204,29 +216,6 @@ export function Rail({
           </span>
         )}
       </div>
-
-      {/* Notification bell — visible in every module */}
-      <button
-        onClick={() => onOpenNotifications?.()}
-        title="Upozornění"
-        style={{
-          position: 'relative', width: 40, height: 40, marginBottom: 4, borderRadius: 8,
-          border: 'none', background: 'transparent', color: '#9ca3af', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent',
-          alignSelf: expanded ? 'flex-start' : 'center', marginLeft: expanded ? 4 : 0,
-        }}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2m6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1z" />
-        </svg>
-        {notificationCount ? (
-          <span style={{
-            position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16, padding: '0 4px',
-            borderRadius: 8, background: '#dc2626', color: '#fff', fontSize: 10, fontWeight: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>{notificationCount}</span>
-        ) : null}
-      </button>
 
       {/* Nav items */}
       {ITEMS.map((item) => {
@@ -248,16 +237,28 @@ export function Rail({
               height: 40,
               paddingLeft: expanded ? 10 : 0,
               paddingRight: expanded ? 10 : 0,
-              borderRadius: 8,
+              borderRadius: 11,
               border: 'none',
               cursor: item.enabled ? 'pointer' : 'not-allowed',
-              backgroundColor: isActive ? '#2d2857' : 'transparent',
-              color: isActive ? '#a89cf0' : item.enabled ? '#9ca3af' : '#4b5563',
-              transition: 'background-color 120ms ease, color 120ms ease',
+              // Active: translucent purple wash + subtle ring
+              backgroundColor: isActive ? accentWash : 'transparent',
+              boxShadow: isActive ? ACTIVE_RING : 'none',
+              color: isActive ? '#ffffff' : item.enabled ? text.muted : text.dim,
+              transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, flexShrink: 0 }}>
+            <span
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 24,
+                flexShrink: 0,
+                // Active icon uses the accent icon tint; inactive/disabled inherits parent color
+                color: isActive ? accentIcon : 'inherit',
+              }}
+            >
               <Icon d={item.d} />
             </span>
             {expanded && (
@@ -286,7 +287,7 @@ export function Rail({
             title={billingExpanded ? 'Sbalit' : 'Rozbalit'}
             style={{
               width: 28, height: 28, marginLeft: 4, flexShrink: 0, borderRadius: 8,
-              border: 'none', background: 'transparent', color: '#9ca3af', cursor: 'pointer',
+              border: 'none', background: 'transparent', color: text.muted, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent',
             }}
           >
@@ -319,13 +320,24 @@ export function Rail({
                     border: 'none',
                     cursor: 'pointer',
                     textAlign: 'left',
-                    backgroundColor: subActive ? '#2d2857' : 'transparent',
-                    color: subActive ? '#a89cf0' : '#9ca3af',
-                    transition: 'background-color 120ms ease, color 120ms ease',
+                    // Same active treatment as parent nav items
+                    backgroundColor: subActive ? accentWash : 'transparent',
+                    boxShadow: subActive ? ACTIVE_RING : 'none',
+                    color: subActive ? '#ffffff' : text.muted,
+                    transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
                     WebkitTapHighlightColor: 'transparent',
                   }}
                 >
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, flexShrink: 0 }}>
+                  <span
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 18,
+                      flexShrink: 0,
+                      color: subActive ? accentIcon : 'inherit',
+                    }}
+                  >
                     <Icon d={tab.d} size={16} />
                   </span>
                   <span
@@ -347,30 +359,110 @@ export function Rail({
         );
       })}
 
-      {/* Spacer */}
+      {/* Spacer — pushes the bottom utility cluster to the bottom */}
       <div style={{ flex: 1 }} />
 
-      {/* Collapse / expand toggle */}
-      <div style={{ display: 'flex', justifyContent: expanded ? 'flex-end' : 'center' }}>
+      {/* Bottom utility cluster: hairline divider + notification bell + collapse toggle */}
+      <div
+        style={{
+          borderTop: '1px solid rgba(255,255,255,0.10)',
+          marginTop: 6,
+          paddingTop: 8,
+          display: 'flex',
+          // Side-by-side when expanded; stacked + centered when collapsed (52px)
+          // so the bell and the collapse toggle each get their own row.
+          flexDirection: expanded ? 'row' : 'column',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        {/* Notification bell as a labeled nav row (same .nav style as prototype) */}
+        <button
+          onClick={() => onOpenNotifications?.()}
+          title="Upozornění"
+          style={{
+            flex: expanded ? 1 : '0 0 auto',
+            width: expanded ? undefined : 40,
+            position: 'relative',
+            height: 38,
+            paddingLeft: expanded ? 11 : 0,
+            paddingRight: expanded ? 8 : 0,
+            borderRadius: 11,
+            border: 'none',
+            background: 'transparent',
+            color: text.muted,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: expanded ? 11 : 0,
+            justifyContent: expanded ? 'flex-start' : 'center',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon d={BELL_D} size={19} />
+          </span>
+          {expanded && (
+            <span
+              style={{
+                fontSize: 12.5,
+                fontWeight: 500,
+                fontFamily: 'system-ui, sans-serif',
+                letterSpacing: 0.2,
+                whiteSpace: 'nowrap',
+                color: 'inherit',
+              }}
+            >
+              Upozornění
+            </span>
+          )}
+          {notificationCount ? (
+            <span
+              style={{
+                // Trailing chip when expanded; floating badge over the bell when collapsed.
+                marginLeft: expanded ? 'auto' : 0,
+                position: expanded ? 'static' : 'absolute',
+                top: expanded ? undefined : 3,
+                right: expanded ? undefined : 3,
+                minWidth: expanded ? 18 : 15,
+                height: expanded ? 18 : 15,
+                padding: '0 5px',
+                borderRadius: 9,
+                background: '#dc2626',
+                color: '#fff',
+                fontSize: 10,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {notificationCount}
+            </span>
+          ) : null}
+        </button>
+
+        {/* Collapse / expand toggle — sits in the bottom cluster */}
         <button
           onClick={() => setExpanded((v) => !v)}
           title={expanded ? 'Sbalit panel' : 'Rozbalit panel'}
           aria-label={expanded ? 'Sbalit panel' : 'Rozbalit panel'}
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
+            width: 30,
+            height: 30,
+            flexShrink: 0,
+            borderRadius: 9,
             border: 'none',
             cursor: 'pointer',
-            backgroundColor: 'transparent',
-            color: '#9ca3af',
+            backgroundColor: 'rgba(255,255,255,0.06)',
+            color: text.muted,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <Icon d={expanded ? CHEVRON_LEFT_D : CHEVRON_RIGHT_D} />
+          <Icon d={expanded ? CHEVRON_LEFT_D : CHEVRON_RIGHT_D} size={16} />
         </button>
       </div>
     </div>
