@@ -10,6 +10,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import { glassSurface } from '../../theme/glass.js';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -65,6 +67,7 @@ function formatEarningsCzk(amount: number): string {
  *     hours + earnings, and an inline edit pencil
  */
 export function RateHistorySection({ projectId }: Props) {
+  const theme = useTheme();
   const state = useContracts(projectId);
   const { showError } = useToast();
   const [open, setOpen] = useState(false);
@@ -117,10 +120,8 @@ export function RateHistorySection({ projectId }: Props) {
   return (
     <Box
       sx={{
-        border: 1,
-        borderColor: 'divider',
+        ...glassSurface(theme, { elevation: 1 }),
         borderRadius: 2,
-        bgcolor: 'background.paper',
         overflow: 'hidden',
       }}
     >

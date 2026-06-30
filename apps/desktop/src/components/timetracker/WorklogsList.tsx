@@ -11,9 +11,11 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import { glassSurface } from '../../theme/glass.js';
 import {
   useWorklogs,
   type PeriodPreset,
@@ -240,7 +242,7 @@ export function WorklogsList({ projectId }: Props) {
                 sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
               >
                 {group.rows.length} {group.rows.length === 1 ? 'entry' : 'entries'} ·{' '}
-                <strong style={{ color: 'rgba(255,255,255,0.92)' }}>
+                <strong style={{ color: 'inherit' }}>
                   {fmtMinutes(group.total)}
                 </strong>
               </Typography>
@@ -307,6 +309,7 @@ function WorklogRow({
   onEdit(): void;
   onDelete(): void;
 }) {
+  const theme = useTheme();
   const sourceLabel =
     worklog.source && SOURCE_LABELS[worklog.source] ? SOURCE_LABELS[worklog.source] : worklog.source;
   // Surface reported_minutes only when it's explicitly different from the
@@ -314,6 +317,8 @@ function WorklogRow({
   // compact for the common case.
   const reportedDiffers =
     worklog.reportedMinutes != null && worklog.reportedMinutes !== worklog.minutes;
+  // Dense data rows need elevation 2 glass so text stays crisp over vibrancy.
+  const rowGlass = glassSurface(theme, { elevation: 2 });
   return (
     <Box
       sx={{
@@ -323,10 +328,8 @@ function WorklogRow({
         alignItems: 'center',
         px: 1.25,
         py: 1,
-        border: 1,
-        borderColor: 'divider',
         borderRadius: 1,
-        backgroundColor: 'background.paper',
+        ...rowGlass,
       }}
     >
       <Box

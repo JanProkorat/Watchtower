@@ -11,6 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
+import { glassSurface } from '../../theme/glass.js';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TodayIcon from '@mui/icons-material/Today';
@@ -61,6 +62,7 @@ function fmtUpcomingDate(date: string): string {
 
 export function TimeOffTab() {
   const today = new Date();
+  const theme = useTheme();
   // The 3-month window is centred on the focus month. Default = previous
   // month + current + next, so "today" is visible by default.
   const [focusYear, setFocusYear] = useState(today.getFullYear());
@@ -273,10 +275,8 @@ export function TimeOffTab() {
           sx={{
             mt: 3,
             p: 2,
-            border: 1,
-            borderColor: 'divider',
+            ...glassSurface(theme, { elevation: 1 }),
             borderRadius: 1,
-            backgroundColor: 'background.paper',
           }}
         >
           <Typography variant="subtitle1" sx={{ fontWeight: 500, mb: 1.5 }}>

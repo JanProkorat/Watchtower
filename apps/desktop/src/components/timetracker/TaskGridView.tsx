@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useTheme, alpha, type Theme } from '@mui/material/styles';
+import { glassSurface } from '../../theme/glass.js';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TodayIcon from '@mui/icons-material/Today';
@@ -716,8 +717,11 @@ function Grid({
 }) {
   const loggedColLeft = KEY_COL_WIDTH + titleColWidth;
   const theme = useTheme();
-  const paper = theme.palette.background.paper;
-  const headerBg = alpha(paper, 0.9);
+  // Dense grid data needs elevation-2 fill so rows stay legible over vibrancy.
+  // glassSurface backgroundColor gives the correctly elevated opaque-enough fill;
+  // we extract only the fill color (no border/shadow/blur per-cell).
+  const paper = glassSurface(theme, { elevation: 2 }).backgroundColor;
+  const headerBg = alpha(paper, 0.98);
   const totalBg = alpha(theme.palette.primary.main, 0.08);
   const earningsBg = alpha(theme.palette.success.main, 0.06);
   const weekendBg = alpha(theme.palette.primary.main, 0.05);
@@ -947,7 +951,7 @@ function Grid({
                 height: '100%',
                 padding: 0,
                 border: 'none',
-                background: paper,
+                background: 'transparent',
               }}
             />
           </tr>
@@ -1164,7 +1168,8 @@ function TaskRow({
 }) {
   const perDay = displayMode === 'tracked' ? task.perDayTracked : task.perDayReported;
   const totalMinutes = displayMode === 'tracked' ? task.totalTracked : task.totalReported;
-  const paper = theme.palette.background.paper;
+  // Match the elevated fill used for all grid cells (defined in Grid above).
+  const paper = glassSurface(theme, { elevation: 2 }).backgroundColor;
   const StatusIcon =
     task.status === 'done'
       ? TaskAltIcon
