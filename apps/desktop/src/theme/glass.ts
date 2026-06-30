@@ -14,14 +14,33 @@ export interface GlassSurfaceStyle {
 }
 
 /**
+ * Per-mode base fill RGB components and base opacity.
+ *
+ * These constants are the single source of truth for the glass fill color.
+ * `theme.ts` imports them to set `palette.background.paper` so the two values
+ * cannot drift independently:
+ *   dark  paper → rgba(GLASS_FILL_DARK_RGB,  GLASS_FILL_DARK_OPACITY)
+ *   light paper → rgba(GLASS_FILL_LIGHT_RGB, GLASS_FILL_LIGHT_OPACITY)
+ */
+export const GLASS_FILL_DARK_RGB = '60,64,86';
+export const GLASS_FILL_DARK_OPACITY = 0.34;
+export const GLASS_FILL_DARK_OPACITY_MAX = 0.72;
+
+export const GLASS_FILL_LIGHT_RGB = '255,255,255';
+export const GLASS_FILL_LIGHT_OPACITY = 0.50;
+export const GLASS_FILL_LIGHT_OPACITY_MAX = 0.85;
+
+/**
  * Returns an sx-compatible CSS object that applies a frosted-glass surface.
  *
  * Design constraints:
  * - Inner CSS blur is capped at 22px for GPU cost. The OS vibrancy layer
  *   (under-window, 22–40px) is the primary blur source; this is supplementary.
- * - Fill uses the theme's background.paper alpha value so the glass palette
- *   stays in sync with the MUI theme.
- * - elevation scales fill opacity and shadow depth linearly (0–4 range).
+ * - Fill color is derived from GLASS_FILL_DARK/LIGHT_RGB constants, which are
+ *   also imported by theme.ts to set palette.background.paper — so the glass
+ *   palette and MUI theme cannot drift.
+ * - elevation scales fill opacity and shadow depth. Negative values are clamped
+ *   to 0; there is no upper bound (opacity saturates at the per-mode max).
  *
  * Used by both MUI component overrides in theme.ts and inline sx props in
  * components added by later phases (B–G). Never hardcode blur/border in those
@@ -34,17 +53,16 @@ export function glassSurface(theme: Theme, opts?: GlassSurfaceOptions): GlassSur
   // Scale fill opacity with elevation (each step adds ~4% opacity).
   const elevationOpacityBoost = elevation * 0.04;
 
-  // Base fill: theme.palette.background.paper is already set to an alpha value
-  // in the themed palette (dark: rgba(60,64,86,0.34), light: rgba(255,255,255,0.50)).
-  // We use it directly and boost opacity for higher elevations.
-  // For elevation > 0, we construct a slightly more opaque version.
+  // Base fill: derived from the GLASS_FILL_* constants, which are also used in
+  // theme.ts to set palette.background.paper, so both stay in sync.
+  // For elevation > 0 we construct a slightly more opaque version.
   let fill: string;
   if (isDark) {
-    const opacity = Math.min(0.34 + elevationOpacityBoost, 0.72);
-    fill = `rgba(60,64,86,${opacity.toFixed(2)})`;
+    const opacity = Math.min(GLASS_FILL_DARK_OPACITY + elevationOpacityBoost, GLASS_FILL_DARK_OPACITY_MAX);
+    fill = `rgba(${GLASS_FILL_DARK_RGB},${opacity.toFixed(2)})`;
   } else {
-    const opacity = Math.min(0.50 + elevationOpacityBoost, 0.85);
-    fill = `rgba(255,255,255,${opacity.toFixed(2)})`;
+    const opacity = Math.min(GLASS_FILL_LIGHT_OPACITY + elevationOpacityBoost, GLASS_FILL_LIGHT_OPACITY_MAX);
+    fill = `rgba(${GLASS_FILL_LIGHT_RGB},${opacity.toFixed(2)})`;
   }
 
   // Hairline border: light top edge highlight + subtle frame.

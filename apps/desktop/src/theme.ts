@@ -1,5 +1,11 @@
 import { alpha, createTheme, type ThemeOptions } from '@mui/material/styles';
-import { glassSurface } from './theme/glass.js';
+import {
+  glassSurface,
+  GLASS_FILL_DARK_RGB,
+  GLASS_FILL_DARK_OPACITY,
+  GLASS_FILL_LIGHT_RGB,
+  GLASS_FILL_LIGHT_OPACITY,
+} from './theme/glass.js';
 
 const fontStack =
   '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif';
@@ -61,7 +67,8 @@ export const darkTheme = createTheme({
     info: { main: '#38bdf8' },
     divider: 'rgba(255,255,255,0.08)',
     // Alpha backgrounds so the macOS vibrancy layer shows through.
-    background: { default: 'rgba(18,20,28,0.32)', paper: 'rgba(60,64,86,0.34)' },
+    // paper value mirrors GLASS_FILL_DARK_RGB/OPACITY in glass.ts — edit there, not here.
+    background: { default: 'rgba(18,20,28,0.32)', paper: `rgba(${GLASS_FILL_DARK_RGB},${GLASS_FILL_DARK_OPACITY})` },
     text: { primary: '#e5e7eb', secondary: '#9aa3b2' },
   },
   components: {
@@ -142,7 +149,8 @@ export const lightTheme = createTheme({
     info: { main: '#0284c7' },
     divider: 'rgba(15,18,24,0.08)',
     // Alpha backgrounds so the macOS vibrancy layer shows through.
-    background: { default: 'rgba(244,245,250,0.40)', paper: 'rgba(255,255,255,0.50)' },
+    // paper value mirrors GLASS_FILL_LIGHT_RGB/OPACITY in glass.ts — edit there, not here.
+    background: { default: 'rgba(244,245,250,0.40)', paper: `rgba(${GLASS_FILL_LIGHT_RGB},${GLASS_FILL_LIGHT_OPACITY})` },
     text: {
       primary: '#0f1218',
       // Bumped from #5b6370 to #3d4450 for better contrast over light vibrancy.
