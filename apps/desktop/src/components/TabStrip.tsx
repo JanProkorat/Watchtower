@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -9,6 +10,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { TabId, TabRecord } from '@watchtower/shared/layout.js';
 import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 import { tabAccent } from '../util/tabAccent.js';
+import { glassSurface } from '../theme/glass.js';
 
 // Outer tab dot is locked to the project's accent color (or a hash-based
 // palette pick for ad-hoc cwd tabs). Per-session attention status is
@@ -241,6 +243,12 @@ export function TabStrip({
   onHideTab,
   onNew,
 }: Props) {
+  const theme = useTheme();
+  // glassSurface is the single source of truth for frosted fill + blur + border.
+  // Decision: TabStrip uses glassSurface directly (not via MuiAppBar component);
+  // the MuiAppBar override in theme.ts is updated to also derive from glassSurface
+  // so both stay in sync and neither is dead + divergent.
+  const glass = glassSurface(theme);
   const ids = tabs.map((t) => t.id);
   const [ctxMenu, setCtxMenu] = useState<{ id: TabId; x: number; y: number } | null>(null);
 
@@ -252,9 +260,11 @@ export function TabStrip({
         alignItems: 'stretch',
         minHeight: 40,
         pl: TRAFFIC_LIGHT_INSET,
-        borderBottom: 1,
-        borderColor: 'divider',
-        backgroundColor: 'background.paper',
+        // Glass frosted bar — glassSurface provides fill, backdropFilter, border, boxShadow.
+        // Border is overridden to only draw the bottom edge (the top is the window chrome).
+        ...glass,
+        border: 'none',
+        borderBottom: `1px solid ${theme.palette.divider}`,
         flexShrink: 0,
         overflowX: 'auto',
         overflowY: 'hidden',

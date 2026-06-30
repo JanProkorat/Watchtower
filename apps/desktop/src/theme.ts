@@ -1,4 +1,4 @@
-import { alpha, createTheme, type ThemeOptions } from '@mui/material/styles';
+import { createTheme, type ThemeOptions } from '@mui/material/styles';
 import {
   glassSurface,
   GLASS_FILL_DARK_RGB,
@@ -73,17 +73,16 @@ export const darkTheme = createTheme({
   },
   components: {
     ...shared.components,
-    // MuiAppBar: frosted glass override — currently dead code (Phase B wires
-    // TabStrip to it). Leave it here; do NOT delete it.
+    // MuiAppBar: frosted glass override. Phase B wires TabStrip to glassSurface
+    // directly (not via MuiAppBar component), but this override is kept live
+    // and updated to also derive from glassSurface so both stay in sync.
     MuiAppBar: {
       styleOverrides: {
         root: {
-          backgroundColor: alpha('#13151c', 0.65),
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          color: '#e5e7eb',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          ...darkGlass,
+          backgroundImage: 'none',
           boxShadow: 'none',
+          color: '#e5e7eb',
         },
       },
     },
@@ -159,17 +158,16 @@ export const lightTheme = createTheme({
   },
   components: {
     ...shared.components,
-    // MuiAppBar: frosted glass override — currently dead code (Phase B wires
-    // TabStrip to it). Leave it here; do NOT delete it.
+    // MuiAppBar: frosted glass override. Phase B wires TabStrip to glassSurface
+    // directly (not via MuiAppBar component), but this override is kept live
+    // and updated to also derive from glassSurface so both stay in sync.
     MuiAppBar: {
       styleOverrides: {
         root: {
-          backgroundColor: alpha('#ffffff', 0.7),
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          color: '#0f1218',
-          borderBottom: '1px solid rgba(15,18,24,0.06)',
+          ...lightGlass,
+          backgroundImage: 'none',
           boxShadow: 'none',
+          color: '#0f1218',
         },
       },
     },

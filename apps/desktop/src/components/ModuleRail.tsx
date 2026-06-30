@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Box, ButtonBase, IconButton, Tooltip, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
@@ -26,6 +27,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import type { ThemeMode } from '../theme.js';
 import type { ListTab } from '../util/timetrackerUrl.js';
 import type { SettingsTab } from '../util/settingsUrl.js';
+import { glassSurface } from '../theme/glass.js';
 
 export type ModuleId = 'dashboard' | 'instances' | 'billing' | 'settings';
 
@@ -144,6 +146,18 @@ export function ModuleRail({
   mode,
   onToggleMode,
 }: Props) {
+  const theme = useTheme();
+  // glassSurface is the single source of truth for frosted sidebar fill + blur.
+  const glass = glassSurface(theme);
+  // Active nav item: purple wash background + 1px ring matching the prototype
+  // (#s-rail: --chip background + 0 0 0 1px rgba(154,135,245,.30) ring).
+  // Dark: chip = rgba(154,135,245,.24); light: chip = rgba(109,95,224,.16).
+  const isDark = theme.palette.mode === 'dark';
+  const activeItemBg = isDark ? 'rgba(154,135,245,0.24)' : 'rgba(109,95,224,0.16)';
+  const activeItemRing = isDark ? 'rgba(154,135,245,0.30)' : 'rgba(109,95,224,0.25)';
+  // Accent icon color for active item (--acc token from prototype).
+  const accentColor = theme.palette.primary.main;
+
   const [expanded, setExpanded] = useState<boolean>(() => readPersistedBool(STORAGE_KEY, true));
   const [billingExpanded, setBillingExpanded] = useState<boolean>(() =>
     readPersistedBool(BILLING_STORAGE_KEY, true),
@@ -216,9 +230,11 @@ export function ModuleRail({
     <Box
       sx={{
         width: expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH,
-        backgroundColor: 'background.paper',
-        borderRight: 1,
-        borderColor: 'divider',
+        // Glass frosted sidebar — glassSurface provides fill, backdropFilter, border.
+        // Border is overridden: sidebar only needs a right-edge hairline.
+        ...glass,
+        border: 'none',
+        borderRight: `1px solid ${theme.palette.divider}`,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'stretch',
@@ -300,19 +316,32 @@ export function ModuleRail({
               justifyContent: expanded ? 'flex-start' : 'center',
               gap: expanded ? 1.25 : 0,
               color: isActive
-                ? 'primary.main'
+                ? 'text.primary'
                 : item.enabled
                   ? 'text.secondary'
                   : 'text.disabled',
-              backgroundColor: isActive ? 'action.selected' : 'transparent',
-              transition: 'background-color 120ms ease, color 120ms ease',
+              // Active: purple wash fill + 1px purple ring (prototype #s-rail .nav.on).
+              backgroundColor: isActive ? activeItemBg : 'transparent',
+              boxShadow: isActive
+                ? `inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 1px ${activeItemRing}`
+                : 'none',
+              transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
               ':hover': {
-                backgroundColor: isActive ? 'action.selected' : 'action.hover',
+                backgroundColor: isActive ? activeItemBg : 'action.hover',
                 color: item.enabled ? 'text.primary' : 'text.disabled',
               },
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24 }}>
+            {/* Active item: icon tinted with theme accent color (prototype .nav.on svg). */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 24,
+                color: isActive ? accentColor : 'inherit',
+              }}
+            >
               {item.icon}
             </Box>
             {expanded && (
@@ -395,11 +424,15 @@ export function ModuleRail({
                     borderRadius: 1,
                     justifyContent: 'flex-start',
                     gap: 1,
-                    color: subActive ? 'primary.main' : 'text.secondary',
-                    backgroundColor: subActive ? 'action.selected' : 'transparent',
-                    transition: 'background-color 120ms ease, color 120ms ease',
+                    color: subActive ? 'text.primary' : 'text.secondary',
+                    // Active sub-item: same purple wash + ring as parent items.
+                    backgroundColor: subActive ? activeItemBg : 'transparent',
+                    boxShadow: subActive
+                      ? `inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 1px ${activeItemRing}`
+                      : 'none',
+                    transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
                     ':hover': {
-                      backgroundColor: subActive ? 'action.selected' : 'action.hover',
+                      backgroundColor: subActive ? activeItemBg : 'action.hover',
                       color: 'text.primary',
                     },
                   }}
@@ -411,7 +444,8 @@ export function ModuleRail({
                       justifyContent: 'center',
                       width: 18,
                       fontSize: 16,
-                      color: 'inherit',
+                      // Active sub-item: icon tinted with theme accent color.
+                      color: subActive ? accentColor : 'inherit',
                     }}
                   >
                     {tab.icon}
