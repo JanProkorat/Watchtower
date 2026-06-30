@@ -1,11 +1,13 @@
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { tabFlex } from '../../util/tabFlex.js';
+import { glassSurface } from '../../theme/glass.js';
 import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
 
 const ATTENTION_DOT: Record<string, string> = {
@@ -56,6 +58,11 @@ export function SessionTabBar({
   onAddSession,
   onSetTask,
 }: Props) {
+  const theme = useTheme();
+  // glassSurface provides frosted fill + backdropFilter + border for this singleton container.
+  // Individual tab chips inside do NOT get their own backdropFilter — that would stack GPU
+  // blur cost without visual benefit (glassFill rule: repeating elements omit the blur).
+  const glass = glassSurface(theme);
   const [hiddenAnchor, setHiddenAnchor] = useState<HTMLElement | null>(null);
 
   // Context menu (right-click on a session tab).
@@ -78,9 +85,12 @@ export function SessionTabBar({
       sx={{
         display: 'flex',
         flexShrink: 0,
-        borderBottom: 1,
-        borderColor: 'divider',
-        backgroundColor: 'background.paper',
+        // Glass frosted bar — matches TabStrip language from Phase B.
+        // glassSurface provides fill, backdropFilter, border, boxShadow.
+        // Border overridden to draw only the bottom edge (top is the TabStrip chrome above).
+        ...glass,
+        border: 'none',
+        borderBottom: `1px solid ${theme.palette.divider}`,
         overflowX: 'auto',
         overflowY: 'hidden',
       }}
