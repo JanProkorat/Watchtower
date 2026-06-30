@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, useTheme } from '@mui/material';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ColumnSlot } from './ColumnSlot.js';
 import { SessionTabBar } from './SessionTabBar.js';
@@ -44,6 +44,7 @@ export function LeafView({
   // Live pane percentages from the column PanelGroup, so the session tabs above
   // can track the resize handle instead of staying at fixed equal widths.
   const [columnSizes, setColumnSizes] = useState<number[]>([]);
+  const theme = useTheme();
 
   if (tab.kind === 'dashboard') {
     return (
@@ -148,7 +149,8 @@ export function LeafView({
                 <PanelResizeHandle
                   style={{
                     width: 6,
-                    background: 'rgba(255,255,255,0.08)',
+                    // Use theme divider so the hairline is visible in both dark and light mode.
+                    background: theme.palette.divider,
                     cursor: 'col-resize',
                   }}
                 />
