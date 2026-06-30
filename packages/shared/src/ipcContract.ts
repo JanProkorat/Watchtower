@@ -79,7 +79,8 @@ export type IpcRequest =
   | { kind: 'tokens:usage'; payload: Record<string, never> }
   | { kind: 'openExternalUrl'; payload: { url: string } }
   | { kind: 'terminalFocus'; payload: { instanceId: string } }
-  | { kind: 'push:registerDevice'; payload: { token: string; platform: string } };
+  | { kind: 'push:registerDevice'; payload: { token: string; platform: string } }
+  | { kind: 'appearance:set'; payload: { mode: 'dark' | 'light' } };
 
 export interface RunningInstancePayload {
   id: string;
@@ -590,7 +591,8 @@ export type IpcResponse =
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
-  | { kind: 'push:registerDevice'; payload: { ok: true } };
+  | { kind: 'push:registerDevice'; payload: { ok: true } }
+  | { kind: 'appearance:set'; payload: { ok: true } };
 
 export interface AgentRowPayload {
   name: string;
@@ -762,6 +764,7 @@ export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'openInVSCode',
   'openExternalUrl',
   'board:signIn',
+  'appearance:set',
 ]);
 
 export interface WatchtowerBridge {

@@ -1,4 +1,5 @@
 import { alpha, createTheme, type ThemeOptions } from '@mui/material/styles';
+import { glassSurface } from './theme/glass.js';
 
 const fontStack =
   '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif';
@@ -22,7 +23,6 @@ const shared: ThemeOptions = {
         root: { borderRadius: 10 },
       },
     },
-    MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
     MuiCssBaseline: {
       styleOverrides: {
         '.tt-num': { fontVariantNumeric: 'tabular-nums' },
@@ -38,6 +38,17 @@ const shared: ThemeOptions = {
   },
 };
 
+// Compute glass surface styles for each mode at theme-build time.
+// glassSurface only reads theme.palette.mode, so we can stub the theme object
+// cheaply here rather than using MUI's callback styleOverrides (which carry
+// heavier typing and are unavailable inside createTheme's own options object).
+const darkGlass = glassSurface({ palette: { mode: 'dark' } } as import('@mui/material/styles').Theme);
+const darkGlassEl1 = glassSurface({ palette: { mode: 'dark' } } as import('@mui/material/styles').Theme, { elevation: 1 });
+const darkGlassEl2 = glassSurface({ palette: { mode: 'dark' } } as import('@mui/material/styles').Theme, { elevation: 2 });
+const lightGlass = glassSurface({ palette: { mode: 'light' } } as import('@mui/material/styles').Theme);
+const lightGlassEl1 = glassSurface({ palette: { mode: 'light' } } as import('@mui/material/styles').Theme, { elevation: 1 });
+const lightGlassEl2 = glassSurface({ palette: { mode: 'light' } } as import('@mui/material/styles').Theme, { elevation: 2 });
+
 export const darkTheme = createTheme({
   ...shared,
   palette: {
@@ -49,11 +60,14 @@ export const darkTheme = createTheme({
     error: { main: '#ef4444' },
     info: { main: '#38bdf8' },
     divider: 'rgba(255,255,255,0.08)',
-    background: { default: '#0a0b0f', paper: '#13151c' },
+    // Alpha backgrounds so the macOS vibrancy layer shows through.
+    background: { default: 'rgba(18,20,28,0.32)', paper: 'rgba(60,64,86,0.34)' },
     text: { primary: '#e5e7eb', secondary: '#9aa3b2' },
   },
   components: {
     ...shared.components,
+    // MuiAppBar: frosted glass override — currently dead code (Phase B wires
+    // TabStrip to it). Leave it here; do NOT delete it.
     MuiAppBar: {
       styleOverrides: {
         root: {
@@ -69,20 +83,50 @@ export const darkTheme = createTheme({
     MuiDrawer: {
       styleOverrides: {
         paper: {
-          backgroundColor: '#0d0f15',
+          ...darkGlass,
+          backgroundImage: 'none',
           borderRight: 'none',
-          boxShadow: '4px 0 32px rgba(0,0,0,0.35)',
         },
       },
     },
     MuiPaper: {
       styleOverrides: {
-        root: { backgroundImage: 'none' },
+        root: {
+          ...darkGlass,
+          backgroundImage: 'none',
+        },
         outlined: {
-          borderColor: 'rgba(255,255,255,0.08)',
+          ...darkGlass,
+          backgroundImage: 'none',
+          borderColor: 'rgba(255,255,255,0.10)',
         },
       },
     },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          ...darkGlassEl2,
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiPopover: {
+      styleOverrides: {
+        paper: {
+          ...darkGlassEl1,
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          ...darkGlassEl1,
+          backgroundImage: 'none',
+        },
+      },
+    },
+    // MuiTooltip intentionally not frosted — solid for legibility.
   },
 });
 
@@ -97,11 +141,18 @@ export const lightTheme = createTheme({
     error: { main: '#dc2626' },
     info: { main: '#0284c7' },
     divider: 'rgba(15,18,24,0.08)',
-    background: { default: '#f7f8fa', paper: '#ffffff' },
-    text: { primary: '#0f1218', secondary: '#5b6370' },
+    // Alpha backgrounds so the macOS vibrancy layer shows through.
+    background: { default: 'rgba(244,245,250,0.40)', paper: 'rgba(255,255,255,0.50)' },
+    text: {
+      primary: '#0f1218',
+      // Bumped from #5b6370 to #3d4450 for better contrast over light vibrancy.
+      secondary: '#3d4450',
+    },
   },
   components: {
     ...shared.components,
+    // MuiAppBar: frosted glass override — currently dead code (Phase B wires
+    // TabStrip to it). Leave it here; do NOT delete it.
     MuiAppBar: {
       styleOverrides: {
         root: {
@@ -117,20 +168,50 @@ export const lightTheme = createTheme({
     MuiDrawer: {
       styleOverrides: {
         paper: {
-          backgroundColor: '#ffffff',
+          ...lightGlass,
+          backgroundImage: 'none',
           borderRight: 'none',
-          boxShadow: '4px 0 32px rgba(15,18,24,0.06)',
         },
       },
     },
     MuiPaper: {
       styleOverrides: {
-        root: { backgroundImage: 'none' },
+        root: {
+          ...lightGlass,
+          backgroundImage: 'none',
+        },
         outlined: {
-          borderColor: 'rgba(15,18,24,0.08)',
+          ...lightGlass,
+          backgroundImage: 'none',
+          borderColor: 'rgba(15,18,24,0.10)',
         },
       },
     },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          ...lightGlassEl2,
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiPopover: {
+      styleOverrides: {
+        paper: {
+          ...lightGlassEl1,
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          ...lightGlassEl1,
+          backgroundImage: 'none',
+        },
+      },
+    },
+    // MuiTooltip intentionally not frosted — solid for legibility.
   },
 });
 
