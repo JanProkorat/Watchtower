@@ -10,6 +10,17 @@ import {
 import { useContractMutations } from '../../state/useContractMutations.js';
 import { canEdit, type ContractWriteInput } from '../../state/billingWrites.js';
 import type { ContractRow } from '@watchtower/shared/billing/types.js';
+import {
+  glassCard,
+  glassPanel,
+  glassFillStrong,
+  dataPanelFill,
+  text as glassText,
+  accentWash,
+  accent,
+  ctaGradient,
+  ctaGlow,
+} from '../../theme/glass.js';
 
 // ---------------------------------------------------------------------------
 // Design tokens (same palette as DashboardView / EarningsMonthView)
@@ -43,7 +54,7 @@ function SectionHeader({ title }: { title: string }): JSX.Element {
         fontSize: 11,
         fontWeight: 700,
         letterSpacing: 0.8,
-        color: C.muted,
+        color: glassText.muted,
         textTransform: 'uppercase',
         marginBottom: 8,
       }}
@@ -67,7 +78,7 @@ function Spinner(): JSX.Element {
         alignItems: 'center',
         justifyContent: 'center',
         gap: 12,
-        color: C.muted,
+        color: glassText.muted,
         fontFamily: 'system-ui, sans-serif',
         fontSize: 15,
         padding: 32,
@@ -78,8 +89,8 @@ function Spinner(): JSX.Element {
         style={{
           width: 32,
           height: 32,
-          border: `3px solid ${C.border}`,
-          borderTop: `3px solid ${C.violet}`,
+          border: '3px solid rgba(255,255,255,0.10)',
+          borderTop: `3px solid ${accent}`,
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
         }}
@@ -89,6 +100,22 @@ function Spinner(): JSX.Element {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Glass field style — shared by ContractDrawer inputs
+// ---------------------------------------------------------------------------
+
+const glassField: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.06)',
+  color: glassText.primary,
+  border: '1px solid rgba(255,255,255,0.10)',
+  borderRadius: 8,
+  padding: '8px 10px',
+  fontSize: 14,
+  fontFamily: 'inherit',
+  width: '100%',
+  boxSizing: 'border-box',
+};
 
 // ---------------------------------------------------------------------------
 // ContractDrawer — bottom-sheet for add / edit / delete
@@ -120,8 +147,29 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
     (md === null || (Number.isFinite(md) && md >= 0));
   const canSubmit = valid && !saving;
 
-  const field: React.CSSProperties = { background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' };
-  const label: React.CSSProperties = { fontSize: 12, color: C.muted, marginBottom: 4 };
+  const labelStyle: React.CSSProperties = { fontSize: 12, color: glassText.muted, marginBottom: 4 };
+
+  // Scrim backdrop filter (both prefixes)
+  const scrimFilter = 'blur(8px)';
+
+  // Sheet style
+  const sheetStyle: React.CSSProperties = {
+    ...glassPanel({ radius: 20, fill: glassFillStrong, blur: 40, saturate: 1.9, brightness: 1.1 }),
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    width: '100%',
+    maxHeight: '85vh',
+    overflowY: 'auto',
+    padding: 20,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 14,
+    // Override border to only show top hairline
+    border: 'none',
+    borderTop: '1px solid rgba(255,255,255,0.15)',
+  };
 
   async function submit() {
     setSaving(true);
@@ -141,50 +189,145 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.ground, borderTopLeftRadius: 16, borderTopRightRadius: 16, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14, borderTop: `1px solid ${C.border}` }}>
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(6,7,11,0.45)',
+        backdropFilter: scrimFilter,
+        WebkitBackdropFilter: scrimFilter,
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'flex-end',
+      }}
+    >
+      <div onClick={(e) => e.stopPropagation()} style={sheetStyle}>
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>
+          <div style={{ fontSize: 16, fontWeight: 700, color: glassText.primary }}>{title}</div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: glassText.muted, fontSize: 20, cursor: 'pointer' }}
+          >
+            ✕
+          </button>
         </div>
+
+        {/* Date range */}
         <div style={{ display: 'flex', gap: 10 }}>
           <div style={{ flex: 1 }}>
-            <div style={label}>Platné od</div>
-            <input type="date" style={field} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+            <div style={labelStyle}>Platné od</div>
+            <input type="date" style={glassField} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={label}>Platné do (volitelné)</div>
-            <input type="date" style={field} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            <div style={labelStyle}>Platné do (volitelné)</div>
+            <input type="date" style={glassField} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
         </div>
+
+        {/* Rate type — translucent segmented control */}
         <div>
-          <div style={label}>Typ sazby</div>
-          <select value={rateType} onChange={(e) => setRateType(e.target.value as 'hourly' | 'daily')} style={field}>
-            <option value="hourly">Hodinová</option>
-            <option value="daily">Denní</option>
-          </select>
+          <div style={labelStyle}>Typ sazby</div>
+          <div
+            style={{
+              display: 'flex',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.10)',
+              borderRadius: 8,
+              overflow: 'hidden',
+            }}
+          >
+            {(['hourly', 'daily'] as const).map((rt) => {
+              const isActive = rateType === rt;
+              return (
+                <button
+                  key={rt}
+                  type="button"
+                  onClick={() => setRateType(rt)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    fontSize: 14,
+                    fontFamily: 'inherit',
+                    background: isActive ? accentWash : 'transparent',
+                    color: isActive ? C.violet : glassText.muted,
+                    border: 'none',
+                    borderRight: rt === 'hourly' ? '1px solid rgba(255,255,255,0.10)' : 'none',
+                    cursor: 'pointer',
+                    fontWeight: isActive ? 600 : 400,
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  {rt === 'hourly' ? 'Hodinová' : 'Denní'}
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Rate + hours per day */}
         <div style={{ display: 'flex', gap: 10 }}>
           <div style={{ flex: 1 }}>
-            <div style={label}>Sazba</div>
-            <input style={field} inputMode="decimal" value={rateAmount} onChange={(e) => setRateAmount(e.target.value)} />
+            <div style={labelStyle}>Sazba</div>
+            <input style={glassField} inputMode="decimal" value={rateAmount} onChange={(e) => setRateAmount(e.target.value)} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={label}>Hodin/den</div>
-            <input style={field} inputMode="decimal" value={hoursPerDay} onChange={(e) => setHoursPerDay(e.target.value)} />
+            <div style={labelStyle}>Hodin/den</div>
+            <input style={glassField} inputMode="decimal" value={hoursPerDay} onChange={(e) => setHoursPerDay(e.target.value)} />
           </div>
         </div>
+
+        {/* MD limit */}
         <div>
-          <div style={label}>MD limit (volitelné)</div>
-          <input style={field} inputMode="decimal" value={mdLimit} onChange={(e) => setMdLimit(e.target.value)} />
+          <div style={labelStyle}>MD limit (volitelné)</div>
+          <input style={glassField} inputMode="decimal" value={mdLimit} onChange={(e) => setMdLimit(e.target.value)} />
         </div>
+
+        {/* Footer actions */}
         <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
           {onDelete && (
-            <button type="button" onClick={async () => { setSaving(true); try { await onDelete!(); } finally { setSaving(false); } }} disabled={saving} style={{ ...field, width: 'auto', color: C.red, cursor: 'pointer' }}>Smazat</button>
+            <button
+              type="button"
+              onClick={async () => { setSaving(true); try { await onDelete!(); } finally { setSaving(false); } }}
+              disabled={saving}
+              style={{
+                ...glassField,
+                width: 'auto',
+                color: C.red,
+                cursor: 'pointer',
+                background: 'rgba(248,113,113,0.12)',
+                border: '1px solid rgba(248,113,113,0.25)',
+              }}
+            >
+              Smazat
+            </button>
           )}
           <div style={{ flex: 1 }} />
-          <button type="button" onClick={onClose} style={{ ...field, width: 'auto', cursor: 'pointer' }}>Zrušit</button>
-          <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...field, width: 'auto', background: canSubmit ? C.violet : C.border, color: '#fff', border: 'none', cursor: canSubmit ? 'pointer' : 'default' }}>
+          {/* Zrušit — glass field style */}
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ ...glassField, width: 'auto', cursor: 'pointer' }}
+          >
+            Zrušit
+          </button>
+          {/* Uložit — CTA gradient */}
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!canSubmit}
+            style={{
+              ...glassField,
+              width: 'auto',
+              background: canSubmit ? ctaGradient : 'rgba(255,255,255,0.07)',
+              boxShadow: canSubmit ? ctaGlow : 'none',
+              color: '#fff',
+              border: 'none',
+              cursor: canSubmit ? 'pointer' : 'default',
+              fontWeight: 600,
+            }}
+          >
             {saving ? 'Ukládám…' : 'Uložit'}
           </button>
         </div>
@@ -221,30 +364,31 @@ export function ProjectDetailView({
 
   const [drawer, setDrawer] = useState<{ mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; contract: ContractRow }>({ mode: 'closed' });
 
+  // Nav bar glass style — frosted sticky bar
+  const navBarStyle: React.CSSProperties = {
+    ...glassPanel({ radius: 0, blur: 20, saturate: 1.6, brightness: 1.1, fill: 'rgba(40,44,64,0.42)', border: 'none', shadow: '0 1px 0 rgba(255,255,255,0.08)' }),
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    padding: '10px 16px',
+    borderRadius: 0,
+  };
+
   // Loading with no data
   if (state === 'loading' && data == null) {
     return (
       <div
         style={{
           fontFamily: 'system-ui, -apple-system, sans-serif',
-          background: C.ground,
+          background: 'transparent',
           minHeight: '100%',
-          color: C.text,
+          color: glassText.primary,
           display: 'flex',
           flexDirection: 'column',
         }}
       >
         {/* Back button always visible */}
-        <div
-          style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 10,
-            background: C.ground,
-            borderBottom: `1px solid ${C.border}`,
-            padding: '10px 16px',
-          }}
-        >
+        <div style={navBarStyle}>
           <button
             onClick={onBack}
             style={{
@@ -309,26 +453,17 @@ export function ProjectDetailView({
     <div
       style={{
         fontFamily: 'system-ui, -apple-system, sans-serif',
-        background: C.ground,
+        background: 'transparent',
         minHeight: '100%',
-        color: C.text,
+        color: glassText.primary,
         display: 'flex',
         flexDirection: 'column',
       }}
     >
       {/* ------------------------------------------------------------------ */}
-      {/* Sticky nav bar                                                        */}
+      {/* Sticky nav bar — frosted glass                                        */}
       {/* ------------------------------------------------------------------ */}
-      <div
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          background: C.ground,
-          borderBottom: `1px solid ${C.border}`,
-          padding: '10px 16px',
-        }}
-      >
+      <div style={navBarStyle}>
         <button
           onClick={onBack}
           style={{
@@ -362,9 +497,7 @@ export function ProjectDetailView({
         {/* ---- Project header card ---- */}
         <div
           style={{
-            background: C.surface,
-            border: `1px solid ${C.border}`,
-            borderRadius: 16,
+            ...glassCard(),
             padding: '20px 20px 16px',
             display: 'flex',
             flexDirection: 'column',
@@ -376,26 +509,26 @@ export function ProjectDetailView({
             style={{
               fontSize: 22,
               fontWeight: 700,
-              color: C.text,
+              color: glassText.primary,
               lineHeight: 1.2,
             }}
           >
             {projectName}
           </div>
 
-          {/* Month + hours */}
+          {/* Mini stat blocks */}
           <div style={{ display: 'flex', gap: 20 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: glassText.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
                 Měsíc
               </div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: glassText.primary }}>
                 {czechMonthLabel(month)}
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: glassText.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
                 Hodiny
               </div>
               <div
@@ -412,7 +545,7 @@ export function ProjectDetailView({
 
             {active != null && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: glassText.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
                   Sazba
                 </div>
                 <div
@@ -439,7 +572,7 @@ export function ProjectDetailView({
                 fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: 0.8,
-                color: C.muted,
+                color: glassText.muted,
                 textTransform: 'uppercase',
               }}
             >
@@ -475,13 +608,11 @@ export function ProjectDetailView({
           {contractPeriods.length === 0 ? (
             <div
               style={{
-                background: C.surface,
-                border: `1px solid ${C.border}`,
-                borderRadius: 12,
+                ...glassCard(12),
                 padding: '24px 16px',
                 textAlign: 'center',
                 fontSize: 13,
-                color: C.muted,
+                color: glassText.muted,
               }}
             >
               žádné sazby
@@ -489,10 +620,9 @@ export function ProjectDetailView({
           ) : (
             <div
               style={{
-                background: C.surface,
-                border: `1px solid ${C.border}`,
-                borderRadius: 12,
+                ...glassCard(12),
                 overflow: 'hidden',
+                padding: 0,
               }}
             >
               {contractPeriods.map(({ contract, earnedCzk }, idx) => {
@@ -511,8 +641,8 @@ export function ProjectDetailView({
                       alignItems: 'center',
                       gap: 10,
                       padding: '12px 16px',
-                      borderBottom: isLast ? 'none' : `1px solid ${C.border}`,
-                      background: isActive ? C.violetBg + '66' : 'transparent',
+                      borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.10)',
+                      background: isActive ? accentWash : 'transparent',
                       cursor: editable ? 'pointer' : 'default',
                     }}
                   >
@@ -522,7 +652,7 @@ export function ProjectDetailView({
                         width: 6,
                         height: 6,
                         borderRadius: '50%',
-                        background: isActive ? C.violet : C.border,
+                        background: isActive ? C.violet : 'rgba(255,255,255,0.20)',
                         flexShrink: 0,
                         marginTop: 1,
                       }}
@@ -533,7 +663,7 @@ export function ProjectDetailView({
                       <div
                         style={{
                           fontSize: 12,
-                          color: isActive ? C.text : C.muted,
+                          color: isActive ? glassText.primary : glassText.muted,
                           fontWeight: isActive ? 600 : 400,
                         }}
                       >
@@ -543,7 +673,7 @@ export function ProjectDetailView({
                         style={{
                           fontSize: 13,
                           fontWeight: 600,
-                          color: isActive ? C.violet : C.muted,
+                          color: isActive ? C.violet : glassText.muted,
                           ...MONO,
                           marginTop: 2,
                         }}
@@ -557,7 +687,7 @@ export function ProjectDetailView({
                       style={{
                         fontSize: 13,
                         fontWeight: 600,
-                        color: isActive ? C.violet : C.muted,
+                        color: isActive ? C.violet : glassText.muted,
                         textAlign: 'right',
                         flexShrink: 0,
                         ...MONO,
@@ -568,7 +698,7 @@ export function ProjectDetailView({
 
                     {/* Edit chevron hint when editable */}
                     {editable && (
-                      <div style={{ color: C.muted, fontSize: 14, flexShrink: 0 }}>›</div>
+                      <div style={{ color: glassText.muted, fontSize: 14, flexShrink: 0 }}>›</div>
                     )}
                   </div>
                 );
@@ -580,10 +710,11 @@ export function ProjectDetailView({
         {/* ---- Worklog ledger (current month) ---- */}
         <div>
           <SectionHeader title={`Výkazy — ${czechMonthLabel(month)}`} />
+          {/* Dense data panel — near-solid, no frost so numbers stay crisp */}
           <div
             style={{
-              background: C.surface,
-              border: `1px solid ${C.border}`,
+              background: dataPanelFill,
+              border: '1px solid rgba(255,255,255,0.10)',
               borderRadius: 12,
               overflow: 'hidden',
             }}
@@ -595,11 +726,11 @@ export function ProjectDetailView({
                 gridTemplateColumns: '90px 60px 1fr 1fr',
                 gap: 8,
                 padding: '8px 16px',
-                borderBottom: `1px solid ${C.border}`,
+                borderBottom: '1px solid rgba(255,255,255,0.10)',
                 fontSize: 10,
                 fontWeight: 700,
                 letterSpacing: 0.8,
-                color: C.muted,
+                color: glassText.muted,
                 textTransform: 'uppercase',
               }}
             >
@@ -616,7 +747,7 @@ export function ProjectDetailView({
                   padding: '24px 16px',
                   textAlign: 'center',
                   fontSize: 13,
-                  color: C.muted,
+                  color: glassText.muted,
                 }}
               >
                 žádné výkazy v tomto měsíci
@@ -636,17 +767,17 @@ export function ProjectDetailView({
                       gridTemplateColumns: '90px 60px 1fr 1fr',
                       gap: 8,
                       padding: '10px 16px',
-                      borderBottom: isLast ? 'none' : `1px solid ${C.border}`,
+                      borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.10)',
                       fontSize: 13,
                       alignItems: 'center',
                     }}
                   >
-                    <div style={{ color: C.muted, fontSize: 12 }}>
+                    <div style={{ color: glassText.muted, fontSize: 12 }}>
                       {formatDateCz(w.workDate)}
                     </div>
                     <div
                       style={{
-                        color: w.taskNumber != null ? C.cyan : C.muted,
+                        color: w.taskNumber != null ? C.cyan : glassText.muted,
                         ...MONO,
                         fontSize: 12,
                         overflow: 'hidden',
@@ -660,7 +791,7 @@ export function ProjectDetailView({
                     <div
                       style={{
                         textAlign: 'right',
-                        color: C.text,
+                        color: glassText.primary,
                         ...MONO,
                       }}
                     >
@@ -669,7 +800,7 @@ export function ProjectDetailView({
                     <div
                       style={{
                         textAlign: 'right',
-                        color: earned > 0 ? C.violet : C.muted,
+                        color: earned > 0 ? C.violet : glassText.muted,
                         fontWeight: earned > 0 ? 600 : 400,
                         ...MONO,
                       }}
@@ -681,7 +812,7 @@ export function ProjectDetailView({
               })
             )}
 
-            {/* Footer total row */}
+            {/* Footer total row — emphasized */}
             {ledgerRows.length > 0 && (
               <div
                 style={{
@@ -689,14 +820,14 @@ export function ProjectDetailView({
                   gridTemplateColumns: '90px 60px 1fr 1fr',
                   gap: 8,
                   padding: '10px 16px',
-                  borderTop: `1px solid ${C.border}`,
-                  background: C.ground,
+                  borderTop: '1px solid rgba(255,255,255,0.15)',
+                  background: 'rgba(168,156,240,0.08)',
                   fontSize: 13,
                   fontWeight: 700,
                   alignItems: 'center',
                 }}
               >
-                <div style={{ color: C.muted, fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                <div style={{ color: glassText.muted, fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase' }}>
                   Celkem
                 </div>
                 <div />
