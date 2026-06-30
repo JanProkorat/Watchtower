@@ -20,6 +20,7 @@ import { BillingArea } from './components/billing/BillingArea.js';
 import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
 import { ToastStack, type ToastItem } from './components/ToastStack.js';
+import { SettingsModule } from './components/SettingsModule.js';
 import { text, glassPanel, glassFillStrong, statusGlass, ctaGradient, ctaGlow, accent } from './theme/glass.js';
 
 // ---------------------------------------------------------------------------
@@ -248,6 +249,8 @@ function Shell({ connection }: ShellProps) {
           <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} />
         ) : activeModule === 'dashboard' || activeModule === 'billing' ? (
           <BillingArea module={activeModule} section={billingSection} />
+        ) : activeModule === 'settings' ? (
+          <SettingsModule />
         ) : (
           <RemoteMacView connection={connection} />
         )}

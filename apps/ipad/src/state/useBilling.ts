@@ -29,7 +29,10 @@ export interface BillingHookResult {
   data: BillingDataset | null;
   state: BillingState;
   lastUpdated: string | null;
-  refresh(): void;
+  /** Re-fetch in the background (stale-while-revalidate — data stays visible).
+   *  Returns a promise that resolves when the fetch settles, so callers like
+   *  pull-to-refresh can await it. */
+  refresh(): Promise<void>;
   patchDaysOff(next: DayOffRow[]): void;
   patchWorklogs(next: WorklogRow[]): void;
   patchTasks(next: TaskRow[]): void;
@@ -237,8 +240,8 @@ export function useBilling(storeOverride?: BillingStore): BillingHookResult {
     [dispatch],
   );
 
-  const refresh = useCallback(() => {
-    void (async () => {
+  const refresh = useCallback((): Promise<void> => {
+    return (async () => {
       const store = storeOverride ?? (await getDefaultStore());
       await runFetch(store);
     })();

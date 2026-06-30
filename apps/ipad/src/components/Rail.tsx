@@ -8,7 +8,7 @@ import { glassPanel, accentWash, accentIcon, text } from '../theme/glass.js';
 // sub-section of billing routes — the same pattern the desktop rail uses, which
 // replaces the old in-module billing nav bar. Labels are Czech (app locale).
 
-export type RailModule = 'dashboard' | 'instances' | 'remote' | 'billing';
+export type RailModule = 'dashboard' | 'instances' | 'remote' | 'billing' | 'settings';
 
 // Billing sub-routes promoted into the rail under the Fakturace parent. The
 // former 'dashboard' billing tab is now the top-level Přehled module, so it is
@@ -100,7 +100,7 @@ const ITEMS: RailItem[] = [
   { id: 'instances', label: 'Instance', d: TERMINAL_D, enabled: true },
   { id: 'remote', label: 'Vzdálený Mac', d: SCREEN_D, enabled: true },
   { id: 'billing', label: 'Fakturace', d: BILLING_D, enabled: true },
-  { id: 'settings', label: 'Nastavení', d: SETTINGS_D, enabled: false },
+  { id: 'settings', label: 'Nastavení', d: SETTINGS_D, enabled: true },
 ];
 
 const BILLING_TABS: { id: BillingSection; label: string; d: string }[] = [

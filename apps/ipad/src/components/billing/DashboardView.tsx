@@ -1,10 +1,12 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useBilling } from '../../state/useBilling.js';
 import { dashboardKpis } from '@watchtower/shared/billing/dashboard.js';
 import { contractBurn } from '@watchtower/shared/billing/contracts.js';
 import { activityHeatmap } from '@watchtower/shared/billing/heatmap.js';
 import { topProjects } from '@watchtower/shared/billing/earnings.js';
 import { formatCzk, formatHours, formatDateCz } from '../../lib/czFormat.js';
-import { glassCard, glassPanel, text as glassText, accent as glassAccent, accentWash } from '../../theme/glass.js';
+import { glassCard, glassPanel, text as glassText, accent as glassAccent } from '../../theme/glass.js';
+import { PullToRefresh } from '../PullToRefresh.js';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -25,29 +27,6 @@ const C = {
   amberBg: '#3b2b07',
   red: '#f87171',
 } as const;
-
-// ---------------------------------------------------------------------------
-// Relative-time helper (Czech, "před X")
-// ---------------------------------------------------------------------------
-
-export function relativeTimeCz(isoTimestamp: string, nowMs = Date.now()): string {
-  const diffMs = nowMs - new Date(isoTimestamp).getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 60) return 'právě teď';
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) {
-    // 1 min → "před 1 min", 2-4 → "před X min", 5+ → "před X min"
-    return `před ${diffMin} min`;
-  }
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) {
-    const h = diffH === 1 ? 'hodinou' : `${diffH} hodinami`;
-    return `před ${h}`;
-  }
-  const diffD = Math.floor(diffH / 24);
-  const d = diffD === 1 ? 'dnem' : diffD < 5 ? `${diffD} dny` : `${diffD} dní`;
-  return `před ${d}`;
-}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -398,12 +377,42 @@ function SectionHeader({ title }: { title: string }): JSX.Element {
 // ---------------------------------------------------------------------------
 
 export function DashboardView(): JSX.Element {
-  const { data, state, lastUpdated, refresh } = useBilling();
+  const { data, state, refresh } = useBilling();
 
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
 
-  const isOffline = state === 'cached' || state === 'offline';
+  // Transient "Přehled aktualizováno" toast, fired after a pull-to-refresh settles.
+  const [toastN, setToastN] = useState(0);
+  const [toastVisible, setToastVisible] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    await refresh();
+    setToastN((n) => n + 1);
+  }, [refresh]);
+  useEffect(() => {
+    if (toastN === 0) return;
+    setToastVisible(true);
+    const t = setTimeout(() => setToastVisible(false), 2200);
+    return () => clearTimeout(t);
+  }, [toastN]);
+
+  // Derived data — memoized so unrelated re-renders (toast, pull gesture) don't
+  // re-crunch the full worklog set on the main thread and jank scrolling.
+  const { kpis, burns, heatmap, top, monthHasData, topMaxMinutes } = useMemo(() => {
+    const worklogs = data?.worklogs ?? [];
+    const contracts = data?.contracts ?? [];
+    const daysOff = data?.daysOff ?? [];
+    const projects = data?.projects ?? [];
+    const topList = topProjects(worklogs, month, 8);
+    return {
+      kpis: dashboardKpis(worklogs, { today }),
+      burns: contractBurn(contracts, worklogs, daysOff, projects, { today }),
+      heatmap: activityHeatmap(worklogs, { today, windowDays: 30 }),
+      top: topList,
+      monthHasData: worklogs.some((r) => r.workDate.slice(0, 7) === month),
+      topMaxMinutes: Math.max(...topList.map((p) => p.minutes), 1),
+    };
+  }, [data, today, month]);
 
   // Loading with no data yet
   if (state === 'loading' && data == null) {
@@ -438,98 +447,19 @@ export function DashboardView(): JSX.Element {
     );
   }
 
-  // Compute derived data (safe — data != null here or we're offline)
-  const worklogs = data?.worklogs ?? [];
-  const contracts = data?.contracts ?? [];
-  const daysOff = data?.daysOff ?? [];
-  const projects = data?.projects ?? [];
-
-  const kpis = dashboardKpis(worklogs, { today });
-  const burns = contractBurn(contracts, worklogs, daysOff, projects, { today });
-  const heatmap = activityHeatmap(worklogs, { today, windowDays: 30 });
-  const top = topProjects(worklogs, month, 8);
-
-  const monthHasData = worklogs.some((r) => r.workDate.slice(0, 7) === month);
-  const topMaxMinutes = Math.max(...top.map((p) => p.minutes), 1);
-
   return (
-    <div
-      style={{
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        background: 'transparent',
-        minHeight: '100%',
-        color: glassText.primary,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-      }}
-    >
-      {/* ------------------------------------------------------------------ */}
-      {/* Header                                                               */}
-      {/* ------------------------------------------------------------------ */}
+    <PullToRefresh onRefresh={handleRefresh}>
       <div
         style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          ...glassPanel({ radius: 13 }),
-          borderRadius: 0,
-          borderLeft: 'none',
-          borderRight: 'none',
-          borderTop: 'none',
-          borderBottom: '1px solid rgba(255,255,255,0.10)',
-          padding: '10px 16px',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          color: glassText.primary,
+          minHeight: '100%',
+          padding: '16px 16px 32px',
           display: 'flex',
-          alignItems: 'center',
-          gap: 8,
+          flexDirection: 'column',
+          gap: 24,
         }}
       >
-        <div style={{ flex: 1, fontSize: 12, color: glassText.muted }}>
-          {lastUpdated
-            ? `aktualizováno ${relativeTimeCz(lastUpdated)}`
-            : state === 'loading'
-              ? 'Načítání…'
-              : 'Žádná data'}
-        </div>
-
-        {isOffline && (
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: C.amber,
-              background: C.amberBg,
-              border: `1px solid ${C.amber}44`,
-              borderRadius: 6,
-              padding: '2px 8px',
-              letterSpacing: 0.3,
-            }}
-          >
-            OFFLINE
-          </div>
-        )}
-
-        <button
-          onClick={() => refresh()}
-          style={{
-            background: accentWash,
-            border: '1px solid rgba(255,255,255,0.14)',
-            borderRadius: 8,
-            color: glassText.secondary,
-            fontSize: 12,
-            padding: '4px 10px',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          Obnovit
-        </button>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Body                                                                 */}
-      {/* ------------------------------------------------------------------ */}
-      <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* ---- KPI tiles ---- */}
         <div>
@@ -628,6 +558,28 @@ export function DashboardView(): JSX.Element {
           </div>
         </div>
       </div>
-    </div>
+      {toastVisible && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 60,
+            ...glassPanel({ radius: 999 }),
+            padding: '9px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 12.5,
+            fontWeight: 500,
+            color: glassText.primary,
+          }}
+        >
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
+          Přehled aktualizováno
+        </div>
+      )}
+    </PullToRefresh>
   );
 }
