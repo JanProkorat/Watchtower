@@ -15,7 +15,7 @@ import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import { glassSurface } from '../../theme/glass.js';
+import { glassFill } from '../../theme/glass.js';
 import {
   useWorklogs,
   type PeriodPreset,
@@ -317,8 +317,10 @@ function WorklogRow({
   // compact for the common case.
   const reportedDiffers =
     worklog.reportedMinutes != null && worklog.reportedMinutes !== worklog.minutes;
-  // Dense data rows need elevation 2 glass so text stays crisp over vibrancy.
-  const rowGlass = glassSurface(theme, { elevation: 2 });
+  // Dense data rows: use glassFill (no per-row backdropFilter) — the parent
+  // container's frosted backdrop already handles the blur; stacking a second
+  // GPU pass per-row costs frames without adding visible effect.
+  const rowGlass = glassFill(theme, { elevation: 2 });
   return (
     <Box
       sx={{

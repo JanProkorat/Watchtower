@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { glassSurface } from '../../../apps/desktop/src/theme/glass.js';
+import { glassSurface, glassFill } from '../../../apps/desktop/src/theme/glass.js';
 import type { Theme } from '@mui/material/styles';
 
 /** Minimal theme stub — glassSurface only reads theme.palette.mode. */
@@ -79,6 +79,41 @@ describe('glassSurface', () => {
   it('negative elevation is clamped to 0', () => {
     const clamped = glassSurface(makeTheme('dark'), { elevation: -5 });
     const zero = glassSurface(makeTheme('dark'), { elevation: 0 });
+    expect(clamped.backgroundColor).toBe(zero.backgroundColor);
+  });
+});
+
+describe('glassFill', () => {
+  it('returns the same backgroundColor as glassSurface for dark mode', () => {
+    const surface = glassSurface(makeTheme('dark'), { elevation: 2 });
+    const fill = glassFill(makeTheme('dark'), { elevation: 2 });
+    expect(fill.backgroundColor).toBe(surface.backgroundColor);
+  });
+
+  it('returns the same backgroundColor as glassSurface for light mode', () => {
+    const surface = glassSurface(makeTheme('light'), { elevation: 1 });
+    const fill = glassFill(makeTheme('light'), { elevation: 1 });
+    expect(fill.backgroundColor).toBe(surface.backgroundColor);
+  });
+
+  it('does NOT include backdropFilter', () => {
+    const fill = glassFill(makeTheme('dark'), { elevation: 2 });
+    expect(fill).not.toHaveProperty('backdropFilter');
+  });
+
+  it('does NOT include WebkitBackdropFilter', () => {
+    const fill = glassFill(makeTheme('dark'), { elevation: 2 });
+    expect(fill).not.toHaveProperty('WebkitBackdropFilter');
+  });
+
+  it('includes border (hairline frame)', () => {
+    const fill = glassFill(makeTheme('dark'));
+    expect(fill.border).toMatch(/^1px solid /);
+  });
+
+  it('negative elevation is clamped to 0', () => {
+    const clamped = glassFill(makeTheme('dark'), { elevation: -5 });
+    const zero = glassFill(makeTheme('dark'), { elevation: 0 });
     expect(clamped.backgroundColor).toBe(zero.backgroundColor);
   });
 });

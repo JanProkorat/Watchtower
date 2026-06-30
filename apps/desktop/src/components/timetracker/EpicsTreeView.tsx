@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useState } from 'react';
 import { useTheme } from '@mui/material/styles';
-import { glassSurface } from '../../theme/glass.js';
+import { glassFill } from '../../theme/glass.js';
 import {
   Alert,
   Box,
@@ -376,7 +376,8 @@ function EpicCard({
   return (
     <Box
       sx={{
-        ...glassSurface(theme, { elevation: 1 }),
+        // glassFill: per-epic cards repeat many times — no per-card backdropFilter.
+        ...glassFill(theme, { elevation: 1 }),
         borderRadius: 1.5,
         overflow: 'hidden',
       }}

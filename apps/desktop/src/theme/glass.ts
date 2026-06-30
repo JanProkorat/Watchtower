@@ -13,6 +13,11 @@ export interface GlassSurfaceStyle {
   boxShadow: string;
 }
 
+export interface GlassFillStyle {
+  backgroundColor: string;
+  border: string;
+}
+
 /**
  * Per-mode base fill RGB components and base opacity.
  *
@@ -29,6 +34,21 @@ export const GLASS_FILL_DARK_OPACITY_MAX = 0.72;
 export const GLASS_FILL_LIGHT_RGB = '255,255,255';
 export const GLASS_FILL_LIGHT_OPACITY = 0.50;
 export const GLASS_FILL_LIGHT_OPACITY_MAX = 0.85;
+
+/**
+ * Shared internal: computes the fill color string for a given mode + elevation.
+ * Used by both glassSurface and glassFill to keep the rgba math in one place.
+ */
+function computeGlassFill(isDark: boolean, elevation: number): string {
+  const elevationOpacityBoost = elevation * 0.04;
+  if (isDark) {
+    const opacity = Math.min(GLASS_FILL_DARK_OPACITY + elevationOpacityBoost, GLASS_FILL_DARK_OPACITY_MAX);
+    return `rgba(${GLASS_FILL_DARK_RGB},${opacity.toFixed(2)})`;
+  } else {
+    const opacity = Math.min(GLASS_FILL_LIGHT_OPACITY + elevationOpacityBoost, GLASS_FILL_LIGHT_OPACITY_MAX);
+    return `rgba(${GLASS_FILL_LIGHT_RGB},${opacity.toFixed(2)})`;
+  }
+}
 
 /**
  * Returns an sx-compatible CSS object that applies a frosted-glass surface.
@@ -50,20 +70,7 @@ export function glassSurface(theme: Theme, opts?: GlassSurfaceOptions): GlassSur
   const elevation = Math.max(0, opts?.elevation ?? 0);
   const isDark = theme.palette.mode === 'dark';
 
-  // Scale fill opacity with elevation (each step adds ~4% opacity).
-  const elevationOpacityBoost = elevation * 0.04;
-
-  // Base fill: derived from the GLASS_FILL_* constants, which are also used in
-  // theme.ts to set palette.background.paper, so both stay in sync.
-  // For elevation > 0 we construct a slightly more opaque version.
-  let fill: string;
-  if (isDark) {
-    const opacity = Math.min(GLASS_FILL_DARK_OPACITY + elevationOpacityBoost, GLASS_FILL_DARK_OPACITY_MAX);
-    fill = `rgba(${GLASS_FILL_DARK_RGB},${opacity.toFixed(2)})`;
-  } else {
-    const opacity = Math.min(GLASS_FILL_LIGHT_OPACITY + elevationOpacityBoost, GLASS_FILL_LIGHT_OPACITY_MAX);
-    fill = `rgba(${GLASS_FILL_LIGHT_RGB},${opacity.toFixed(2)})`;
-  }
+  const fill = computeGlassFill(isDark, elevation);
 
   // Hairline border: light top edge highlight + subtle frame.
   const borderColor = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(15,18,24,0.10)';
@@ -84,5 +91,27 @@ export function glassSurface(theme: Theme, opts?: GlassSurfaceOptions): GlassSur
     WebkitBackdropFilter: 'blur(22px) saturate(1.5)',
     border: `1px solid ${borderColor}`,
     boxShadow: `inset 0 1px 0 ${highlightColor}, 0 ${elevation > 0 ? elevation * 2 : 2}px ${shadowBlur}px ${shadowColor}`,
+  };
+}
+
+/**
+ * Use for elements that repeat many times (rows, cells, cards in a list) —
+ * they sit over the already-blurred backdrop, so a second per-element
+ * backdrop-filter only costs GPU without adding visible frosting benefit.
+ *
+ * Returns the same fill color and hairline border as glassSurface for the
+ * given mode + elevation, but omits backdropFilter / WebkitBackdropFilter
+ * and the inset shadow.
+ */
+export function glassFill(theme: Theme, opts?: GlassSurfaceOptions): GlassFillStyle {
+  const elevation = Math.max(0, opts?.elevation ?? 0);
+  const isDark = theme.palette.mode === 'dark';
+
+  const fill = computeGlassFill(isDark, elevation);
+  const borderColor = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(15,18,24,0.10)';
+
+  return {
+    backgroundColor: fill,
+    border: `1px solid ${borderColor}`,
   };
 }
