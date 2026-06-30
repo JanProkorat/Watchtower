@@ -11,20 +11,20 @@ interface Props { children: ReactNode }
 interface State { error: Error | null; info: string | null }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null, info: null };
+  override state: State = { error: null, info: null };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo): void {
+  override componentDidCatch(error: Error, info: ErrorInfo): void {
     // Keep it on screen; also log for the Xcode/Safari console.
     this.setState({ info: info.componentStack ?? null });
     // eslint-disable-next-line no-console
     console.error('[Watchtower] render crash:', error, info.componentStack);
   }
 
-  render(): ReactNode {
+  override render(): ReactNode {
     const { error, info } = this.state;
     if (!error) return this.props.children;
     return (
