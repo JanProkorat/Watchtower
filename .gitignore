@@ -46,3 +46,5 @@ shared/*.js.map
 # Capacitor build outputs
 apps/ipad/dist/
 apps/ipad/ios/App/App/public/
+apps/iphone/dist/
+apps/iphone/ios/App/App/public/
