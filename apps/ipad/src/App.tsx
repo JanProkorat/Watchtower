@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import { Preferences } from '@capacitor/preferences';
 import { PushNotifications } from '@capacitor/push-notifications';
 import {
@@ -22,6 +22,14 @@ import { WakeButton } from './components/WakeButton.js';
 import { ToastStack, type ToastItem } from './components/ToastStack.js';
 import { SettingsModule } from './components/SettingsModule.js';
 import { text, glassPanel, glassFillStrong, statusGlass, ctaGradient, ctaGlow, accent } from './theme/glass.js';
+
+// Retry button for the connection toast — translucent glass; `color: inherit`
+// picks up the toast's status accent (red when disconnected).
+const toastRetryBtn: CSSProperties = {
+  padding: '6px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.22)',
+  background: 'rgba(255,255,255,0.10)', color: 'inherit', fontSize: 12, fontWeight: 600,
+  cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+};
 
 // ---------------------------------------------------------------------------
 // Capacitor Preferences store (same helper as before)
@@ -78,8 +86,9 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
         onNew={() => setSpawnOpen(true)}
       />
 
-      {/* Terminal body */}
-      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+      {/* Terminal body — padded so the terminal panel floats off the tab strip
+          and window edges, consistent with the glass surfaces around it. */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', padding: '10px 12px 12px', boxSizing: 'border-box' }}>
         {activeId ? (
           <TerminalView key={activeId} instanceId={activeId} />
         ) : (
@@ -128,13 +137,30 @@ function Shell({ connection }: ShellProps) {
   const { items: attention, ackedIds, acknowledge } = useAttention();
   const [hubOpen, setHubOpen] = useState(false);
   const { blockedIds } = useAuthBlock();
-  const { bridge, status } = useConnection();
+  const { bridge, status, reconnect } = useConnection();
 
   // Once we've had a live connection, any later non-connected state is a
   // *reconnect* — keep the status toast steady (one message/colour) instead of
   // flickering connecting↔disconnected.
   const [everConnected, setEverConnected] = useState(false);
   useEffect(() => { if (status === 'connected') setEverConnected(true); }, [status]);
+
+  // Track whether a connect attempt has actually failed. Lets the toast show a
+  // steady "can't connect" (with retry) instead of a perpetual "connecting…"
+  // when the Mac is unreachable — but still shows "connecting…" during the
+  // genuine first attempt. Cleared on a live connect and on an explicit retry.
+  const [everFailed, setEverFailed] = useState(false);
+  useEffect(() => {
+    if (status === 'disconnected') setEverFailed(true);
+    else if (status === 'connected') setEverFailed(false);
+  }, [status]);
+  const retryConnect = useCallback(() => { setEverFailed(false); reconnect(); }, [reconnect]);
+
+  // Immersive (fullscreen) mode for the Remote Mac view — hides the rail so the
+  // remote screen fills the whole window. Only meaningful on the 'remote'
+  // module; auto-reset when navigating away so the rail can't get stuck hidden.
+  const [immersive, setImmersive] = useState(false);
+  useEffect(() => { if (activeModule !== 'remote') setImmersive(false); }, [activeModule]);
 
   // Select (focus) an instance and mark it seen — clears its tab ⚠️ and drops
   // it from the bell count. Used by the hub, push taps, and tab taps.
@@ -179,9 +205,11 @@ function Shell({ connection }: ShellProps) {
   }, []);
 
   // Mac-connection status + auth-block surface as top-right toasts that OVERLAY
-  // content (never push layout). Only the Mac-dependent modules show the
-  // connection toast/pill — billing has its own (Supabase) status elsewhere.
-  const macModule = activeModule === 'instances' || activeModule === 'remote';
+  // content (never push layout). Only the Instances module shows the connection
+  // toast — the Remote Mac view renders its own VNC status banner (and wake), so
+  // a second floating toast there would be redundant; billing has its own
+  // (Supabase) status elsewhere.
+  const macModule = activeModule === 'instances';
   const toasts: ToastItem[] = [];
   if (activeModule === 'instances' && blockedIds.size > 0) {
     toasts.push({
@@ -204,12 +232,23 @@ function Shell({ connection }: ShellProps) {
     });
   }
   if (macModule && status !== 'connected') {
+    // Three cases: dropped after being live (reconnecting), never connected and
+    // a first attempt already failed (can't connect), or the genuine initial
+    // attempt still in progress (connecting).
+    const reconnecting = everConnected;
+    const cannotConnect = !everConnected && everFailed;
     toasts.push({
       id: 'conn',
-      state: everConnected ? 'disconnected' : 'connecting',
-      title: everConnected ? 'Mac odpojen' : 'Připojuji k Macu…',
-      subtitle: everConnected ? 'obnovuji připojení…' : undefined,
-      action: connection.mac ? <WakeButton connection={connection} /> : undefined,
+      state: reconnecting || cannotConnect ? 'disconnected' : 'connecting',
+      title: reconnecting ? 'Mac odpojen' : cannotConnect ? 'Nelze se připojit k Macu' : 'Připojuji k Macu…',
+      subtitle: reconnecting ? 'obnovuji připojení…'
+        : cannotConnect ? 'zkontrolujte, že na Macu běží Watchtower' : undefined,
+      action: (reconnecting || cannotConnect) ? (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={retryConnect} style={toastRetryBtn}>Zkusit znovu</button>
+          {connection.mac && <WakeButton connection={connection} />}
+        </div>
+      ) : undefined,
     });
   }
 
@@ -234,15 +273,18 @@ function Shell({ connection }: ShellProps) {
     >
       {/* Content row: shared left rail + module content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, position: 'relative' }}>
-        {/* Shared left rail — active across all modules */}
-        <Rail
-          active={activeModule}
-          billingSection={billingSection}
-          onSelect={setActiveModule}
-          onSelectBillingTab={selectBilling}
-          notificationCount={attention.length}
-          onOpenNotifications={() => setHubOpen(true)}
-        />
+        {/* Shared left rail — active across all modules. Hidden while the
+            Remote Mac view is in immersive (fullscreen) mode. */}
+        {!immersive && (
+          <Rail
+            active={activeModule}
+            billingSection={billingSection}
+            onSelect={setActiveModule}
+            onSelectBillingTab={selectBilling}
+            notificationCount={attention.length}
+            onOpenNotifications={() => setHubOpen(true)}
+          />
+        )}
 
         {/* Module content */}
         {activeModule === 'instances' ? (
@@ -252,7 +294,11 @@ function Shell({ connection }: ShellProps) {
         ) : activeModule === 'settings' ? (
           <SettingsModule />
         ) : (
-          <RemoteMacView connection={connection} />
+          <RemoteMacView
+            connection={connection}
+            immersive={immersive}
+            onToggleImmersive={() => setImmersive((v) => !v)}
+          />
         )}
 
         {/* Notification hub popover */}
