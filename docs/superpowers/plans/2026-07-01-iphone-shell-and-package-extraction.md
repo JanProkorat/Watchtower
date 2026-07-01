@@ -36,7 +36,23 @@ Epic #77. Chosen approach: **extract shared packages first**, then build `apps/i
 
 ## Progress & resume (2026-07-01)
 
-**Extraction DONE (P0–P3), committed + pushed on `feat/76-iphone-shell`.** Resume at **P4**.
+**P0–P6 DONE, committed + pushed on `feat/76-iphone-shell`; PR open to `main`.**
+On-device visual verification of P6 happens against the PR branch (user chose
+"open PR now, verify after"); push follow-up layout fixes if anything looks
+wrong logged-in. Messaging follow-up issue filed (see P7).
+
+- **P4** — `apps/iphone` scaffolded (configs, index/main/css, ErrorBoundary),
+  `cap add ios` + pods, `.gitignore` mirrored. tsc/build/cap-sync clean.
+- **P5** — auth gate (`useSupabaseAuth`) → `BillingLogin` → bottom-tab shell
+  (Přehled/Výdělky/Reporty/Záznamy) composing the individual module views;
+  records sub-nav; project drill-down; portrait-locked Info.plist.
+- **P6** — ui-core `useIsNarrow()` (≤480px, SSR-safe); phone-width fixes gated on
+  it so the iPad path is byte-identical: DashboardView KPI wrap, EarningsSummary
+  4-tile wrap, ContractDrawer input rows stack, TaskGridView slim frozen cols.
+  Full suite 909 pass / 8 fail (pre-existing `relativeTimeCz` — stale test, the
+  function doesn't exist on main either).
+
+_Original resume note (kept for history):_ Extraction DONE (P0–P3). Resume at **P4**.
 
 **Worktree:** `/Users/jan/Projects/Watchtower/.claude/worktrees/iphone-76` (branch `feat/76-iphone-shell`, tracks origin). `node_modules` already installed here.
 
