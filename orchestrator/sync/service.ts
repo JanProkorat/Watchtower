@@ -2,11 +2,13 @@ import type { SqliteLike } from '../db/migrations.js';
 import type { PgStore } from '../db/pg/pool.js';
 import { pushAll } from './push.js';
 import { pullAll } from './pull.js';
+import { purgeDue, purgeTombstones } from './purge.js';
 
 export interface SyncCycleResult {
   ok: boolean;
   push?: Record<string, number>;
   pull?: Record<string, { pulled: number; conflicts: number; touchedFkIds: number[] }>;
+  purge?: Record<string, number>;
   error?: string;
 }
 
@@ -17,6 +19,7 @@ export interface SyncServiceOptions {
   periodMs?: number;
   /** Debounce window after a local change. Default 1.5s. */
   debounceMs?: number;
+  now?: () => number;
   onCycle?: (r: SyncCycleResult) => void;
 }
 
@@ -31,6 +34,7 @@ export class SyncService {
   private readonly store: PgStore | null;
   private readonly periodMs: number;
   private readonly debounceMs: number;
+  private readonly now: () => number;
   private readonly onCycle?: (r: SyncCycleResult) => void;
 
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -43,6 +47,7 @@ export class SyncService {
     this.store = opts.store;
     this.periodMs = opts.periodMs ?? 60_000;
     this.debounceMs = opts.debounceMs ?? 1_500;
+    this.now = opts.now ?? (() => Date.now());
     this.onCycle = opts.onCycle;
   }
 
@@ -86,6 +91,15 @@ export class SyncService {
       result = { ok: false, error: err instanceof Error ? err.message : String(err) };
     } finally {
       this.running = false;
+    }
+    // Both stores just converged → safe to hard-delete old tombstones. Throttled
+    // to once/day. A purge failure must not flip the cycle to not-ok; it self-heals.
+    if (result.ok && this.store && purgeDue(this.db, this.now())) {
+      try {
+        result.purge = (await purgeTombstones(this.db, this.store, this.now())).purged;
+      } catch (err) {
+        console.warn('[purge] failed (will retry next cycle):', err);
+      }
     }
     this.onCycle?.(result);
     if (this.pending) { this.pending = false; void this.syncNow(); }
