@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildTimeOffModel } from '../../apps/ipad/src/state/timeOffModel.js';
+import { buildTimeOffModel } from '@watchtower/module-timetracker';
 import type { DayOffRow } from '@watchtower/shared/billing/types.js';
 
 describe('buildTimeOffModel', () => {

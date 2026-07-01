@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { buildDayOffUpsert, buildDayOffDelete, applyDayOffWrite, canEdit } from '../../apps/ipad/src/state/billingWrites.js';
+import { buildDayOffUpsert, buildDayOffDelete, applyDayOffWrite, canEdit } from '@watchtower/data-supabase';
 import type { DayOffRow } from '@watchtower/shared/billing/types.js';
 import {
   computeDerivedForWrite, buildWorklogInsert, buildWorklogUpdate, buildWorklogDelete,
   buildOptimisticWorklogRow, buildEditedWorklogRow, applyWorklogWrite,
-} from '../../apps/ipad/src/state/billingWrites.js';
+} from '@watchtower/data-supabase';
 import type { ContractRow, TaskRow, WorklogRow } from '@watchtower/shared/billing/types.js';
 import {
   buildTaskInsert, buildTaskUpdate, buildTaskDelete,
   buildOptimisticTaskRow, buildEditedTaskRow, applyTaskWrite, canEditTask,
-} from '../../apps/ipad/src/state/billingWrites.js';
+} from '@watchtower/data-supabase';
 import type { ProjectRow, TaskRow as TaskRowT } from '@watchtower/shared/billing/types.js';
 
 describe('buildDayOffUpsert', () => {
@@ -204,7 +204,7 @@ describe('canEditTask', () => {
 import {
   buildContractInsert, buildContractUpdate, buildContractEndDateUpdate, buildContractDelete,
   buildOptimisticContractRow, applyContractWrite, rebillProjectWorklogs,
-} from '../../apps/ipad/src/state/billingWrites.js';
+} from '@watchtower/data-supabase';
 import type { ContractRow as ContractRowT, WorklogRow as WorklogRowT } from '@watchtower/shared/billing/types.js';
 
 const cInput = { projectId: 3, effectiveFrom: '2026-01-01', endDate: null, rateType: 'hourly' as const, rateAmount: 100, hoursPerDay: 8, mdLimit: null };

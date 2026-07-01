@@ -1,6 +1,6 @@
 import { useWake } from '../state/useWake.js';
 import type { Connection } from '../connection.js';
-import { glassPanel, statusGlass, accent, accentWash, text, ctaGradient } from '../theme/glass.js';
+import { glassPanel, statusGlass, accent, accentWash, text, ctaGradient } from '@watchtower/ui-core';
 
 // "Probudit Mac" button. Disabled until a MAC is configured. Fire-and-forget:
 // after a tap it shows a transient "Paket odeslán" — it cannot confirm the Mac

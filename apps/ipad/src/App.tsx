@@ -16,12 +16,12 @@ import { TabStrip } from './components/TabStrip.js';
 import { TerminalView } from './components/TerminalView.js';
 import { SpawnModal } from './components/SpawnModal.js';
 import { RemoteMacView } from './components/RemoteMacView.js';
-import { BillingArea } from './components/billing/BillingArea.js';
+import { BillingArea } from '@watchtower/module-timetracker';
 import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
 import { ToastStack, type ToastItem } from './components/ToastStack.js';
 import { SettingsModule } from './components/SettingsModule.js';
-import { text, glassPanel, glassFillStrong, statusGlass, ctaGradient, ctaGlow, accent } from './theme/glass.js';
+import { text, glassPanel, glassFillStrong, statusGlass, ctaGradient, ctaGlow, accent } from '@watchtower/ui-core';
 
 // Retry button for the connection toast — translucent glass; `color: inherit`
 // picks up the toast's status accent (red when disconnected).

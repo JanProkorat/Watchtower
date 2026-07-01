@@ -7,7 +7,7 @@ import { useConnection } from '../state/connectionContext.js';
 import { connectionToVncWsUrl, type Connection } from '../connection.js';
 import { loadVncCreds, saveVncCreds, type VncCreds } from '../state/vncCreds.js';
 import { WakeButton } from './WakeButton.js';
-import { baseBg, statusGlass, glassPanel, text, ctaGradient, ctaGlow } from '../theme/glass.js';
+import { baseBg, statusGlass, glassPanel, text, ctaGradient, ctaGlow } from '@watchtower/ui-core';
 
 // Capacitor Preferences-backed store (same shape as App's).
 const store = {

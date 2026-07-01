@@ -7,7 +7,7 @@
 // transient ones (connecting) are driven by the caller's state. Coexists with
 // the bottom-right connection pill.
 import type { ReactNode } from 'react';
-import { statusGlass, type StatusState } from '../theme/glass.js';
+import { statusGlass, type StatusState } from '@watchtower/ui-core';
 
 export interface ToastItem {
   id: string;
