@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
 import { formatCzk, formatHours, formatDateCz } from '@watchtower/ui-core';
-import { czechMonthLabel } from '@watchtower/ui-core';
+import { czechMonthLabel, useIsNarrow } from '@watchtower/ui-core';
 import {
   rollupEarningsByContract,
   activeContract,
@@ -136,6 +136,10 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
   const [hoursPerDay, setHoursPerDay] = useState(initial ? String(initial.hoursPerDay) : '8');
   const [mdLimit, setMdLimit] = useState(initial?.mdLimit != null ? String(initial.mdLimit) : '');
   const [saving, setSaving] = useState(false);
+  // Phone width: stack the paired input rows (dates, rate+hours) vertically —
+  // two side-by-side native iOS date pickers don't fit ~170px each.
+  const isNarrow = useIsNarrow();
+  const pairRow = { display: 'flex', gap: 10, flexDirection: isNarrow ? 'column' as const : 'row' as const };
 
   const rate = Number(rateAmount.replace(',', '.'));
   const hpd = Number(hoursPerDay.replace(',', '.'));
@@ -215,7 +219,7 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
         </div>
 
         {/* Date range */}
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={pairRow}>
           <div style={{ flex: 1 }}>
             <div style={labelStyle}>Platné od</div>
             <input type="date" style={glassField} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
@@ -267,7 +271,7 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
         </div>
 
         {/* Rate + hours per day */}
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={pairRow}>
           <div style={{ flex: 1 }}>
             <div style={labelStyle}>Sazba</div>
             <input style={glassField} inputMode="decimal" value={rateAmount} onChange={(e) => setRateAmount(e.target.value)} />
@@ -516,8 +520,9 @@ export function ProjectDetailView({
             {projectName}
           </div>
 
-          {/* Mini stat blocks */}
-          <div style={{ display: 'flex', gap: 20 }}>
+          {/* Mini stat blocks — wrap on phone width so the mono rate label can't
+              clip; no-op on iPad (they always fit there). */}
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: glassText.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
                 Měsíc

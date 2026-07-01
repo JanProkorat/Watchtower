@@ -6,7 +6,7 @@ import { activityHeatmap } from '@watchtower/shared/billing/heatmap.js';
 import { topProjects } from '@watchtower/shared/billing/earnings.js';
 import { formatCzk, formatHours, formatDateCz } from '@watchtower/ui-core';
 import { glassCard, glassPanel, text as glassText, accent as glassAccent } from '@watchtower/ui-core';
-import { PullToRefresh } from '@watchtower/ui-core';
+import { PullToRefresh, useIsNarrow } from '@watchtower/ui-core';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -36,16 +36,20 @@ function KpiTile({
   label,
   minutes,
   earnedCzk,
+  narrow = false,
 }: {
   label: string;
   minutes: number;
   earnedCzk: number;
+  narrow?: boolean;
 }): JSX.Element {
   return (
     <div
       style={{
-        flex: 1,
-        minWidth: 0,
+        // On phone width the parent row wraps; a ~40% floor forces a 2-per-row
+        // grid (third tile drops to its own row) instead of three 112px slivers.
+        flex: narrow ? '1 1 40%' : 1,
+        minWidth: narrow ? 130 : 0,
         ...glassCard(12),
         padding: '14px 16px',
         display: 'flex',
@@ -378,6 +382,9 @@ function SectionHeader({ title }: { title: string }): JSX.Element {
 
 export function DashboardView(): JSX.Element {
   const { data, state, refresh } = useBilling();
+  // Phone width: let the three KPI tiles wrap (2 + 1) instead of squeezing into
+  // one 112px-per-tile row. iPad (above the breakpoint) keeps the single row.
+  const isNarrow = useIsNarrow();
 
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
@@ -464,10 +471,10 @@ export function DashboardView(): JSX.Element {
         {/* ---- KPI tiles ---- */}
         <div>
           <SectionHeader title="Odpracováno" />
-          <div style={{ display: 'flex', gap: 10 }}>
-            <KpiTile label="Dnes" minutes={kpis.today.minutes} earnedCzk={kpis.today.earnedCzk} />
-            <KpiTile label="Sprint" minutes={kpis.sprint.minutes} earnedCzk={kpis.sprint.earnedCzk} />
-            <KpiTile label="Tento měsíc" minutes={kpis.month.minutes} earnedCzk={kpis.month.earnedCzk} />
+          <div style={{ display: 'flex', gap: 10, flexWrap: isNarrow ? 'wrap' : 'nowrap' }}>
+            <KpiTile label="Dnes" minutes={kpis.today.minutes} earnedCzk={kpis.today.earnedCzk} narrow={isNarrow} />
+            <KpiTile label="Sprint" minutes={kpis.sprint.minutes} earnedCzk={kpis.sprint.earnedCzk} narrow={isNarrow} />
+            <KpiTile label="Tento měsíc" minutes={kpis.month.minutes} earnedCzk={kpis.month.earnedCzk} narrow={isNarrow} />
           </div>
         </div>
 

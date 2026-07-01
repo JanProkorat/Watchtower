@@ -1,5 +1,5 @@
 import { C } from './tokens.js';
-import { glassCard, text } from '@watchtower/ui-core';
+import { glassCard, text, useIsNarrow } from '@watchtower/ui-core';
 import type { EarningsSummaryResult } from '@watchtower/shared/billing/reports/earnings-summary.js';
 import { formatCzk, formatHours } from '@watchtower/ui-core';
 
@@ -8,12 +8,14 @@ interface EarningsSummaryPanelProps {
   onOpenProject(id: number): void;
 }
 
-function Tile({ label, value, accent }: { label: string; value: string; accent?: boolean }): JSX.Element {
+function Tile({ label, value, accent, narrow = false }: { label: string; value: string; accent?: boolean; narrow?: boolean }): JSX.Element {
   return (
     <div
       style={{
-        flex: 1,
-        minWidth: 0,
+        // Phone width: a ~40% floor makes the four tiles sit 2-per-row instead
+        // of four slivers. iPad keeps the single-row flex:1 layout.
+        flex: narrow ? '1 1 40%' : 1,
+        minWidth: narrow ? 120 : 0,
         ...glassCard(12),
         padding: '12px 14px',
         display: 'flex',
@@ -33,16 +35,18 @@ function Tile({ label, value, accent }: { label: string; value: string; accent?:
 
 export function EarningsSummaryPanel({ summary, onOpenProject }: EarningsSummaryPanelProps): JSX.Element {
   const maxEarned = Math.max(...summary.perProject.map((p) => p.earnedCzk), 1);
+  const isNarrow = useIsNarrow();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Tile label="Celkem vyděláno" value={formatCzk(summary.totalCzk)} accent />
-        <Tile label="Účtovatelné" value={formatHours(summary.billableMinutes)} />
-        <Tile label="Neúčtovatelné" value={formatHours(summary.unbillableMinutes)} />
+        <Tile label="Celkem vyděláno" value={formatCzk(summary.totalCzk)} accent narrow={isNarrow} />
+        <Tile label="Účtovatelné" value={formatHours(summary.billableMinutes)} narrow={isNarrow} />
+        <Tile label="Neúčtovatelné" value={formatHours(summary.unbillableMinutes)} narrow={isNarrow} />
         <Tile
           label="Prům. sazba"
           value={summary.avgEffectiveHourlyRateCzk != null ? `${formatCzk(summary.avgEffectiveHourlyRateCzk)}/h` : '–'}
+          narrow={isNarrow}
         />
       </div>
 

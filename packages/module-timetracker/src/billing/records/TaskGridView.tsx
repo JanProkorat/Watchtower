@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
 import { buildTaskGrid } from '@watchtower/shared/billing/records/task-grid.js';
-import { addMonths, czechMonthLabel } from '@watchtower/ui-core';
+import { addMonths, czechMonthLabel, useIsNarrow } from '@watchtower/ui-core';
 import { formatCzk } from '@watchtower/ui-core';
 import { czechHolidays, workdayDates } from '@watchtower/shared/billing/workdays.js';
 import { C } from '../reports/tokens.js';
@@ -23,6 +23,9 @@ function dayTint(meta: DayMeta): string | undefined {
 
 export function TaskGridView(): JSX.Element {
   const { data } = useBilling();
+  // Phone width: slim the two frozen columns and day cells so more of the month
+  // is visible before horizontal scroll (iPad keeps the roomier layout).
+  const isNarrow = useIsNarrow();
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [projectId, setProjectId] = useState<number | undefined>(undefined);
   const worklogs = data?.worklogs ?? [];
@@ -75,8 +78,13 @@ export function TaskGridView(): JSX.Element {
   const czkVal = (czk: number): string => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(czk);
 
   const btn: React.CSSProperties = { background: 'rgba(255,255,255,0.08)', color: '#c2c9d8', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0 14px', height: 30, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
-  const cellBase: React.CSSProperties = { width: CELL, minWidth: CELL, textAlign: 'center', fontSize: 11, borderLeft: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' };
-  const nameCol: React.CSSProperties = { position: 'sticky', left: 0, zIndex: 1, background: '#101019', minWidth: 180, maxWidth: 180, paddingRight: 8 };
+  // Column widths — slimmer on phone width so the two frozen columns don't eat
+  // the whole viewport. Σ sits right after the task name, frozen left alongside it.
+  const cell = isNarrow ? 30 : CELL;
+  const NAME_W = isNarrow ? 116 : 180;
+  const SIG_W = isNarrow ? 64 : 120;
+  const cellBase: React.CSSProperties = { width: cell, minWidth: cell, textAlign: 'center', fontSize: 11, borderLeft: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' };
+  const nameCol: React.CSSProperties = { position: 'sticky', left: 0, zIndex: 1, background: '#101019', minWidth: NAME_W, maxWidth: NAME_W, paddingRight: 8 };
   // Sticky header/footer cells must be opaque so scrolling rows don't bleed
   // through — layer any day tint over the solid header/footer fill.
   const HEAD_BG = '#14151d';
@@ -84,9 +92,6 @@ export function TaskGridView(): JSX.Element {
   const FOOT_H = 28; // footer row height (drives the stacked bottom offsets)
   const overTint = (bg: string | undefined, base: string): string =>
     bg ? `linear-gradient(${bg}, ${bg}), ${base}` : base;
-  // Sum (Σ) column — now sits right after the task name, frozen left alongside it.
-  const NAME_W = 180;
-  const SIG_W = 120;
   const sigCol: React.CSSProperties = { position: 'sticky', left: NAME_W, minWidth: SIG_W, width: SIG_W, textAlign: 'right', paddingRight: 10, whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.10)', borderBottom: '1px solid rgba(255,255,255,0.05)' };
 
   return (
