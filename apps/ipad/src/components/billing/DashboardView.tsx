@@ -1,9 +1,12 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useBilling } from '../../state/useBilling.js';
 import { dashboardKpis } from '@watchtower/shared/billing/dashboard.js';
 import { contractBurn } from '@watchtower/shared/billing/contracts.js';
 import { activityHeatmap } from '@watchtower/shared/billing/heatmap.js';
 import { topProjects } from '@watchtower/shared/billing/earnings.js';
 import { formatCzk, formatHours, formatDateCz } from '../../lib/czFormat.js';
+import { glassCard, glassPanel, text as glassText, accent as glassAccent } from '../../theme/glass.js';
+import { PullToRefresh } from '../PullToRefresh.js';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -26,29 +29,6 @@ const C = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Relative-time helper (Czech, "před X")
-// ---------------------------------------------------------------------------
-
-export function relativeTimeCz(isoTimestamp: string, nowMs = Date.now()): string {
-  const diffMs = nowMs - new Date(isoTimestamp).getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 60) return 'právě teď';
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) {
-    // 1 min → "před 1 min", 2-4 → "před X min", 5+ → "před X min"
-    return `před ${diffMin} min`;
-  }
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) {
-    const h = diffH === 1 ? 'hodinou' : `${diffH} hodinami`;
-    return `před ${h}`;
-  }
-  const diffD = Math.floor(diffH / 24);
-  const d = diffD === 1 ? 'dnem' : diffD < 5 ? `${diffD} dny` : `${diffD} dní`;
-  return `před ${d}`;
-}
-
-// ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
@@ -66,22 +46,20 @@ function KpiTile({
       style={{
         flex: 1,
         minWidth: 0,
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        borderRadius: 12,
+        ...glassCard(12),
         padding: '14px 16px',
         display: 'flex',
         flexDirection: 'column',
         gap: 4,
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: glassText.muted, letterSpacing: 0.6, textTransform: 'uppercase' }}>
         {label}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color: glassText.primary, lineHeight: 1.2 }}>
         {formatHours(minutes)}
       </div>
-      <div style={{ fontSize: 13, color: C.violet, fontWeight: 500 }}>
+      <div style={{ fontSize: 13, color: glassAccent, fontWeight: 500 }}>
         {formatCzk(earnedCzk)}
       </div>
     </div>
@@ -99,7 +77,7 @@ function BurnBar({
 }): JSX.Element {
   if (limit == null) {
     return (
-      <div style={{ fontSize: 12, color: C.muted }}>
+      <div style={{ fontSize: 12, color: glassText.muted }}>
         {used.toFixed(2)} MD (bez limitu)
       </div>
     );
@@ -110,10 +88,10 @@ function BurnBar({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: C.muted }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: glassText.muted }}>
         <span>{used.toFixed(2)} / {limit} MD</span>
         {projected != null && (
-          <span style={{ color: isOverrun ? C.amber : C.muted }}>
+          <span style={{ color: isOverrun ? C.amber : glassText.muted }}>
             odhad: {projected.toFixed(2)} MD
           </span>
         )}
@@ -122,7 +100,7 @@ function BurnBar({
         style={{
           position: 'relative',
           height: 8,
-          background: C.ground,
+          background: 'rgba(255,255,255,0.08)',
           borderRadius: 4,
           overflow: 'hidden',
         }}
@@ -192,9 +170,7 @@ function ContractCard({
   return (
     <div
       style={{
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        borderRadius: 12,
+        ...glassCard(12),
         padding: '14px 16px',
         display: 'flex',
         flexDirection: 'column',
@@ -213,11 +189,11 @@ function ContractCard({
             }}
           />
         )}
-        <div style={{ fontSize: 14, fontWeight: 600, color: C.text, flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: glassText.primary, flex: 1, minWidth: 0 }}>
           {name || '(bez názvu)'}
         </div>
         {workdaysRemaining != null && (
-          <div style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>
+          <div style={{ fontSize: 12, color: glassText.muted, flexShrink: 0 }}>
             {workdaysRemaining} pd zbývá
           </div>
         )}
@@ -228,7 +204,7 @@ function ContractCard({
 }
 
 function heatmapColor(minutes: number, maxMinutes: number): string {
-  if (minutes === 0 || maxMinutes === 0) return C.border;
+  if (minutes === 0 || maxMinutes === 0) return 'rgba(255,255,255,0.08)';
   const ratio = minutes / maxMinutes;
   if (ratio < 0.25) return C.violetDim + '55'; // ~level 1
   if (ratio < 0.5) return C.violetDim;          // level 2
@@ -289,24 +265,24 @@ function StatStrip({
         flexWrap: 'wrap',
         gap: '8px 16px',
         fontSize: 12,
-        color: C.muted,
+        color: glassText.muted,
       }}
     >
       <span>
-        <strong style={{ color: C.violet }}>{currentStreak}</strong> dní v řadě
+        <strong style={{ color: glassAccent }}>{currentStreak}</strong> dní v řadě
       </span>
       <span>
-        nejdelší série: <strong style={{ color: C.text }}>{longestStreak}</strong>
+        nejdelší série: <strong style={{ color: glassText.primary }}>{longestStreak}</strong>
       </span>
       <span>
-        aktivní dny: <strong style={{ color: C.text }}>{activeDays}</strong>
+        aktivní dny: <strong style={{ color: glassText.primary }}>{activeDays}</strong>
       </span>
       <span>
-        průměr/týden: <strong style={{ color: C.text }}>{formatHours(weeklyAvgMinutes)}</strong>
+        průměr/týden: <strong style={{ color: glassText.primary }}>{formatHours(weeklyAvgMinutes)}</strong>
       </span>
       {busiestDay && (
         <span>
-          nejrušnější: <strong style={{ color: C.text }}>{formatDateCz(busiestDay)}</strong>
+          nejrušnější: <strong style={{ color: glassText.primary }}>{formatDateCz(busiestDay)}</strong>
         </span>
       )}
     </div>
@@ -331,7 +307,7 @@ function TopProjectRow({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ width: 18, fontSize: 11, color: C.muted, textAlign: 'right', flexShrink: 0 }}>
+        <div style={{ width: 18, fontSize: 11, color: glassText.muted, textAlign: 'right', flexShrink: 0 }}>
           {rank}.
         </div>
         {color && (
@@ -345,19 +321,19 @@ function TopProjectRow({
             }}
           />
         )}
-        <div style={{ flex: 1, fontSize: 13, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ flex: 1, fontSize: 13, color: glassText.primary, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {name || '(bez názvu)'}
         </div>
-        <div style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>{formatHours(minutes)}</div>
+        <div style={{ fontSize: 12, color: glassText.muted, flexShrink: 0 }}>{formatHours(minutes)}</div>
         {earnedCzk > 0 && (
-          <div style={{ fontSize: 12, color: C.violet, flexShrink: 0 }}>{formatCzk(earnedCzk)}</div>
+          <div style={{ fontSize: 12, color: glassAccent, flexShrink: 0 }}>{formatCzk(earnedCzk)}</div>
         )}
       </div>
       <div
         style={{
           marginLeft: 26,
           height: 4,
-          background: C.border,
+          background: 'rgba(255,255,255,0.10)',
           borderRadius: 2,
           overflow: 'hidden',
         }}
@@ -386,7 +362,7 @@ function SectionHeader({ title }: { title: string }): JSX.Element {
         fontSize: 11,
         fontWeight: 700,
         letterSpacing: 0.8,
-        color: C.muted,
+        color: glassText.muted,
         textTransform: 'uppercase',
         marginBottom: 8,
       }}
@@ -401,12 +377,42 @@ function SectionHeader({ title }: { title: string }): JSX.Element {
 // ---------------------------------------------------------------------------
 
 export function DashboardView(): JSX.Element {
-  const { data, state, lastUpdated, refresh } = useBilling();
+  const { data, state, refresh } = useBilling();
 
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
 
-  const isOffline = state === 'cached' || state === 'offline';
+  // Transient "Přehled aktualizováno" toast, fired after a pull-to-refresh settles.
+  const [toastN, setToastN] = useState(0);
+  const [toastVisible, setToastVisible] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    await refresh();
+    setToastN((n) => n + 1);
+  }, [refresh]);
+  useEffect(() => {
+    if (toastN === 0) return;
+    setToastVisible(true);
+    const t = setTimeout(() => setToastVisible(false), 2200);
+    return () => clearTimeout(t);
+  }, [toastN]);
+
+  // Derived data — memoized so unrelated re-renders (toast, pull gesture) don't
+  // re-crunch the full worklog set on the main thread and jank scrolling.
+  const { kpis, burns, heatmap, top, monthHasData, topMaxMinutes } = useMemo(() => {
+    const worklogs = data?.worklogs ?? [];
+    const contracts = data?.contracts ?? [];
+    const daysOff = data?.daysOff ?? [];
+    const projects = data?.projects ?? [];
+    const topList = topProjects(worklogs, month, 8);
+    return {
+      kpis: dashboardKpis(worklogs, { today }),
+      burns: contractBurn(contracts, worklogs, daysOff, projects, { today }),
+      heatmap: activityHeatmap(worklogs, { today, windowDays: 30 }),
+      top: topList,
+      monthHasData: worklogs.some((r) => r.workDate.slice(0, 7) === month),
+      topMaxMinutes: Math.max(...topList.map((p) => p.minutes), 1),
+    };
+  }, [data, today, month]);
 
   // Loading with no data yet
   if (state === 'loading' && data == null) {
@@ -419,7 +425,7 @@ export function DashboardView(): JSX.Element {
           alignItems: 'center',
           justifyContent: 'center',
           gap: 12,
-          color: C.muted,
+          color: glassText.muted,
           fontFamily: 'system-ui, sans-serif',
           fontSize: 15,
           padding: 32,
@@ -429,7 +435,7 @@ export function DashboardView(): JSX.Element {
           style={{
             width: 32,
             height: 32,
-            border: `3px solid ${C.border}`,
+            border: '3px solid rgba(255,255,255,0.12)',
             borderTop: `3px solid ${C.violet}`,
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
@@ -441,94 +447,19 @@ export function DashboardView(): JSX.Element {
     );
   }
 
-  // Compute derived data (safe — data != null here or we're offline)
-  const worklogs = data?.worklogs ?? [];
-  const contracts = data?.contracts ?? [];
-  const daysOff = data?.daysOff ?? [];
-  const projects = data?.projects ?? [];
-
-  const kpis = dashboardKpis(worklogs, { today });
-  const burns = contractBurn(contracts, worklogs, daysOff, projects, { today });
-  const heatmap = activityHeatmap(worklogs, { today, windowDays: 30 });
-  const top = topProjects(worklogs, month, 8);
-
-  const monthHasData = worklogs.some((r) => r.workDate.slice(0, 7) === month);
-  const topMaxMinutes = Math.max(...top.map((p) => p.minutes), 1);
-
   return (
-    <div
-      style={{
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        background: C.ground,
-        minHeight: '100%',
-        color: C.text,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-      }}
-    >
-      {/* ------------------------------------------------------------------ */}
-      {/* Header                                                               */}
-      {/* ------------------------------------------------------------------ */}
+    <PullToRefresh onRefresh={handleRefresh}>
       <div
         style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          background: C.ground,
-          borderBottom: `1px solid ${C.border}`,
-          padding: '10px 16px',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          color: glassText.primary,
+          minHeight: '100%',
+          padding: '16px 16px 32px',
           display: 'flex',
-          alignItems: 'center',
-          gap: 8,
+          flexDirection: 'column',
+          gap: 24,
         }}
       >
-        <div style={{ flex: 1, fontSize: 12, color: C.muted }}>
-          {lastUpdated
-            ? `aktualizováno ${relativeTimeCz(lastUpdated)}`
-            : state === 'loading'
-              ? 'Načítání…'
-              : 'Žádná data'}
-        </div>
-
-        {isOffline && (
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: C.amber,
-              background: C.amberBg,
-              border: `1px solid ${C.amber}44`,
-              borderRadius: 6,
-              padding: '2px 8px',
-              letterSpacing: 0.3,
-            }}
-          >
-            OFFLINE
-          </div>
-        )}
-
-        <button
-          onClick={() => refresh()}
-          style={{
-            background: 'transparent',
-            border: `1px solid ${C.border}`,
-            borderRadius: 8,
-            color: C.muted,
-            fontSize: 12,
-            padding: '4px 10px',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          Obnovit
-        </button>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Body                                                                 */}
-      {/* ------------------------------------------------------------------ */}
-      <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* ---- KPI tiles ---- */}
         <div>
@@ -565,13 +496,11 @@ export function DashboardView(): JSX.Element {
           <div>
             <SectionHeader title={`Top projekty — ${month.replace('-', '/')}`} />
             {top.length === 0 ? (
-              <div style={{ fontSize: 13, color: C.muted, padding: '8px 0' }}>žádná data</div>
+              <div style={{ fontSize: 13, color: glassText.muted, padding: '8px 0' }}>žádná data</div>
             ) : (
               <div
                 style={{
-                  background: C.surface,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 12,
+                  ...glassCard(12),
                   padding: '14px 16px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -595,12 +524,10 @@ export function DashboardView(): JSX.Element {
         ) : (
           <div
             style={{
-              background: C.surface,
-              border: `1px solid ${C.border}`,
-              borderRadius: 12,
+              ...glassCard(12),
               padding: '28px 16px',
               textAlign: 'center',
-              color: C.muted,
+              color: glassText.muted,
               fontSize: 14,
             }}
           >
@@ -613,9 +540,7 @@ export function DashboardView(): JSX.Element {
           <SectionHeader title="Aktivita (30 dní)" />
           <div
             style={{
-              background: C.surface,
-              border: `1px solid ${C.border}`,
-              borderRadius: 12,
+              ...glassCard(12),
               padding: '14px 16px',
               display: 'flex',
               flexDirection: 'column',
@@ -633,6 +558,28 @@ export function DashboardView(): JSX.Element {
           </div>
         </div>
       </div>
-    </div>
+      {toastVisible && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 60,
+            ...glassPanel({ radius: 999 }),
+            padding: '9px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 12.5,
+            fontWeight: 500,
+            color: glassText.primary,
+          }}
+        >
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
+          Přehled aktualizováno
+        </div>
+      )}
+    </PullToRefresh>
   );
 }

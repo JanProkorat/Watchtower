@@ -3,6 +3,12 @@ import { useBilling } from '../../state/useBilling.js';
 import { aggregateMonthEarnings, trailingMonths } from '@watchtower/shared/billing/earnings.js';
 import { formatCzk, formatHours } from '../../lib/czFormat.js';
 import { czechMonthLabel, addMonths } from '../../lib/monthHelpers.js';
+import {
+  glassCard,
+  glassPanel,
+  text as glassText,
+  accent,
+} from '../../theme/glass.js';
 
 // ---------------------------------------------------------------------------
 // Design tokens (same palette as DashboardView)
@@ -31,10 +37,10 @@ function MonthPicker({
   onChange: (m: string) => void;
 }): JSX.Element {
   const btnStyle: React.CSSProperties = {
-    background: 'transparent',
-    border: `1px solid ${C.border}`,
+    background: 'rgba(255,255,255,0.07)',
+    border: '1px solid rgba(255,255,255,0.10)',
     borderRadius: 8,
-    color: C.muted,
+    color: glassText.secondary,
     fontSize: 20,
     lineHeight: 1,
     width: 36,
@@ -50,11 +56,13 @@ function MonthPicker({
   return (
     <div
       style={{
+        ...glassPanel({ radius: 0, blur: 20, saturate: 1.6, brightness: 1.1, fill: 'rgba(40,44,64,0.42)', border: 'none', shadow: '0 1px 0 rgba(255,255,255,0.08)' }),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 12,
         padding: '12px 16px',
+        borderRadius: 0,
       }}
     >
       <button style={btnStyle} onClick={() => onChange(addMonths(month, -1))}>
@@ -64,7 +72,7 @@ function MonthPicker({
         style={{
           fontSize: 18,
           fontWeight: 600,
-          color: C.text,
+          color: glassText.primary,
           minWidth: 160,
           textAlign: 'center',
           letterSpacing: 0.2,
@@ -140,7 +148,7 @@ function TrailingBars({
                 position: 'absolute',
                 bottom: -18,
                 fontSize: 9,
-                color: isSelected ? C.violet : C.muted,
+                color: isSelected ? C.violet : glassText.muted,
                 fontWeight: isSelected ? 700 : 400,
                 letterSpacing: 0.2,
                 textAlign: 'center',
@@ -186,7 +194,7 @@ function ProjectRow({
         flexDirection: 'column',
         gap: 6,
         padding: '12px 0',
-        borderBottom: `1px solid ${C.border}`,
+        borderBottom: '1px solid rgba(255,255,255,0.10)',
         cursor: 'pointer',
       }}
     >
@@ -207,7 +215,7 @@ function ProjectRow({
             flex: 1,
             fontSize: 14,
             fontWeight: 500,
-            color: C.text,
+            color: glassText.primary,
             minWidth: 0,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -217,7 +225,7 @@ function ProjectRow({
           {name || '(bez názvu)'}
         </div>
         {/* Hours */}
-        <div style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>
+        <div style={{ fontSize: 12, color: glassText.muted, flexShrink: 0 }}>
           {formatHours(minutes)}
         </div>
         {/* Earnings */}
@@ -225,14 +233,14 @@ function ProjectRow({
           {formatCzk(earnedCzk)}
         </div>
         {/* Chevron */}
-        <div style={{ fontSize: 16, color: C.muted, flexShrink: 0 }}>›</div>
+        <div style={{ fontSize: 16, color: glassText.muted, flexShrink: 0 }}>›</div>
       </div>
       {/* Proportional bar */}
       <div
         style={{
           marginLeft: 18,
           height: 3,
-          background: C.border,
+          background: 'rgba(255,255,255,0.10)',
           borderRadius: 2,
           overflow: 'hidden',
         }}
@@ -261,7 +269,7 @@ function SectionHeader({ title }: { title: string }): JSX.Element {
         fontSize: 11,
         fontWeight: 700,
         letterSpacing: 0.8,
-        color: C.muted,
+        color: glassText.muted,
         textTransform: 'uppercase',
         marginBottom: 8,
       }}
@@ -285,7 +293,7 @@ function Spinner(): JSX.Element {
         alignItems: 'center',
         justifyContent: 'center',
         gap: 12,
-        color: C.muted,
+        color: glassText.muted,
         fontFamily: 'system-ui, sans-serif',
         fontSize: 15,
         padding: 32,
@@ -296,8 +304,8 @@ function Spinner(): JSX.Element {
         style={{
           width: 32,
           height: 32,
-          border: `3px solid ${C.border}`,
-          borderTop: `3px solid ${C.violet}`,
+          border: '3px solid rgba(255,255,255,0.10)',
+          borderTop: `3px solid ${accent}`,
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
         }}
@@ -325,9 +333,9 @@ export function EarningsMonthView({ onOpenProject }: { onOpenProject: (projectId
       <div
         style={{
           fontFamily: 'system-ui, -apple-system, sans-serif',
-          background: C.ground,
+          background: 'transparent',
           minHeight: '100%',
-          color: C.text,
+          color: glassText.primary,
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -349,9 +357,9 @@ export function EarningsMonthView({ onOpenProject }: { onOpenProject: (projectId
     <div
       style={{
         fontFamily: 'system-ui, -apple-system, sans-serif',
-        background: C.ground,
+        background: 'transparent',
         minHeight: '100%',
-        color: C.text,
+        color: glassText.primary,
         display: 'flex',
         flexDirection: 'column',
         gap: 0,
@@ -360,21 +368,20 @@ export function EarningsMonthView({ onOpenProject }: { onOpenProject: (projectId
       {/* ---- Month picker ---- */}
       <MonthPicker month={selectedMonth} onChange={setSelectedMonth} />
 
-      <div style={{ padding: '0 16px 32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ padding: '0 16px 32px', display: 'flex', flexDirection: 'column', gap: 24, paddingTop: 16 }}>
 
         {/* ---- Hero total ---- */}
         <div
           style={{
-            background: C.surface,
-            border: `1px solid ${C.border}`,
-            borderRadius: 16,
+            ...glassCard(),
             padding: '20px 20px 16px',
             display: 'flex',
             flexDirection: 'column',
             gap: 4,
+            textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, color: C.muted, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, color: glassText.muted, textTransform: 'uppercase' }}>
             Celkem výdělky
           </div>
           <div
@@ -396,9 +403,7 @@ export function EarningsMonthView({ onOpenProject }: { onOpenProject: (projectId
           <SectionHeader title="Vývoj (8 měsíců)" />
           <div
             style={{
-              background: C.surface,
-              border: `1px solid ${C.border}`,
-              borderRadius: 12,
+              ...glassCard(12),
               padding: '16px 12px 28px',
             }}
           >
@@ -412,12 +417,10 @@ export function EarningsMonthView({ onOpenProject }: { onOpenProject: (projectId
           {perProject.length === 0 ? (
             <div
               style={{
-                background: C.surface,
-                border: `1px solid ${C.border}`,
-                borderRadius: 12,
+                ...glassCard(12),
                 padding: '28px 16px',
                 textAlign: 'center',
-                color: C.muted,
+                color: glassText.muted,
                 fontSize: 14,
               }}
             >
@@ -426,9 +429,7 @@ export function EarningsMonthView({ onOpenProject }: { onOpenProject: (projectId
           ) : (
             <div
               style={{
-                background: C.surface,
-                border: `1px solid ${C.border}`,
-                borderRadius: 12,
+                ...glassCard(12),
                 padding: '0 16px',
               }}
             >

@@ -20,12 +20,14 @@ export function formatCzk(amount: number): string {
 // Hours: convert minutes to Czech-formatted hours string.
 // Uses Czech decimal comma (,) and NBSP before the unit.
 // Examples: 90 min → "1,5 h", 60 min → "1 h", 75 min → "1,25 h"
+// Rounded to ≤2 decimals (quarter-hour precision) — never raw floats like
+// "55,4166666667 h".
 // ---------------------------------------------------------------------------
 export function formatHours(minutes: number): string {
   const hours = minutes / 60;
-  // Format with Czech locale (decimal comma), drop trailing zeros.
+  // Format with Czech locale (decimal comma); trailing zeros dropped.
   const formatted = new Intl.NumberFormat('cs-CZ', {
-    maximumFractionDigits: 10,
+    maximumFractionDigits: 2,
     useGrouping: false,
   }).format(hours);
   return `${formatted}${NBSP}h`;

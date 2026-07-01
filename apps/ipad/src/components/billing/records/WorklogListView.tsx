@@ -8,6 +8,7 @@ import { canEdit, computeDerivedForWrite, type WorklogWriteInput } from '../../.
 import { addMonths, czechMonthLabel } from '../../../lib/monthHelpers.js';
 import { formatHours, formatDateCz, formatCzk } from '../../../lib/czFormat.js';
 import { C } from '../reports/tokens.js';
+import { glassPanel, glassCard, ctaGradient, ctaGlow, glassFillStrong } from '../../../theme/glass.js';
 
 const SOURCE_LABEL: Record<string, string> = { manual: 'manual', 'watchtower-auto': 'watchtower', 'jira-sync': 'jira' };
 
@@ -33,7 +34,7 @@ export function WorklogListView(): JSX.Element {
   const days = groupWorklogsByDay(worklogs, { month, projectId });
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', background: C.ground, minHeight: '100%', color: C.text }}>
+    <div style={{ fontFamily: 'system-ui, sans-serif', background: 'transparent', minHeight: '100%', color: C.text }}>
       <MonthBar
         month={month}
         onPrev={() => setMonth(addMonths(month, -1))}
@@ -56,7 +57,7 @@ export function WorklogListView(): JSX.Element {
         {days.map((d) => (
           <div key={d.date}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{formatDateCz(d.date)}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f4f4f8' }}>{formatDateCz(d.date)}</div>
               <div style={{ fontSize: 12, color: C.muted }}>{formatHours(d.totalMinutes)}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -65,13 +66,13 @@ export function WorklogListView(): JSX.Element {
                   key={w.syncId}
                   onClick={() => editable && setDrawer({ mode: 'edit', worklog: w })}
                   disabled={!editable}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 12px', textAlign: 'left', cursor: editable ? 'pointer' : 'default', fontFamily: 'inherit', color: C.text, width: '100%' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, ...glassCard(10), border: '1px solid rgba(255,255,255,0.10)', padding: '8px 12px', textAlign: 'left', cursor: editable ? 'pointer' : 'default', fontFamily: 'inherit', color: C.text, width: '100%' }}
                 >
-                  {w.projectColor && <div style={{ width: 8, height: 8, borderRadius: '50%', background: w.projectColor, flexShrink: 0 }} />}
-                  {w.taskNumber && <div style={{ fontFamily: 'monospace', fontSize: 12, color: C.muted, flexShrink: 0 }}>{w.taskNumber}</div>}
-                  <div style={{ flex: 1, fontSize: 13, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.taskTitle || w.projectName}</div>
-                  {w.source && <div style={{ fontSize: 10, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 5, padding: '1px 6px', textTransform: 'uppercase', flexShrink: 0 }}>{SOURCE_LABEL[w.source] ?? w.source}</div>}
-                  <div style={{ fontSize: 12, color: C.text, flexShrink: 0 }}>
+                  {w.projectColor && <div style={{ width: 9, height: 9, borderRadius: '50%', background: w.projectColor, flexShrink: 0 }} />}
+                  {w.taskNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: C.muted, flexShrink: 0 }}>{w.taskNumber}</div>}
+                  <div style={{ flex: 1, fontSize: 12.5, color: '#d7dbe6', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.taskTitle || w.projectName}</div>
+                  {w.source && <div style={{ fontSize: 9.5, color: C.muted, border: '1px solid rgba(255,255,255,0.10)', borderRadius: 5, padding: '1px 6px', textTransform: 'uppercase', flexShrink: 0, background: 'rgba(255,255,255,0.04)', letterSpacing: '0.05em' }}>{SOURCE_LABEL[w.source] ?? w.source}</div>}
+                  <div style={{ fontSize: 12.5, color: '#f4f4f8', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
                     {formatHours(w.minutes)}
                     {w.effectiveMinutes !== w.minutes && <span style={{ color: C.muted }}> → {formatHours(w.effectiveMinutes)}</span>}
                   </div>
@@ -111,19 +112,19 @@ function MonthBar({ month, onPrev, onNext, onToday, projects, projectId, onProje
   projects: { id: number; name: string }[]; projectId: number | undefined; onProject(id: number | undefined): void;
   canAdd: boolean; onAdd(): void;
 }): JSX.Element {
-  const btn: React.CSSProperties = { background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 7, padding: '4px 10px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' };
+  const btn: React.CSSProperties = { background: 'rgba(255,255,255,0.08)', color: '#c2c9d8', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0 14px', height: 30, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
   return (
-    <div style={{ position: 'sticky', top: 0, zIndex: 10, background: C.ground, borderBottom: `1px solid ${C.border}`, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+    <div style={{ position: 'sticky', top: 0, zIndex: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
       <button style={btn} onClick={onPrev}>‹</button>
-      <div style={{ fontSize: 14, fontWeight: 600, minWidth: 130, textAlign: 'center' }}>{czechMonthLabel(month)}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, minWidth: 130, textAlign: 'center', color: '#f4f4f8' }}>{czechMonthLabel(month)}</div>
       <button style={btn} onClick={onNext}>›</button>
       <button style={btn} onClick={onToday}>Dnes</button>
       <div style={{ flex: 1 }} />
-      <select value={projectId ?? ''} onChange={(e) => onProject(e.target.value === '' ? undefined : Number(e.target.value))} style={{ ...btn }}>
+      <select value={projectId ?? ''} onChange={(e) => onProject(e.target.value === '' ? undefined : Number(e.target.value))} style={{ ...btn, height: 34, padding: '0 12px' }}>
         <option value="">Všechny projekty</option>
         {projects.map((p) => <option key={p.id} value={p.id}>{p.name || '(bez názvu)'}</option>)}
       </select>
-      {canAdd && <button style={{ ...btn, background: C.violet, color: '#fff', border: 'none' }} onClick={onAdd}>+ Přidat</button>}
+      {canAdd && <button style={{ height: 34, padding: '0 16px', borderRadius: 11, border: 'none', background: ctaGradient, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: ctaGlow, display: 'inline-flex', alignItems: 'center' }} onClick={onAdd}>+ Přidat</button>}
     </div>
   );
 }
@@ -166,8 +167,8 @@ function WorklogDrawer({ title, tasks, contracts, initial, onClose, onSubmit, on
     ? tasks.slice(0, 50)
     : tasks.filter((t) => `${t.taskNumber ?? ''} ${t.taskTitle} ${t.projectName}`.toLowerCase().includes(taskQuery.toLowerCase())).slice(0, 50);
 
-  const field: React.CSSProperties = { background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' };
-  const label: React.CSSProperties = { fontSize: 12, color: C.muted, marginBottom: 4 };
+  const field: React.CSSProperties = { background: 'rgba(255,255,255,0.07)', color: '#d7dbe6', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 11, padding: '8px 12px', fontSize: 14, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', outline: 'none' };
+  const label: React.CSSProperties = { fontSize: 10, letterSpacing: '0.05em', textTransform: 'uppercase', color: C.muted, marginBottom: 5 };
 
   async function submit() {
     // Edit: reuse the existing task (taskId unchanged); Create: require a picked task.
@@ -180,10 +181,10 @@ function WorklogDrawer({ title, tasks, contracts, initial, onClose, onSubmit, on
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.ground, borderTopLeftRadius: 16, borderTopRightRadius: 16, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14, borderTop: `1px solid ${C.border}` }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(6,7,11,0.45)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...glassPanel({ radius: 20, fill: glassFillStrong, blur: 40, saturate: 1.9, brightness: 1.1 }), borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: '1px solid rgba(255,255,255,0.20)', borderBottom: 'none', boxShadow: '0 -20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.30)', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#f4f4f8' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
 
@@ -193,10 +194,10 @@ function WorklogDrawer({ title, tasks, contracts, initial, onClose, onSubmit, on
             <input style={field} placeholder="Hledat úkol…" value={taskQuery} onChange={(e) => setTaskQuery(e.target.value)} />
             <div style={{ maxHeight: 180, overflowY: 'auto', marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {filteredTasks.map((t) => (
-                <button key={t.taskId} onClick={() => setTaskId(t.taskId)} style={{ ...field, textAlign: 'left', cursor: 'pointer', border: taskId === t.taskId ? `2px solid ${C.violet}` : `1px solid ${C.border}`, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button key={t.taskId} onClick={() => setTaskId(t.taskId)} style={{ ...glassCard(10), padding: '7px 11px', textAlign: 'left', cursor: 'pointer', border: taskId === t.taskId ? '2px solid #a89cf0' : '1px solid rgba(255,255,255,0.10)', display: 'flex', gap: 9, alignItems: 'center', fontFamily: 'inherit', color: C.text, width: '100%' }}>
                   {t.projectColor && <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.projectColor, flexShrink: 0 }} />}
-                  <span style={{ fontFamily: 'monospace', fontSize: 12, color: C.muted }}>{t.taskNumber ?? '—'}</span>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.taskTitle}</span>
+                  <span style={{ fontFamily: 'monospace', fontSize: 11, color: C.muted }}>{t.taskNumber ?? '—'}</span>
+                  <span style={{ fontSize: 12, color: '#d7dbe6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.taskTitle}</span>
                 </button>
               ))}
             </div>
@@ -215,11 +216,11 @@ function WorklogDrawer({ title, tasks, contracts, initial, onClose, onSubmit, on
         <div style={{ display: 'flex', gap: 10 }}>
           <div style={{ flex: 1 }}>
             <div style={label}>Čas (např. 1,5 / 1:30 / 1h30m)</div>
-            <input style={{ ...field, borderColor: minutesStr && !minutesValid ? C.red : C.border }} value={minutesStr} onChange={(e) => setMinutesStr(e.target.value)} />
+            <input style={{ ...field, borderColor: minutesStr && !minutesValid ? C.red : 'rgba(255,255,255,0.10)' }} value={minutesStr} onChange={(e) => setMinutesStr(e.target.value)} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={label}>Vykázáno (volitelné)</div>
-            <input style={{ ...field, borderColor: reportedStr && !reportedValid ? C.red : C.border }} value={reportedStr} onChange={(e) => setReportedStr(e.target.value)} />
+            <input style={{ ...field, borderColor: reportedStr && !reportedValid ? C.red : 'rgba(255,255,255,0.10)' }} value={reportedStr} onChange={(e) => setReportedStr(e.target.value)} />
           </div>
         </div>
         <div>
@@ -229,17 +230,17 @@ function WorklogDrawer({ title, tasks, contracts, initial, onClose, onSubmit, on
 
         {previewBilling && (
           <div style={{ fontSize: 13, color: C.muted }}>
-            Výdělek: <span style={{ color: C.text, fontWeight: 600 }}>{previewBilling.earnedAmount != null ? formatCzk(previewBilling.earnedAmount) : '—'}</span>
+            Výdělek: <span style={{ color: '#f4f4f8', fontWeight: 600 }}>{previewBilling.earnedAmount != null ? formatCzk(previewBilling.earnedAmount) : '—'}</span>
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 4, alignItems: 'center' }}>
           {onDelete && (
-            <button onClick={async () => { setSaving(true); await onDelete(); }} disabled={saving} style={{ ...field, width: 'auto', color: C.red, cursor: 'pointer' }}>Smazat</button>
+            <button onClick={async () => { setSaving(true); await onDelete(); }} disabled={saving} style={{ height: 36, padding: '0 14px', borderRadius: 10, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', color: '#fca5a5', background: 'rgba(110,24,24,0.32)', border: '1px solid rgba(248,113,113,0.40)', display: 'inline-flex', alignItems: 'center' }}>Smazat</button>
           )}
           <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{ ...field, width: 'auto', cursor: 'pointer' }}>Zrušit</button>
-          <button onClick={submit} disabled={!canSubmit} style={{ ...field, width: 'auto', background: canSubmit ? C.violet : C.border, color: '#fff', border: 'none', cursor: canSubmit ? 'pointer' : 'default' }}>
+          <button onClick={onClose} style={{ height: 36, padding: '0 14px', borderRadius: 10, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', color: '#c2c9d8', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)', display: 'inline-flex', alignItems: 'center' }}>Zrušit</button>
+          <button onClick={submit} disabled={!canSubmit} style={{ height: 38, padding: '0 16px', borderRadius: 11, border: 'none', background: canSubmit ? ctaGradient : 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'default', fontFamily: 'inherit', boxShadow: canSubmit ? ctaGlow : 'none', display: 'inline-flex', alignItems: 'center' }}>
             {saving ? 'Ukládám…' : 'Uložit'}
           </button>
         </div>

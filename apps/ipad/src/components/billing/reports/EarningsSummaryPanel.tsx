@@ -1,4 +1,5 @@
 import { C } from './tokens.js';
+import { glassCard, text } from '../../../theme/glass.js';
 import type { EarningsSummaryResult } from '@watchtower/shared/billing/reports/earnings-summary.js';
 import { formatCzk, formatHours } from '../../../lib/czFormat.js';
 
@@ -13,19 +14,17 @@ function Tile({ label, value, accent }: { label: string; value: string; accent?:
       style={{
         flex: 1,
         minWidth: 0,
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        borderRadius: 12,
+        ...glassCard(12),
         padding: '12px 14px',
         display: 'flex',
         flexDirection: 'column',
         gap: 4,
       }}
     >
-      <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: text.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
         {label}
       </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: accent ? C.violet : C.text, lineHeight: 1.2 }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: accent ? C.violet : text.primary, lineHeight: 1.2 }}>
         {value}
       </div>
     </div>
@@ -50,9 +49,7 @@ export function EarningsSummaryPanel({ summary, onOpenProject }: EarningsSummary
       {summary.perProject.length > 0 && (
         <div
           style={{
-            background: C.surface,
-            border: `1px solid ${C.border}`,
-            borderRadius: 12,
+            ...glassCard(12),
             padding: '14px 16px',
             display: 'flex',
             flexDirection: 'column',
@@ -69,12 +66,12 @@ export function EarningsSummaryPanel({ summary, onOpenProject }: EarningsSummary
                 {p.color && (
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
                 )}
-                <div style={{ flex: 1, fontSize: 13, color: C.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ flex: 1, fontSize: 13, color: text.primary, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p.name || '(bez názvu)'}
                 </div>
                 <div style={{ fontSize: 12, color: C.violet, flexShrink: 0 }}>{formatCzk(p.earnedCzk)}</div>
               </div>
-              <div style={{ height: 4, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: 4, background: 'rgba(255,255,255,0.10)', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{ width: `${(p.earnedCzk / maxEarned) * 100}%`, height: '100%', background: p.color ?? C.violet, borderRadius: 2 }} />
               </div>
             </div>

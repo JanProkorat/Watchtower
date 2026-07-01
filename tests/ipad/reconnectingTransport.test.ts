@@ -1,5 +1,5 @@
 // tests/ipad/reconnectingTransport.test.ts
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createReconnectingTransport } from '../../apps/ipad/src/lib/reconnectingTransport.js';
 
 // Fake inner transport factory we can drive open/close on.
@@ -74,5 +74,46 @@ describe('createReconnectingTransport', () => {
     expect(statuses).toEqual(['connecting', 'connected', 'disconnected', 'connecting', 'disconnected', 'connecting']);
     expect(statuses.slice(2)).not.toContain('connected');
     rt.close();
+  });
+
+  it('retries a stalled connect that never opens or closes (connect watchdog)', async () => {
+    vi.useFakeTimers();
+    try {
+      const { factory, created } = makeFactory();
+      const rt = createReconnectingTransport(
+        { url: 'ws://x/ws', token: 't' },
+        { factory, backoffMs: () => 0, connectTimeoutMs: 100 },
+      );
+      // First socket neither opens nor closes — the server is unreachable (e.g.
+      // the desktop app isn't running yet). Without a watchdog the transport
+      // stays stuck on this dead socket forever; with one it abandons the
+      // attempt after the timeout and builds a fresh socket.
+      expect(created).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(150);
+      expect(created.length).toBeGreaterThanOrEqual(2);
+      rt.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reconnects on a live-connection drop even after the watchdog is armed', async () => {
+    vi.useFakeTimers();
+    try {
+      const { factory, created } = makeFactory();
+      const rt = createReconnectingTransport(
+        { url: 'ws://x/ws', token: 't' },
+        { factory, backoffMs: () => 0, connectTimeoutMs: 100 },
+      );
+      created[0].open();            // opens fine → watchdog must be disarmed
+      await vi.advanceTimersByTimeAsync(500); // well past the timeout; no spurious retry
+      expect(created).toHaveLength(1);
+      created[0].fail();            // live connection drops later
+      await vi.advanceTimersByTimeAsync(1);
+      expect(created.length).toBeGreaterThanOrEqual(2); // reconnected
+      rt.close();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

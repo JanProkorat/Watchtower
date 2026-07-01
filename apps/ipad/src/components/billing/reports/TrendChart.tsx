@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { C } from './tokens.js';
+import { glassCard, text } from '../../../theme/glass.js';
 import type { TrendBucket, RateMarker } from '@watchtower/shared/billing/reports/trend.js';
 import { bucketKey, enumerateBuckets, type Granularity } from '@watchtower/shared/billing/reports/buckets.js';
 import { formatCzk, formatHours } from '../../../lib/czFormat.js';
@@ -28,14 +29,14 @@ export function TrendChart({ series, markers, from, to, granularity }: TrendChar
   const markerBuckets = new Set(markers.map((m) => bucketKey(m.effectiveFrom, granularity)));
 
   if (filled.length === 0) {
-    return <div style={{ fontSize: 13, color: C.muted, padding: '8px 0' }}>žádná data</div>;
+    return <div style={{ fontSize: 13, color: text.muted, padding: '8px 0' }}>žádná data</div>;
   }
 
   const shown = active != null ? byBucket.get(active) ?? { bucket: active, minutes: 0, earnedCzk: 0 } : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ height: 18, fontSize: 12, color: C.muted }}>
+    <div style={{ ...glassCard(16), padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ height: 18, fontSize: 12, color: text.muted }}>
         {shown
           ? `${bucketLabel(shown.bucket, granularity)}: ${formatHours(shown.minutes)} · ${formatCzk(shown.earnedCzk)}`
           : 'klepnutím zobrazíte detail'}
@@ -81,7 +82,7 @@ export function TrendChart({ series, markers, from, to, granularity }: TrendChar
           );
         })}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.muted }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: text.muted }}>
         <span>{bucketLabel(filled[0]?.bucket ?? '', granularity)}</span>
         <span>{bucketLabel(filled[filled.length - 1]?.bucket ?? '', granularity)}</span>
       </div>
