@@ -112,19 +112,30 @@ function MonthBar({ month, onPrev, onNext, onToday, projects, projectId, onProje
   projects: { id: number; name: string }[]; projectId: number | undefined; onProject(id: number | undefined): void;
   canAdd: boolean; onAdd(): void;
 }): JSX.Element {
-  const btn: React.CSSProperties = { background: 'rgba(255,255,255,0.08)', color: '#c2c9d8', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0 14px', height: 30, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
+  const stepBtn: React.CSSProperties = { width: 34, height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c9bdff', fontSize: 18, lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
+  const flatBtn: React.CSSProperties = { height: 34, padding: '0 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c2c9d8', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
   return (
-    <div style={{ position: 'sticky', top: 0, zIndex: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
-      <button style={btn} onClick={onPrev}>‹</button>
-      <div style={{ fontSize: 14, fontWeight: 600, minWidth: 130, textAlign: 'center', color: '#f4f4f8' }}>{czechMonthLabel(month)}</div>
-      <button style={btn} onClick={onNext}>›</button>
-      <button style={btn} onClick={onToday}>Dnes</button>
-      <div style={{ flex: 1 }} />
-      <select value={projectId ?? ''} onChange={(e) => onProject(e.target.value === '' ? undefined : Number(e.target.value))} style={{ ...btn, height: 34, padding: '0 12px' }}>
-        <option value="">Všechny projekty</option>
-        {projects.map((p) => <option key={p.id} value={p.id}>{p.name || '(bez názvu)'}</option>)}
-      </select>
-      {canAdd && <button style={{ height: 34, padding: '0 16px', borderRadius: 11, border: 'none', background: ctaGradient, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: ctaGlow, display: 'inline-flex', alignItems: 'center' }} onClick={onAdd}>+ Přidat</button>}
+    <div style={{ position: 'sticky', top: 0, zIndex: 10, padding: '10px 16px 12px', display: 'flex', flexDirection: 'column', gap: 10, ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+      {/* Row 1: month stepper (‹ label ›) + Dnes */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button style={stepBtn} onClick={onPrev} aria-label="Předchozí měsíc">‹</button>
+        <div style={{ minWidth: 128, textAlign: 'center', fontSize: 15, fontWeight: 700, color: '#f4f4f8' }}>{czechMonthLabel(month)}</div>
+        <button style={stepBtn} onClick={onNext} aria-label="Další měsíc">›</button>
+        <div style={{ flex: 1 }} />
+        <button style={flatBtn} onClick={onToday}>Dnes</button>
+      </div>
+      {/* Row 2: project filter (grows) + add */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <select
+          value={projectId ?? ''}
+          onChange={(e) => onProject(e.target.value === '' ? undefined : Number(e.target.value))}
+          style={{ flex: 1, minWidth: 0, height: 36, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c2c9d8', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}
+        >
+          <option value="">Všechny projekty</option>
+          {projects.map((p) => <option key={p.id} value={p.id}>{p.name || '(bez názvu)'}</option>)}
+        </select>
+        {canAdd && <button style={{ height: 36, padding: '0 16px', borderRadius: 9, border: 'none', background: ctaGradient, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: ctaGlow, display: 'inline-flex', alignItems: 'center', flexShrink: 0 }} onClick={onAdd}>+ Přidat</button>}
+      </div>
     </div>
   );
 }
