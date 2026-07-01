@@ -1,7 +1,7 @@
 import { C } from './tokens.js';
-import { glassCard, text } from '../../../theme/glass.js';
+import { glassCard, text } from '@watchtower/ui-core';
 import type { HeatmapResult } from '@watchtower/shared/billing/heatmap.js';
-import { formatHours, formatDateCz } from '../../../lib/czFormat.js';
+import { formatHours, formatDateCz } from '@watchtower/ui-core';
 
 interface ActivityHeatmapPanelProps {
   heatmap: HeatmapResult;

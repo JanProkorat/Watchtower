@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { C } from './tokens.js';
-import { glassCard, text } from '../../../theme/glass.js';
+import { glassCard, text } from '@watchtower/ui-core';
 import type { TrendBucket, RateMarker } from '@watchtower/shared/billing/reports/trend.js';
 import { bucketKey, enumerateBuckets, type Granularity } from '@watchtower/shared/billing/reports/buckets.js';
-import { formatCzk, formatHours } from '../../../lib/czFormat.js';
+import { formatCzk, formatHours } from '@watchtower/ui-core';
 
 interface TrendChartProps {
   series: TrendBucket[];

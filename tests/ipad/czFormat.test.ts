@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCzk, formatHours, formatDateCz } from '../../apps/ipad/src/lib/czFormat.js';
+import { formatCzk, formatHours, formatDateCz } from '@watchtower/ui-core';
 const NBSP = ' ';
 describe('czFormat', () => {
   it('formats CZK with NBSP thousands and Kč suffix', () => {

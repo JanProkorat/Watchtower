@@ -1,7 +1,7 @@
 import { C } from './tokens.js';
-import { glassCard, text } from '../../../theme/glass.js';
+import { glassCard, text } from '@watchtower/ui-core';
 import type { ProjectBreakdownSlice } from '@watchtower/shared/billing/reports/breakdown.js';
-import { formatHours } from '../../../lib/czFormat.js';
+import { formatHours } from '@watchtower/ui-core';
 
 interface ProjectDonutProps {
   slices: ProjectBreakdownSlice[];

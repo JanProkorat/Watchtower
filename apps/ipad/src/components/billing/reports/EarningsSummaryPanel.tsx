@@ -1,7 +1,7 @@
 import { C } from './tokens.js';
-import { glassCard, text } from '../../../theme/glass.js';
+import { glassCard, text } from '@watchtower/ui-core';
 import type { EarningsSummaryResult } from '@watchtower/shared/billing/reports/earnings-summary.js';
-import { formatCzk, formatHours } from '../../../lib/czFormat.js';
+import { formatCzk, formatHours } from '@watchtower/ui-core';
 
 interface EarningsSummaryPanelProps {
   summary: EarningsSummaryResult;

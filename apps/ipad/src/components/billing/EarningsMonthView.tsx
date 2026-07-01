@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useBilling } from '../../state/useBilling.js';
 import { aggregateMonthEarnings, trailingMonths } from '@watchtower/shared/billing/earnings.js';
-import { formatCzk, formatHours } from '../../lib/czFormat.js';
-import { czechMonthLabel, addMonths } from '../../lib/monthHelpers.js';
+import { formatCzk, formatHours } from '@watchtower/ui-core';
+import { czechMonthLabel, addMonths } from '@watchtower/ui-core';
 import {
   glassCard,
   glassPanel,
   text as glassText,
   accent,
-} from '../../theme/glass.js';
+} from '@watchtower/ui-core';
 
 // ---------------------------------------------------------------------------
 // Design tokens (same palette as DashboardView)

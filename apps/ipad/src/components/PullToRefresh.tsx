@@ -7,7 +7,7 @@
 // retracts. The touchmove listener is attached non-passive so we can
 // preventDefault the iOS rubber-band while pulling.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { text, accentIcon } from '../theme/glass.js';
+import { text, accentIcon } from '@watchtower/ui-core';
 
 const THRESHOLD = 70; // px of pull (after resistance) needed to trigger
 const MAX = 96; // px cap on the indicator travel

@@ -4,7 +4,7 @@
 // account sign-out, moved out of the billing content header. Glass surfaces on
 // the ambient background, consistent with the rest of the app.
 import { useSupabaseAuth } from '../state/useSupabaseAuth.js';
-import { glassCard, ctaGradient, ctaGlow, text } from '../theme/glass.js';
+import { glassCard, ctaGradient, ctaGlow, text } from '@watchtower/ui-core';
 
 export function SettingsModule(): JSX.Element {
   const { status, signOut } = useSupabaseAuth();

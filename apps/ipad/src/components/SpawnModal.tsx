@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useConnection } from '../state/connectionContext.js';
 import type { ProjectSummary } from '../state/useProjects.js';
-import { glassPanel, glassFillStrong, ctaGradient, ctaGlow, text, accent } from '../theme/glass.js';
+import { glassPanel, glassFillStrong, ctaGradient, ctaGlow, text, accent } from '@watchtower/ui-core';
 
 type InstanceKind = 'claude' | 'shell';
 

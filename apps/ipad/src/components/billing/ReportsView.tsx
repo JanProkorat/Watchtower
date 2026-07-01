@@ -12,7 +12,7 @@ import { EarningsSummaryPanel } from './reports/EarningsSummaryPanel.js';
 import { ProjectDonut } from './reports/ProjectDonut.js';
 import { ActivityHeatmapPanel } from './reports/ActivityHeatmapPanel.js';
 import { C } from './reports/tokens.js';
-import { text } from '../../theme/glass.js';
+import { text } from '@watchtower/ui-core';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }): JSX.Element {
   return (

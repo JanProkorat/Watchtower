@@ -3,7 +3,7 @@ import { useMemo, type CSSProperties } from 'react';
 import { groupInstancesByProject } from '@watchtower/shared/groupInstances.js';
 import { ACTION_NEEDED_STATUSES } from '@watchtower/shared/tabAttention.js';
 import type { GroupableInstance, GroupableProject } from '@watchtower/shared/groupInstances.js';
-import { glassPanel, accentHover, text } from '../theme/glass.js';
+import { glassPanel, accentHover, text } from '@watchtower/ui-core';
 
 interface Props {
   instances: ReadonlyArray<GroupableInstance>;

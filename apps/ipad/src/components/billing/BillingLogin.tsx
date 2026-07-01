@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { SupabaseAuthState } from '../../state/useSupabaseAuth.js';
-import { glassPanel, glassFillStrong, ctaGradient, ctaGlow, text } from '../../theme/glass.js';
+import { glassPanel, glassFillStrong, ctaGradient, ctaGlow, text } from '@watchtower/ui-core';
 
 interface Props {
   signIn: SupabaseAuthState['signIn'];

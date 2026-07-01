@@ -3,7 +3,7 @@ import { getSupabase } from '../lib/supabaseClient.js';
 import { contractsOverlap } from '@watchtower/shared/billing/contracts-overlap.js';
 import { previousDay } from '@watchtower/shared/billing/date-helpers.js';
 import type { ContractRow, WorklogRow } from '@watchtower/shared/billing/types.js';
-import { formatDateCz } from '../lib/czFormat.js';
+import { formatDateCz } from '@watchtower/ui-core';
 import {
   buildContractInsert,
   buildContractUpdate,

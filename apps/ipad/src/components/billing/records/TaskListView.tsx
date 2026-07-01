@@ -5,7 +5,7 @@ import { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
 import type { TaskRow, EpicRow, ProjectRow } from '@watchtower/shared/billing/types.js';
 import { canEdit, canEditTask, type TaskWriteInput } from '../../../state/billingWrites.js';
 import { C } from '../reports/tokens.js';
-import { glassPanel, glassCard, ctaGradient, ctaGlow, glassFillStrong } from '../../../theme/glass.js';
+import { glassPanel, glassCard, ctaGradient, ctaGlow, glassFillStrong } from '@watchtower/ui-core';
 
 const STATUS_LABEL: Record<string, string> = {
   open: 'Otevřený', in_progress: 'Probíhá', to_accept: 'K akceptaci', done: 'Hotovo',

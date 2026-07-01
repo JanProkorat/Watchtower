@@ -5,10 +5,10 @@ import { groupWorklogsByDay } from '@watchtower/shared/billing/records/worklog-l
 import { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
 import type { TaskRow, WorklogRow, ContractRow } from '@watchtower/shared/billing/types.js';
 import { canEdit, computeDerivedForWrite, type WorklogWriteInput } from '../../../state/billingWrites.js';
-import { addMonths, czechMonthLabel } from '../../../lib/monthHelpers.js';
-import { formatHours, formatDateCz, formatCzk } from '../../../lib/czFormat.js';
+import { addMonths, czechMonthLabel } from '@watchtower/ui-core';
+import { formatHours, formatDateCz, formatCzk } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
-import { glassPanel, glassCard, ctaGradient, ctaGlow, glassFillStrong } from '../../../theme/glass.js';
+import { glassPanel, glassCard, ctaGradient, ctaGlow, glassFillStrong } from '@watchtower/ui-core';
 
 const SOURCE_LABEL: Record<string, string> = { manual: 'manual', 'watchtower-auto': 'watchtower', 'jira-sync': 'jira' };
 

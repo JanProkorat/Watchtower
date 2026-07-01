@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useBilling } from '../../../state/useBilling.js';
 import { buildTaskGrid } from '@watchtower/shared/billing/records/task-grid.js';
-import { addMonths, czechMonthLabel } from '../../../lib/monthHelpers.js';
-import { formatCzk } from '../../../lib/czFormat.js';
+import { addMonths, czechMonthLabel } from '@watchtower/ui-core';
+import { formatCzk } from '@watchtower/ui-core';
 import { czechHolidays, workdayDates } from '@watchtower/shared/billing/workdays.js';
 import { C } from '../reports/tokens.js';
-import { glassPanel, dataPanelFill } from '../../../theme/glass.js';
+import { glassPanel, dataPanelFill } from '@watchtower/ui-core';
 
 const CELL = 34; // px per day column
 const DOW_ABBR = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];

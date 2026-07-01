@@ -1,6 +1,6 @@
 // apps/ipad/src/components/Rail.tsx
 import { useEffect, useState } from 'react';
-import { glassPanel, accentWash, accentIcon, text } from '../theme/glass.js';
+import { glassPanel, accentWash, accentIcon, text } from '@watchtower/ui-core';
 
 // Mirrors the desktop ModuleRail: same glyphs, the same Watchtower logo, and
 // collapse/expand. Top-level modules are Přehled (dashboard) / Instance /

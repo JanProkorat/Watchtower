@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { czechMonthLabel, addMonths } from '../../apps/ipad/src/lib/monthHelpers.js';
+import { czechMonthLabel, addMonths } from '@watchtower/ui-core';
 
 describe('czechMonthLabel', () => {
   it('returns Czech month name + year', () => {

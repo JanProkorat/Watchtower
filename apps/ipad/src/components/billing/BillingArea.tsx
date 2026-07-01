@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSupabaseAuth } from '../../state/useSupabaseAuth.js';
 import type { BillingSection } from '../Rail.js';
-import { text } from '../../theme/glass.js';
+import { text } from '@watchtower/ui-core';
 import { BillingLogin } from './BillingLogin.js';
 import { DashboardView } from './DashboardView.js';
 import { EarningsMonthView } from './EarningsMonthView.js';

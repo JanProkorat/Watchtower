@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useBilling } from '../../../state/useBilling.js';
 import { buildTimeOffModel, type TimeOffKind } from '../../../state/timeOffModel.js';
-import { addMonths } from '../../../lib/monthHelpers.js';
-import { formatDateCz } from '../../../lib/czFormat.js';
+import { addMonths } from '@watchtower/ui-core';
+import { formatDateCz } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
 import { useDaysOffMutations } from '../../../state/useDaysOffMutations.js';
 import { canEdit } from '../../../state/billingWrites.js';
-import { glassPanel, glassCard } from '../../../theme/glass.js';
+import { glassPanel, glassCard } from '@watchtower/ui-core';
 
 const KIND_COLOR: Record<TimeOffKind, string> = { vacation: '#22D3EE', sick: '#f87171', other: '#fbbf24', holiday: '#6d5fbb' };
 const KIND_LABEL: Record<TimeOffKind, string> = { vacation: 'Dovolená', sick: 'Nemoc', other: 'Jiné', holiday: 'Svátek' };

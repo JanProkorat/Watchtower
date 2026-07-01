@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useBilling } from '../../state/useBilling.js';
-import { formatCzk, formatHours, formatDateCz } from '../../lib/czFormat.js';
-import { czechMonthLabel } from '../../lib/monthHelpers.js';
+import { formatCzk, formatHours, formatDateCz } from '@watchtower/ui-core';
+import { czechMonthLabel } from '@watchtower/ui-core';
 import {
   rollupEarningsByContract,
   activeContract,
   rateLabel,
-} from '../../lib/projectDetailHelpers.js';
+} from '@watchtower/ui-core';
 import { useContractMutations } from '../../state/useContractMutations.js';
 import { canEdit, type ContractWriteInput } from '../../state/billingWrites.js';
 import type { ContractRow } from '@watchtower/shared/billing/types.js';
@@ -20,7 +20,7 @@ import {
   accent,
   ctaGradient,
   ctaGlow,
-} from '../../theme/glass.js';
+} from '@watchtower/ui-core';
 
 // ---------------------------------------------------------------------------
 // Design tokens (same palette as DashboardView / EarningsMonthView)

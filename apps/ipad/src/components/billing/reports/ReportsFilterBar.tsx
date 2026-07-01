@@ -1,6 +1,6 @@
 // apps/ipad/src/components/billing/reports/ReportsFilterBar.tsx
 import { C } from './tokens.js';
-import { glassCard, accentWash, accent, text } from '../../../theme/glass.js';
+import { glassCard, accentWash, accent, text } from '@watchtower/ui-core';
 import type { Preset } from '../../../state/useReportsFilters.js';
 import { clampGranularity } from '../../../state/useReportsFilters.js';
 import type { Granularity } from '@watchtower/shared/billing/reports/buckets.js';

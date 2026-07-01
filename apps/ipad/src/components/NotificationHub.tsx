@@ -1,5 +1,5 @@
 // apps/ipad/src/components/NotificationHub.tsx
-import { glassPanel, glassCard, text, accent } from '../theme/glass.js';
+import { glassPanel, glassCard, text, accent } from '@watchtower/ui-core';
 import type { AttentionItem } from '../state/attentionList.js';
 
 interface Props { items: AttentionItem[]; onSelect(instanceId: string): void; onClose(): void }

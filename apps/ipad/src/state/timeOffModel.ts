@@ -1,6 +1,6 @@
 import type { DayOffRow } from '@watchtower/shared/billing/types.js';
 import { czechHolidays } from '@watchtower/shared/billing/workdays.js';
-import { czechMonthLabel, addMonths } from '../lib/monthHelpers.js';
+import { czechMonthLabel, addMonths } from '@watchtower/ui-core';
 
 export type TimeOffKind = 'vacation' | 'sick' | 'other' | 'holiday';
 export interface CalDay { date: string | null; kind: TimeOffKind | null; isWeekend: boolean }
