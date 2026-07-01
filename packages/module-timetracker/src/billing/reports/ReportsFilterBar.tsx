@@ -48,6 +48,20 @@ function pill(active: boolean, disabled = false): React.CSSProperties {
   };
 }
 
+// A labeled filter field — small uppercase caption above its control group.
+// Stacking the groups into captioned rows reads as an intentional filter card
+// at any width (no floating divider / meaningless spacer as before).
+function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: text.muted }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
   const { preset, granularity, projectId, projects, from, to } = props;
   // A granularity option is unavailable if the clamp would bump it for this range.
@@ -56,62 +70,64 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
   return (
     <div
       style={{
-        ...glassCard(12),
-        padding: '10px 14px',
+        ...glassCard(14),
+        padding: '14px 16px',
         display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        gap: '8px 12px',
+        flexDirection: 'column',
+        gap: 14,
       }}
     >
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {PRESETS.map((p) => (
-          <button key={p.key} style={pill(preset === p.key)} onClick={() => props.onPreset(p.key)}>
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.12)' }} />
-
-      <div style={{ display: 'flex', gap: 4 }}>
-        {GRANS.map((g) => {
-          const disabled = granDisabled(g.key);
-          return (
-            <button
-              key={g.key}
-              disabled={disabled}
-              style={pill(granularity === g.key, disabled)}
-              onClick={() => !disabled && props.onGranularity(g.key)}
-            >
-              {g.label}
+      <Field label="Období">
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {PRESETS.map((p) => (
+            <button key={p.key} style={pill(preset === p.key)} onClick={() => props.onPreset(p.key)}>
+              {p.label}
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      </Field>
 
-      <div style={{ flex: 1 }} />
+      <Field label="Rozlišení">
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {GRANS.map((g) => {
+            const disabled = granDisabled(g.key);
+            return (
+              <button
+                key={g.key}
+                disabled={disabled}
+                style={pill(granularity === g.key, disabled)}
+                onClick={() => !disabled && props.onGranularity(g.key)}
+              >
+                {g.label}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
 
-      <select
-        value={projectId ?? ''}
-        onChange={(e) => props.onProject(e.target.value === '' ? undefined : Number(e.target.value))}
-        style={{
-          background: 'rgba(48,52,76,0.40)',
-          color: C.text,
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 7,
-          padding: '5px 10px',
-          fontSize: 13,
-          fontFamily: 'inherit',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        }}
-      >
-        <option value="">Všechny projekty</option>
-        {projects.map((p) => (
-          <option key={p.id} value={p.id}>{p.name || '(bez názvu)'}</option>
-        ))}
-      </select>
+      <Field label="Projekt">
+        <select
+          value={projectId ?? ''}
+          onChange={(e) => props.onProject(e.target.value === '' ? undefined : Number(e.target.value))}
+          style={{
+            width: '100%',
+            background: 'rgba(48,52,76,0.40)',
+            color: C.text,
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 9,
+            padding: '9px 12px',
+            fontSize: 14,
+            fontFamily: 'inherit',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+          }}
+        >
+          <option value="">Všechny projekty</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>{p.name || '(bez názvu)'}</option>
+          ))}
+        </select>
+      </Field>
     </div>
   );
 }

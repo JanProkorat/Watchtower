@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
 import { buildTimeOffModel, type TimeOffKind } from '../../timeOffModel.js';
-import { addMonths } from '@watchtower/ui-core';
+import { addMonths, useIsNarrow } from '@watchtower/ui-core';
 import { formatDateCz } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
 import { useDaysOffMutations } from '@watchtower/data-supabase';
@@ -22,7 +22,11 @@ export function TimeOffView(): JSX.Element {
   const [picker, setPicker] = useState<string | null>(null);
   const [focus, setFocus] = useState(() => new Date().toISOString().slice(0, 7));
   const today = new Date().toISOString().slice(0, 10);
+  const isNarrow = useIsNarrow();
   const model = buildTimeOffModel(focus, data?.daysOff ?? [], today);
+  // Phone: show only the focused month, full-width (the model returns prev/focus/
+  // next for the iPad's multi-month overview, which stacks badly on a phone).
+  const monthsShown = isNarrow ? model.months.filter((m) => m.month === focus) : model.months;
 
   const btn: React.CSSProperties = { background: 'rgba(255,255,255,0.08)', color: '#c2c9d8', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0 11px', height: 30, fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center' };
 
@@ -47,8 +51,8 @@ export function TimeOffView(): JSX.Element {
       </div>
 
       <div style={{ padding: '16px', display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-        {model.months.map((mc) => (
-          <div key={mc.month} style={{ ...glassCard(12), border: '1px solid rgba(255,255,255,0.10)', padding: 12, minWidth: 230 }}>
+        {monthsShown.map((mc) => (
+          <div key={mc.month} style={{ ...glassCard(12), border: '1px solid rgba(255,255,255,0.10)', padding: 12, ...(isNarrow ? { flex: '1 1 100%', minWidth: 0 } : { minWidth: 230 }) }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: '#f4f4f8' }}>{mc.label}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
               {DOW.map((d) => <div key={d} style={{ fontSize: 10, color: C.muted, textAlign: 'center', paddingBottom: 2 }}>{d}</div>)}

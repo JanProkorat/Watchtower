@@ -320,7 +320,7 @@ function Spinner(): JSX.Element {
 // EarningsMonthView — main export
 // ---------------------------------------------------------------------------
 
-export function EarningsMonthView({ onOpenProject }: { onOpenProject: (projectId: number) => void }): JSX.Element {
+export function EarningsMonthView({ onOpenProject }: { onOpenProject: (projectId: number, month: string) => void }): JSX.Element {
   const { data, state } = useBilling();
 
   const [selectedMonth, setSelectedMonth] = useState<string>(() =>
@@ -441,7 +441,7 @@ export function EarningsMonthView({ onOpenProject }: { onOpenProject: (projectId
                   minutes={p.minutes}
                   earnedCzk={p.earnedCzk}
                   barPct={(p.earnedCzk / maxEarned) * 100}
-                  onTap={() => onOpenProject(p.projectId)}
+                  onTap={() => onOpenProject(p.projectId, selectedMonth)}
                 />
               ))}
             </div>

@@ -11,7 +11,7 @@ import {
   TaskListView,
   TimeOffView,
 } from '@watchtower/module-timetracker';
-import { text, glassPanel, glassFillStrong, accentIcon, accentWash } from '@watchtower/ui-core';
+import { text, glassPanel, accentIcon } from '@watchtower/ui-core';
 
 // ---------------------------------------------------------------------------
 // iPhone shell — TimeTracker only, data plane (Supabase). One auth gate, then
@@ -76,8 +76,10 @@ function Shell({ signOut }: { signOut: () => Promise<void> }): JSX.Element {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [recordsSection, setRecordsSection] = useState<RecordsSection>('records-list');
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
+  // Month the caller was viewing when drilling in — detail opens on it, not today.
+  const [selectedMonth, setSelectedMonth] = useState<string | undefined>(undefined);
 
-  const openProject = (id: number) => setSelectedProject(id);
+  const openProject = (id: number, month?: string) => { setSelectedProject(id); setSelectedMonth(month); };
   const closeProject = () => setSelectedProject(null);
 
   // Switching tabs always drops any project drill-down.
@@ -104,10 +106,29 @@ function Shell({ signOut }: { signOut: () => Promise<void> }): JSX.Element {
         </button>
       </header>
 
+      {/* Records sub-nav — a top segmented control under the header (only on the
+          Záznamy tab), so it's not a second bar stacked on the bottom tab bar. */}
+      {onRecords && selectedProject === null && (
+        <div style={segmented}>
+          {RECORDS_TABS.map((r) => {
+            const active = recordsSection === r.id;
+            return (
+              <button
+                key={r.id}
+                onClick={() => selectRecords(r.id)}
+                style={{ ...segItem, ...(active ? segItemActive : null) }}
+              >
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Content */}
       <div style={{ flex: 1, minHeight: 0, overflow: selfScrolls ? 'hidden' : 'auto' }}>
         {selectedProject !== null ? (
-          <ProjectDetailView projectId={selectedProject} onBack={closeProject} />
+          <ProjectDetailView projectId={selectedProject} initialMonth={selectedMonth} onBack={closeProject} />
         ) : tab === 'dashboard' ? (
           <DashboardView />
         ) : tab === 'earnings' ? (
@@ -125,26 +146,7 @@ function Shell({ signOut }: { signOut: () => Promise<void> }): JSX.Element {
         )}
       </div>
 
-      {/* Records sub-nav — only on the Záznamy tab, above the primary tab bar. */}
-      {onRecords && selectedProject === null && (
-        <nav style={subNav}>
-          {RECORDS_TABS.map((r) => {
-            const active = recordsSection === r.id;
-            return (
-              <button
-                key={r.id}
-                onClick={() => selectRecords(r.id)}
-                style={{ ...subNavItem, ...(active ? subNavItemActive : null) }}
-              >
-                <Icon d={r.d} size={18} />
-                <span style={{ fontSize: 10, fontWeight: 600 }}>{r.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      )}
-
-      {/* Bottom primary tab bar. */}
+      {/* Bottom primary tab bar — floating liquid-glass pill. */}
       <nav style={tabBar}>
         {PRIMARY_TABS.map((t) => {
           const active = tab === t.id;
@@ -232,46 +234,61 @@ const signOutBtn: CSSProperties = {
   WebkitTapHighlightColor: 'transparent',
 };
 
-const subNav: CSSProperties = {
+// Records secondary nav — a top segmented control (glass track + active pill),
+// visually distinct from the bottom primary tab bar so the two never read as a
+// stacked double navbar.
+const segmented: CSSProperties = {
   display: 'flex',
-  gap: 6,
-  padding: '6px 8px',
+  gap: 4,
+  margin: '2px 14px 10px',
+  padding: 4,
   flexShrink: 0,
-  ...glassPanel({ radius: 0, blur: 28, fill: glassFillStrong }),
-  borderLeft: 'none',
-  borderRight: 'none',
-  borderBottom: 'none',
+  borderRadius: 13,
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  backdropFilter: 'blur(18px)',
+  WebkitBackdropFilter: 'blur(18px)',
 };
 
-const subNavItem: CSSProperties = {
+const segItem: CSSProperties = {
   flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: 2,
-  padding: '6px 0',
-  borderRadius: 10,
+  padding: '7px 4px',
+  borderRadius: 9,
   border: 'none',
   background: 'transparent',
-  color: text.dim,
+  color: text.muted,
+  fontSize: 12.5,
+  fontWeight: 600,
+  fontFamily: 'inherit',
   cursor: 'pointer',
   WebkitTapHighlightColor: 'transparent',
 };
 
-const subNavItemActive: CSSProperties = {
-  background: accentWash,
+const segItemActive: CSSProperties = {
+  background: 'rgba(255,255,255,0.12)',
   color: accentIcon,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 1px 3px rgba(0,0,0,0.28)',
 };
 
+// Bottom primary tab bar — a floating liquid-glass pill: rounded, translucent,
+// specular top edge + drop shadow, inset from the screen edges and clearing the
+// home-indicator safe area.
 const tabBar: CSSProperties = {
   display: 'flex',
   flexShrink: 0,
-  padding: '8px 8px calc(8px + env(safe-area-inset-bottom))',
   gap: 4,
-  ...glassPanel({ radius: 0, blur: 34, fill: glassFillStrong }),
-  borderLeft: 'none',
-  borderRight: 'none',
-  borderBottom: 'none',
+  margin: '0 12px',
+  marginBottom: 'calc(10px + env(safe-area-inset-bottom))',
+  padding: 7,
+  ...glassPanel({
+    radius: 26,
+    blur: 44,
+    saturate: 2.0,
+    brightness: 1.16,
+    fill: 'rgba(46,50,72,0.55)',
+    border: '1px solid rgba(255,255,255,0.14)',
+    shadow: '0 12px 34px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.28)',
+  }),
 };
 
 const tabItem: CSSProperties = {
@@ -280,16 +297,19 @@ const tabItem: CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   gap: 3,
-  padding: '6px 0',
-  borderRadius: 12,
+  padding: '8px 0',
+  borderRadius: 18,
   border: 'none',
   background: 'transparent',
   color: text.dim,
   cursor: 'pointer',
   WebkitTapHighlightColor: 'transparent',
+  transition: 'color 0.15s',
 };
 
+// Active tab reads as a lit glass lozenge inside the pill.
 const tabItemActive: CSSProperties = {
-  background: accentWash,
-  color: accentIcon,
+  background: 'linear-gradient(180deg, rgba(140,124,242,0.30), rgba(124,109,240,0.16))',
+  color: '#ffffff',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.30), 0 2px 8px rgba(124,109,240,0.28)',
 };

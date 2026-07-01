@@ -29,6 +29,9 @@ interface Props {
 export function BillingArea({ module, section }: Props): JSX.Element {
   const { status, signIn } = useSupabaseAuth();
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
+  // Month the caller was viewing when drilling in, so the detail opens on it
+  // (not on today). Undefined → detail defaults to the current month.
+  const [selectedMonth, setSelectedMonth] = useState<string | undefined>(undefined);
 
   // Drill-down resets whenever the rail navigates to a different module/section.
   useEffect(() => { setSelectedProject(null); }, [module, section]);
@@ -42,7 +45,7 @@ export function BillingArea({ module, section }: Props): JSX.Element {
   }
   if (status === 'out') return <BillingLogin signIn={signIn} />;
 
-  const openProject = (id: number) => setSelectedProject(id);
+  const openProject = (id: number, month?: string) => { setSelectedProject(id); setSelectedMonth(month); };
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden', background: 'transparent' }}>
@@ -52,7 +55,7 @@ export function BillingArea({ module, section }: Props): JSX.Element {
           in this wrapper. */}
       <div style={{ flex: 1, overflow: module === 'dashboard' || section === 'records-grid' ? 'hidden' : 'auto', minHeight: 0 }}>
         {selectedProject !== null ? (
-          <ProjectDetailView projectId={selectedProject} onBack={() => setSelectedProject(null)} />
+          <ProjectDetailView projectId={selectedProject} initialMonth={selectedMonth} onBack={() => setSelectedProject(null)} />
         ) : module === 'dashboard' ? (
           <DashboardView />
         ) : section === 'earnings' ? (

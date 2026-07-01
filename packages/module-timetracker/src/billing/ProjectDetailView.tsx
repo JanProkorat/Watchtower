@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
 import { formatCzk, formatHours, formatDateCz } from '@watchtower/ui-core';
-import { czechMonthLabel, useIsNarrow } from '@watchtower/ui-core';
+import { czechMonthLabel, addMonths, useIsNarrow } from '@watchtower/ui-core';
 import {
   rollupEarningsByContract,
   activeContract,
@@ -115,6 +115,24 @@ const glassField: React.CSSProperties = {
   fontFamily: 'inherit',
   width: '100%',
   boxSizing: 'border-box',
+};
+
+// Compact prev/next stepper button for the detail's month navigation.
+const monthStepBtn: React.CSSProperties = {
+  width: 30,
+  height: 30,
+  borderRadius: 8,
+  border: '1px solid rgba(255,255,255,0.12)',
+  background: 'rgba(255,255,255,0.06)',
+  color: '#c9bdff',
+  fontSize: 18,
+  lineHeight: 1,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -347,14 +365,18 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
 export function ProjectDetailView({
   projectId,
   onBack,
+  initialMonth,
 }: {
   projectId: number;
   onBack: () => void;
+  /** Month (YYYY-MM) the caller was viewing — the detail opens on it, not today. */
+  initialMonth?: string;
 }): JSX.Element {
   const { data, state, patchContracts, patchWorklogs } = useBilling();
 
   const today = new Date().toISOString().slice(0, 10);
-  const month = today.slice(0, 7);
+  // Open on the caller's month; navigable within the detail via the stepper.
+  const [month, setMonth] = useState(initialMonth ?? today.slice(0, 7));
 
   // Editing is only allowed when dataset is fresh (live).
   const editable = canEdit(state);
@@ -527,8 +549,21 @@ export function ProjectDetailView({
               <div style={{ fontSize: 11, fontWeight: 600, color: glassText.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
                 Měsíc
               </div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: glassText.primary }}>
-                {czechMonthLabel(month)}
+              {/* Navigable month stepper — the detail's totals/ledger follow it. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  onClick={() => setMonth(addMonths(month, -1))}
+                  aria-label="Předchozí měsíc"
+                  style={monthStepBtn}
+                >‹</button>
+                <div style={{ fontSize: 16, fontWeight: 600, color: glassText.primary, minWidth: 120, textAlign: 'center' }}>
+                  {czechMonthLabel(month)}
+                </div>
+                <button
+                  onClick={() => setMonth(addMonths(month, 1))}
+                  aria-label="Další měsíc"
+                  style={monthStepBtn}
+                >›</button>
               </div>
             </div>
 
