@@ -27,7 +27,18 @@ export function createWebSocketTransport(opts: {
   let counter = 0;
 
   ws.onopen = () => { open = true; outbox.splice(0).forEach((m) => ws.send(m)); opts.onOpen?.(); };
-  ws.onclose = () => { opts.onClose?.(); };
+  // Signal a dead socket exactly once. A failed connect surfaces differently
+  // across engines — iOS WKWebView often fires `error` alone (no following
+  // `close`), desktop browsers fire `error` then `close`. Keying the reconnect
+  // loop off `close` only would miss the WKWebView case, so also treat a
+  // *pre-open* error as a close (a connect failure). We deliberately ignore
+  // errors AFTER the socket opened: iOS can fire spurious `error` events on a
+  // perfectly healthy connection, and a real drop always brings its own
+  // `close`. Dedupe so a browser firing both error+close doesn't double-signal.
+  let closedOnce = false;
+  const signalClose = () => { if (closedOnce) return; closedOnce = true; opts.onClose?.(); };
+  ws.onclose = signalClose;
+  ws.onerror = () => { if (!open) signalClose(); };
   ws.onmessage = (e: MessageEvent) => {
     const raw = typeof e.data === 'string' ? e.data : String(e.data);
     let msg;
