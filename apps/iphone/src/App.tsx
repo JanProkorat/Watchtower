@@ -156,8 +156,8 @@ function Shell({ signOut }: { signOut: () => Promise<void> }): JSX.Element {
               onClick={() => selectTab(t.id)}
               style={{ ...tabItem, ...(active ? tabItemActive : null) }}
             >
-              <Icon d={t.d} size={24} />
-              <span style={{ fontSize: 11, fontWeight: 600 }}>{t.label}</span>
+              <Icon d={t.d} size={20} />
+              <span style={{ fontSize: 10, fontWeight: 600 }}>{t.label}</span>
             </button>
           );
         })}
@@ -277,17 +277,17 @@ const tabBar: CSSProperties = {
   display: 'flex',
   flexShrink: 0,
   gap: 4,
-  margin: '0 12px',
-  marginBottom: 'calc(10px + env(safe-area-inset-bottom))',
-  padding: 7,
+  margin: '0 14px',
+  marginBottom: 'calc(8px + env(safe-area-inset-bottom))',
+  padding: 4,
   ...glassPanel({
-    radius: 26,
+    radius: 20,
     blur: 44,
     saturate: 2.0,
     brightness: 1.16,
     fill: 'rgba(46,50,72,0.55)',
     border: '1px solid rgba(255,255,255,0.14)',
-    shadow: '0 12px 34px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.28)',
+    shadow: '0 10px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.26)',
   }),
 };
 
@@ -296,9 +296,9 @@ const tabItem: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  gap: 3,
-  padding: '8px 0',
-  borderRadius: 18,
+  gap: 2,
+  padding: '5px 0',
+  borderRadius: 15,
   border: 'none',
   background: 'transparent',
   color: text.dim,
