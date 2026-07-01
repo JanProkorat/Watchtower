@@ -4,19 +4,19 @@ import type {
   WorkspaceLeaf,
   WorkspaceNode,
   WorkspaceSplit,
-} from '@watchtower/shared/layout.js';
+} from './layout.js';
 import { newNodeId } from './newNodeId.js';
 
-export function leaf(id: NodeId, tabId: TabId): WorkspaceLeaf {
+export function leaf<TLeaf = TabId>(id: NodeId, tabId: TLeaf): WorkspaceLeaf<TLeaf> {
   return { kind: 'leaf', id, tabId };
 }
 
-export function split(
+export function split<TLeaf = TabId>(
   id: NodeId,
   dir: 'row' | 'col',
-  children: WorkspaceNode[],
+  children: WorkspaceNode<TLeaf>[],
   sizes?: number[],
-): WorkspaceSplit {
+): WorkspaceSplit<TLeaf> {
   return {
     kind: 'split',
     id,
@@ -34,7 +34,7 @@ function evenSizes(n: number): number[] {
   return arr;
 }
 
-export function findLeafById(node: WorkspaceNode, id: NodeId): WorkspaceLeaf | null {
+export function findLeafById<TLeaf = TabId>(node: WorkspaceNode<TLeaf>, id: NodeId): WorkspaceLeaf<TLeaf> | null {
   if (node.kind === 'leaf') return node.id === id ? node : null;
   for (const child of node.children) {
     const hit = findLeafById(child, id);
@@ -43,7 +43,7 @@ export function findLeafById(node: WorkspaceNode, id: NodeId): WorkspaceLeaf | n
   return null;
 }
 
-export function findLeafByTabId(node: WorkspaceNode, tabId: TabId): WorkspaceLeaf | null {
+export function findLeafByTabId<TLeaf = TabId>(node: WorkspaceNode<TLeaf>, tabId: TLeaf): WorkspaceLeaf<TLeaf> | null {
   if (node.kind === 'leaf') return node.tabId === tabId ? node : null;
   for (const child of node.children) {
     const hit = findLeafByTabId(child, tabId);
@@ -52,7 +52,7 @@ export function findLeafByTabId(node: WorkspaceNode, tabId: TabId): WorkspaceLea
   return null;
 }
 
-export function firstLeafInPreOrder(node: WorkspaceNode): WorkspaceLeaf | null {
+export function firstLeafInPreOrder<TLeaf = TabId>(node: WorkspaceNode<TLeaf>): WorkspaceLeaf<TLeaf> | null {
   if (node.kind === 'leaf') return node;
   for (const child of node.children) {
     const hit = firstLeafInPreOrder(child);
@@ -61,16 +61,16 @@ export function firstLeafInPreOrder(node: WorkspaceNode): WorkspaceLeaf | null {
   return null;
 }
 
-export function collectTabIds(node: WorkspaceNode): TabId[] {
+export function collectTabIds<TLeaf = TabId>(node: WorkspaceNode<TLeaf>): TLeaf[] {
   if (node.kind === 'leaf') return [node.tabId];
   return node.children.flatMap(collectTabIds);
 }
 
-export function replaceLeafTab(
-  node: WorkspaceNode,
+export function replaceLeafTab<TLeaf = TabId>(
+  node: WorkspaceNode<TLeaf>,
   leafId: NodeId,
-  newTabId: TabId,
-): WorkspaceNode {
+  newTabId: TLeaf,
+): WorkspaceNode<TLeaf> {
   if (node.kind === 'leaf') {
     return node.id === leafId ? { ...node, tabId: newTabId } : node;
   }
@@ -82,18 +82,18 @@ export function replaceLeafTab(
 
 export type SplitPosition = 'before' | 'after';
 
-function containsTabId(node: WorkspaceNode, tabId: TabId): boolean {
+function containsTabId<TLeaf>(node: WorkspaceNode<TLeaf>, tabId: TLeaf): boolean {
   if (node.kind === 'leaf') return node.tabId === tabId;
   return node.children.some((c) => containsTabId(c, tabId));
 }
 
-export function splitLeaf(
-  node: WorkspaceNode,
+export function splitLeaf<TLeaf = TabId>(
+  node: WorkspaceNode<TLeaf>,
   targetLeafId: NodeId,
   dir: 'row' | 'col',
   position: SplitPosition,
-  newTabId: TabId,
-): WorkspaceNode {
+  newTabId: TLeaf,
+): WorkspaceNode<TLeaf> {
   // Mounting the same tab in two leaves collides on the xterm slot
   // registry (the host can only attach to one DOM node), so the second
   // leaf would steal the terminal and leave the first blank. Refuse.
@@ -101,13 +101,13 @@ export function splitLeaf(
   return splitLeafInner(node, targetLeafId, dir, position, newTabId);
 }
 
-function splitLeafInner(
-  node: WorkspaceNode,
+function splitLeafInner<TLeaf>(
+  node: WorkspaceNode<TLeaf>,
   targetLeafId: NodeId,
   dir: 'row' | 'col',
   position: SplitPosition,
-  newTabId: TabId,
-): WorkspaceNode {
+  newTabId: TLeaf,
+): WorkspaceNode<TLeaf> {
   if (node.kind === 'leaf') {
     if (node.id !== targetLeafId) return node;
     const newLeaf = leaf(newNodeId(), newTabId);
@@ -122,11 +122,11 @@ function splitLeafInner(
   };
 }
 
-export function unmountLeaf(node: WorkspaceNode, leafId: NodeId): WorkspaceNode | null {
+export function unmountLeaf<TLeaf = TabId>(node: WorkspaceNode<TLeaf>, leafId: NodeId): WorkspaceNode<TLeaf> | null {
   if (node.kind === 'leaf') {
     return node.id === leafId ? null : node;
   }
-  const newChildren: WorkspaceNode[] = [];
+  const newChildren: WorkspaceNode<TLeaf>[] = [];
   for (const c of node.children) {
     const after = unmountLeaf(c, leafId);
     if (after) newChildren.push(after);
@@ -140,11 +140,11 @@ export function unmountLeaf(node: WorkspaceNode, leafId: NodeId): WorkspaceNode 
   };
 }
 
-export function setSizes(
-  node: WorkspaceNode,
+export function setSizes<TLeaf = TabId>(
+  node: WorkspaceNode<TLeaf>,
   splitId: NodeId,
   sizes: number[],
-): WorkspaceNode {
+): WorkspaceNode<TLeaf> {
   if (node.kind === 'leaf') return node;
   if (node.id === splitId) {
     return { ...node, sizes };
