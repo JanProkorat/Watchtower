@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
-import { useBilling } from '../../../state/useBilling.js';
-import { useTaskMutations } from '../../../state/useTaskMutations.js';
+import { useBilling } from '@watchtower/data-supabase';
+import { useTaskMutations } from '@watchtower/data-supabase';
 import { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
 import type { TaskRow, EpicRow, ProjectRow } from '@watchtower/shared/billing/types.js';
-import { canEdit, canEditTask, type TaskWriteInput } from '../../../state/billingWrites.js';
+import { canEdit, canEditTask, type TaskWriteInput } from '@watchtower/data-supabase';
 import { C } from '../reports/tokens.js';
 import { glassPanel, glassCard, ctaGradient, ctaGlow, glassFillStrong } from '@watchtower/ui-core';
 

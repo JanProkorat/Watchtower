@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useBilling } from '../../../state/useBilling.js';
-import { useWorklogMutations } from '../../../state/useWorklogMutations.js';
+import { useBilling } from '@watchtower/data-supabase';
+import { useWorklogMutations } from '@watchtower/data-supabase';
 import { groupWorklogsByDay } from '@watchtower/shared/billing/records/worklog-list.js';
 import { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
 import type { TaskRow, WorklogRow, ContractRow } from '@watchtower/shared/billing/types.js';
-import { canEdit, computeDerivedForWrite, type WorklogWriteInput } from '../../../state/billingWrites.js';
+import { canEdit, computeDerivedForWrite, type WorklogWriteInput } from '@watchtower/data-supabase';
 import { addMonths, czechMonthLabel } from '@watchtower/ui-core';
 import { formatHours, formatDateCz, formatCzk } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';

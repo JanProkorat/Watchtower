@@ -9,8 +9,8 @@ import {
   type BillingDataset,
   type RawWorklogRow,
   type RawEpicRow,
-} from '../../apps/ipad/src/state/billingCache.js';
-import type { RawTaskRow } from '../../apps/ipad/src/state/billingCache.js';
+} from '@watchtower/data-supabase';
+import type { RawTaskRow } from '@watchtower/data-supabase';
 import type { ContractRow, DayOffRow, ProjectRow, WorklogRow } from '@watchtower/shared/billing/types.js';
 
 // ---------------------------------------------------------------------------
@@ -308,8 +308,8 @@ describe('loadCache — slice 3a shape guard', () => {
   });
 });
 
-import { mapContractRow } from '../../apps/ipad/src/state/billingCache.js';
-import type { RawContractRow } from '../../apps/ipad/src/state/billingCache.js';
+import { mapContractRow } from '@watchtower/data-supabase';
+import type { RawContractRow } from '@watchtower/data-supabase';
 
 describe('mapContractRow', () => {
   it('maps a raw contract row incl. syncId, nullable end_date/md_limit', () => {

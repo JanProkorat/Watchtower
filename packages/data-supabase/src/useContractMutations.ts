@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { getSupabase } from '../lib/supabaseClient.js';
+import { getSupabase } from './supabaseClient.js';
 import { contractsOverlap } from '@watchtower/shared/billing/contracts-overlap.js';
 import { previousDay } from '@watchtower/shared/billing/date-helpers.js';
 import type { ContractRow, WorklogRow } from '@watchtower/shared/billing/types.js';

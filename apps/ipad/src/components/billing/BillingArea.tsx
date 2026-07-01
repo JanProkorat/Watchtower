@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSupabaseAuth } from '../../state/useSupabaseAuth.js';
+import { useSupabaseAuth } from '@watchtower/data-supabase';
 import type { BillingSection } from '../Rail.js';
 import { text } from '@watchtower/ui-core';
 import { BillingLogin } from './BillingLogin.js';

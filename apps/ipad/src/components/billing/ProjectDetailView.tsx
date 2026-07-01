@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useBilling } from '../../state/useBilling.js';
+import { useBilling } from '@watchtower/data-supabase';
 import { formatCzk, formatHours, formatDateCz } from '@watchtower/ui-core';
 import { czechMonthLabel } from '@watchtower/ui-core';
 import {
@@ -7,8 +7,8 @@ import {
   activeContract,
   rateLabel,
 } from '@watchtower/ui-core';
-import { useContractMutations } from '../../state/useContractMutations.js';
-import { canEdit, type ContractWriteInput } from '../../state/billingWrites.js';
+import { useContractMutations } from '@watchtower/data-supabase';
+import { canEdit, type ContractWriteInput } from '@watchtower/data-supabase';
 import type { ContractRow } from '@watchtower/shared/billing/types.js';
 import {
   glassCard,

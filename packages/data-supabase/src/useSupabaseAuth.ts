@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { getSupabase } from '../lib/supabaseClient.js';
+import { getSupabase } from './supabaseClient.js';
 
 // ---------------------------------------------------------------------------
 // Pure helper — maps a Supabase auth error to a Czech user-facing message.

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useBilling } from '../../state/useBilling.js';
+import { useBilling } from '@watchtower/data-supabase';
 import { aggregateMonthEarnings, trailingMonths } from '@watchtower/shared/billing/earnings.js';
 import { formatCzk, formatHours } from '@watchtower/ui-core';
 import { czechMonthLabel, addMonths } from '@watchtower/ui-core';

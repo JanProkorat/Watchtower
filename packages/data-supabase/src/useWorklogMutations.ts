@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { getSupabase } from '../lib/supabaseClient.js';
+import { getSupabase } from './supabaseClient.js';
 import type { WorklogRow, ContractRow, TaskRow } from '@watchtower/shared/billing/types.js';
 import {
   computeDerivedForWrite,

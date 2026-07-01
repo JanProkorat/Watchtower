@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { getSupabase } from '../lib/supabaseClient.js';
+import { getSupabase } from './supabaseClient.js';
 import type { DayOffRow } from '@watchtower/shared/billing/types.js';
 import { buildDayOffUpsert, buildDayOffDelete, applyDayOffWrite } from './billingWrites.js';
 

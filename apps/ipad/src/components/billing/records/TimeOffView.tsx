@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { useBilling } from '../../../state/useBilling.js';
+import { useBilling } from '@watchtower/data-supabase';
 import { buildTimeOffModel, type TimeOffKind } from '../../../state/timeOffModel.js';
 import { addMonths } from '@watchtower/ui-core';
 import { formatDateCz } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
-import { useDaysOffMutations } from '../../../state/useDaysOffMutations.js';
-import { canEdit } from '../../../state/billingWrites.js';
+import { useDaysOffMutations } from '@watchtower/data-supabase';
+import { canEdit } from '@watchtower/data-supabase';
 import { glassPanel, glassCard } from '@watchtower/ui-core';
 
 const KIND_COLOR: Record<TimeOffKind, string> = { vacation: '#22D3EE', sick: '#f87171', other: '#fbbf24', holiday: '#6d5fbb' };

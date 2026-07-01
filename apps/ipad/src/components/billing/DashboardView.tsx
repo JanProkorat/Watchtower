@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useBilling } from '../../state/useBilling.js';
+import { useBilling } from '@watchtower/data-supabase';
 import { dashboardKpis } from '@watchtower/shared/billing/dashboard.js';
 import { contractBurn } from '@watchtower/shared/billing/contracts.js';
 import { activityHeatmap } from '@watchtower/shared/billing/heatmap.js';

@@ -3,7 +3,7 @@
 // The Settings (Nastavení) module. Minimal for now — it's the new home of the
 // account sign-out, moved out of the billing content header. Glass surfaces on
 // the ambient background, consistent with the rest of the app.
-import { useSupabaseAuth } from '../state/useSupabaseAuth.js';
+import { useSupabaseAuth } from '@watchtower/data-supabase';
 import { glassCard, ctaGradient, ctaGlow, text } from '@watchtower/ui-core';
 
 export function SettingsModule(): JSX.Element {

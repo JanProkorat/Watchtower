@@ -11,7 +11,8 @@
     "paths": {
       "@watchtower/shared/*": ["../../packages/shared/src/*"],
       "@watchtower/transport": ["../../packages/transport/src/index.ts"],
-      "@watchtower/ui-core": ["../../packages/ui-core/src/index.ts"]
+      "@watchtower/ui-core": ["../../packages/ui-core/src/index.ts"],
+      "@watchtower/data-supabase": ["../../packages/data-supabase/src/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"]

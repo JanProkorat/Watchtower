@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fetchAllPaged, SUPABASE_PAGE_SIZE } from '../../apps/ipad/src/state/paginate.js';
+import { fetchAllPaged, SUPABASE_PAGE_SIZE } from '@watchtower/data-supabase';
 
 // ---------------------------------------------------------------------------
 // fetchAllPaged — PostgREST pagination. Worklog history exceeds the 1000-row
