@@ -1,6 +1,6 @@
 import { DASHBOARD_TAB_ID, type TabId, type WorkspaceNode } from '@watchtower/shared/layout.js';
-import { leaf } from './workspaceTreeOps.js';
-import { newNodeId } from './newNodeId.js';
+import { leaf } from '@watchtower/shared/workspaceTreeOps.js';
+import { newNodeId } from '@watchtower/shared/newNodeId.js';
 
 export function pruneLayout(node: WorkspaceNode, validTabs: Set<string>): WorkspaceNode {
   const cleaned = pruneRec(node, validTabs);

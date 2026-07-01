@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pruneLayout } from '../../../apps/desktop/src/layout/pruneLayout.js';
-import { leaf, split } from '../../../apps/desktop/src/layout/workspaceTreeOps.js';
+import { leaf, split } from '@watchtower/shared/workspaceTreeOps.js';
 import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 
 describe('pruneLayout', () => {
