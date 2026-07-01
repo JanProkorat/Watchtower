@@ -4,7 +4,8 @@ name: CI
 # vitest strips types (esbuild) so the suite passed, and the only prior PR check
 # was GitGuardian (secret scanning) — no tsc ran. See docs note typecheck-not-in-ci.
 #
-# `typecheck:ci` covers all packages including apps/desktop (type errors fixed in #121).
+# `typecheck:ci` covers all workspaces — shared, transport, electron, orchestrator,
+# and apps/{desktop,ipad,iphone} (desktop type drift fixed in #121; iphone folded in too).
 
 on:
   pull_request:
