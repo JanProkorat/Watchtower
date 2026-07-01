@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { tmpdir } from 'node:os';
 import { mkdtempSync } from 'node:fs';
 import path from 'node:path';
@@ -10,6 +10,12 @@ import { SyncService } from '../../../orchestrator/sync/service.js';
 import { SettingsRepo } from '../../../orchestrator/db/repositories/settings.js';
 import { ProjectsRepo } from '../../../orchestrator/db/repositories/projects.js';
 import { pushAll } from '../../../orchestrator/sync/push.js';
+import * as purgeModule from '../../../orchestrator/sync/purge.js';
+
+vi.mock('../../../orchestrator/sync/purge.js', () => ({
+  purgeDue: vi.fn(() => false),
+  purgeTombstones: vi.fn(async () => ({ purged: {}, ranAt: '' })),
+}));
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
@@ -88,6 +94,35 @@ describe('SyncService offline behaviour', () => {
     // No purge ran → throttle key never written.
     expect(new SettingsRepo(db).getString('sync.purge.lastRunAt', '')).toBe('');
   });
+
+  it('purge throw does not flip ok to false — failure-isolation contract', async () => {
+    // Arrange: stub store converges trivially (no rows to push/pull).
+    const stub = {
+      query: async () => ({ rows: [] }),
+      healthCheck: async () => true,
+      end: async () => {},
+    };
+    // Make purgeDue return true so the purge block is entered, then make
+    // purgeTombstones reject to exercise the inner catch.
+    vi.mocked(purgeModule.purgeDue).mockReturnValueOnce(true);
+    vi.mocked(purgeModule.purgeTombstones).mockRejectedValueOnce(new Error('purge exploded'));
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const svc = new SyncService({ db: freshSqlite(), store: stub as any, now: () => Date.parse('2026-07-01T00:00:00.000Z') });
+      const res = await svc.syncNow();
+
+      // The cycle converged, so ok must remain true even though purge threw.
+      expect(res.ok).toBe(true);
+      // The error was swallowed — purge key must not appear in the result.
+      expect(res.purge).toBeUndefined();
+      // The throw was logged, not silently dropped.
+      expect(warnSpy).toHaveBeenCalledOnce();
+      expect(warnSpy.mock.calls[0][0]).toContain('[purge]');
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });
 
 describe('SyncService live-PG purge', () => {
@@ -101,6 +136,10 @@ describe('SyncService live-PG purge', () => {
     const p = new ProjectsRepo(db).create({ name: 'Doomed' });
     const NOW = Date.parse('2026-07-01T12:00:00.000Z');
     const OLD = new Date(NOW - 40 * 24 * 60 * 60 * 1000).toISOString();
+    // The purge module is mocked globally; restore real implementations for this integration test.
+    const { purgeDue: realPurgeDue, purgeTombstones: realPurgeTombstones } = await vi.importActual<typeof purgeModule>('../../../orchestrator/sync/purge.js');
+    vi.mocked(purgeModule.purgeDue).mockImplementation(realPurgeDue);
+    vi.mocked(purgeModule.purgeTombstones).mockImplementation(realPurgeTombstones);
     const svc = new SyncService({ db, store, now: () => NOW });
     await svc.syncNow(); // push it up
     const syncId = (db.prepare(`SELECT sync_id FROM projects WHERE id=?`).get(p.id) as any).sync_id;
