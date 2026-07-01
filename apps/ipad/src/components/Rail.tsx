@@ -10,12 +10,11 @@ import { glassPanel, accentWash, accentIcon, text } from '@watchtower/ui-core';
 
 export type RailModule = 'dashboard' | 'instances' | 'remote' | 'billing' | 'settings';
 
-// Billing sub-routes promoted into the rail under the Fakturace parent. The
-// former 'dashboard' billing tab is now the top-level Přehled module, so it is
-// intentionally absent here.
-export type BillingSection =
-  | 'earnings' | 'reports'
-  | 'records-list' | 'records-grid' | 'records-tasks' | 'records-timeoff';
+// Billing sub-routes are owned by the TimeTracker module (promoted into the rail
+// under the Fakturace parent). Re-exported so app-level nav keeps importing it
+// from the Rail.
+export type { BillingSection } from '@watchtower/module-timetracker';
+import type { BillingSection } from '@watchtower/module-timetracker';
 
 interface Props {
   active: RailModule;

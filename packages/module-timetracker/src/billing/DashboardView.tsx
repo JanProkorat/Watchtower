@@ -6,7 +6,7 @@ import { activityHeatmap } from '@watchtower/shared/billing/heatmap.js';
 import { topProjects } from '@watchtower/shared/billing/earnings.js';
 import { formatCzk, formatHours, formatDateCz } from '@watchtower/ui-core';
 import { glassCard, glassPanel, text as glassText, accent as glassAccent } from '@watchtower/ui-core';
-import { PullToRefresh } from '../PullToRefresh.js';
+import { PullToRefresh } from '@watchtower/ui-core';
 
 // ---------------------------------------------------------------------------
 // Design tokens

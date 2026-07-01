@@ -20,6 +20,7 @@ export default defineConfig({
       '@watchtower/transport': path.resolve(__dirname, '../../packages/transport/src'),
       '@watchtower/ui-core': path.resolve(__dirname, '../../packages/ui-core/src'),
       '@watchtower/data-supabase': path.resolve(__dirname, '../../packages/data-supabase/src'),
+      '@watchtower/module-timetracker': path.resolve(__dirname, '../../packages/module-timetracker/src'),
       // noVNC publishes exports as a bare string rather than a subpath map,
       // which confuses Vite's package-exports resolver. Point the subpath
       // import directly at the file so the build succeeds.

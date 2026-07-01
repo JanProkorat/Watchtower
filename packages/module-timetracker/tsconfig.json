@@ -10,8 +10,9 @@
     "baseUrl": ".",
     "paths": {
       "@watchtower/shared/*": ["../shared/src/*"],
-      "@watchtower/ui-core": ["../ui-core/src/index.ts"]
+      "@watchtower/ui-core": ["../ui-core/src/index.ts"],
+      "@watchtower/data-supabase": ["../data-supabase/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

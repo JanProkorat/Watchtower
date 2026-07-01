@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { relativeTimeCz } from '../../apps/ipad/src/components/billing/DashboardView.js';
+import { relativeTimeCz } from '../../packages/module-timetracker/src/billing/DashboardView.js';
 
 const NOW = new Date('2026-06-27T10:00:00Z').getTime();
 const iso = (ms: number) => new Date(ms).toISOString();

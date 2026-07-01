@@ -1,7 +1,7 @@
 // apps/ipad/src/components/billing/ReportsView.tsx
 import { useMemo } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
-import { useReportsFilters } from '../../state/useReportsFilters.js';
+import { useReportsFilters } from '../useReportsFilters.js';
 import { trendSeries, rateChangeMarkers } from '@watchtower/shared/billing/reports/trend.js';
 import { earningsSummary } from '@watchtower/shared/billing/reports/earnings-summary.js';
 import { projectBreakdown } from '@watchtower/shared/billing/reports/breakdown.js';

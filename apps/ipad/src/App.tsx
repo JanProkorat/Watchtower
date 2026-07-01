@@ -16,7 +16,7 @@ import { TabStrip } from './components/TabStrip.js';
 import { TerminalView } from './components/TerminalView.js';
 import { SpawnModal } from './components/SpawnModal.js';
 import { RemoteMacView } from './components/RemoteMacView.js';
-import { BillingArea } from './components/billing/BillingArea.js';
+import { BillingArea } from '@watchtower/module-timetracker';
 import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
 import { ToastStack, type ToastItem } from './components/ToastStack.js';

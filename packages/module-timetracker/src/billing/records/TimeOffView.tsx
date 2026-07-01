@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
-import { buildTimeOffModel, type TimeOffKind } from '../../../state/timeOffModel.js';
+import { buildTimeOffModel, type TimeOffKind } from '../../timeOffModel.js';
 import { addMonths } from '@watchtower/ui-core';
 import { formatDateCz } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
