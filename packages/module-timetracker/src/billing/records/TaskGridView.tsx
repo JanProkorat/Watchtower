@@ -77,7 +77,8 @@ export function TaskGridView(): JSX.Element {
   const hrsVal = (min: number): string => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 }).format(min / 60);
   const czkVal = (czk: number): string => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(czk);
 
-  const btn: React.CSSProperties = { background: 'rgba(255,255,255,0.08)', color: '#c2c9d8', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0 14px', height: 30, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
+  const stepBtn: React.CSSProperties = { width: 34, height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c9bdff', fontSize: 18, lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
+  const flatBtn: React.CSSProperties = { height: 34, padding: '0 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c2c9d8', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
   // Column widths — slimmer on phone width so the two frozen columns don't eat
   // the whole viewport. Σ sits right after the task name, frozen left alongside it.
   const cell = isNarrow ? 30 : CELL;
@@ -96,13 +97,21 @@ export function TaskGridView(): JSX.Element {
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', background: 'transparent', height: '100%', minHeight: 0, color: C.text, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ flexShrink: 0, zIndex: 11, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
-        <button style={btn} onClick={() => setMonth(addMonths(month, -1))}>‹</button>
-        <div style={{ fontSize: 14, fontWeight: 600, minWidth: 130, textAlign: 'center', color: '#f4f4f8' }}>{czechMonthLabel(month)}</div>
-        <button style={btn} onClick={() => setMonth(addMonths(month, 1))}>›</button>
-        <button style={btn} onClick={() => setMonth(new Date().toISOString().slice(0, 7))}>Dnes</button>
-        <div style={{ flex: 1 }} />
-        <select value={projectId ?? ''} onChange={(e) => setProjectId(e.target.value === '' ? undefined : Number(e.target.value))} style={{ ...btn, height: 34, padding: '0 12px' }}>
+      <div style={{ flexShrink: 0, zIndex: 11, padding: '10px 16px 12px', display: 'flex', flexDirection: 'column', gap: 10, ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+        {/* Row 1: month stepper (‹ label ›) + Dnes */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button style={stepBtn} onClick={() => setMonth(addMonths(month, -1))} aria-label="Předchozí měsíc">‹</button>
+          <div style={{ minWidth: 128, textAlign: 'center', fontSize: 15, fontWeight: 700, color: '#f4f4f8' }}>{czechMonthLabel(month)}</div>
+          <button style={stepBtn} onClick={() => setMonth(addMonths(month, 1))} aria-label="Další měsíc">›</button>
+          <div style={{ flex: 1 }} />
+          <button style={flatBtn} onClick={() => setMonth(new Date().toISOString().slice(0, 7))}>Dnes</button>
+        </div>
+        {/* Row 2: full-width project filter */}
+        <select
+          value={projectId ?? ''}
+          onChange={(e) => setProjectId(e.target.value === '' ? undefined : Number(e.target.value))}
+          style={{ width: '100%', height: 36, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c2c9d8', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}
+        >
           <option value="">Všechny projekty</option>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name || '(bez názvu)'}</option>)}
         </select>
