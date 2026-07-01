@@ -6,11 +6,13 @@ import { clampGranularity } from '../../useReportsFilters.js';
 import type { Granularity } from '@watchtower/shared/billing/reports/buckets.js';
 import type { ProjectRow } from '@watchtower/shared/billing/types.js';
 
+// Short labels so all five presets fit one row of the segmented control (the
+// OBDOBÍ caption already conveys these are time periods).
 const PRESETS: { key: Preset; label: string }[] = [
   { key: '7d', label: '7 dní' },
   { key: '30d', label: '30 dní' },
-  { key: 'month', label: 'Tento měsíc' },
-  { key: 'year', label: 'Tento rok' },
+  { key: 'month', label: 'Měsíc' },
+  { key: 'year', label: 'Rok' },
   { key: 'all', label: 'Vše' },
 ];
 
@@ -32,18 +34,33 @@ interface ReportsFilterBarProps {
   onProject(id: number | undefined): void;
 }
 
-function pill(active: boolean, disabled = false): React.CSSProperties {
+// Glass segmented-control track — one per field (Období, Rozlišení).
+const segTrack: React.CSSProperties = {
+  display: 'flex',
+  gap: 3,
+  padding: 3,
+  borderRadius: 11,
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.08)',
+};
+
+// Equal-width segment; the active one fills as a lit glass cell.
+function segCell(active: boolean, disabled = false): React.CSSProperties {
   return {
-    padding: '5px 12px',
-    borderRadius: 7,
-    border: active ? '1px solid rgba(168,156,240,0.30)' : '1px solid transparent',
-    fontSize: 13,
+    flex: 1,
+    padding: '7px 4px',
+    borderRadius: 8,
+    border: 'none',
+    fontSize: 12.5,
     fontWeight: 600,
     fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+    textAlign: 'center',
     cursor: disabled ? 'default' : 'pointer',
-    opacity: disabled ? 0.35 : 1,
+    opacity: disabled ? 0.32 : 1,
     background: active ? accentWash : 'transparent',
     color: active ? accent : text.muted,
+    boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 3px rgba(0,0,0,0.25)' : 'none',
     transition: 'background 0.15s, color 0.15s',
   };
 }
@@ -78,9 +95,9 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
       }}
     >
       <Field label="Období">
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={segTrack}>
           {PRESETS.map((p) => (
-            <button key={p.key} style={pill(preset === p.key)} onClick={() => props.onPreset(p.key)}>
+            <button key={p.key} style={segCell(preset === p.key)} onClick={() => props.onPreset(p.key)}>
               {p.label}
             </button>
           ))}
@@ -88,14 +105,14 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
       </Field>
 
       <Field label="Rozlišení">
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={segTrack}>
           {GRANS.map((g) => {
             const disabled = granDisabled(g.key);
             return (
               <button
                 key={g.key}
                 disabled={disabled}
-                style={pill(granularity === g.key, disabled)}
+                style={segCell(granularity === g.key, disabled)}
                 onClick={() => !disabled && props.onGranularity(g.key)}
               >
                 {g.label}
