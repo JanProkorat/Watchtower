@@ -31,3 +31,46 @@ Epic #77. Chosen approach: **extract shared packages first**, then build `apps/i
 - TT views are laid out for iPad width; iPhone needs real layout work (P6), likely iterative on-device.
 - iPhone device install needs the Apple dev account; **simulator works without home network** (Supabase is cloud) — matches the "no home wifi/ethernet" constraint.
 - Messaging deferred (see scope).
+
+---
+
+## Progress & resume (2026-07-01)
+
+**Extraction DONE (P0–P3), committed + pushed on `feat/76-iphone-shell`.** Resume at **P4**.
+
+**Worktree:** `/Users/jan/Projects/Watchtower/.claude/worktrees/iphone-76` (branch `feat/76-iphone-shell`, tracks origin). `node_modules` already installed here.
+
+**Packages created** (source-aliased, no build step — pattern = `@watchtower/transport`):
+`@watchtower/ui-core` (glass tokens, cz format, `PullToRefresh`), `@watchtower/data-supabase`
+(`getSupabase`, `useSupabaseAuth`, `useBilling` + offline cache, 4 mutation hooks, `billingWrites`),
+`@watchtower/module-timetracker` (barrel exports `BillingArea` + `DashboardView`,`EarningsMonthView`,
+`ProjectDetailView`,`ReportsView`,`WorklogListView`,`TaskListView`,`TaskGridView`,`TimeOffView`,
+`BillingSection`, `useReportsFilters`, `timeOffModel`). All data-plane only — no live-plane coupling.
+
+**Wiring a package into an app:** `package.json` `{name, private, type:module, main:"src/index.ts", exports}`;
+`tsconfig.json` extends `../../tsconfig.base.json`, `moduleResolution:Bundler`, `jsx:react-jsx` if it has
+`.tsx`, `types:["vite/client"]` if it uses `import.meta.env`, `paths` to the packages it imports; then in
+the app add a vite `resolve.alias` **and** a tsconfig `paths` entry, and run `npm install` (creates the
+`node_modules/@watchtower/<pkg>` symlink so vitest/node resolve it).
+
+### P4 — scaffold `apps/iphone`
+- `package.json` name `@watchtower/iphone` (copy iPad deps: react, @supabase/supabase-js, @capacitor/{core,ios,preferences,push-notifications}); scripts `build`,`build:dev`,`cap:sync`.
+- `vite.config.ts` (copy iPad's; aliases for shared/ui-core/data-supabase/module-timetracker; **drop** the noVNC alias — iPhone has no VNC).
+- `tsconfig.json` (copy iPad's + the 4 `@watchtower/*` paths). `index.html`, `src/main.tsx`, `src/index.css`.
+- `capacitor.config.ts` appId **`cz.greencode.watchtower.iphone`**, appName `Watchtower`, webDir `dist`.
+- `npx cap add ios` then `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx cap sync ios` (pod install needs the UTF-8 locale — known CocoaPods bug).
+
+### P5 — iPhone shell + TimeTracker
+- `App.tsx`: `useSupabaseAuth` gate → `BillingLogin` when signed out; when in, a **bottom tab bar** (Přehled / Výdělky / Reporty / Záznamy) switching between `DashboardView` / `EarningsMonthView` / `ReportsView` / records views from `@watchtower/module-timetracker`. Portrait. Reuse ambient bg from ui-core glass.
+- Offline cache is already inside `useBilling` (Capacitor Preferences) — works as-is.
+
+### P6 — narrow-screen layout adaptation
+- The TT views are laid out for iPad width; tune for iPhone (iterative, simulator). UI two-attempt rule applies.
+
+### P7 — verify + PR
+- `npx vitest run` (baseline **909 pass / 8 fail**; the 8 `relativeTimeCz` failures are pre-existing on main — NOT a regression), tsc for every package + both apps, `vite build` for ipad + iphone. Open PR to `main`. File the **deferred messaging follow-up** issue (cross-device ping/reply UI — no reusable module, needs push infra).
+
+### Gotchas (also in ~/.claude memory)
+- **`.env` is git-ignored → absent in the worktree.** For `apps/iphone` `build:dev`/runtime you need `VITE_SUPABASE_ANON_KEY`; copy from the main checkout: `cp ~/Projects/Watchtower/apps/ipad/.env.* .../worktrees/iphone-76/apps/iphone/`. (Have the user `cp` — writing `.env*` is guarded.) Supabase URL is hardcoded in `supabaseClient.ts`.
+- Time clock for #76 is open (`.claude/private/clock/76.json`); leave it — auto-logger bills across sessions. Close it (`logged:true`, add `czech_summary`) only when the PR merges.
+- Messaging is OUT of scope (deferred).
