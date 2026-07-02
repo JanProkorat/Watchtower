@@ -36,11 +36,12 @@ export function PaneTerminal({ instanceId, rect, focused, onFocus, onSplit, onCl
         boxSizing: 'border-box',
         backgroundColor: '#0e0f12',
         borderRadius: 12,
-        border: focused
-          ? '1px solid rgba(129,140,248,0.9)'
-          : '1px solid rgba(255,255,255,0.10)',
+        // Neutral border in both states — no full-perimeter purple ring/tint.
+        border: '1px solid rgba(255,255,255,0.10)',
+        // Focus is shown as a thin accent line at the TOP only (inset shadow,
+        // so it costs no layout space and doesn't tint the whole pane).
         boxShadow: focused
-          ? '0 10px 28px rgba(0,0,0,0.40), 0 0 0 3px rgba(129,140,248,0.18), inset 0 1px 0 rgba(255,255,255,0.06)'
+          ? 'inset 0 3px 0 rgba(129,140,248,0.95), 0 10px 28px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.06)'
           : '0 10px 28px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.06)',
         overflow: 'hidden',
       }}

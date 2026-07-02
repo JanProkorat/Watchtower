@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Preferences } from '@capacitor/preferences';
 import { PushNotifications } from '@capacitor/push-notifications';
 import {
@@ -83,8 +83,48 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
     return `${base} · ${id.slice(-4)}`;
   }, [instances]);
 
-  function handleSpawned(id: string) {
-    setActiveId(id);
+  // #2 — On first load (or after the active instance goes away), default to the
+  // first tab's first instance instead of the empty "Vyberte instanci" state.
+  useEffect(() => {
+    if (!activeId && groups.length > 0) {
+      const first = groups[0]?.instanceIds[0];
+      if (first) setActiveId(first);
+    }
+  }, [activeId, groups, setActiveId]);
+
+  // #3 — When a NEW instance appears in the active project tab (e.g. just
+  // spawned), tile it into the current layout (split right) so it's visible
+  // immediately instead of hidden behind the single-pane default. Pre-existing
+  // instances on first load are seeded as "seen" so they are NOT auto-tiled
+  // (keeps the launch view uncluttered); only later arrivals are split in.
+  const seenInstanceIds = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const ids = instances.map((i) => i.id);
+    if (seenInstanceIds.current === null) {
+      if (ids.length === 0) return; // wait for the first real load
+      seenInstanceIds.current = new Set(ids);
+      return;
+    }
+    const seen = seenInstanceIds.current;
+    const fresh = ids.filter((id) => !seen.has(id));
+    if (fresh.length === 0) return;
+    fresh.forEach((id) => seen.add(id));
+    if (!activeTabKey || !activeGroup || !activeId) return;
+    for (const id of fresh) {
+      if (!activeGroup.instanceIds.includes(id)) continue; // different tab — leave it
+      const layout = workspace.getTabLayout(activeTabKey, activeId);
+      if (layout.focusedLeafId) {
+        workspace.actions.split(activeTabKey, layout.focusedLeafId, 'row', 'after', id);
+      }
+    }
+    // Only react to instance-list changes; active-tab context is read fresh each run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instances]);
+
+  function handleSpawned(_id: string) {
+    // Don't hijack activeId here: keeping it on the current instance preserves
+    // the tab's default seed so the #3 effect can split the new instance in as a
+    // second pane. First-ever instance is picked up by the #2 effect.
     setSpawnOpen(false);
   }
 
