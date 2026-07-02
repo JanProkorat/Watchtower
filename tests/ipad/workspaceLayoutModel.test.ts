@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  defaultTabLayout, splitPane, closePane, resizeSplitSizes, replacePane,
+  defaultTabLayout, tiledDefaultLayout, splitPane, closePane, resizeSplitSizes, replacePane,
   focusPane, mountedInstanceIds, serializeWorkspace, deserializeWorkspace,
   appendPaneRight,
   type TabLayout,
@@ -113,6 +113,32 @@ describe('workspaceLayoutModel', () => {
   it('appendPaneRight refuses an already-mounted instance', () => {
     const two = appendPaneRight(defaultTabLayout('i1'), 'i2');
     expect(appendPaneRight(two, 'i1')).toBe(two);
+  });
+
+  it('tiledDefaultLayout with one instance is a single focused leaf', () => {
+    const l = tiledDefaultLayout(['i1'], 'i1');
+    expect(l.root.kind).toBe('leaf');
+    expect(mountedInstanceIds(l)).toEqual(['i1']);
+    expect(l.focusedLeafId).toBe(l.root.kind === 'leaf' ? l.root.id : null);
+  });
+
+  it('tiledDefaultLayout tiles all live instances (even row) and focuses the given one', () => {
+    const l = tiledDefaultLayout(['i1', 'i2', 'i3'], 'i2');
+    expect(l.root.kind).toBe('split');
+    if (l.root.kind !== 'split') throw new Error('expected split');
+    expect(l.root.dir).toBe('row');
+    expect(mountedInstanceIds(l)).toEqual(['i1', 'i2', 'i3']); // order preserved
+    l.root.sizes.forEach((s) => expect(s).toBeCloseTo(100 / 3));
+    // focused leaf holds i2
+    const focused = l.root.children.find((c) => c.kind === 'leaf' && c.id === l.focusedLeafId);
+    expect(focused && focused.kind === 'leaf' && focused.tabId).toBe('i2');
+  });
+
+  it('tiledDefaultLayout falls back to the first pane when the focus id is absent', () => {
+    const l = tiledDefaultLayout(['i1', 'i2'], 'nope');
+    if (l.root.kind !== 'split') throw new Error('expected split');
+    const first = l.root.children[0];
+    expect(l.focusedLeafId).toBe(first && first.kind === 'leaf' ? first.id : null);
   });
 });
 

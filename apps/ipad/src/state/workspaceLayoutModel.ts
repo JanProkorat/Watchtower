@@ -17,6 +17,26 @@ export interface TabLayout {
 /** Keyed by project-group tab key (see App.tsx tabKey()). */
 export type WorkspaceState = Record<string, TabLayout>;
 
+/**
+ * Default layout for a tab with no saved layout: tile ALL the group's live
+ * instances in a row (even widths), focusing `focusedInstanceId` if present
+ * (else the first). This is why reconnecting/relaunching shows every running
+ * instance instead of just one. Leaf ids are deterministic (`d-<instanceId>`)
+ * so the layout is stable across renders (no xterm remount) and matches the
+ * copy `ensureTab` seeds into state.
+ */
+export function tiledDefaultLayout(instanceIds: string[], focusedInstanceId: string): TabLayout {
+  const ids = instanceIds.length > 0 ? instanceIds : [focusedInstanceId];
+  if (ids.length === 1) {
+    const root = leaf<string>(`d-${ids[0]}`, ids[0]!);
+    return { root, focusedLeafId: root.id };
+  }
+  const children = ids.map((id) => leaf<string>(`d-${id}`, id));
+  const root = split<string>('d-root', 'row', children); // even sizes
+  const focused = children.find((c) => c.tabId === focusedInstanceId) ?? children[0]!;
+  return { root, focusedLeafId: focused.id };
+}
+
 export function defaultTabLayout(instanceId: string): TabLayout {
   // Deterministic leaf id (not newNodeId()): an unstored tab's default layout
   // is rebuilt inline on every render by useWorkspaceLayout.getTabLayout, so a

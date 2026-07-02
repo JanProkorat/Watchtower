@@ -16,6 +16,7 @@ interface Props {
   onResize: (splitId: NodeId, sizes: number[]) => void;
   onSplit: (leafId: NodeId, dir: 'row' | 'col', position: 'before' | 'after', instanceId: string) => void;
   onClose: (leafId: NodeId) => void;
+  onKill: (leafId: NodeId, instanceId: string) => void;
   /** All instances in this tab's project group, in group order. */
   groupInstanceIds: string[];
   /** Human-readable label for an instance id (for the picker). */
@@ -45,7 +46,7 @@ interface PendingSplit {
  * gaps between sibling panes; each pane's chrome splits/closes it; a split opens
  * the instance picker to choose what fills the new pane.
  */
-export function WorkspacePane({ layout, onFocusLeaf, onResize, onSplit, onClose, groupInstanceIds, labelFor }: Props) {
+export function WorkspacePane({ layout, onFocusLeaf, onResize, onSplit, onClose, onKill, groupInstanceIds, labelFor }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [pending, setPending] = useState<PendingSplit | null>(null);
@@ -126,8 +127,12 @@ export function WorkspacePane({ layout, onFocusLeaf, onResize, onSplit, onClose,
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // The container is absolutely pinned to the (position:relative) body's content
+  // box. Using inset:0 instead of height:100% avoids a WebKit flex quirk where
+  // the % height resolves against the viewport and the panes overflow below the
+  // tab strip, clipping the terminal's last line.
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div ref={containerRef} style={{ position: 'absolute', inset: 0 }}>
       {size.w > 0 && leaves.map(({ leafId, instanceId }) => {
         const rect = rects.get(leafId);
         if (!rect) return null;
@@ -140,6 +145,7 @@ export function WorkspacePane({ layout, onFocusLeaf, onResize, onSplit, onClose,
             onFocus={() => onFocusLeaf(leafId, instanceId)}
             onSplit={(dir, position) => setPending({ leafId, dir, position })}
             onClose={() => onClose(leafId)}
+            onKill={() => onKill(leafId, instanceId)}
           />
         );
       })}

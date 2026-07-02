@@ -4,11 +4,13 @@ import type { NodeId } from '@watchtower/shared/layout.js';
 import type { SplitPosition } from '@watchtower/shared/workspaceTreeOps.js';
 import {
   type WorkspaceState, type TabLayout,
-  defaultTabLayout, splitPane, closePane, resizeSplitSizes, focusPane, appendPaneRight,
+  defaultTabLayout, tiledDefaultLayout, splitPane, closePane, resizeSplitSizes, focusPane, appendPaneRight,
   serializeWorkspace, deserializeWorkspace,
 } from './workspaceLayoutModel.js';
 
-const PREF_KEY = 'watchtower.ipad.workspace';
+// v2: default layout changed from single-pane to tiling all live instances;
+// bump the key so stale single-pane layouts from earlier builds are ignored.
+const PREF_KEY = 'watchtower.ipad.workspace.v2';
 
 export interface WorkspaceLayoutActions {
   split(tabKey: string, leafId: NodeId, dir: 'row' | 'col', position: SplitPosition, instanceId: string): void;
@@ -26,7 +28,8 @@ export interface WorkspaceLayoutActions {
 
 export function useWorkspaceLayout(): {
   loaded: boolean;
-  getTabLayout(tabKey: string, defaultInstanceId: string): TabLayout;
+  getTabLayout(tabKey: string, groupInstanceIds: string[], focusedInstanceId: string): TabLayout;
+  ensureTab(tabKey: string, groupInstanceIds: string[], focusedInstanceId: string): void;
   actions: WorkspaceLayoutActions;
 } {
   const [state, setState] = useState<WorkspaceState>({});
@@ -56,9 +59,21 @@ export function useWorkspaceLayout(): {
   }, [state, loaded]);
 
   const getTabLayout = useCallback(
-    (tabKey: string, defaultInstanceId: string): TabLayout =>
-      state[tabKey] ?? defaultTabLayout(defaultInstanceId),
+    (tabKey: string, groupInstanceIds: string[], focusedInstanceId: string): TabLayout =>
+      state[tabKey] ?? tiledDefaultLayout(groupInstanceIds, focusedInstanceId),
     [state],
+  );
+
+  // Persist a tab's tiled default into state the first time it's shown, so later
+  // focus/resize/split mutations operate on the full multi-pane layout instead
+  // of collapsing it to a single-pane seed. No-op once the tab exists.
+  const ensureTab = useCallback(
+    (tabKey: string, groupInstanceIds: string[], focusedInstanceId: string): void => {
+      setState((prev) =>
+        prev[tabKey] ? prev : { ...prev, [tabKey]: tiledDefaultLayout(groupInstanceIds, focusedInstanceId) },
+      );
+    },
+    [],
   );
 
   // Mutate a tab's layout, seeding a default from `instanceId` if absent.
@@ -85,5 +100,5 @@ export function useWorkspaceLayout(): {
       mutate(tabKey, seedInstanceId, (l) => appendPaneRight(l, instanceId)),
   }), [mutate]);
 
-  return { loaded, getTabLayout, actions };
+  return { loaded, getTabLayout, ensureTab, actions };
 }

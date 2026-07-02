@@ -61,6 +61,7 @@ function tabKey(projectId: number | null): string {
 function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string | null; setActiveId: (id: string | null) => void; ackedIds: ReadonlySet<string> }) {
   const { instances } = useInstances();
   const { projects } = useProjects();
+  const { bridge } = useConnection();
   const workspace = useWorkspaceLayout();
   const [spawnOpen, setSpawnOpen] = useState(false);
 
@@ -83,14 +84,25 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
     return `${base} · ${id.slice(-4)}`;
   }, [instances]);
 
-  // #2 — On first load (or after the active instance goes away), default to the
-  // first tab's first instance instead of the empty "Vyberte instanci" state.
+  // #2 — Default to the first tab's first instance instead of the empty
+  // "Vyberte instanci" state. Also re-selects when the active instance goes away
+  // (e.g. killed, or a stale id after reconnect) so the view never gets stuck.
   useEffect(() => {
-    if (!activeId && groups.length > 0) {
+    const valid = activeId != null && groups.some((g) => g.instanceIds.includes(activeId));
+    if (!valid && groups.length > 0) {
       const first = groups[0]?.instanceIds[0];
       if (first) setActiveId(first);
     }
   }, [activeId, groups, setActiveId]);
+
+  // Seed the active tab's tiled default (all live instances) into state the
+  // first time it's shown, so reconnecting/relaunching displays every running
+  // instance — and so focus/resize don't collapse it to one pane.
+  useEffect(() => {
+    if (activeTabKey && activeGroup && activeId) {
+      workspace.ensureTab(activeTabKey, activeGroup.instanceIds, activeId);
+    }
+  }, [activeTabKey, activeGroup, activeId, workspace]);
 
   // #3 — When a NEW instance appears in the active project tab (e.g. just
   // spawned), tile it into the current layout (split right) so it's visible
@@ -166,7 +178,7 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
         {activeId && activeTabKey ? (
           <WorkspacePane
             key={activeTabKey}
-            layout={workspace.getTabLayout(activeTabKey, activeId)}
+            layout={workspace.getTabLayout(activeTabKey, activeGroup?.instanceIds ?? [activeId], activeId)}
             onFocusLeaf={(leafId, instanceId) => {
               workspace.actions.focus(activeTabKey, leafId, activeId);
               setActiveId(instanceId);
@@ -175,6 +187,12 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
             onSplit={(leafId, dir, position, instanceId) =>
               workspace.actions.split(activeTabKey, leafId, dir, position, instanceId)}
             onClose={(leafId) => workspace.actions.close(activeTabKey, leafId, activeId)}
+            onKill={(leafId, instanceId) => {
+              // Terminate the session on the Mac AND drop the pane. removeInstance
+              // kills the pty and removes the row, so it won't linger.
+              void bridge.invoke('removeInstance', { instanceId }).catch(() => { /* surfaced via reconnect refetch */ });
+              workspace.actions.close(activeTabKey, leafId, activeId);
+            }}
             groupInstanceIds={activeGroup?.instanceIds ?? []}
             labelFor={instanceLabel}
           />

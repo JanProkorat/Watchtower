@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Rect } from '@watchtower/shared/computePaneRects.js';
 import { useXtermSession } from '../lib/useXtermSession.js';
 
@@ -9,6 +9,7 @@ interface Props {
   onFocus: () => void;
   onSplit: (dir: 'row' | 'col', position: 'before' | 'after') => void;
   onClose: () => void;
+  onKill: () => void;
 }
 
 /**
@@ -20,7 +21,7 @@ interface Props {
  *
  * Top-right chrome: split-right, split-down, close — brighter when focused.
  */
-export function PaneTerminal({ instanceId, rect, focused, onFocus, onSplit, onClose }: Props) {
+export function PaneTerminal({ instanceId, rect, focused, onFocus, onSplit, onClose, onKill }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   useXtermSession(hostRef, instanceId, { onFocus });
 
@@ -66,7 +67,8 @@ export function PaneTerminal({ instanceId, rect, focused, onFocus, onSplit, onCl
       >
         <ChromeButton title="Rozdělit vpravo" glyph="⇥" onTap={() => onSplit('row', 'after')} />
         <ChromeButton title="Rozdělit dolů" glyph="⤓" onTap={() => onSplit('col', 'after')} />
-        <ChromeButton title="Zavřít panel" glyph="✕" onTap={onClose} />
+        <KillButton onKill={onKill} />
+        <ChromeButton title="Skrýt panel" glyph="✕" onTap={onClose} />
       </div>
     </div>
   );
@@ -100,6 +102,43 @@ function ChromeButton({ title, glyph, onTap }: { title: string; glyph: string; o
       style={chromeButtonStyle}
     >
       {glyph}
+    </button>
+  );
+}
+
+/**
+ * Kill (terminate) button. Destructive, so it arms on the first tap and only
+ * kills on a confirming second tap within a short window — no accidental kills.
+ * Distinct from the ✕ button, which only hides the pane (instance keeps running).
+ */
+function KillButton({ onKill }: { onKill: () => void }) {
+  const [armed, setArmed] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  return (
+    <button
+      title={armed ? 'Klepněte znovu pro ukončení instance' : 'Ukončit instanci'}
+      aria-label="Ukončit instanci"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (timerRef.current) clearTimeout(timerRef.current);
+        if (armed) {
+          setArmed(false);
+          onKill();
+        } else {
+          setArmed(true);
+          timerRef.current = setTimeout(() => setArmed(false), 2500);
+        }
+      }}
+      style={{
+        ...chromeButtonStyle,
+        ...(armed
+          ? { width: 'auto', padding: '0 8px', background: 'rgba(180,40,40,0.9)', borderColor: 'rgba(248,113,113,0.7)', color: '#fff', fontSize: 11, fontWeight: 600 }
+          : { color: '#f0a0a0' }),
+      }}
+    >
+      {armed ? 'Ukončit?' : '⏻'}
     </button>
   );
 }
