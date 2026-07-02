@@ -7,9 +7,8 @@ thread). This replaces it with a **native** VNC client (RoyalVNC, Swift) exposed
 through a Capacitor plugin, for smooth full-screen remote control — especially
 on the iPad-on-external-monitor primary surface.
 
-> **Status: DRAFT — needs one decision from the maintainer before build (see
-> §Decisions → Transport). Native build + on-device VNC test are required to
-> verify; this spec is authored while away, so it lands as the plan of record.**
+> **Status: APPROVED plan of record. Transport DECIDED: Option B (direct TCP
+> over Tailscale). Native build + on-device VNC test are required to verify.**
 
 ## Current state (from code exploration)
 
@@ -40,9 +39,9 @@ on the iPad-on-external-monitor primary surface.
 
 ## Decisions
 
-### Transport — the one open decision (needs maintainer input)
+### Transport — DECIDED: Option B (direct TCP over Tailscale)
 
-RoyalVNC speaks **raw TCP RFB**, not WebSocket. Two ways to feed it:
+RoyalVNC speaks **raw TCP RFB**, not WebSocket. Two options were weighed:
 
 - **Option A — keep the WS bridge.** Reuse `/vnc?token=…`. RoyalVNC has no WS
   transport, so we'd wrap its socket in an on-device WS→TCP shim (or fork its
@@ -57,11 +56,11 @@ RoyalVNC speaks **raw TCP RFB**, not WebSocket. Two ways to feed it:
   password — the bearer token is dropped for this channel. **Cost:** a small
   orchestrator TCP listener; access control shifts to the network layer.
 
-**Recommendation: Option B.** It's the natural fit for a native client, avoids
-fighting RoyalVNC's transport, and the reachability is already gated by
-Tailscale (the epic's access model). The maintainer should confirm they're
-comfortable with Tailscale-ACL + VNC-password as the access control for the
-raw-TCP VNC port (no bearer token on that channel).
+**Decision: Option B** (approved). It's the natural fit for a native client,
+avoids fighting RoyalVNC's transport, and reachability is already gated by
+Tailscale (the epic's access model). Access control for the raw-TCP VNC port is
+**Tailscale ACLs + the RFB Apple-DH password** — no bearer token on that
+channel (accepted trade-off).
 
 ### Native view presentation
 
@@ -100,7 +99,8 @@ notifies JS.
 
 ## Scope / build order (for the plan)
 
-1. (Option B) Orchestrator raw-TCP VNC passthrough + tests.
+1. Orchestrator raw-TCP VNC passthrough (bound to the LAN/Tailscale host,
+   relaying to `127.0.0.1:5900`) + tests.
 2. RoyalVNC SPM/Pod dependency; confirm Apple-DH (type 30) auth support.
 3. `VncPlugin.swift` + **correct registration** (`.m` macro + target +
    packageClassList) + `vncPlugin.ts`.
@@ -126,8 +126,9 @@ notifies JS.
   right + verify on device.
 - **Native overlay lifecycle** — presenting/dismissing a VC over the Capacitor
   webview, rotation, immersive-mode interplay.
-- **Option B access control** — raw-TCP port relies on Tailscale ACLs; confirm
-  acceptable.
+- **Access control** — the raw-TCP port relies on Tailscale ACLs + the VNC
+  password (accepted); ensure the passthrough only binds the tailnet/LAN
+  interface, never a public one.
 - **Verification is native + device + reachable-Mac** — cannot be validated CI-
   or desktop-side; keep noVNC as a fallback until the native path is proven.
 
