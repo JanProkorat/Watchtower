@@ -113,6 +113,7 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
               workspace.actions.focus(activeTabKey, leafId);
               setActiveId(instanceId);
             }}
+            onResize={(splitId, sizes) => workspace.actions.resize(activeTabKey, splitId, sizes)}
           />
         ) : (
           <div
