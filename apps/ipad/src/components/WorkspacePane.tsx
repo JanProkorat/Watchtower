@@ -4,6 +4,7 @@ import { computePaneRects, type Rect } from '@watchtower/shared/computePaneRects
 import type { TabLayout, PaneTree } from '../state/workspaceLayoutModel.js';
 import { sizesAfterDrag } from '../lib/paneResize.js';
 import { availableInstancesForPicker } from '../lib/panePicker.js';
+import { adjacentLeaf } from '../lib/paneNav.js';
 import { PaneTerminal } from './PaneTerminal.js';
 import { PanePicker } from './PanePicker.js';
 
@@ -78,6 +79,52 @@ export function WorkspacePane({ layout, onFocusLeaf, onResize, onSplit, onClose,
   // so pointermove doesn't need to re-bind; pointer capture routes all events
   // to the handle even when the finger leaves it.
   const dragRef = useRef<{ splitId: NodeId; index: number; dir: 'row' | 'col'; start: number; avail: number; sizes: number[] } | null>(null);
+
+  // Leaf-only rect map for geometric focus navigation. computePaneRects also
+  // emits split-node rects (for dividers); those must be excluded here or ⌘⌥
+  // arrows could "focus" a split node.
+  const leafRects = useMemo<Map<NodeId, Rect>>(() => {
+    const m = new Map<NodeId, Rect>();
+    for (const { leafId } of leaves) {
+      const r = rects.get(leafId);
+      if (r) m.set(leafId, r);
+    }
+    return m;
+  }, [leaves, rects]);
+
+  // Latest values for the once-bound keydown handler (avoids re-binding the
+  // window listener on every layout/resize change).
+  const nav = useRef({ focusedLeafId: layout.focusedLeafId, leafRects, leaves, onClose, onFocusLeaf });
+  nav.current = { focusedLeafId: layout.focusedLeafId, leafRects, leaves, onClose, onFocusLeaf };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!e.metaKey) return;
+      const st = nav.current;
+      const focused = st.focusedLeafId;
+      if (!focused) return;
+      const key = e.key.toLowerCase();
+      if (key === 'd') {
+        e.preventDefault();
+        setPending({ leafId: focused, dir: e.shiftKey ? 'col' : 'row', position: 'after' });
+      } else if (key === 'w') {
+        e.preventDefault();
+        st.onClose(focused);
+      } else if (e.altKey && e.key.startsWith('Arrow')) {
+        const dir = e.key === 'ArrowLeft' ? 'left'
+          : e.key === 'ArrowRight' ? 'right'
+          : e.key === 'ArrowUp' ? 'up' : 'down';
+        const next = adjacentLeaf(st.leafRects, focused, dir);
+        if (next) {
+          e.preventDefault();
+          const inst = st.leaves.find((l) => l.leafId === next)?.instanceId;
+          if (inst) st.onFocusLeaf(next, inst);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
