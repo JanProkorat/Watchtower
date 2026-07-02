@@ -73,6 +73,16 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
   const activeGroup = activeId ? groups.find((g) => g.instanceIds.includes(activeId)) ?? null : null;
   const activeTabKey = activeGroup ? tabKey(activeGroup.projectId) : null;
 
+  // Picker label for an instance. Instances in one project group share a cwd
+  // (grouping matches cwd===folderPath), so the folder basename alone can't tell
+  // them apart — append a short id tail for uniqueness.
+  const instanceLabel = useCallback((id: string): string => {
+    const inst = instances.find((i) => i.id === id);
+    if (!inst) return id;
+    const base = inst.cwd.split('/').filter(Boolean).pop() ?? inst.cwd;
+    return `${base} · ${id.slice(-4)}`;
+  }, [instances]);
+
   function handleSpawned(id: string) {
     setActiveId(id);
     setSpawnOpen(false);
@@ -114,6 +124,11 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
               setActiveId(instanceId);
             }}
             onResize={(splitId, sizes) => workspace.actions.resize(activeTabKey, splitId, sizes)}
+            onSplit={(leafId, dir, position, instanceId) =>
+              workspace.actions.split(activeTabKey, leafId, dir, position, instanceId)}
+            onClose={(leafId) => workspace.actions.close(activeTabKey, leafId, activeId)}
+            groupInstanceIds={activeGroup?.instanceIds ?? []}
+            labelFor={instanceLabel}
           />
         ) : (
           <div

@@ -3,7 +3,9 @@ import type { NodeId } from '@watchtower/shared/layout.js';
 import { computePaneRects, type Rect } from '@watchtower/shared/computePaneRects.js';
 import type { TabLayout, PaneTree } from '../state/workspaceLayoutModel.js';
 import { sizesAfterDrag } from '../lib/paneResize.js';
+import { availableInstancesForPicker } from '../lib/panePicker.js';
 import { PaneTerminal } from './PaneTerminal.js';
+import { PanePicker } from './PanePicker.js';
 
 const GAP = 8;
 
@@ -11,6 +13,12 @@ interface Props {
   layout: TabLayout;
   onFocusLeaf: (leafId: NodeId, instanceId: string) => void;
   onResize: (splitId: NodeId, sizes: number[]) => void;
+  onSplit: (leafId: NodeId, dir: 'row' | 'col', position: 'before' | 'after', instanceId: string) => void;
+  onClose: (leafId: NodeId) => void;
+  /** All instances in this tab's project group, in group order. */
+  groupInstanceIds: string[];
+  /** Human-readable label for an instance id (for the picker). */
+  labelFor: (instanceId: string) => string;
 }
 
 interface Divider {
@@ -22,16 +30,24 @@ interface Divider {
   rect: Rect; // the handle's pixel rect
 }
 
+interface PendingSplit {
+  leafId: NodeId;
+  dir: 'row' | 'col';
+  position: 'before' | 'after';
+}
+
 /**
  * Flat, absolute-positioned terminal pool for one project-group tab. Every live
  * leaf's terminal is a sibling absolutely-positioned child of one stable
  * container; positions come from the pure `computePaneRects`. Terminals are
  * never reparented, so xterm is never remounted. Divider handles sit in the
- * gaps between sibling panes; dragging one updates that split's sizes.
+ * gaps between sibling panes; each pane's chrome splits/closes it; a split opens
+ * the instance picker to choose what fills the new pane.
  */
-export function WorkspacePane({ layout, onFocusLeaf, onResize }: Props) {
+export function WorkspacePane({ layout, onFocusLeaf, onResize, onSplit, onClose, groupInstanceIds, labelFor }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const [pending, setPending] = useState<PendingSplit | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -52,6 +68,12 @@ export function WorkspacePane({ layout, onFocusLeaf, onResize }: Props) {
   const leaves = useMemo(() => leafEntries(layout.root), [layout.root]);
   const dividers = useMemo(() => collectDividers(layout.root, rects), [layout.root, rects]);
 
+  const mountedIds = useMemo(() => leaves.map((l) => l.instanceId), [leaves]);
+  const candidates = useMemo(
+    () => availableInstancesForPicker(groupInstanceIds, mountedIds).map((id) => ({ instanceId: id, label: labelFor(id) })),
+    [groupInstanceIds, mountedIds, labelFor],
+  );
+
   // Active drag: split + starting pointer coord + starting sizes. Held in a ref
   // so pointermove doesn't need to re-bind; pointer capture routes all events
   // to the handle even when the finger leaves it.
@@ -69,6 +91,8 @@ export function WorkspacePane({ layout, onFocusLeaf, onResize }: Props) {
             rect={rect}
             focused={layout.focusedLeafId === leafId}
             onFocus={() => onFocusLeaf(leafId, instanceId)}
+            onSplit={(dir, position) => setPending({ leafId, dir, position })}
+            onClose={() => onClose(leafId)}
           />
         );
       })}
@@ -108,6 +132,17 @@ export function WorkspacePane({ layout, onFocusLeaf, onResize }: Props) {
           }}
         />
       ))}
+
+      {pending && (
+        <PanePicker
+          candidates={candidates}
+          onPick={(instanceId) => {
+            onSplit(pending.leafId, pending.dir, pending.position, instanceId);
+            setPending(null);
+          }}
+          onCancel={() => setPending(null)}
+        />
+      )}
     </div>
   );
 }
