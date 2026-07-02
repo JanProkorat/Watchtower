@@ -8,9 +8,11 @@ export interface Rect {
 }
 
 /**
- * Walk the workspace tree and assign each leaf a pixel rect that exactly tiles
- * the [0,0,width,height] box. `gap` px is reserved between sibling panes for
- * divider handles (n children -> (n-1) gaps along the split axis).
+ * Walk the workspace tree and assign EVERY node (leaves and splits) a pixel
+ * rect that exactly tiles the [0,0,width,height] box. `gap` px is reserved
+ * between sibling panes for divider handles (n children -> (n-1) gaps along the
+ * split axis). Leaf rects position terminals; split rects (and their children's
+ * rects) let the caller place resize-divider handles at split boundaries.
  */
 export function computePaneRects<TLeaf>(
   root: WorkspaceNode<TLeaf>,
@@ -32,8 +34,8 @@ function walk<TLeaf>(
   gap: number,
   out: Map<NodeId, Rect>,
 ): void {
+  out.set(node.id, { x, y, w, h });
   if (node.kind === 'leaf') {
-    out.set(node.id, { x, y, w, h });
     return;
   }
   const n = node.children.length;

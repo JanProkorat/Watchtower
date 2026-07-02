@@ -40,4 +40,10 @@ describe('computePaneRects', () => {
     expect(rects.get('a')!.w).toBeCloseTo(100);
     expect(rects.get('b')!.w).toBeCloseTo(300);
   });
+
+  it('emits a rect for split nodes too (for divider placement)', () => {
+    const root = split<string>('s', 'row', [L('a', 'i1'), L('b', 'i2')], [50, 50]);
+    const rects = computePaneRects(root, 1006, 800, 6);
+    expect(rects.get('s')).toEqual({ x: 0, y: 0, w: 1006, h: 800 });
+  });
 });
