@@ -17,7 +17,6 @@ import { WorkspacePane } from './components/WorkspacePane.js';
 import { useWorkspaceLayout } from './state/useWorkspaceLayout.js';
 import { groupInstancesByProject } from '@watchtower/shared/groupInstances.js';
 import { SpawnModal } from './components/SpawnModal.js';
-import { BillingArea } from '@watchtower/module-timetracker';
 import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
 import { ToastStack, type ToastItem } from './components/ToastStack.js';
@@ -32,6 +31,13 @@ const RemoteMacView = lazy(() =>
 );
 const SettingsModule = lazy(() =>
   import('./components/SettingsModule.js').then((m) => ({ default: m.SettingsModule })),
+);
+// The dashboard default view. Lazy so the billing module + the whole
+// @supabase/supabase-js chain parse OFF the startup critical path — otherwise
+// the shell/rail are held behind that synchronous parse and the app is
+// unresponsive for the first seconds (even on the login screen).
+const BillingArea = lazy(() =>
+  import('@watchtower/module-timetracker').then((m) => ({ default: m.BillingArea })),
 );
 import { text, glassPanel, glassFillStrong, statusGlass, ctaGradient, ctaGlow, accent } from '@watchtower/ui-core';
 
