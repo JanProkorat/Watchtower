@@ -530,7 +530,13 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       return { ok: true };
 
     case 'removeInstance': {
-      disposeInstanceRow(req.payload.instanceId);
+      const removedId = req.payload.instanceId;
+      disposeInstanceRow(removedId);
+      // Notify all clients so they refetch and drop the removed instance.
+      // Clients refetch the instance list on any stateChanged; without this the
+      // removed instance lingers in stale lists (e.g. the iPad's project
+      // grouping and pane picker still offer it).
+      emitPush({ kind: 'stateChanged', payload: { instanceId: removedId, status: 'finished' } });
       return { ok: true };
     }
 
