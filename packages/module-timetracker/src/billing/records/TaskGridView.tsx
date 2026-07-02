@@ -208,7 +208,10 @@ export function TaskGridView(): JSX.Element {
                             <button
                               onClick={() => openCell(t, i)}
                               disabled={!editable}
-                              style={{ width: '100%', minHeight: 26, background: 'transparent', border: 'none', color: 'inherit', font: 'inherit', cursor: editable ? 'pointer' : 'default', padding: '5px 0' }}
+                              // Narrow (iPhone): taller tap target — day columns can't widen past
+                              // ~30px without losing the month, so we buy touch comfort vertically.
+                              // The tap highlight flags which cell was hit on a dense grid.
+                              style={{ width: '100%', minHeight: isNarrow ? 40 : 26, background: 'transparent', border: 'none', color: 'inherit', font: 'inherit', cursor: editable ? 'pointer' : 'default', padding: '5px 0', WebkitTapHighlightColor: 'rgba(168,156,240,0.35)' }}
                             >
                               {hrs(min)}
                             </button>
@@ -266,7 +269,7 @@ export function TaskGridView(): JSX.Element {
               <button
                 key={w.syncId}
                 onClick={() => setSheet({ mode: 'edit', worklog: w })}
-                style={{ ...glassCard(10), display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: C.text, width: '100%', border: '1px solid rgba(255,255,255,0.10)' }}
+                style={{ ...glassCard(10), display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, padding: '8px 12px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: C.text, width: '100%', border: '1px solid rgba(255,255,255,0.10)' }}
               >
                 <div style={{ flex: 1, fontSize: 13, color: '#d7dbe6', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.description || w.taskTitle || w.projectName}</div>
                 <div style={{ fontSize: 12, color: '#c2c9d8', flexShrink: 0 }}>
