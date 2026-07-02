@@ -1,9 +1,7 @@
-import { useInstances } from './useInstances.js';
-import { useProjects } from './useProjects.js';
+import { useInstancesData } from './instancesData.js';
 import { buildAttentionList, type AttentionItem } from './attentionList.js';
 
 export function useAttentionInstances(): AttentionItem[] {
-  const { instances } = useInstances();
-  const { projects } = useProjects();
+  const { instances, projects } = useInstancesData();
   return buildAttentionList(instances, projects);
 }
