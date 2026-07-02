@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Preferences } from '@capacitor/preferences';
 import { PushNotifications } from '@capacitor/push-notifications';
 import {
@@ -13,7 +13,9 @@ import { useAttention } from './state/useAttention.js';
 import { registerForPush } from './state/pushRegistration.js';
 import { Rail, type RailModule, type BillingSection } from './components/Rail.js';
 import { TabStrip } from './components/TabStrip.js';
-import { TerminalView } from './components/TerminalView.js';
+import { WorkspacePane } from './components/WorkspacePane.js';
+import { useWorkspaceLayout } from './state/useWorkspaceLayout.js';
+import { groupInstancesByProject } from '@watchtower/shared/groupInstances.js';
 import { SpawnModal } from './components/SpawnModal.js';
 import { RemoteMacView } from './components/RemoteMacView.js';
 import { BillingArea } from '@watchtower/module-timetracker';
@@ -46,6 +48,12 @@ const store = {
 
 const NON_LIVE_STATUSES = new Set(['finished', 'crashed', 'suspended']);
 
+// A project-group tab's workspace-layout key. Mirrors groupInstancesByProject's
+// grouping: real projects key by id, unmatched instances share the 'other' tab.
+function tabKey(projectId: number | null): string {
+  return projectId == null ? 'other' : `project:${projectId}`;
+}
+
 // ---------------------------------------------------------------------------
 // InstancesModule — the instances view content (Rail lives in Shell now)
 // ---------------------------------------------------------------------------
@@ -53,9 +61,17 @@ const NON_LIVE_STATUSES = new Set(['finished', 'crashed', 'suspended']);
 function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string | null; setActiveId: (id: string | null) => void; ackedIds: ReadonlySet<string> }) {
   const { instances } = useInstances();
   const { projects } = useProjects();
+  const workspace = useWorkspaceLayout();
   const [spawnOpen, setSpawnOpen] = useState(false);
 
   const nonLiveInstances = instances.filter((i) => NON_LIVE_STATUSES.has(i.status));
+
+  // Which project-group tab owns the currently-selected instance? Its workspace
+  // layout (one tree per tab) is what the WorkspacePane tiles. Only the active
+  // tab's terminals are mounted; switching tabs swaps whole layouts.
+  const groups = useMemo(() => groupInstancesByProject(instances, projects), [instances, projects]);
+  const activeGroup = activeId ? groups.find((g) => g.instanceIds.includes(activeId)) ?? null : null;
+  const activeTabKey = activeGroup ? tabKey(activeGroup.projectId) : null;
 
   function handleSpawned(id: string) {
     setActiveId(id);
@@ -89,8 +105,15 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
       {/* Terminal body — padded so the terminal panel floats off the tab strip
           and window edges, consistent with the glass surfaces around it. */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative', padding: '10px 12px 12px', boxSizing: 'border-box' }}>
-        {activeId ? (
-          <TerminalView key={activeId} instanceId={activeId} />
+        {activeId && activeTabKey ? (
+          <WorkspacePane
+            key={activeTabKey}
+            layout={workspace.getTabLayout(activeTabKey, activeId)}
+            onFocusLeaf={(leafId, instanceId) => {
+              workspace.actions.focus(activeTabKey, leafId);
+              setActiveId(instanceId);
+            }}
+          />
         ) : (
           <div
             style={{
