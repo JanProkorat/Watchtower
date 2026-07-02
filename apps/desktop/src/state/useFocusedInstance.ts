@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import type { PersistedLayout, TabRecord } from '@watchtower/shared/layout.js';
-import { findLeafById } from '../layout/workspaceTreeOps.js';
+import { findLeafById } from '@watchtower/shared/workspaceTreeOps.js';
 
 export function useFocusedInstance(
   layout: PersistedLayout,

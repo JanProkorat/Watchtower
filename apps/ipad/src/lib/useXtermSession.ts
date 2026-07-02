@@ -1,20 +1,28 @@
-// apps/ipad/src/components/TerminalView.tsx
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import type { RefObject } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { useConnection } from '../state/connectionContext.js';
-import { attachTerminal } from '../lib/attachTerminal.js';
+import { attachTerminal } from './attachTerminal.js';
 
-interface Props {
-  instanceId: string;
-}
-
-export function TerminalView({ instanceId }: Props) {
+/**
+ * Own the full lifecycle of one xterm attached to `instanceId`, rendered into
+ * the caller-provided `hostRef` div. Extracted verbatim from the original
+ * self-contained TerminalView so a WorkspacePane-owned, absolutely-positioned
+ * host can drive it without the terminal ever being reparented. Re-runs only
+ * when instanceId or the bridge changes.
+ *
+ * `opts.onFocus` fires in addition to the existing `terminalFocus` bridge call
+ * whenever the terminal's textarea gains focus — the pane uses it to mark the
+ * focused leaf.
+ */
+export function useXtermSession(
+  hostRef: RefObject<HTMLDivElement | null>,
+  instanceId: string,
+  opts?: { onFocus?: () => void },
+): void {
   const { bridge } = useConnection();
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const termRef = useRef<XTerm | null>(null);
-  const fitRef = useRef<FitAddon | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -37,8 +45,6 @@ export function TerminalView({ instanceId }: Props) {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host);
-    termRef.current = term;
-    fitRef.current = fit;
 
     // Initial fit — deferred one frame so the DOM has laid out.
     requestAnimationFrame(() => {
@@ -56,6 +62,7 @@ export function TerminalView({ instanceId }: Props) {
     // WebView (tapping inside the terminal shifts input focus to the textarea).
     const onTextareaFocus = () => {
       void bridge.invoke('terminalFocus', { instanceId });
+      opts?.onFocus?.();
     };
     term.textarea?.addEventListener('focus', onTextareaFocus);
 
@@ -75,12 +82,25 @@ export function TerminalView({ instanceId }: Props) {
     // --- Attach to live pty stream ---
     // sink.resize is intentionally a no-op: we fit to our own viewport, not
     // the snapshot dims. The ResizeObserver above drives ptyResize; focus
-    // ownership (Task 4) lets the orchestrator follow this client's size.
+    // ownership lets the orchestrator follow this client's size.
     let attachDispose: (() => void) | null = null;
     // Guard against the component unmounting between attach resolving and the
     // rAF firing; avoids calling ptyResize (and fit.fit on a disposed terminal)
     // after teardown.
     let disposed = false;
+
+    // On WebKit the monospace cell metrics can settle a beat after first paint;
+    // an early fit then overestimates rows and clips the terminal's last line
+    // (e.g. Claude's bottom status bar). Re-fit once fonts are ready and once
+    // shortly after so the row count matches the visible box.
+    const refit = () => {
+      try {
+        fit.fit();
+        void bridge.invoke('ptyResize', { instanceId, cols: term.cols, rows: term.rows });
+      } catch { /* ignore */ }
+    };
+    void document.fonts?.ready?.then(() => { if (!disposed) refit(); });
+    const refitTimer = setTimeout(() => { if (!disposed) refit(); }, 200);
     void attachTerminal(bridge, instanceId, {
       write: (d) => term.write(d),
       resize: () => { /* no-op: viewport-fit takes priority */ },
@@ -101,39 +121,14 @@ export function TerminalView({ instanceId }: Props) {
 
     return () => {
       disposed = true;
+      clearTimeout(refitTimer);
       term.textarea?.removeEventListener('focus', onTextareaFocus);
       inputDisp.dispose();
       ro.disconnect();
       if (attachDispose) attachDispose();
       term.dispose();
-      termRef.current = null;
-      fitRef.current = null;
     };
   // We deliberately re-run only when instanceId or bridge changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceId, bridge]);
-
-  return (
-    <div
-      ref={hostRef}
-      style={{
-        width: '100%',
-        height: '100%',
-        boxSizing: 'border-box',
-        // Solid dark fill — a terminal must stay legible, so it isn't frosted;
-        // the rounded frame + hairline + soft shadow make it read as a panel
-        // floating on the ambient background instead of an edge-to-edge slab.
-        backgroundColor: '#0e0f12',
-        borderRadius: 14,
-        border: '1px solid rgba(255,255,255,0.10)',
-        boxShadow: '0 10px 28px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.06)',
-        // Inner breathing room so text doesn't hug the rounded corners. FitAddon
-        // reads the host's content box, so this padding is subtracted from the
-        // cols/rows calc automatically.
-        padding: 10,
-        overflow: 'hidden',
-        position: 'relative',
-      }}
-    />
-  );
 }

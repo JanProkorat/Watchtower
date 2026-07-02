@@ -22,21 +22,21 @@ export interface TabRecord {
 
 export type NodeId = string;
 
-export type WorkspaceNode = WorkspaceLeaf | WorkspaceSplit;
-
-export interface WorkspaceLeaf {
+export interface WorkspaceLeaf<TLeaf = TabId> {
   kind: 'leaf';
   id: NodeId;
-  tabId: TabId;
+  tabId: TLeaf;
 }
 
-export interface WorkspaceSplit {
+export interface WorkspaceSplit<TLeaf = TabId> {
   kind: 'split';
   id: NodeId;
   dir: 'row' | 'col';
   sizes: number[]; // percent, must sum to ~100
-  children: WorkspaceNode[];
+  children: WorkspaceNode<TLeaf>[];
 }
+
+export type WorkspaceNode<TLeaf = TabId> = WorkspaceLeaf<TLeaf> | WorkspaceSplit<TLeaf>;
 
 export interface PersistedLayout {
   root: WorkspaceNode;

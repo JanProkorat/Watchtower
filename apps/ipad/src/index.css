@@ -37,3 +37,10 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* Spinner for transient loaders (e.g. the spawn indicator). */
+@keyframes wt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

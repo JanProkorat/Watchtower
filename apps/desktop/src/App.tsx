@@ -53,7 +53,7 @@ import {
   collectTabIds,
   findLeafById,
   findLeafByTabId,
-} from './layout/workspaceTreeOps.js';
+} from '@watchtower/shared/workspaceTreeOps.js';
 import { parseTabId } from './layout/tabId.js';
 import { pruneLayout } from './layout/pruneLayout.js';
 import { leafToCollapseOnHide } from './layout/hiddenPaneCollapse.js';

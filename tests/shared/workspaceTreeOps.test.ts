@@ -10,7 +10,7 @@ import {
   unmountLeaf,
   setSizes,
   collectTabIds,
-} from '../../../apps/desktop/src/layout/workspaceTreeOps.js';
+} from '@watchtower/shared/workspaceTreeOps.js';
 import type { WorkspaceNode } from '@watchtower/shared/layout.js';
 
 const L = (id: string, tabId: string): WorkspaceNode =>

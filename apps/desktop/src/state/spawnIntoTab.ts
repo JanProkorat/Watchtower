@@ -1,6 +1,6 @@
 import type { PersistedLayout, TabId } from '@watchtower/shared/layout.js';
 import type { WorkspaceLayoutActions } from './useWorkspaceLayout.js';
-import { findLeafByTabId } from '../layout/workspaceTreeOps.js';
+import { findLeafByTabId } from '@watchtower/shared/workspaceTreeOps.js';
 
 export interface RouteContext {
   layout: PersistedLayout;
