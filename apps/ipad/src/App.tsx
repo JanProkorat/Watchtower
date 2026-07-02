@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Preferences } from '@capacitor/preferences';
 import { PushNotifications } from '@capacitor/push-notifications';
 import {
@@ -17,12 +17,22 @@ import { WorkspacePane } from './components/WorkspacePane.js';
 import { useWorkspaceLayout } from './state/useWorkspaceLayout.js';
 import { groupInstancesByProject } from '@watchtower/shared/groupInstances.js';
 import { SpawnModal } from './components/SpawnModal.js';
-import { RemoteMacView } from './components/RemoteMacView.js';
 import { BillingArea } from '@watchtower/module-timetracker';
 import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
 import { ToastStack, type ToastItem } from './components/ToastStack.js';
-import { SettingsModule } from './components/SettingsModule.js';
+
+// Lazy-loaded so their heavy dependency graphs stay off the startup critical
+// path. RemoteMacView pulls in noVNC, whose module has a TOP-LEVEL AWAIT (a
+// hardware H264-decode probe); statically importing it gated the entire React
+// mount on that probe, freezing the app for the first seconds. Neither module
+// is the startup (dashboard) view, so deferring them is free.
+const RemoteMacView = lazy(() =>
+  import('./components/RemoteMacView.js').then((m) => ({ default: m.RemoteMacView })),
+);
+const SettingsModule = lazy(() =>
+  import('./components/SettingsModule.js').then((m) => ({ default: m.SettingsModule })),
+);
 import { text, glassPanel, glassFillStrong, statusGlass, ctaGradient, ctaGlow, accent } from '@watchtower/ui-core';
 
 // Retry button for the connection toast — translucent glass; `color: inherit`
@@ -432,20 +442,29 @@ function Shell({ connection }: ShellProps) {
           />
         )}
 
-        {/* Module content */}
-        {activeModule === 'instances' ? (
-          <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} />
-        ) : activeModule === 'dashboard' || activeModule === 'billing' ? (
-          <BillingArea module={activeModule} section={billingSection} />
-        ) : activeModule === 'settings' ? (
-          <SettingsModule />
-        ) : (
-          <RemoteMacView
-            connection={connection}
-            immersive={immersive}
-            onToggleImmersive={() => setImmersive((v) => !v)}
-          />
-        )}
+        {/* Module content. Suspense covers the lazy modules (Remote Mac,
+            Settings); the eager dashboard/instances views never suspend. */}
+        <Suspense
+          fallback={
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: text.dim, fontSize: 14 }}>
+              Načítání…
+            </div>
+          }
+        >
+          {activeModule === 'instances' ? (
+            <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} />
+          ) : activeModule === 'dashboard' || activeModule === 'billing' ? (
+            <BillingArea module={activeModule} section={billingSection} />
+          ) : activeModule === 'settings' ? (
+            <SettingsModule />
+          ) : (
+            <RemoteMacView
+              connection={connection}
+              immersive={immersive}
+              onToggleImmersive={() => setImmersive((v) => !v)}
+            />
+          )}
+        </Suspense>
 
         {/* Notification hub popover */}
         {hubOpen && (
