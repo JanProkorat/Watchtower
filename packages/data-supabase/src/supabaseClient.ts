@@ -1,6 +1,15 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://xggihnrvsmbzbkhsnuky.supabase.co';
+// Base project URL. Env-driven (VITE_SUPABASE_URL) so the URL and the anon key
+// below always come from the SAME Supabase project: a mismatch — e.g. a
+// production-mode build carrying the prod anon key while this URL stays pinned
+// to dev — is silently rejected at login (invalid API key surfaced only as a
+// generic failure). Falls back to the dev project when the var is unset, which
+// matches the dev anon key in .env.development. To target another project, set
+// VITE_SUPABASE_URL alongside that project's VITE_SUPABASE_ANON_KEY.
+const SUPABASE_URL =
+  (import.meta.env.VITE_SUPABASE_URL as string | undefined) ??
+  'https://xggihnrvsmbzbkhsnuky.supabase.co';
 
 // Public anon key, injected at build time from VITE_SUPABASE_ANON_KEY (set in a
 // git-ignored apps/ipad/.env or the build environment) — kept out of git so
