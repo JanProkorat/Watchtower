@@ -4,7 +4,6 @@ import {
   firstLeafInPreOrder, findLeafById, collectTabIds,
   type SplitPosition,
 } from '@watchtower/shared/workspaceTreeOps.js';
-import { newNodeId } from '@watchtower/shared/newNodeId.js';
 
 /** A pane tree whose leaf identities are instanceIds. */
 export type PaneTree = WorkspaceNode<string>;
@@ -18,7 +17,14 @@ export interface TabLayout {
 export type WorkspaceState = Record<string, TabLayout>;
 
 export function defaultTabLayout(instanceId: string): TabLayout {
-  const root = leaf<string>(newNodeId(), instanceId);
+  // Deterministic leaf id (not newNodeId()): an unstored tab's default layout
+  // is rebuilt inline on every render by useWorkspaceLayout.getTabLayout, so a
+  // random id would change each render, flip WorkspacePane's key={leafId}, and
+  // remount the xterm — defeating the "terminals never remount" invariant. A
+  // stable id keyed by the instance keeps the default pane mounted until a real
+  // (persisted) mutation replaces it. New leaves from splits still use
+  // newNodeId(); 'd-' vs 'n' prefixes can't collide.
+  const root = leaf<string>(`d-${instanceId}`, instanceId);
   return { root, focusedLeafId: root.id };
 }
 

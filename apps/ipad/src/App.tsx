@@ -120,10 +120,10 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
             key={activeTabKey}
             layout={workspace.getTabLayout(activeTabKey, activeId)}
             onFocusLeaf={(leafId, instanceId) => {
-              workspace.actions.focus(activeTabKey, leafId);
+              workspace.actions.focus(activeTabKey, leafId, activeId);
               setActiveId(instanceId);
             }}
-            onResize={(splitId, sizes) => workspace.actions.resize(activeTabKey, splitId, sizes)}
+            onResize={(splitId, sizes) => workspace.actions.resize(activeTabKey, splitId, sizes, activeId)}
             onSplit={(leafId, dir, position, instanceId) =>
               workspace.actions.split(activeTabKey, leafId, dir, position, instanceId)}
             onClose={(leafId) => workspace.actions.close(activeTabKey, leafId, activeId)}
