@@ -5,8 +5,7 @@ import {
   parseConnection, loadConnection, saveConnection, type Connection,
 } from './connection.js';
 import { ConnectionProvider, useConnection } from './state/connectionContext.js';
-import { useInstances } from './state/useInstances.js';
-import { useProjects } from './state/useProjects.js';
+import { InstancesDataProvider, useInstancesData } from './state/instancesData.js';
 import { useActiveTerminal } from './state/useActiveTerminal.js';
 import { useAuthBlock } from './state/useAuthBlock.js';
 import { useAttention } from './state/useAttention.js';
@@ -75,8 +74,7 @@ function tabKey(projectId: number | null): string {
 // ---------------------------------------------------------------------------
 
 function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string | null; setActiveId: (id: string | null) => void; ackedIds: ReadonlySet<string> }) {
-  const { instances } = useInstances();
-  const { projects } = useProjects();
+  const { instances, projects } = useInstancesData();
   const { bridge } = useConnection();
   const workspace = useWorkspaceLayout();
   const [spawnOpen, setSpawnOpen] = useState(false);
@@ -678,7 +676,9 @@ export function App() {
 
   return (
     <ConnectionProvider connection={connection}>
-      <Shell connection={connection} />
+      <InstancesDataProvider>
+        <Shell connection={connection} />
+      </InstancesDataProvider>
     </ConnectionProvider>
   );
 }
