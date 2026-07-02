@@ -4,7 +4,7 @@ import type { NodeId } from '@watchtower/shared/layout.js';
 import type { SplitPosition } from '@watchtower/shared/workspaceTreeOps.js';
 import {
   type WorkspaceState, type TabLayout,
-  defaultTabLayout, splitPane, closePane, resizeSplitSizes, focusPane,
+  defaultTabLayout, splitPane, closePane, resizeSplitSizes, focusPane, appendPaneRight,
   serializeWorkspace, deserializeWorkspace,
 } from './workspaceLayoutModel.js';
 
@@ -19,6 +19,9 @@ export interface WorkspaceLayoutActions {
   // instead of a placeholder-'' default.
   resize(tabKey: string, splitId: NodeId, sizes: number[], seedInstanceId: string): void;
   focus(tabKey: string, leafId: NodeId, seedInstanceId: string): void;
+  // Append a new pane on the far right, evening the widths. seedInstanceId is
+  // the instance the tab's default is seeded from when it isn't in state yet.
+  appendRight(tabKey: string, instanceId: string, seedInstanceId: string): void;
 }
 
 export function useWorkspaceLayout(): {
@@ -78,6 +81,8 @@ export function useWorkspaceLayout(): {
       mutate(tabKey, seedInstanceId, (l) => resizeSplitSizes(l, splitId, sizes)),
     focus: (tabKey, leafId, seedInstanceId) =>
       mutate(tabKey, seedInstanceId, (l) => focusPane(l, leafId)),
+    appendRight: (tabKey, instanceId, seedInstanceId) =>
+      mutate(tabKey, seedInstanceId, (l) => appendPaneRight(l, instanceId)),
   }), [mutate]);
 
   return { loaded, getTabLayout, actions };

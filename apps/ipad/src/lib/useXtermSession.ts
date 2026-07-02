@@ -88,6 +88,19 @@ export function useXtermSession(
     // rAF firing; avoids calling ptyResize (and fit.fit on a disposed terminal)
     // after teardown.
     let disposed = false;
+
+    // On WebKit the monospace cell metrics can settle a beat after first paint;
+    // an early fit then overestimates rows and clips the terminal's last line
+    // (e.g. Claude's bottom status bar). Re-fit once fonts are ready and once
+    // shortly after so the row count matches the visible box.
+    const refit = () => {
+      try {
+        fit.fit();
+        void bridge.invoke('ptyResize', { instanceId, cols: term.cols, rows: term.rows });
+      } catch { /* ignore */ }
+    };
+    void document.fonts?.ready?.then(() => { if (!disposed) refit(); });
+    const refitTimer = setTimeout(() => { if (!disposed) refit(); }, 200);
     void attachTerminal(bridge, instanceId, {
       write: (d) => term.write(d),
       resize: () => { /* no-op: viewport-fit takes priority */ },
@@ -108,6 +121,7 @@ export function useXtermSession(
 
     return () => {
       disposed = true;
+      clearTimeout(refitTimer);
       term.textarea?.removeEventListener('focus', onTextareaFocus);
       inputDisp.dispose();
       ro.disconnect();

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   defaultTabLayout, splitPane, closePane, resizeSplitSizes, replacePane,
   focusPane, mountedInstanceIds, serializeWorkspace, deserializeWorkspace,
+  appendPaneRight,
   type TabLayout,
 } from '../../apps/ipad/src/state/workspaceLayoutModel.js';
 
@@ -85,6 +86,33 @@ describe('workspaceLayoutModel', () => {
   it('deserializeWorkspace returns {} on null or garbage', () => {
     expect(deserializeWorkspace(null)).toEqual({});
     expect(deserializeWorkspace('not json')).toEqual({});
+  });
+
+  it('appendPaneRight wraps a single leaf into a 50/50 row split, new pane rightmost + focused', () => {
+    const l = appendPaneRight(defaultTabLayout('i1'), 'i2');
+    expect(l.root.kind).toBe('split');
+    if (l.root.kind !== 'split') throw new Error('expected split');
+    expect(l.root.dir).toBe('row');
+    // new pane is the last child (far right) and holds i2
+    const last = l.root.children[l.root.children.length - 1];
+    expect(last.kind === 'leaf' && last.tabId).toBe('i2');
+    expect(l.focusedLeafId).toBe(last.kind === 'leaf' ? last.id : null);
+    expect(l.root.sizes).toEqual([50, 50]);
+  });
+
+  it('appendPaneRight appends to an existing row split and evens the widths (thirds)', () => {
+    const two = appendPaneRight(defaultTabLayout('i1'), 'i2');
+    const three = appendPaneRight(two, 'i3');
+    expect(three.root.kind).toBe('split');
+    if (three.root.kind !== 'split') throw new Error('expected split');
+    expect(three.root.children).toHaveLength(3);
+    expect(mountedInstanceIds(three)).toEqual(['i1', 'i2', 'i3']); // order preserved, i3 rightmost
+    three.root.sizes.forEach((s) => expect(s).toBeCloseTo(100 / 3));
+  });
+
+  it('appendPaneRight refuses an already-mounted instance', () => {
+    const two = appendPaneRight(defaultTabLayout('i1'), 'i2');
+    expect(appendPaneRight(two, 'i1')).toBe(two);
   });
 });
 

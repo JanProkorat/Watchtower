@@ -1,9 +1,10 @@
 import type { NodeId, WorkspaceNode } from '@watchtower/shared/layout.js';
 import {
-  leaf, splitLeaf, unmountLeaf, setSizes, replaceLeafTab,
+  leaf, split, splitLeaf, unmountLeaf, setSizes, replaceLeafTab,
   firstLeafInPreOrder, findLeafById, collectTabIds,
   type SplitPosition,
 } from '@watchtower/shared/workspaceTreeOps.js';
+import { newNodeId } from '@watchtower/shared/newNodeId.js';
 
 /** A pane tree whose leaf identities are instanceIds. */
 export type PaneTree = WorkspaceNode<string>;
@@ -55,6 +56,24 @@ export function resizeSplitSizes(layout: TabLayout, splitId: NodeId, sizes: numb
 
 export function replacePane(layout: TabLayout, leafId: NodeId, instanceId: string): TabLayout {
   return { ...layout, root: replaceLeafTab<string>(layout.root, leafId, instanceId) };
+}
+
+/**
+ * Add `instanceId` as a new pane on the FAR RIGHT and even out the widths, so a
+ * newly-spawned instance lands rightmost and every pane takes an equal share
+ * (2 -> halves, 3 -> thirds, ...). If the root is already a row split we append
+ * to it and re-even its sizes; otherwise (a single leaf, or a column split) we
+ * wrap the current root in a new row split with the new pane on the right.
+ * Refuses (returns unchanged) if the instance is already mounted.
+ */
+export function appendPaneRight(layout: TabLayout, instanceId: string): TabLayout {
+  if (mountedInstanceIds(layout).includes(instanceId)) return layout;
+  const newLeaf = leaf<string>(newNodeId(), instanceId);
+  const root: PaneTree =
+    layout.root.kind === 'split' && layout.root.dir === 'row'
+      ? split<string>(layout.root.id, 'row', [...layout.root.children, newLeaf]) // re-evens sizes
+      : split<string>(newNodeId(), 'row', [layout.root, newLeaf]); // wrap: 50/50
+  return { root, focusedLeafId: newLeaf.id };
 }
 
 export function focusPane(layout: TabLayout, leafId: NodeId): TabLayout {

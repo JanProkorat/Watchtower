@@ -112,19 +112,27 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
     if (!activeTabKey || !activeGroup || !activeId) return;
     for (const id of fresh) {
       if (!activeGroup.instanceIds.includes(id)) continue; // different tab — leave it
-      const layout = workspace.getTabLayout(activeTabKey, activeId);
-      if (layout.focusedLeafId) {
-        workspace.actions.split(activeTabKey, layout.focusedLeafId, 'row', 'after', id);
-      }
+      // Append far-right + even the widths (2->halves, 3->thirds, ...).
+      workspace.actions.appendRight(activeTabKey, id, activeId);
     }
     // Only react to instance-list changes; active-tab context is read fresh each run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instances]);
 
-  function handleSpawned(_id: string) {
+  // Loader while a just-spawned instance boots on the Mac and appears in the
+  // list. Cleared once it shows up (the #3 effect then tiles it in).
+  const [pendingSpawnId, setPendingSpawnId] = useState<string | null>(null);
+  useEffect(() => {
+    if (pendingSpawnId && instances.some((i) => i.id === pendingSpawnId)) {
+      setPendingSpawnId(null);
+    }
+  }, [pendingSpawnId, instances]);
+
+  function handleSpawned(id: string) {
     // Don't hijack activeId here: keeping it on the current instance preserves
-    // the tab's default seed so the #3 effect can split the new instance in as a
-    // second pane. First-ever instance is picked up by the #2 effect.
+    // the tab's default seed so the #3 effect can append the new instance as a
+    // rightmost pane. First-ever instance is picked up by the #2 effect.
+    setPendingSpawnId(id);
     setSpawnOpen(false);
   }
 
@@ -184,6 +192,47 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
             }}
           >
             Vyberte instanci
+          </div>
+        )}
+
+        {/* Spawn loader — a just-created instance takes a moment to boot on the
+            Mac; show a chip so it's clear something's happening. Top-center to
+            clear the hardware-keyboard accessory bar at the bottom. */}
+        {pendingSpawnId && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 14,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 30,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 9,
+              padding: '8px 14px',
+              borderRadius: 999,
+              background: glassFillStrong,
+              border: '1px solid rgba(255,255,255,0.14)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+              color: text.secondary,
+              fontSize: 13,
+              fontWeight: 500,
+            }}
+          >
+            <span
+              style={{
+                width: 13,
+                height: 13,
+                borderRadius: '50%',
+                border: '2px solid rgba(255,255,255,0.25)',
+                borderTopColor: accent,
+                animation: 'wt-spin 0.8s linear infinite',
+                display: 'inline-block',
+              }}
+            />
+            Spouštím instanci…
           </div>
         )}
       </div>
