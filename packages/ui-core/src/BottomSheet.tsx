@@ -65,7 +65,10 @@ export function BottomSheet({ onClose, children, style, anchor }: {
           top = above;
           below = false;
         } else {
+          // Neither side fits (very tall popover / short viewport): clamp to the
+          // bottom edge and point the arrow toward whichever half the anchor sits in.
           top = Math.max(MARGIN, vh - ph - MARGIN);
+          below = anchor!.top <= vh / 2;
         }
       }
       const arrowLeft = Math.max(14, Math.min(pw - 28, anchor!.left + anchor!.width / 2 - left - 7));

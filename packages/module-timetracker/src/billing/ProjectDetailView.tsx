@@ -191,7 +191,7 @@ function ContractDrawer({ title, projectId, initial, anchor, onClose, onSubmit, 
   }
 
   return (
-    <BottomSheet onClose={onClose} anchor={anchor} style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+    <BottomSheet onClose={onClose} anchor={anchor}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: glassText.primary }}>{title}</div>
