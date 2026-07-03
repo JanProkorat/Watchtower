@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { TaskRow, WorklogRow, ContractRow } from '@watchtower/shared/billing/types.js';
 import { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
 import { computeDerivedForWrite, type WorklogWriteInput } from '@watchtower/data-supabase';
-import { formatCzk, useIsNarrow } from '@watchtower/ui-core';
+import { formatCzk } from '@watchtower/ui-core';
 import { BottomSheet, glassCard, ctaGradient, ctaGlow, type SheetAnchor } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
 
@@ -18,7 +18,6 @@ export function WorklogDrawer({ title, tasks, contracts, initial, lockedTask, in
   onSubmit(task: TaskRow, input: WorklogWriteInput): Promise<void>;
   onDelete?(): Promise<void>;
 }): JSX.Element {
-  const isNarrow = useIsNarrow();
   const isEdit = initial != null;
   const isLocked = !isEdit && lockedTask != null;
   const showPicker = !isEdit && !isLocked;
@@ -95,7 +94,7 @@ export function WorklogDrawer({ title, tasks, contracts, initial, lockedTask, in
           <div style={label}>Datum</div>
           <input type="date" style={field} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
-        <div style={{ display: 'flex', flexDirection: isNarrow ? 'column' : 'row', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ flex: 1 }}>
             <div style={label}>Čas (např. 1,5 / 1:30 / 1h30m)</div>
             <input style={{ ...field, borderColor: minutesStr && !minutesValid ? C.red : 'rgba(255,255,255,0.10)' }} value={minutesStr} onChange={(e) => setMinutesStr(e.target.value)} />

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
 import { formatCzk, formatHours, formatDateCz } from '@watchtower/ui-core';
-import { czechMonthLabel, addMonths, useIsNarrow } from '@watchtower/ui-core';
+import { czechMonthLabel, addMonths } from '@watchtower/ui-core';
 import {
   rollupEarningsByContract,
   activeContract,
@@ -158,8 +158,7 @@ function ContractDrawer({ title, projectId, initial, anchor, onClose, onSubmit, 
   const [saving, setSaving] = useState(false);
   // Phone width: stack the paired input rows (dates, rate+hours) vertically —
   // two side-by-side native iOS date pickers don't fit ~170px each.
-  const isNarrow = useIsNarrow();
-  const pairRow = { display: 'flex', gap: 10, flexDirection: isNarrow ? 'column' as const : 'row' as const };
+  const pairRow = { display: 'flex', gap: 10, flexDirection: 'column' as const };
 
   const rate = Number(rateAmount.replace(',', '.'));
   const hpd = Number(hoursPerDay.replace(',', '.'));
