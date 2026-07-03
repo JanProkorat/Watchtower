@@ -1,6 +1,6 @@
 // apps/ipad/src/components/billing/reports/ReportsFilterBar.tsx
 import { C } from './tokens.js';
-import { glassCard, accentWash, accent, text } from '@watchtower/ui-core';
+import { glassCard, accentWash, accent, text, useIsNarrow } from '@watchtower/ui-core';
 import type { Preset } from '../../useReportsFilters.js';
 import { clampGranularity } from '../../useReportsFilters.js';
 import type { Granularity } from '@watchtower/shared/billing/reports/buckets.js';
@@ -68,9 +68,9 @@ function segCell(active: boolean, disabled = false): React.CSSProperties {
 // A labeled filter field — small uppercase caption above its control group.
 // Stacking the groups into captioned rows reads as an intentional filter card
 // at any width (no floating divider / meaningless spacer as before).
-function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
+function Field({ label, children, flex }: { label: string; children: React.ReactNode; flex?: number }): JSX.Element {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minWidth: 0, ...(flex != null ? { flex } : {}) }}>
       <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: text.muted }}>
         {label}
       </div>
@@ -83,6 +83,7 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
   const { preset, granularity, projectId, projects, from, to } = props;
   // A granularity option is unavailable if the clamp would bump it for this range.
   const granDisabled = (g: Granularity) => clampGranularity(g, from, to) !== g;
+  const isNarrow = useIsNarrow();
 
   return (
     <div
@@ -90,11 +91,12 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
         ...glassCard(14),
         padding: '14px 16px',
         display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
+        flexDirection: isNarrow ? 'column' : 'row',
+        alignItems: isNarrow ? 'stretch' : 'flex-end',
+        gap: isNarrow ? 14 : 16,
       }}
     >
-      <Field label="Období">
+      <Field label="Období" flex={isNarrow ? undefined : 2.4}>
         <div style={segTrack}>
           {PRESETS.map((p) => (
             <button key={p.key} style={segCell(preset === p.key)} onClick={() => props.onPreset(p.key)}>
@@ -104,7 +106,7 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
         </div>
       </Field>
 
-      <Field label="Rozlišení">
+      <Field label="Rozlišení" flex={isNarrow ? undefined : 1.5}>
         <div style={segTrack}>
           {GRANS.map((g) => {
             const disabled = granDisabled(g.key);
@@ -122,7 +124,7 @@ export function ReportsFilterBar(props: ReportsFilterBarProps): JSX.Element {
         </div>
       </Field>
 
-      <Field label="Projekt">
+      <Field label="Projekt" flex={isNarrow ? undefined : 1.6}>
         <select
           value={projectId ?? ''}
           onChange={(e) => props.onProject(e.target.value === '' ? undefined : Number(e.target.value))}
