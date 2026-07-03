@@ -97,13 +97,15 @@ export class AutoTimeLogger {
       .find((p) => p.folderPath != null && expandHome(p.folderPath) === instance.cwd);
     if (!project || !project.autoTrack) return;
 
-    const taskId = this.resolveTask(instance.taskId, project.id);
     const pings = this.hookEvents.listForInstance(instance.id).map((e) => e.receivedAt);
     const minutesByDate = activeMinutesByDate(pings, IDLE_CAP_MS);
+    const entries = [...minutesByDate].filter(([, minutes]) => minutes >= 1);
+    if (entries.length === 0) return;
+
+    const taskId = this.resolveTask(instance.taskId, project.id);
 
     let wrote = false;
-    for (const [workDate, minutes] of minutesByDate) {
-      if (minutes < 1) continue;
+    for (const [workDate, minutes] of entries) {
       const externalId = `auto:${instance.id}:${workDate}`;
       try {
         const existing = this.worklogs.findByExternalId(AUTO_SOURCE, externalId);
