@@ -3,7 +3,7 @@ import type { TaskRow, WorklogRow, ContractRow } from '@watchtower/shared/billin
 import { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
 import { computeDerivedForWrite, type WorklogWriteInput } from '@watchtower/data-supabase';
 import { formatCzk, useIsNarrow } from '@watchtower/ui-core';
-import { glassPanel, glassCard, ctaGradient, ctaGlow, glassFillStrong } from '@watchtower/ui-core';
+import { BottomSheet, glassCard, ctaGradient, ctaGlow } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
 
 export function WorklogDrawer({ title, tasks, contracts, initial, lockedTask, initialDate, onClose, onSubmit, onDelete }: {
@@ -63,8 +63,7 @@ export function WorklogDrawer({ title, tasks, contracts, initial, lockedTask, in
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(6,7,11,0.45)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...glassPanel({ radius: 20, fill: glassFillStrong, blur: 40, saturate: 1.9, brightness: 1.1 }), borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: '1px solid rgba(255,255,255,0.20)', borderBottom: 'none', boxShadow: '0 -20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.30)', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <BottomSheet onClose={onClose}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#f4f4f8' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -126,7 +125,6 @@ export function WorklogDrawer({ title, tasks, contracts, initial, lockedTask, in
             {saving ? 'Ukládám…' : 'Uložit'}
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }

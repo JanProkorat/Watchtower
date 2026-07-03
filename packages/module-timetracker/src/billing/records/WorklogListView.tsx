@@ -7,7 +7,7 @@ import { canEdit } from '@watchtower/data-supabase';
 import { addMonths, czechMonthLabel } from '@watchtower/ui-core';
 import { formatHours, formatDateCz } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
-import { glassPanel, glassCard, ctaGradient, ctaGlow } from '@watchtower/ui-core';
+import { glassCard, ctaGradient, ctaGlow } from '@watchtower/ui-core';
 import { WorklogDrawer } from './WorklogDrawer.js';
 
 const SOURCE_LABEL: Record<string, string> = { manual: 'manual', 'watchtower-auto': 'watchtower', 'jira-sync': 'jira' };
@@ -115,7 +115,7 @@ function MonthBar({ month, onPrev, onNext, onToday, projects, projectId, onProje
   const stepBtn: React.CSSProperties = { width: 34, height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c9bdff', fontSize: 18, lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
   const flatBtn: React.CSSProperties = { height: 34, padding: '0 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c2c9d8', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
   return (
-    <div style={{ position: 'sticky', top: 0, zIndex: 10, padding: '10px 16px 12px', display: 'flex', flexDirection: 'column', gap: 10, ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+    <div style={{ position: 'sticky', top: 12, zIndex: 10, margin: '12px 16px', padding: '10px 16px 12px', display: 'flex', flexDirection: 'column', gap: 10, ...glassCard(16) }}>
       {/* Row 1: month stepper (‹ label ›) + Dnes */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button style={stepBtn} onClick={onPrev} aria-label="Předchozí měsíc">‹</button>

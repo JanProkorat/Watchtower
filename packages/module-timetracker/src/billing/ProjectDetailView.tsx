@@ -11,9 +11,8 @@ import { useContractMutations } from '@watchtower/data-supabase';
 import { canEdit, type ContractWriteInput } from '@watchtower/data-supabase';
 import type { ContractRow } from '@watchtower/shared/billing/types.js';
 import {
+  BottomSheet,
   glassCard,
-  glassPanel,
-  glassFillStrong,
   dataPanelFill,
   text as glassText,
   accentWash,
@@ -171,28 +170,6 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
 
   const labelStyle: React.CSSProperties = { fontSize: 12, color: glassText.muted, marginBottom: 4 };
 
-  // Scrim backdrop filter (both prefixes)
-  const scrimFilter = 'blur(8px)';
-
-  // Sheet style
-  const sheetStyle: React.CSSProperties = {
-    ...glassPanel({ radius: 20, fill: glassFillStrong, blur: 40, saturate: 1.9, brightness: 1.1 }),
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    width: '100%',
-    maxHeight: '85vh',
-    overflowY: 'auto',
-    padding: 20,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 14,
-    // Override border to only show top hairline
-    border: 'none',
-    borderTop: '1px solid rgba(255,255,255,0.15)',
-  };
-
   async function submit() {
     setSaving(true);
     try {
@@ -211,20 +188,7 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(6,7,11,0.45)',
-        backdropFilter: scrimFilter,
-        WebkitBackdropFilter: scrimFilter,
-        zIndex: 100,
-        display: 'flex',
-        alignItems: 'flex-end',
-      }}
-    >
-      <div onClick={(e) => e.stopPropagation()} style={sheetStyle}>
+    <BottomSheet onClose={onClose} style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: glassText.primary }}>{title}</div>
@@ -353,8 +317,7 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
             {saving ? 'Ukládám…' : 'Uložit'}
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -390,14 +353,14 @@ export function ProjectDetailView({
 
   const [drawer, setDrawer] = useState<{ mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; contract: ContractRow }>({ mode: 'closed' });
 
-  // Nav bar glass style — frosted sticky bar
+  // Nav bar glass style — floating glass card
   const navBarStyle: React.CSSProperties = {
-    ...glassPanel({ radius: 0, blur: 20, saturate: 1.6, brightness: 1.1, fill: 'rgba(40,44,64,0.42)', border: 'none', shadow: '0 1px 0 rgba(255,255,255,0.08)' }),
     position: 'sticky',
-    top: 0,
+    top: 12,
     zIndex: 10,
+    margin: '12px 16px',
     padding: '10px 16px',
-    borderRadius: 0,
+    ...glassCard(16),
   };
 
   // Loading with no data

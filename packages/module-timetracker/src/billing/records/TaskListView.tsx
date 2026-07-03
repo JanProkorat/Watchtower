@@ -5,7 +5,7 @@ import { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
 import type { TaskRow, EpicRow, ProjectRow } from '@watchtower/shared/billing/types.js';
 import { canEdit, canEditTask, type TaskWriteInput } from '@watchtower/data-supabase';
 import { C } from '../reports/tokens.js';
-import { glassPanel, glassCard, ctaGradient, ctaGlow, glassFillStrong } from '@watchtower/ui-core';
+import { BottomSheet, glassCard, ctaGradient, ctaGlow } from '@watchtower/ui-core';
 
 const STATUS_LABEL: Record<string, string> = {
   open: 'Otevřený', in_progress: 'Probíhá', to_accept: 'K akceptaci', done: 'Hotovo',
@@ -44,7 +44,7 @@ export function TaskListView(): JSX.Element {
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', background: 'transparent', minHeight: '100%', color: C.text }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+      <div style={{ position: 'sticky', top: 12, zIndex: 10, margin: '12px 16px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassCard(16) }}>
         <input placeholder="Hledat úkol…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 140, background: 'rgba(255,255,255,0.07)', color: '#d7dbe6', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 11, padding: '0 12px', height: 34, fontSize: 12, fontFamily: 'inherit', outline: 'none' }} />
         {editable && <button onClick={() => setDrawer({ mode: 'create' })} style={{ height: 34, padding: '0 16px', borderRadius: 11, border: 'none', background: ctaGradient, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: ctaGlow }}>+ Přidat úkol</button>}
       </div>
@@ -138,8 +138,7 @@ function TaskDrawer({ title, epics, projects, initial, readOnly, onClose, onSubm
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(6,7,11,0.45)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...glassPanel({ radius: 20, fill: glassFillStrong, blur: 40, saturate: 1.9, brightness: 1.1 }), borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: '1px solid rgba(255,255,255,0.20)', borderBottom: 'none', boxShadow: '0 -20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.30)', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <BottomSheet onClose={onClose}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#f4f4f8' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -195,7 +194,6 @@ function TaskDrawer({ title, epics, projects, initial, readOnly, onClose, onSubm
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }

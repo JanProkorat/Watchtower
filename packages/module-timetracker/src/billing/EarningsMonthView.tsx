@@ -5,7 +5,6 @@ import { formatCzk, formatHours } from '@watchtower/ui-core';
 import { czechMonthLabel, addMonths } from '@watchtower/ui-core';
 import {
   glassCard,
-  glassPanel,
   text as glassText,
   accent,
 } from '@watchtower/ui-core';
@@ -56,13 +55,13 @@ function MonthPicker({
   return (
     <div
       style={{
-        ...glassPanel({ radius: 0, blur: 20, saturate: 1.6, brightness: 1.1, fill: 'rgba(40,44,64,0.42)', border: 'none', shadow: '0 1px 0 rgba(255,255,255,0.08)' }),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 12,
+        margin: '12px 16px',
         padding: '12px 16px',
-        borderRadius: 0,
+        ...glassCard(16),
       }}
     >
       <button style={btnStyle} onClick={() => onChange(addMonths(month, -1))}>

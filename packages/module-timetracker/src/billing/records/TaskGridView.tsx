@@ -6,7 +6,7 @@ import { addMonths, czechMonthLabel, useIsNarrow } from '@watchtower/ui-core';
 import { formatCzk, formatHours } from '@watchtower/ui-core';
 import { czechHolidays, workdayDates } from '@watchtower/shared/billing/workdays.js';
 import { C } from '../reports/tokens.js';
-import { glassPanel, dataPanelFill, glassCard, glassFillStrong, ctaGradient, ctaGlow } from '@watchtower/ui-core';
+import { BottomSheet, dataPanelFill, glassCard, ctaGradient, ctaGlow } from '@watchtower/ui-core';
 import { WorklogDrawer } from './WorklogDrawer.js';
 import type { WorklogRow, TaskRow } from '@watchtower/shared/billing/types.js';
 
@@ -126,7 +126,7 @@ export function TaskGridView(): JSX.Element {
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', background: 'transparent', height: '100%', minHeight: 0, color: C.text, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ flexShrink: 0, zIndex: 11, padding: '10px 16px 12px', display: 'flex', flexDirection: 'column', gap: 10, ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+      <div style={{ flexShrink: 0, zIndex: 11, margin: '12px 16px', padding: '10px 16px 12px', display: 'flex', flexDirection: 'column', gap: 10, ...glassCard(16) }}>
         {/* Row 1: month stepper (‹ label ›) + Dnes */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button style={stepBtn} onClick={() => setMonth(addMonths(month, -1))} aria-label="Předchozí měsíc">‹</button>
@@ -259,8 +259,7 @@ export function TaskGridView(): JSX.Element {
       )}
 
       {sheet.mode === 'list' && (
-        <div onClick={() => setSheet({ mode: 'closed' })} style={{ position: 'fixed', inset: 0, background: 'rgba(6,7,11,0.45)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...glassPanel({ radius: 20, fill: glassFillStrong, blur: 40, saturate: 1.9, brightness: 1.1 }), borderBottomLeftRadius: 0, borderBottomRightRadius: 0, border: '1px solid rgba(255,255,255,0.20)', borderBottom: 'none', boxShadow: '0 -20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.30)', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <BottomSheet onClose={() => setSheet({ mode: 'closed' })} style={{ gap: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#f4f4f8' }}>Záznamy</div>
               <button onClick={() => setSheet({ mode: 'closed' })} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -286,8 +285,7 @@ export function TaskGridView(): JSX.Element {
                 + Přidat
               </button>
             )}
-          </div>
-        </div>
+        </BottomSheet>
       )}
 
       {sheet.mode === 'create' && (

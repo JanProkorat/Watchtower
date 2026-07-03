@@ -6,7 +6,7 @@ import { formatDateCz } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
 import { useDaysOffMutations } from '@watchtower/data-supabase';
 import { canEdit } from '@watchtower/data-supabase';
-import { glassPanel, glassCard } from '@watchtower/ui-core';
+import { glassCard, glassPanel } from '@watchtower/ui-core';
 
 const KIND_COLOR: Record<TimeOffKind, string> = { vacation: '#22D3EE', sick: '#f87171', other: '#fbbf24', holiday: '#6d5fbb' };
 const KIND_LABEL: Record<TimeOffKind, string> = { vacation: 'Dovolená', sick: 'Nemoc', other: 'Jiné', holiday: 'Svátek' };
@@ -32,7 +32,7 @@ export function TimeOffView(): JSX.Element {
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', background: 'transparent', minHeight: '100%', color: C.text }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassPanel({ radius: 13, blur: 28, saturate: 1.7 }), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+      <div style={{ position: 'sticky', top: 12, zIndex: 10, margin: '12px 16px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassCard(16) }}>
         <button style={btn} onClick={() => setFocus(addMonths(focus, -1))}>‹</button>
         <button style={btn} onClick={() => setFocus(new Date().toISOString().slice(0, 7))}>Dnes</button>
         <button style={btn} onClick={() => setFocus(addMonths(focus, 1))}>›</button>
