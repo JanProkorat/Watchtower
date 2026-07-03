@@ -30,6 +30,23 @@ describe('buildTaskGrid', () => {
     expect(g.monthTotalCzk).toBe(2250);
   });
 
+  it('attaches estimatedMinutes from estimatesByKey (null when absent)', () => {
+    const rows = [
+      wl({ projectId: 1, taskNumber: 'X-2', workDate: '2026-06-01', minutes: 60 }),
+      wl({ projectId: 1, taskNumber: 'X-10', workDate: '2026-06-01', minutes: 45 }),
+    ];
+    const estimatesByKey = new Map<string, number | null>([['1:X-2', 120]]);
+    const g = buildTaskGrid(rows, { month: '2026-06', estimatesByKey });
+    const byNum = Object.fromEntries(g.tasks.map((t) => [t.taskNumber, t.estimatedMinutes]));
+    expect(byNum['X-2']).toBe(120); // keyed 1:X-2
+    expect(byNum['X-10']).toBe(null); // no entry
+  });
+
+  it('leaves estimatedMinutes null when no estimatesByKey is passed', () => {
+    const g = buildTaskGrid([wl({ taskNumber: 'X-1', workDate: '2026-06-01' })], { month: '2026-06' });
+    expect(g.tasks[0].estimatedMinutes).toBeNull();
+  });
+
   it('buckets null taskNumber into one row per project and filters month/project', () => {
     const rows = [
       wl({ projectId: 1, taskNumber: null, workDate: '2026-06-05', minutes: 20 }),

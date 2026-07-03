@@ -41,6 +41,7 @@ export function TaskGridView(): JSX.Element {
   const worklogs = data?.worklogs ?? [];
   const projects = data?.projects ?? [];
   const tasks = data?.tasks ?? [];
+
   const editable = canEdit(state);
 
   // Tapping a day cell opens the right surface for how many worklogs it holds:
@@ -60,7 +61,14 @@ export function TaskGridView(): JSX.Element {
     }
   }
 
-  const g = buildTaskGrid(worklogs, { month, projectId });
+  // Expected-time lookup keyed the same way buildTaskGrid buckets tasks
+  // (`${projectId}:${taskNumber ?? ''}`). estimatedMinutes already has the Jira
+  // fallback applied in mapTaskRow, so board-pulled tasks carry an estimate.
+  const estimatesByKey = new Map<string, number | null>(
+    tasks.map((t) => [`${t.projectId}:${t.taskNumber ?? ''}`, t.estimatedMinutes]),
+  );
+
+  const g = buildTaskGrid(worklogs, { month, projectId, estimatesByKey });
   const dayHeaders = Array.from({ length: g.daysInMonth }, (_, i) => i + 1);
   const hrs = (min: number) => (min === 0 ? '' : (min / 60).toFixed(1).replace('.', ','));
 
@@ -199,7 +207,12 @@ export function TaskGridView(): JSX.Element {
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#c2c9d8' }}>{t.taskTitle ?? ''}</span>
                         </div>
                       </td>
-                      <td style={{ ...sigCol, background: '#101019', zIndex: 1, fontWeight: 700, color: C.violet, fontSize: 12 }}>{hrs(rowTotal)}</td>
+                      <td style={{ ...sigCol, background: '#101019', zIndex: 1, fontSize: 12 }}>
+                        <b style={{ color: C.violet, fontWeight: 700 }}>{hrs(rowTotal)}</b>
+                        {t.estimatedMinutes != null && t.estimatedMinutes > 0 && (
+                          <span style={{ color: C.muted, fontWeight: 400 }}> / {hrs(t.estimatedMinutes)}</span>
+                        )}
+                      </td>
                       {t.perDay.map((min, i) => {
                         const meta = dayMeta[i]!;
                         const bg = dayTint(meta);

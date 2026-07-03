@@ -90,6 +90,8 @@ export type RawTaskRow = {
   title: string | null;
   status: string;
   estimated_minutes: number | null;
+  jira_estimate_secs: number | null;
+  jira_status: string | null;
   description: string | null;
   epics: { projects: RawProject | null } | null;
 };
@@ -103,13 +105,19 @@ export function mapTaskRow(raw: RawTaskRow): TaskRow {
     taskNumber: raw.number ?? null,
     taskTitle: raw.title ?? '',
     status: raw.status,
-    estimatedMinutes: raw.estimated_minutes ?? null,
+    // Manual estimate wins; fall back to the estimate pulled from Jira
+    // (`jira_estimate_secs`) so board-pulled tasks show an expected time in the
+    // grid without a hand-entered value. Mirrors the desktop taskGrid service.
+    estimatedMinutes:
+      raw.estimated_minutes ??
+      (raw.jira_estimate_secs != null ? Math.round(raw.jira_estimate_secs / 60) : null),
     description: raw.description ?? null,
     projectId: proj?.id ?? 0,
     projectName: proj?.name ?? '',
     projectColor: proj?.color ?? null,
     projectKind: proj?.kind ?? '',
     isBillable: proj?.is_billable ?? false,
+    jiraStatus: raw.jira_status ?? null,
   };
 }
 

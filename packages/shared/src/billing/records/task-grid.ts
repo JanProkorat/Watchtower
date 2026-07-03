@@ -7,6 +7,12 @@ export interface TaskGridRow {
   taskTitle: string | null;
   projectColor: string | null;
   perDay: number[];
+  /**
+   * Expected time for the task, in minutes. Manual estimate wins; falls back
+   * to the estimate pulled from Jira (see `estimatesByKey`). Null when neither
+   * is known. Mirrors the desktop grid's `estimatedMinutes`.
+   */
+  estimatedMinutes: number | null;
 }
 
 export interface TaskGridResult {
@@ -20,9 +26,19 @@ export interface TaskGridResult {
 
 export function buildTaskGrid(
   rows: WorklogRow[],
-  opts: { month: string; projectId?: number },
+  opts: {
+    month: string;
+    projectId?: number;
+    /**
+     * Expected-time lookup keyed by `${projectId}:${taskNumber ?? ''}` (the
+     * same key this builder buckets tasks under). Value is the already-resolved
+     * estimate in minutes (manual estimate with the Jira fallback applied by
+     * the caller). Absent key → row.estimatedMinutes stays null.
+     */
+    estimatesByKey?: Map<string, number | null>;
+  },
 ): TaskGridResult {
-  const { month, projectId } = opts;
+  const { month, projectId, estimatesByKey } = opts;
   const parts = month.split('-').map(Number);
   const y = parts[0]!;
   const m = parts[1]!;
@@ -52,6 +68,7 @@ export function buildTaskGrid(
         taskTitle: r.taskTitle,
         projectColor: r.projectColor,
         perDay,
+        estimatedMinutes: estimatesByKey?.get(key) ?? null,
       };
       byTask.set(key, row);
     }

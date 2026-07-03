@@ -38,6 +38,8 @@ const SettingsModule = lazy(() =>
 const BillingArea = lazy(() =>
   import('@watchtower/module-timetracker').then((m) => ({ default: m.BillingArea })),
 );
+import type { BoardActions } from '@watchtower/module-timetracker';
+import type { JiraSyncRequestPayload, JiraSyncResultPayload } from '@watchtower/shared/ipcContract.js';
 import { text, glassPanel, glassFillStrong, statusGlass, ctaGradient, ctaGlow, accent } from '@watchtower/ui-core';
 
 // Retry button for the connection toast — translucent glass; `color: inherit`
@@ -316,6 +318,26 @@ function Shell({ connection }: ShellProps) {
   }, [status]);
   const retryConnect = useCallback(() => { setEverFailed(false); reconnect(); }, [reconnect]);
 
+  // Jira board actions (Phase 3/4) — iPad-only Mac RPC injected into BoardView.
+  // BoardView itself re-pulls its own Supabase data afterwards (no shared
+  // billing provider to refresh from here); these callbacks only perform the
+  // Mac round-trip. bridge.invoke is untyped, so results are cast here.
+  const boardActions: BoardActions = useMemo<BoardActions>(() => ({
+    online: status === 'connected',
+    sync: async (projectIds: number[]) => {
+      let authFailed = false;
+      let error: string | undefined;
+      for (const projectId of projectIds) {
+        const r = await bridge.invoke('board:sync', { projectId }) as { result: { ok: boolean; authFailed?: boolean; error?: string } };
+        if (r.result.authFailed) authFailed = true;
+        if (r.result.error) error = r.result.error;
+      }
+      return { ok: !error, authFailed, error };
+    },
+    preview: async (req: JiraSyncRequestPayload) => await bridge.invoke('jira:syncPreview', req) as JiraSyncResultPayload,
+    upload: async (req: JiraSyncRequestPayload) => await bridge.invoke('jira:sync', req) as JiraSyncResultPayload,
+  }), [status, bridge]);
+
   // Immersive (fullscreen) mode for the Remote Mac view — hides the rail so the
   // remote screen fills the whole window. Only meaningful on the 'remote'
   // module; auto-reset when navigating away so the rail can't get stuck hidden.
@@ -458,7 +480,7 @@ function Shell({ connection }: ShellProps) {
           {activeModule === 'instances' ? (
             <InstancesModule activeId={activeId} setActiveId={selectInstance} ackedIds={ackedIds} />
           ) : activeModule === 'dashboard' || activeModule === 'billing' ? (
-            <BillingArea module={activeModule} section={billingSection} />
+            <BillingArea module={activeModule} section={billingSection} boardActions={boardActions} />
           ) : activeModule === 'settings' ? (
             <SettingsModule />
           ) : (

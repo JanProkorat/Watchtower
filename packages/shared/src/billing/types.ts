@@ -32,6 +32,8 @@ export interface TaskRow {
   projectColor: string | null;
   projectKind: string;
   isBillable: boolean;
+  /** Raw Jira status the task was last pulled with (null = not on a board). */
+  jiraStatus: string | null;
 }
 
 export interface ContractRow {

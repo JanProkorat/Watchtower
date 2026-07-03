@@ -73,6 +73,9 @@ const WORKLOGS_D = 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.5
 const GRID_D = 'M20 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m0 2v3H5V5zm-5 14h-5v-9h5zM5 10h3v9H5zm12 9v-9h3v9z';
 const TASKS_D = 'M22 7h-9v2h9zm0 8h-9v2h9zM5.54 11 2 7.46l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41zm0 8L2 15.46l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41z';
 const TIMEOFF_D = 'm21 19.57-1.427 1.428-6.442-6.442 1.43-1.428zM13.12 3c-2.58 0-5.16.98-7.14 2.95l-.01.01c-3.95 3.95-3.95 10.36 0 14.31l14.3-14.31C18.3 3.99 15.71 3 13.12 3M6.14 17.27C5.4 16.03 5 14.61 5 13.12c0-.93.16-1.82.46-2.67.19 1.91.89 3.79 2.07 5.44zm2.84-2.84C7.63 12.38 7.12 9.93 7.6 7.6c.58-.12 1.16-.18 1.75-.18 1.8 0 3.55.55 5.08 1.56zm1.47-8.97c.85-.3 1.74-.46 2.67-.46 1.49 0 2.91.4 4.15 1.14l-1.39 1.39c-1.65-1.18-3.52-1.88-5.43-2.07';
+// Kanban board glyph (Material "ViewColumn"): outer frame + three vertical
+// column dividers — reads as a Jira-style board at rail size.
+const BOARD_D = 'M22 3H2v18h20V3zM8 19H4V5h4v14zm6 0h-4V5h4v14zm6 0h-4V5h4v14z';
 const BELL_D = 'M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2m6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1z';
 
 function WatchtowerLogo({ size = 28 }: { size?: number }) {
@@ -109,6 +112,7 @@ const BILLING_TABS: { id: BillingSection; label: string; d: string }[] = [
   { id: 'records-grid', label: 'Mřížka', d: GRID_D },
   { id: 'records-tasks', label: 'Úkoly', d: TASKS_D },
   { id: 'records-timeoff', label: 'Volno', d: TIMEOFF_D },
+  { id: 'board', label: 'Nástěnka', d: BOARD_D },
 ];
 
 // Active item ring — translucent purple outline
