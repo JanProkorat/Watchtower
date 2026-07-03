@@ -46,6 +46,7 @@ interface DraftState {
   kind: 'work' | 'time_off';
   isDefault: boolean;
   folderPath: string;
+  autoTrack: boolean;
   jiraGlobs: string[];
   jiraBoardUrl: string;
   taskUrlTemplate: string;
@@ -59,6 +60,7 @@ function emptyDraft(): DraftState {
     kind: 'work',
     isDefault: false,
     folderPath: '',
+    autoTrack: false,
     jiraGlobs: [],
     jiraBoardUrl: '',
     taskUrlTemplate: '',
@@ -74,6 +76,7 @@ function draftOf(project: ProjectViewPayload | null): DraftState {
     kind: project.kind,
     isDefault: project.isDefault,
     folderPath: project.folderPath ?? '',
+    autoTrack: project.autoTrack,
     jiraGlobs: project.jiraGlobs.length > 0 ? project.jiraGlobs : [],
     jiraBoardUrl: project.jiraBoardUrl ?? '',
     taskUrlTemplate: project.taskUrlTemplate ?? '',
@@ -165,6 +168,17 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
               />
             }
             label="Default project"
+            sx={{ mr: 0 }}
+          />
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={draft.autoTrack}
+                onChange={(e) => setDraft({ ...draft, autoTrack: e.target.checked })}
+              />
+            }
+            label="Auto-track time"
             sx={{ mr: 0 }}
           />
 
@@ -369,6 +383,7 @@ function toInput(draft: DraftState): ProjectInputPayload {
     kind: draft.kind,
     isDefault: draft.isDefault,
     folderPath: draft.folderPath.trim() ? draft.folderPath.trim() : null,
+    autoTrack: draft.autoTrack,
     jiraGlobs: draft.jiraGlobs.filter((g) => g.trim() !== ''),
     jiraBoardUrl: draft.jiraBoardUrl.trim() ? draft.jiraBoardUrl.trim() : null,
     taskUrlTemplate: draft.taskUrlTemplate.trim() ? draft.taskUrlTemplate.trim() : null,
