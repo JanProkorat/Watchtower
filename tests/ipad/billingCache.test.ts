@@ -245,7 +245,7 @@ describe('mapTaskRow', () => {
   it('flattens task → epic → project', () => {
     const raw: RawTaskRow = {
       id: 7, sync_id: 't-1', epic_id: 5, number: 'X-9', title: 'Task nine',
-      status: 'open', estimated_minutes: null, description: null,
+      status: 'open', estimated_minutes: null, jira_estimate_secs: null, description: null,
       epics: { projects: { id: 3, name: 'Proj', color: '#abc', kind: 'work', is_billable: true } },
     };
     expect(mapTaskRow(raw)).toEqual({
@@ -277,7 +277,7 @@ describe('mapTaskRow — slice 3a fields', () => {
   it('maps syncId/epicId/status/estimatedMinutes/description', () => {
     const raw: RawTaskRow = {
       id: 7, sync_id: 't-sync', epic_id: 5, number: 'X-9', title: 'Task nine',
-      status: 'in_progress', estimated_minutes: 120, description: 'do it',
+      status: 'in_progress', estimated_minutes: 120, jira_estimate_secs: null, description: 'do it',
       epics: { projects: { id: 3, name: 'Proj', color: '#abc', kind: 'work', is_billable: true } },
     };
     expect(mapTaskRow(raw)).toEqual({
@@ -289,12 +289,25 @@ describe('mapTaskRow — slice 3a fields', () => {
   it('defaults estimatedMinutes/description to null and status to empty', () => {
     const raw: RawTaskRow = {
       id: 8, sync_id: 's8', epic_id: 1, number: null, title: null,
-      status: 'open', estimated_minutes: null, description: null, epics: null,
+      status: 'open', estimated_minutes: null, jira_estimate_secs: null, description: null, epics: null,
     };
     const r = mapTaskRow(raw);
     expect(r.estimatedMinutes).toBeNull();
     expect(r.description).toBeNull();
     expect(r.taskTitle).toBe('');
+  });
+
+  it('falls back to jira_estimate_secs (÷60) when no manual estimate; manual wins', () => {
+    const base = {
+      id: 9, sync_id: 's9', epic_id: 1, number: 'X-9', title: 'T', status: 'open',
+      description: null, epics: null,
+    };
+    // Jira-only: 7200s → 120min.
+    expect(mapTaskRow({ ...base, estimated_minutes: null, jira_estimate_secs: 7200 }).estimatedMinutes).toBe(120);
+    // Manual wins over a (different) Jira estimate.
+    expect(mapTaskRow({ ...base, estimated_minutes: 45, jira_estimate_secs: 7200 }).estimatedMinutes).toBe(45);
+    // Neither → null.
+    expect(mapTaskRow({ ...base, estimated_minutes: null, jira_estimate_secs: null }).estimatedMinutes).toBeNull();
   });
 });
 

@@ -124,7 +124,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
     (from, to) =>
       supabase
         .from('tasks')
-        .select('id,sync_id,epic_id,number,title,status,estimated_minutes,description,epics(projects(id,name,color,kind,is_billable))')
+        .select('id,sync_id,epic_id,number,title,status,estimated_minutes,jira_estimate_secs,description,epics(projects(id,name,color,kind,is_billable))')
         .is('deleted_at', null)
         .order('id', { ascending: true })
         .range(from, to) as unknown as PromiseLike<PageResult<RawTaskRow>>,

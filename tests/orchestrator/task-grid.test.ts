@@ -112,6 +112,46 @@ describe('TaskGridService', () => {
     expect(res.dailyTotalsTracked).toEqual({ 4: 120, 5: 60 });
   });
 
+  it('falls back to the pulled Jira estimate for estimatedMinutes when no manual estimate is set', () => {
+    const project = s.projectsRepo.create({ name: 'P', kind: 'work' });
+    const epic = s.epicsRepo.create({ projectId: project.id, name: 'E' });
+
+    // Task pulled from Jira: no manual estimate, Jira original estimate = 2h.
+    const pulled = s.tasksRepo.create({ epicId: epic.id, number: 'FIE-1', title: 'pulled' });
+    s.tasksRepo.updateJiraFields(pulled.id, {
+      jiraStatus: 'In Progress',
+      estimateSeconds: 7200,
+      component: null,
+      syncedAt: '2026-05-01T00:00:00.000Z',
+    });
+    s.worklogsRepo.create({ taskId: pulled.id, workDate: '2026-05-05', minutes: 60 });
+
+    // Manual estimate present AND a (different) Jira estimate — manual must win.
+    const manual = s.tasksRepo.create({
+      epicId: epic.id,
+      number: 'FIE-2',
+      title: 'manual',
+      estimatedMinutes: 45,
+    });
+    s.tasksRepo.updateJiraFields(manual.id, {
+      jiraStatus: 'In Progress',
+      estimateSeconds: 7200,
+      component: null,
+      syncedAt: '2026-05-01T00:00:00.000Z',
+    });
+    s.worklogsRepo.create({ taskId: manual.id, workDate: '2026-05-05', minutes: 60 });
+
+    // Neither estimate — stays null.
+    const bare = s.tasksRepo.create({ epicId: epic.id, number: 'FIE-3', title: 'bare' });
+    s.worklogsRepo.create({ taskId: bare.id, workDate: '2026-05-05', minutes: 60 });
+
+    const res = s.service.get(2026, 5);
+    const byNum = Object.fromEntries(res.tasks.map((t) => [t.taskNumber, t.estimatedMinutes]));
+    expect(byNum['FIE-1']).toBe(120); // 7200s / 60, from the Jira fallback
+    expect(byNum['FIE-2']).toBe(45); // manual estimate wins over Jira's 120
+    expect(byNum['FIE-3']).toBe(null);
+  });
+
   it('includes daysInMonth correctly for short / long / leap months', () => {
     expect(s.service.get(2026, 2).daysInMonth).toBe(28); // 2026 is not leap
     expect(s.service.get(2024, 2).daysInMonth).toBe(29); // 2024 is leap
