@@ -61,6 +61,7 @@ import { listAgents } from './services/claudeAgents.js';
 import { JiraSyncService } from './services/jiraSync.js';
 import { JiraBoardService } from './services/jiraBoard.js';
 import { fetchTokenUsage } from './services/tokenUsage.js';
+import { AutoTimeLogger } from './services/autoTimeLogger.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
@@ -222,6 +223,10 @@ function resolveTaskByNumberPayload(
 
 function worklogsRepo(): WorklogsRepo {
   return new WorklogsRepo(handle!.db);
+}
+
+function autoTimeLogger(): AutoTimeLogger {
+  return new AutoTimeLogger(handle!.db, notifySync);
 }
 
 /**
@@ -1109,6 +1114,11 @@ function respawnIncompleteRowsOnBoot(): void {
         authBlockDetector.onHookEvent(eventName, body, instanceId);
         const stateEvent = mapHookEventToStateEvent(eventName, body);
         if (stateEvent) applyTransition(instanceId, stateEvent);
+        // Auto-log this instance's active time to its project on session end
+        // (no-op unless the matched project has auto_track enabled). Best-effort:
+        // the service swallows its own errors so a logging failure can't break
+        // the state machine.
+        if (eventName === 'SessionEnd') autoTimeLogger().onSessionEnd(row);
       },
     });
     // Register the WS bridge's broadcast as the secondary push sink so every
