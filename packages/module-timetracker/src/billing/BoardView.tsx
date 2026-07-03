@@ -1,13 +1,33 @@
 import { useState } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
 import { buildBoard, type BoardCard } from '@watchtower/shared/billing/board/board.js';
+import type { JiraSyncRequestPayload, JiraSyncResultPayload } from '@watchtower/shared/ipcContract.js';
 import { useIsNarrow, glassPanel, dataPanelFill } from '@watchtower/ui-core';
 import { C } from './reports/tokens.js';
+import { BoardUploadSheet } from './BoardUploadSheet.js';
 
 // Read-only Jira-status board: three columns (To Do / Rozpracované / K akceptaci)
 // built by the pure `buildBoard` helper from the tasks + worklogs the client
 // already holds. No writes — matches the desktop board's grouping so iPad/
 // iPhone show the same state without a second sync path.
+//
+// iPad-only actions (re-sync from Jira, upload worklogs to Jira) are injected
+// via the optional `actions` prop — bridge-agnostic: when absent (iPhone, or
+// the Mac unreachable) the board stays exactly as before. There is no shared
+// billing provider, so the injected callbacks perform ONLY the Mac RPC; this
+// component re-pulls its own data via its own `useBilling().refresh()` once a
+// callback resolves.
+
+/** Mac-RPC capability injected by the iPad shell. Undefined on iPhone. */
+export interface BoardActions {
+  online: boolean;
+  /** Re-sync the given projects from Jira on the Mac; resolves when all done. */
+  sync: (projectIds: number[]) => Promise<{ ok: boolean; authFailed: boolean; error?: string }>;
+  /** Jira worklog upload — dryRun preview. */
+  preview: (req: JiraSyncRequestPayload) => Promise<JiraSyncResultPayload>;
+  /** Jira worklog upload — real run. */
+  upload: (req: JiraSyncRequestPayload) => Promise<JiraSyncResultPayload>;
+}
 
 const hrs = (min: number): string => (min / 60).toFixed(1).replace('.', ',');
 
@@ -74,17 +94,39 @@ function BoardCardTile({ card }: { card: BoardCard }): JSX.Element {
   );
 }
 
-export function BoardView(): JSX.Element {
-  const { data } = useBilling();
+export function BoardView({ actions }: { actions?: BoardActions } = {}): JSX.Element {
+  const { data, refresh } = useBilling();
   // Phone width: columns shrink so ~1.5 columns preview on screen; iPad keeps
   // the roomier width. Either way the row always scrolls horizontally.
   const isNarrow = useIsNarrow();
   const [projectId, setProjectId] = useState<number | undefined>(undefined);
+  const [syncing, setSyncing] = useState(false);
+  const [notice, setNotice] = useState<{ kind: 'error' | 'amber'; text: string } | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const projects = data?.projects ?? [];
+  const tasks = data?.tasks ?? [];
 
-  const g = buildBoard(data?.tasks ?? [], data?.worklogs ?? [], { projectId });
+  const g = buildBoard(tasks, data?.worklogs ?? [], { projectId });
   const totalCards = g.columns.reduce((sum, c) => sum + c.cards.length, 0);
   const colWidth = isNarrow ? 200 : 240;
+
+  async function handleSync() {
+    if (!actions) return;
+    const ids = projectId != null
+      ? [projectId]
+      : Array.from(new Set(tasks.filter((t) => t.jiraStatus != null).map((t) => t.projectId)));
+    if (ids.length === 0) return;
+    setSyncing(true);
+    try {
+      const result = await actions.sync(ids);
+      await refresh();
+      if (result.authFailed) setNotice({ kind: 'amber', text: 'Přihlaste se k Jira na Macu' });
+      else if (result.error) setNotice({ kind: 'error', text: result.error });
+      else setNotice(null);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   return (
     <div
@@ -114,29 +156,101 @@ export function BoardView(): JSX.Element {
           borderBottom: '1px solid rgba(255,255,255,0.10)',
         }}
       >
-        <select
-          value={projectId ?? ''}
-          onChange={(e) => setProjectId(e.target.value === '' ? undefined : Number(e.target.value))}
-          style={{
-            width: '100%',
-            height: 36,
-            padding: '0 12px',
-            borderRadius: 9,
-            border: '1px solid rgba(255,255,255,0.12)',
-            background: 'rgba(255,255,255,0.06)',
-            color: '#c2c9d8',
-            fontSize: 13,
-            fontFamily: 'inherit',
-            cursor: 'pointer',
-          }}
-        >
-          <option value="">Všechny projekty</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name || '(bez názvu)'}
-            </option>
-          ))}
-        </select>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select
+            value={projectId ?? ''}
+            onChange={(e) => setProjectId(e.target.value === '' ? undefined : Number(e.target.value))}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              height: 36,
+              padding: '0 12px',
+              borderRadius: 9,
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.06)',
+              color: '#c2c9d8',
+              fontSize: 13,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="">Všechny projekty</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name || '(bez názvu)'}
+              </option>
+            ))}
+          </select>
+          {actions && (
+            <>
+              <button
+                onClick={handleSync}
+                disabled={!actions.online || syncing}
+                style={{
+                  height: 36,
+                  padding: '0 12px',
+                  borderRadius: 9,
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.06)',
+                  color: actions.online ? '#c2c9d8' : C.muted,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: actions.online && !syncing ? 'pointer' : 'default',
+                  fontFamily: 'inherit',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {syncing ? 'Synchronizuji…' : 'Synchronizovat'}
+              </button>
+              <button
+                onClick={() => setUploadOpen(true)}
+                disabled={!actions.online}
+                style={{
+                  height: 36,
+                  padding: '0 12px',
+                  borderRadius: 9,
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.06)',
+                  color: actions.online ? '#c2c9d8' : C.muted,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: actions.online ? 'pointer' : 'default',
+                  fontFamily: 'inherit',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Nahrát výkazy
+              </button>
+            </>
+          )}
+        </div>
+        {actions && !actions.online && (
+          <div style={{ fontSize: 11, color: C.muted }}>Mac není dostupný</div>
+        )}
+        {actions && notice && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              padding: '6px 10px',
+              borderRadius: 8,
+              background: notice.kind === 'error' ? 'rgba(248,113,113,0.12)' : 'rgba(251,191,36,0.12)',
+              border: `1px solid ${notice.kind === 'error' ? C.red : C.amber}`,
+            }}
+          >
+            <span style={{ fontSize: 12, color: notice.kind === 'error' ? C.red : C.amber }}>{notice.text}</span>
+            <button
+              onClick={() => setNotice(null)}
+              style={{ background: 'none', border: 'none', color: C.muted, fontSize: 14, cursor: 'pointer', flexShrink: 0 }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {totalCards === 0 ? (
@@ -195,6 +309,15 @@ export function BoardView(): JSX.Element {
             </div>
           ))}
         </div>
+      )}
+
+      {actions && uploadOpen && (
+        <BoardUploadSheet
+          actions={actions}
+          projectId={projectId}
+          onClose={() => setUploadOpen(false)}
+          onUploaded={refresh}
+        />
       )}
     </div>
   );

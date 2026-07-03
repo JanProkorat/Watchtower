@@ -3,7 +3,7 @@ import { useSupabaseAuth } from '@watchtower/data-supabase';
 import type { BillingSection } from './types.js';
 import { text } from '@watchtower/ui-core';
 import { BillingLogin } from './BillingLogin.js';
-import { BoardView } from './BoardView.js';
+import { BoardView, type BoardActions } from './BoardView.js';
 import { DashboardView } from './DashboardView.js';
 import { EarningsMonthView } from './EarningsMonthView.js';
 import { ProjectDetailView } from './ProjectDetailView.js';
@@ -25,9 +25,12 @@ interface Props {
   module: 'dashboard' | 'billing';
   /** Active billing sub-route (ignored when module === 'dashboard'). */
   section: BillingSection;
+  /** iPad-only Mac-RPC actions for the Jira board (re-sync, upload). Omitted
+   *  on iPhone (no bridge) — the board then renders read-only. */
+  boardActions?: BoardActions;
 }
 
-export function BillingArea({ module, section }: Props): JSX.Element {
+export function BillingArea({ module, section, boardActions }: Props): JSX.Element {
   const { status, signIn } = useSupabaseAuth();
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   // Month the caller was viewing when drilling in, so the detail opens on it
@@ -70,7 +73,7 @@ export function BillingArea({ module, section }: Props): JSX.Element {
         ) : section === 'records-tasks' ? (
           <TaskListView />
         ) : section === 'board' ? (
-          <BoardView />
+          <BoardView actions={boardActions} />
         ) : (
           <TimeOffView />
         )}
