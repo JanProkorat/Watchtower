@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
 import { formatCzk, formatHours, formatDateCz } from '@watchtower/ui-core';
-import { czechMonthLabel, addMonths, useIsNarrow } from '@watchtower/ui-core';
+import { czechMonthLabel, addMonths } from '@watchtower/ui-core';
 import {
   rollupEarningsByContract,
   activeContract,
@@ -11,15 +11,16 @@ import { useContractMutations } from '@watchtower/data-supabase';
 import { canEdit, type ContractWriteInput } from '@watchtower/data-supabase';
 import type { ContractRow } from '@watchtower/shared/billing/types.js';
 import {
+  BottomSheet,
   glassCard,
-  glassPanel,
-  glassFillStrong,
   dataPanelFill,
   text as glassText,
   accentWash,
   accent,
   ctaGradient,
   ctaGlow,
+  anchorFromEvent,
+  type SheetAnchor,
 } from '@watchtower/ui-core';
 
 // ---------------------------------------------------------------------------
@@ -139,10 +140,11 @@ const monthStepBtn: React.CSSProperties = {
 // ContractDrawer — bottom-sheet for add / edit / delete
 // ---------------------------------------------------------------------------
 
-function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete }: {
+function ContractDrawer({ title, projectId, initial, anchor, onClose, onSubmit, onDelete }: {
   title: string;
   projectId: number;
   initial?: ContractRow;
+  anchor?: SheetAnchor | null;
   onClose(): void;
   onSubmit(input: ContractWriteInput): Promise<void>;
   onDelete?(): Promise<void>;
@@ -156,8 +158,7 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
   const [saving, setSaving] = useState(false);
   // Phone width: stack the paired input rows (dates, rate+hours) vertically —
   // two side-by-side native iOS date pickers don't fit ~170px each.
-  const isNarrow = useIsNarrow();
-  const pairRow = { display: 'flex', gap: 10, flexDirection: isNarrow ? 'column' as const : 'row' as const };
+  const pairRow = { display: 'flex', gap: 10, flexDirection: 'column' as const };
 
   const rate = Number(rateAmount.replace(',', '.'));
   const hpd = Number(hoursPerDay.replace(',', '.'));
@@ -170,28 +171,6 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
   const canSubmit = valid && !saving;
 
   const labelStyle: React.CSSProperties = { fontSize: 12, color: glassText.muted, marginBottom: 4 };
-
-  // Scrim backdrop filter (both prefixes)
-  const scrimFilter = 'blur(8px)';
-
-  // Sheet style
-  const sheetStyle: React.CSSProperties = {
-    ...glassPanel({ radius: 20, fill: glassFillStrong, blur: 40, saturate: 1.9, brightness: 1.1 }),
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    width: '100%',
-    maxHeight: '85vh',
-    overflowY: 'auto',
-    padding: 20,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 14,
-    // Override border to only show top hairline
-    border: 'none',
-    borderTop: '1px solid rgba(255,255,255,0.15)',
-  };
 
   async function submit() {
     setSaving(true);
@@ -211,20 +190,7 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(6,7,11,0.45)',
-        backdropFilter: scrimFilter,
-        WebkitBackdropFilter: scrimFilter,
-        zIndex: 100,
-        display: 'flex',
-        alignItems: 'flex-end',
-      }}
-    >
-      <div onClick={(e) => e.stopPropagation()} style={sheetStyle}>
+    <BottomSheet onClose={onClose} anchor={anchor}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: glassText.primary }}>{title}</div>
@@ -353,8 +319,7 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
             {saving ? 'Ukládám…' : 'Uložit'}
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -388,16 +353,16 @@ export function ProjectDetailView({
   const { createContract, updateContract, deleteContract, error: contractError } =
     useContractMutations({ contracts: allContractsAll, worklogs: allWorklogsAll, patchContracts, patchWorklogs });
 
-  const [drawer, setDrawer] = useState<{ mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; contract: ContractRow }>({ mode: 'closed' });
+  const [drawer, setDrawer] = useState<{ mode: 'closed' } | { mode: 'create'; anchor: SheetAnchor | null } | { mode: 'edit'; contract: ContractRow; anchor: SheetAnchor | null }>({ mode: 'closed' });
 
-  // Nav bar glass style — frosted sticky bar
+  // Nav bar glass style — floating glass card
   const navBarStyle: React.CSSProperties = {
-    ...glassPanel({ radius: 0, blur: 20, saturate: 1.6, brightness: 1.1, fill: 'rgba(40,44,64,0.42)', border: 'none', shadow: '0 1px 0 rgba(255,255,255,0.08)' }),
     position: 'sticky',
-    top: 0,
+    top: 12,
     zIndex: 10,
+    margin: '12px 16px',
     padding: '10px 16px',
-    borderRadius: 0,
+    ...glassCard(16),
   };
 
   // Loading with no data
@@ -621,7 +586,7 @@ export function ProjectDetailView({
             {editable && (
               <button
                 type="button"
-                onClick={() => setDrawer({ mode: 'create' })}
+                onClick={(e) => setDrawer({ mode: 'create', anchor: anchorFromEvent(e) })}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -675,7 +640,7 @@ export function ProjectDetailView({
                 return (
                   <div
                     key={contract.syncId}
-                    onClick={() => editable && setDrawer({ mode: 'edit', contract })}
+                    onClick={(e) => editable && setDrawer({ mode: 'edit', contract, anchor: anchorFromEvent(e) })}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -902,6 +867,7 @@ export function ProjectDetailView({
         <ContractDrawer
           title="Nová sazba"
           projectId={projectId}
+          anchor={drawer.anchor}
           onClose={() => setDrawer({ mode: 'closed' })}
           onSubmit={async (input) => { await createContract(input); setDrawer({ mode: 'closed' }); }}
         />
@@ -911,6 +877,7 @@ export function ProjectDetailView({
           title="Upravit sazbu"
           projectId={projectId}
           initial={drawer.contract}
+          anchor={drawer.anchor}
           onClose={() => setDrawer({ mode: 'closed' })}
           onSubmit={async (input) => { await updateContract(drawer.contract.syncId, input); setDrawer({ mode: 'closed' }); }}
           onDelete={async () => { await deleteContract(drawer.contract.syncId); setDrawer({ mode: 'closed' }); }}
