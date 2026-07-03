@@ -24,7 +24,7 @@ const ANIM_CSS = `
 /* WebKit (iOS) centers date-input values by default and gives the control an
    intrinsic min-width that won't shrink — so in a narrow popover it overflows
    the panel. Left-align the value and let it shrink to its container. */
-.wt-sheet-panel input[type="date"] { text-align: left; min-width: 0; max-width: 100%; width: 100%; box-sizing: border-box; }
+.wt-sheet-panel input[type="date"] { -webkit-appearance: none; appearance: none; display: block; text-align: left; min-width: 0; max-width: 100%; width: 100%; box-sizing: border-box; }
 .wt-sheet-panel input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .wt-sheet-panel input[type="date"]::-webkit-datetime-edit { text-align: left; padding: 0; }
 `;
