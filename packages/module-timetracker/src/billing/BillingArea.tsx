@@ -3,6 +3,7 @@ import { useSupabaseAuth } from '@watchtower/data-supabase';
 import type { BillingSection } from './types.js';
 import { text } from '@watchtower/ui-core';
 import { BillingLogin } from './BillingLogin.js';
+import { BoardView } from './BoardView.js';
 import { DashboardView } from './DashboardView.js';
 import { EarningsMonthView } from './EarningsMonthView.js';
 import { ProjectDetailView } from './ProjectDetailView.js';
@@ -53,7 +54,7 @@ export function BillingArea({ module, section }: Props): JSX.Element {
           (sticky header + pinned footer) own their own scroll and fill the
           height, so we don't double-scroll those here; other sections scroll
           in this wrapper. */}
-      <div style={{ flex: 1, overflow: module === 'dashboard' || section === 'records-grid' ? 'hidden' : 'auto', minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: module === 'dashboard' || section === 'records-grid' || section === 'board' ? 'hidden' : 'auto', minHeight: 0 }}>
         {selectedProject !== null ? (
           <ProjectDetailView projectId={selectedProject} initialMonth={selectedMonth} onBack={() => setSelectedProject(null)} />
         ) : module === 'dashboard' ? (
@@ -68,6 +69,8 @@ export function BillingArea({ module, section }: Props): JSX.Element {
           <TaskGridView />
         ) : section === 'records-tasks' ? (
           <TaskListView />
+        ) : section === 'board' ? (
+          <BoardView />
         ) : (
           <TimeOffView />
         )}

@@ -2,4 +2,5 @@
 // Rail re-exports this so app-level nav code keeps importing it from the Rail.
 export type BillingSection =
   | 'earnings' | 'reports'
-  | 'records-list' | 'records-grid' | 'records-tasks' | 'records-timeoff';
+  | 'records-list' | 'records-grid' | 'records-tasks' | 'records-timeoff'
+  | 'board';
