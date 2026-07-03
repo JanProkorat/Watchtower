@@ -29,9 +29,9 @@ any project can auto-track time across all its instances, with no per-repo setup
 |---|---|---|
 | Task attribution | Tagged task if the instance is tagged (`instance.task_id`), else a per-project catch-all task | Precise when you bother to tag; never loses time when you don't |
 | Activation scope | Per-project opt-in toggle, **off by default** | Deliberate cutover for green code / fitness; no surprise worklogs |
-| Trigger | `SessionEnd` (and `Stop`) for instances in an enabled project | Reuses the proven private-flow trigger point |
-| Aggregation grain | One worklog per **(task, work_date)** | Clean, bill-ready daily rows; matches how a human logs |
-| Idempotency | Recompute + upsert keyed on `(source, external_id)` | Leverages the existing partial unique index; no watermark table |
+| Trigger | `SessionEnd` for instances in an enabled project | Reuses the proven private-flow trigger point; fires on every `/clear` and on quit, so a long session's time lands when it ends. (`Stop` every-turn logging was rejected: it churns the sync push for no real gain) |
+| Aggregation grain | One worklog per **(instance, work_date)** | One row per managed instance per day; accrues across that instance's `/clear`'d sessions. Avoids cross-instance collision on the shared catch-all task and never needs to read events from instance rows that may already be gone |
+| Idempotency | Recompute + upsert keyed on `(source, external_id)` = `auto:<instance_id>:<work_date>` | Leverages the existing partial unique index; no watermark table |
 | Idle cap | 10 min per gap (hardcoded constant) | Matches the private flow; YAGNI on a setting |
 
 ## Architecture
@@ -44,34 +44,34 @@ transitions) when a `SessionEnd`/`Stop` event arrives.
 ```
 Claude hook → watchtower-hook.mjs → hookListener → hook_events (append)
                                                         │
-                                       onHookEvent (index.ts) ──► autoLogger.onSessionBoundary(instanceId, event)
+                                       onHookEvent (index.ts, SessionEnd) ──► autoLogger.onSessionEnd(instance)
                                                                           │
-   ┌──────────────────────────────────────────────────────────────────┬─┘
-   │ 1. resolve project by instance.cwd → project.folder_path          │
-   │ 2. bail unless project.auto_track = 1                             │
-   │ 3. resolve task: instance.task_id ?? catchAllTask(project)        │
-   │ 4. compute active minutes per work_date (capped-gap, pure fn)      │
-   │ 5. upsert worklog per (task, work_date), source='watchtower-auto' │
-   └───────────────────────────────────────────────────────────────────┘
+   ┌──────────────────────────────────────────────────────────────────────┬─┘
+   │ 1. resolve project by instance.cwd → project.folder_path              │
+   │ 2. bail unless project.auto_track = 1                                 │
+   │ 3. resolve task: instance.task_id (if not done) ?? catchAllTask(proj) │
+   │ 4. compute active minutes per work_date (capped-gap, pure fn)          │
+   │ 5. upsert worklog per (instance, work_date), source='watchtower-auto' │
+   └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Units
 
-- **`activeMinutes(pings: number[], idleCapMs)` — pure function.** Given sorted
-  hook-event timestamps for one task's instances, sums inter-event gaps, capping
-  each gap at `idleCapMs` (10 min). Returns minutes grouped by local `work_date`
-  so a session crossing midnight splits correctly. Unit-testable in isolation, no
-  DB. Callers partition events **by resolved task first** (a project can have some
-  instances tagged to task A and others on the catch-all the same day), then feed
-  each task's event stream in separately.
-- **`resolveProjectByCwd(cwd)`** — expands `~`, exact-matches a live instance's
-  `cwd` against `projects.folder_path`. Reuses the existing `liveByCwd` /
-  `findByCwd` logic (`orchestrator/index.ts:921`).
-- **`catchAllTask(projectId)`** — find-or-creates epic `Auto-tracked` → task
-  `General` under the project; returns its `task_id`. Idempotent.
-- **`autoLogger.onSessionBoundary(instanceId, event)`** — the orchestrator hook.
+- **`activeMinutesByDate(pings: number[], idleCapMs)` — pure function.** Given a
+  single instance's hook-event timestamps, sums inter-event gaps, capping each gap
+  at `idleCapMs` (10 min) and crediting it to the local `work_date` of the earlier
+  ping. Returns minutes grouped by `work_date` so a session crossing midnight
+  splits. Unit-testable in isolation, no DB.
+- **project match** — expands a leading `~` in `projects.folder_path` and
+  exact-matches it against `instance.cwd` (same exact-match semantics as the
+  existing launch bridge, `orchestrator/index.ts:927`).
+- **`catchAllTaskId(projectId)`** — find-or-creates epic `Auto-tracked` → task
+  number `AUTO` (title `General`) under the project; returns its `task_id`.
+  Idempotent.
+- **`AutoTimeLogger.onSessionEnd(instance)`** — the orchestrator hook.
   Orchestrates the five steps above; does nothing (fast return) for projects
-  with `auto_track = 0` or instances that match no project.
+  with `auto_track = 0` or instances that match no project. Best-effort:
+  swallows its own errors so it can never break the hook path.
 
 ### Data model
 
@@ -89,9 +89,11 @@ node:sqlite / better-sqlite3 `ADD COLUMN` divergence on non-empty tables (see th
 Worklog rows written by this feature:
 
 - `source = 'watchtower-auto'`
-- `external_id = auto:<task_id>:<work_date>` — stable, so re-fires and every
-  `/clear`'d session on the same day collapse into one row via the existing
-  partial unique index `idx_worklogs_external(source, external_id)`.
+- `external_id = auto:<instance_id>:<work_date>` — stable, so re-fires and every
+  `/clear`'d session on the same instance/day collapse into one row via the
+  existing partial unique index `idx_worklogs_external(source, external_id)`.
+  (A managed instance keeps one `WATCHTOWER_INSTANCE_ID` across `/clear`, so the
+  key is stable across cleared sessions.)
 - `minutes` = recomputed capped-gap total for that (task, work_date).
 - `reported_minutes` = derived by the **shared billing-rounding formula** (same
   one the repo layer already applies), not computed ad hoc.
@@ -100,9 +102,8 @@ Worklog rows written by this feature:
 
 ### Upsert semantics
 
-On each `SessionEnd`/`Stop`, resolve the affected task, gather the hook events of
-**all the project's instances that resolve to that same task** for the day,
-recompute total active minutes per `(task, work_date)`, then:
+On each `SessionEnd`, recompute active minutes from **this instance's** hook
+events grouped by `work_date`, and for each date:
 
 - If a worklog with that `(source, external_id)` exists → **update** its
   `minutes`/`reported_minutes` to the recomputed total (`source`/`external_id`
@@ -137,9 +138,11 @@ project-update surface:
 
 ## Edge cases
 
-- **Retagging mid-session:** task is resolved at each `SessionEnd`. If an
-  instance's tag changes, subsequent boundaries log to the new task; already-logged
-  minutes stay where they were. Acceptable — no attempt to retroactively move.
+- **Retagging mid-session:** task is resolved at each `SessionEnd`. Because the
+  worklog is keyed by `(instance, work_date)` and the upsert updates `task_id`,
+  retagging the instance **moves** that day's auto worklog to the newly-resolved
+  task on the next `SessionEnd`. A tagged task that is `done` falls back to the
+  catch-all (done tasks are locked).
 - **Cross-midnight sessions:** handled by per-`work_date` grouping in
   `activeMinutes`.
 - **Nested Claude processes:** `index.ts` already drops hook events whose cwd
@@ -171,8 +174,9 @@ enabling app auto-track on a repo that still runs the scripts double-bills.
   over-cap gaps clamped, cross-midnight split, out-of-order timestamps.
 - **`catchAllTask` idempotency:** two calls → one epic + one task.
 - **Auto-log integration:** synthetic `hook_events` for an enabled project →
-  one worklog per (task, day); re-fire → still one row, minutes unchanged;
-  tagged instance → logs to the tag; untagged → logs to catch-all.
+  one worklog per (instance, day); re-fire → still one row, minutes unchanged;
+  tagged instance → logs to the tag; untagged → logs to catch-all; disabled
+  project or unmatched cwd → nothing.
 - **Migration test:** `auto_track` column present, defaults 0, existing rows
   unaffected (run under both node:sqlite and the prod engine expectation).
 - Keep the suite green (219+; add tests for new code per project convention).
