@@ -91,6 +91,7 @@ export type RawTaskRow = {
   status: string;
   estimated_minutes: number | null;
   jira_estimate_secs: number | null;
+  jira_status: string | null;
   description: string | null;
   epics: { projects: RawProject | null } | null;
 };
@@ -116,6 +117,7 @@ export function mapTaskRow(raw: RawTaskRow): TaskRow {
     projectColor: proj?.color ?? null,
     projectKind: proj?.kind ?? '',
     isBillable: proj?.is_billable ?? false,
+    jiraStatus: raw.jira_status ?? null,
   };
 }
 

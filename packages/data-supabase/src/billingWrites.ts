@@ -266,6 +266,7 @@ export function buildOptimisticTaskRow(
     projectColor: opts.project.color,
     projectKind: opts.project.kind,
     isBillable: opts.project.isBillable,
+    jiraStatus: null, // locally-created task is not on a board
   };
 }
 

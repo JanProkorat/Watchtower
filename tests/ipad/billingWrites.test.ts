@@ -162,7 +162,7 @@ describe('buildOptimisticTaskRow', () => {
     expect(buildOptimisticTaskRow(taskInput, { syncId: 't1', taskId: 0, project })).toEqual({
       taskId: 0, syncId: 't1', epicId: 5, taskNumber: 'X-9', taskTitle: 'Nine', status: 'open',
       estimatedMinutes: 120, description: 'note', projectId: 3, projectName: 'Proj',
-      projectColor: '#abc', projectKind: 'work', isBillable: true,
+      projectColor: '#abc', projectKind: 'work', isBillable: true, jiraStatus: null,
     });
   });
 });

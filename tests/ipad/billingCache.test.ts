@@ -245,13 +245,14 @@ describe('mapTaskRow', () => {
   it('flattens task → epic → project', () => {
     const raw: RawTaskRow = {
       id: 7, sync_id: 't-1', epic_id: 5, number: 'X-9', title: 'Task nine',
-      status: 'open', estimated_minutes: null, jira_estimate_secs: null, description: null,
+      status: 'open', estimated_minutes: null, jira_estimate_secs: null, jira_status: null, description: null,
       epics: { projects: { id: 3, name: 'Proj', color: '#abc', kind: 'work', is_billable: true } },
     };
     expect(mapTaskRow(raw)).toEqual({
       taskId: 7, syncId: 't-1', epicId: 5, taskNumber: 'X-9', taskTitle: 'Task nine',
       status: 'open', estimatedMinutes: null, description: null,
       projectId: 3, projectName: 'Proj', projectColor: '#abc', projectKind: 'work', isBillable: true,
+      jiraStatus: null,
     });
   });
 });
@@ -274,22 +275,23 @@ describe('mapEpicRow', () => {
 });
 
 describe('mapTaskRow — slice 3a fields', () => {
-  it('maps syncId/epicId/status/estimatedMinutes/description', () => {
+  it('maps syncId/epicId/status/estimatedMinutes/description/jiraStatus', () => {
     const raw: RawTaskRow = {
       id: 7, sync_id: 't-sync', epic_id: 5, number: 'X-9', title: 'Task nine',
-      status: 'in_progress', estimated_minutes: 120, jira_estimate_secs: null, description: 'do it',
+      status: 'in_progress', estimated_minutes: 120, jira_estimate_secs: null, jira_status: 'In Progress', description: 'do it',
       epics: { projects: { id: 3, name: 'Proj', color: '#abc', kind: 'work', is_billable: true } },
     };
     expect(mapTaskRow(raw)).toEqual({
       taskId: 7, syncId: 't-sync', epicId: 5, taskNumber: 'X-9', taskTitle: 'Task nine',
       status: 'in_progress', estimatedMinutes: 120, description: 'do it',
       projectId: 3, projectName: 'Proj', projectColor: '#abc', projectKind: 'work', isBillable: true,
+      jiraStatus: 'In Progress',
     });
   });
   it('defaults estimatedMinutes/description to null and status to empty', () => {
     const raw: RawTaskRow = {
       id: 8, sync_id: 's8', epic_id: 1, number: null, title: null,
-      status: 'open', estimated_minutes: null, jira_estimate_secs: null, description: null, epics: null,
+      status: 'open', estimated_minutes: null, jira_estimate_secs: null, jira_status: null, description: null, epics: null,
     };
     const r = mapTaskRow(raw);
     expect(r.estimatedMinutes).toBeNull();
@@ -300,7 +302,7 @@ describe('mapTaskRow — slice 3a fields', () => {
   it('falls back to jira_estimate_secs (÷60) when no manual estimate; manual wins', () => {
     const base = {
       id: 9, sync_id: 's9', epic_id: 1, number: 'X-9', title: 'T', status: 'open',
-      description: null, epics: null,
+      jira_status: null, description: null, epics: null,
     };
     // Jira-only: 7200s → 120min.
     expect(mapTaskRow({ ...base, estimated_minutes: null, jira_estimate_secs: 7200 }).estimatedMinutes).toBe(120);
