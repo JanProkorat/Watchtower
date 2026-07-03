@@ -3,16 +3,17 @@ import type { TaskRow, WorklogRow, ContractRow } from '@watchtower/shared/billin
 import { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
 import { computeDerivedForWrite, type WorklogWriteInput } from '@watchtower/data-supabase';
 import { formatCzk, useIsNarrow } from '@watchtower/ui-core';
-import { BottomSheet, glassCard, ctaGradient, ctaGlow } from '@watchtower/ui-core';
+import { BottomSheet, glassCard, ctaGradient, ctaGlow, type SheetAnchor } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
 
-export function WorklogDrawer({ title, tasks, contracts, initial, lockedTask, initialDate, onClose, onSubmit, onDelete }: {
+export function WorklogDrawer({ title, tasks, contracts, initial, lockedTask, initialDate, anchor, onClose, onSubmit, onDelete }: {
   title: string;
   tasks: TaskRow[];
   contracts: ContractRow[];
   initial?: WorklogRow;
   lockedTask?: TaskRow;
   initialDate?: string;
+  anchor?: SheetAnchor | null;
   onClose(): void;
   onSubmit(task: TaskRow, input: WorklogWriteInput): Promise<void>;
   onDelete?(): Promise<void>;
@@ -63,7 +64,7 @@ export function WorklogDrawer({ title, tasks, contracts, initial, lockedTask, in
   }
 
   return (
-    <BottomSheet onClose={onClose}>
+    <BottomSheet onClose={onClose} anchor={anchor}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#f4f4f8' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>

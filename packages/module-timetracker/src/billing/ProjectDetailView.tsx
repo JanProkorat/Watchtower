@@ -19,6 +19,8 @@ import {
   accent,
   ctaGradient,
   ctaGlow,
+  anchorFromEvent,
+  type SheetAnchor,
 } from '@watchtower/ui-core';
 
 // ---------------------------------------------------------------------------
@@ -138,10 +140,11 @@ const monthStepBtn: React.CSSProperties = {
 // ContractDrawer — bottom-sheet for add / edit / delete
 // ---------------------------------------------------------------------------
 
-function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete }: {
+function ContractDrawer({ title, projectId, initial, anchor, onClose, onSubmit, onDelete }: {
   title: string;
   projectId: number;
   initial?: ContractRow;
+  anchor?: SheetAnchor | null;
   onClose(): void;
   onSubmit(input: ContractWriteInput): Promise<void>;
   onDelete?(): Promise<void>;
@@ -188,7 +191,7 @@ function ContractDrawer({ title, projectId, initial, onClose, onSubmit, onDelete
   }
 
   return (
-    <BottomSheet onClose={onClose} style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+    <BottomSheet onClose={onClose} anchor={anchor} style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: glassText.primary }}>{title}</div>
@@ -351,7 +354,7 @@ export function ProjectDetailView({
   const { createContract, updateContract, deleteContract, error: contractError } =
     useContractMutations({ contracts: allContractsAll, worklogs: allWorklogsAll, patchContracts, patchWorklogs });
 
-  const [drawer, setDrawer] = useState<{ mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; contract: ContractRow }>({ mode: 'closed' });
+  const [drawer, setDrawer] = useState<{ mode: 'closed' } | { mode: 'create'; anchor: SheetAnchor | null } | { mode: 'edit'; contract: ContractRow; anchor: SheetAnchor | null }>({ mode: 'closed' });
 
   // Nav bar glass style — floating glass card
   const navBarStyle: React.CSSProperties = {
@@ -584,7 +587,7 @@ export function ProjectDetailView({
             {editable && (
               <button
                 type="button"
-                onClick={() => setDrawer({ mode: 'create' })}
+                onClick={(e) => setDrawer({ mode: 'create', anchor: anchorFromEvent(e) })}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -638,7 +641,7 @@ export function ProjectDetailView({
                 return (
                   <div
                     key={contract.syncId}
-                    onClick={() => editable && setDrawer({ mode: 'edit', contract })}
+                    onClick={(e) => editable && setDrawer({ mode: 'edit', contract, anchor: anchorFromEvent(e) })}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -865,6 +868,7 @@ export function ProjectDetailView({
         <ContractDrawer
           title="Nová sazba"
           projectId={projectId}
+          anchor={drawer.anchor}
           onClose={() => setDrawer({ mode: 'closed' })}
           onSubmit={async (input) => { await createContract(input); setDrawer({ mode: 'closed' }); }}
         />
@@ -874,6 +878,7 @@ export function ProjectDetailView({
           title="Upravit sazbu"
           projectId={projectId}
           initial={drawer.contract}
+          anchor={drawer.anchor}
           onClose={() => setDrawer({ mode: 'closed' })}
           onSubmit={async (input) => { await updateContract(drawer.contract.syncId, input); setDrawer({ mode: 'closed' }); }}
           onDelete={async () => { await deleteContract(drawer.contract.syncId); setDrawer({ mode: 'closed' }); }}

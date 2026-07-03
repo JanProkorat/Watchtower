@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
 import { buildTimeOffModel, type TimeOffKind } from '../../timeOffModel.js';
-import { addMonths, useIsNarrow } from '@watchtower/ui-core';
+import { addMonths, useIsNarrow, anchorFromEvent, type SheetAnchor } from '@watchtower/ui-core';
 import { formatDateCz } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
 import { useDaysOffMutations } from '@watchtower/data-supabase';
@@ -19,7 +19,7 @@ export function TimeOffView(): JSX.Element {
     daysOff: data?.daysOff ?? [],
     patchDaysOff,
   });
-  const [picker, setPicker] = useState<string | null>(null);
+  const [picker, setPicker] = useState<{ date: string; anchor: SheetAnchor | null } | null>(null);
   const [focus, setFocus] = useState(() => new Date().toISOString().slice(0, 7));
   const today = new Date().toISOString().slice(0, 10);
   const isNarrow = useIsNarrow();
@@ -58,7 +58,7 @@ export function TimeOffView(): JSX.Element {
               {DOW.map((d) => <div key={d} style={{ fontSize: 10, color: C.muted, textAlign: 'center', paddingBottom: 2 }}>{d}</div>)}
               {mc.weeks.flat().map((c, i) => (
                 <div key={i} title={c.date ? formatDateCz(c.date) : ''}
-                  onClick={() => editable && c.date && setPicker(c.date)}
+                  onClick={(e) => editable && c.date && setPicker({ date: c.date, anchor: anchorFromEvent(e) })}
                   style={{
                     aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 11, borderRadius: 6,
@@ -77,7 +77,7 @@ export function TimeOffView(): JSX.Element {
                     background: c.kind && c.kind !== 'holiday' ? KIND_COLOR[c.kind] : c.date ? 'rgba(255,255,255,0.04)' : 'transparent',
                     border: c.kind === 'holiday' ? '1px dashed rgba(168,156,240,0.6)' : 'none',
                     fontWeight: c.kind ? 700 : 400,
-                    ...(c.date && c.date === picker ? { boxShadow: 'inset 0 0 0 2px #a89cf0' } : {}),
+                    ...(c.date && c.date === picker?.date ? { boxShadow: 'inset 0 0 0 2px #a89cf0' } : {}),
                   }}>
                   {c.date ? Number(c.date.slice(8, 10)) : ''}
                 </div>
@@ -88,17 +88,17 @@ export function TimeOffView(): JSX.Element {
       </div>
 
       {picker && editable && (
-        <BottomSheet onClose={() => setPicker(null)}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#f4f4f8' }}>{formatDateCz(picker)}</div>
+        <BottomSheet onClose={() => setPicker(null)} anchor={picker.anchor}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#f4f4f8' }}>{formatDateCz(picker.date)}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {(['vacation', 'sick', 'other'] as const).map((k) => (
-              <button key={k} onClick={() => { void setDayOff(picker, k); setPicker(null); }}
+              <button key={k} onClick={() => { void setDayOff(picker.date, k); setPicker(null); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, background: KIND_COLOR[k], color: '#0F0F17', border: 'none', borderRadius: 12, padding: '0 16px', height: 48, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                 <span style={{ width: 10, height: 10, borderRadius: 2, background: '#0F0F17', opacity: 0.35, flexShrink: 0 }} />
                 {KIND_LABEL[k]}
               </button>
             ))}
-            <button onClick={() => { void clearDayOff(picker); setPicker(null); }}
+            <button onClick={() => { void clearDayOff(picker.date); setPicker(null); }}
               style={{ background: 'rgba(255,255,255,0.08)', color: C.text, border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, height: 44, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>
               Smazat záznam
             </button>

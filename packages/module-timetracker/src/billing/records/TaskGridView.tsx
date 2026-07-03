@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useBilling, useWorklogMutations, canEdit } from '@watchtower/data-supabase';
 import { buildTaskGrid } from '@watchtower/shared/billing/records/task-grid.js';
 import { worklogsForCell } from '@watchtower/shared/billing/records/worklog-cell.js';
-import { addMonths, czechMonthLabel, useIsNarrow } from '@watchtower/ui-core';
+import { addMonths, czechMonthLabel, useIsNarrow, anchorFromEvent, type SheetAnchor } from '@watchtower/ui-core';
 import { formatCzk, formatHours } from '@watchtower/ui-core';
 import { czechHolidays, workdayDates } from '@watchtower/shared/billing/workdays.js';
 import { C } from '../reports/tokens.js';
@@ -17,9 +17,9 @@ interface DayMeta { isWeekend: boolean; isToday: boolean; kind: 'holiday' | 'vac
 
 type Sheet =
   | { mode: 'closed' }
-  | { mode: 'list'; entries: WorklogRow[]; task: TaskRow | null; date: string }
-  | { mode: 'create'; task: TaskRow; date: string }
-  | { mode: 'edit'; worklog: WorklogRow };
+  | { mode: 'list'; entries: WorklogRow[]; task: TaskRow | null; date: string; anchor: SheetAnchor | null }
+  | { mode: 'create'; task: TaskRow; date: string; anchor: SheetAnchor | null }
+  | { mode: 'edit'; worklog: WorklogRow; anchor: SheetAnchor | null };
 
 // Per-cell tint for non-working / status days. Presentation only — does not affect totals.
 function dayTint(meta: DayMeta): string | undefined {
@@ -45,17 +45,18 @@ export function TaskGridView(): JSX.Element {
 
   // Tapping a day cell opens the right surface for how many worklogs it holds:
   // none → create (task+date locked); one → edit that entry; many → list sheet.
-  function openCell(row: { projectId: number; taskNumber: string | null }, dayIdx: number): void {
+  function openCell(row: { projectId: number; taskNumber: string | null }, dayIdx: number, e: React.MouseEvent): void {
     if (!editable) return;
+    const anchor = anchorFromEvent(e);
     const workDate = `${month}-${String(dayIdx + 1).padStart(2, '0')}`;
     const entries = worklogsForCell(worklogs, { projectId: row.projectId, taskNumber: row.taskNumber, workDate });
     const task = tasks.find((t) => t.projectId === row.projectId && (t.taskNumber ?? '') === (row.taskNumber ?? '')) ?? null;
     if (entries.length === 0) {
-      if (task) setSheet({ mode: 'create', task, date: workDate });
+      if (task) setSheet({ mode: 'create', task, date: workDate, anchor });
     } else if (entries.length === 1) {
-      setSheet({ mode: 'edit', worklog: entries[0]! });
+      setSheet({ mode: 'edit', worklog: entries[0]!, anchor });
     } else {
-      setSheet({ mode: 'list', entries, task, date: workDate });
+      setSheet({ mode: 'list', entries, task, date: workDate, anchor });
     }
   }
 
@@ -206,7 +207,7 @@ export function TaskGridView(): JSX.Element {
                         return (
                           <td key={i} style={{ ...cellBase, padding: 0, background: bg, color: min ? '#c2c9d8' : '#5a6072', ...todayStyle }}>
                             <button
-                              onClick={() => openCell(t, i)}
+                              onClick={(e) => openCell(t, i, e)}
                               disabled={!editable}
                               // Narrow (iPhone): taller tap target — day columns can't widen past
                               // ~30px without losing the month, so we buy touch comfort vertically.
@@ -259,7 +260,7 @@ export function TaskGridView(): JSX.Element {
       )}
 
       {sheet.mode === 'list' && (
-        <BottomSheet onClose={() => setSheet({ mode: 'closed' })} style={{ gap: 10 }}>
+        <BottomSheet onClose={() => setSheet({ mode: 'closed' })} anchor={sheet.anchor} style={{ gap: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#f4f4f8' }}>Záznamy</div>
               <button onClick={() => setSheet({ mode: 'closed' })} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -267,7 +268,7 @@ export function TaskGridView(): JSX.Element {
             {sheet.entries.map((w) => (
               <button
                 key={w.syncId}
-                onClick={() => setSheet({ mode: 'edit', worklog: w })}
+                onClick={() => setSheet({ mode: 'edit', worklog: w, anchor: sheet.anchor })}
                 style={{ ...glassCard(10), display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, padding: '8px 12px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: C.text, width: '100%', border: '1px solid rgba(255,255,255,0.10)' }}
               >
                 <div style={{ flex: 1, fontSize: 13, color: '#d7dbe6', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.description || w.taskTitle || w.projectName}</div>
@@ -279,7 +280,7 @@ export function TaskGridView(): JSX.Element {
             ))}
             {sheet.task && (
               <button
-                onClick={() => setSheet(sheet.task ? { mode: 'create', task: sheet.task, date: sheet.date } : { mode: 'closed' })}
+                onClick={() => setSheet(sheet.task ? { mode: 'create', task: sheet.task, date: sheet.date, anchor: sheet.anchor } : { mode: 'closed' })}
                 style={{ marginTop: 4, height: 38, borderRadius: 11, border: 'none', background: ctaGradient, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: ctaGlow }}
               >
                 + Přidat
@@ -295,6 +296,7 @@ export function TaskGridView(): JSX.Element {
           contracts={contracts}
           lockedTask={sheet.task}
           initialDate={sheet.date}
+          anchor={sheet.anchor}
           onClose={() => setSheet({ mode: 'closed' })}
           onSubmit={async (taskRow, input) => { await createWorklog(taskRow, input); setSheet({ mode: 'closed' }); }}
         />
@@ -305,6 +307,7 @@ export function TaskGridView(): JSX.Element {
           tasks={tasks}
           contracts={contracts}
           initial={sheet.worklog}
+          anchor={sheet.anchor}
           onClose={() => setSheet({ mode: 'closed' })}
           onSubmit={async (_taskRow, input) => { await updateWorklog(sheet.worklog.syncId, input); setSheet({ mode: 'closed' }); }}
           onDelete={async () => { await deleteWorklog(sheet.worklog.syncId); setSheet({ mode: 'closed' }); }}

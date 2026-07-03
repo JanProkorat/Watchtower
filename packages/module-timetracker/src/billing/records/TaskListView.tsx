@@ -5,7 +5,7 @@ import { parseMinutes } from '@watchtower/shared/billing/parseMinutes.js';
 import type { TaskRow, EpicRow, ProjectRow } from '@watchtower/shared/billing/types.js';
 import { canEdit, canEditTask, type TaskWriteInput } from '@watchtower/data-supabase';
 import { C } from '../reports/tokens.js';
-import { BottomSheet, glassCard, ctaGradient, ctaGlow } from '@watchtower/ui-core';
+import { BottomSheet, glassCard, ctaGradient, ctaGlow, anchorFromEvent, type SheetAnchor } from '@watchtower/ui-core';
 
 const STATUS_LABEL: Record<string, string> = {
   open: 'Otevřený', in_progress: 'Probíhá', to_accept: 'K akceptaci', done: 'Hotovo',
@@ -20,7 +20,7 @@ function statusChipStyle(status: string): React.CSSProperties {
   return { ...base, color: C.muted, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' };
 }
 
-type DrawerState = { mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; task: TaskRow };
+type DrawerState = { mode: 'closed' } | { mode: 'create'; anchor: SheetAnchor | null } | { mode: 'edit'; task: TaskRow; anchor: SheetAnchor | null };
 
 export function TaskListView(): JSX.Element {
   const { data, state, patchTasks } = useBilling();
@@ -46,7 +46,7 @@ export function TaskListView(): JSX.Element {
     <div style={{ fontFamily: 'system-ui, sans-serif', background: 'transparent', minHeight: '100%', color: C.text }}>
       <div style={{ position: 'sticky', top: 12, zIndex: 10, margin: '12px 16px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...glassCard(16) }}>
         <input placeholder="Hledat úkol…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 140, background: 'rgba(255,255,255,0.07)', color: '#d7dbe6', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 11, padding: '0 12px', height: 34, fontSize: 12, fontFamily: 'inherit', outline: 'none' }} />
-        {editable && <button onClick={() => setDrawer({ mode: 'create' })} style={{ height: 34, padding: '0 16px', borderRadius: 11, border: 'none', background: ctaGradient, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: ctaGlow }}>+ Přidat úkol</button>}
+        {editable && <button onClick={(e) => setDrawer({ mode: 'create', anchor: anchorFromEvent(e) })} style={{ height: 34, padding: '0 16px', borderRadius: 11, border: 'none', background: ctaGradient, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: ctaGlow }}>+ Přidat úkol</button>}
       </div>
       {!editable && <div style={{ padding: '6px 16px', fontSize: 12, color: C.muted }}>jen pro čtení offline</div>}
       {error && <div style={{ padding: '6px 16px', fontSize: 12, color: C.red }}>{error}</div>}
@@ -56,7 +56,7 @@ export function TaskListView(): JSX.Element {
         {filtered.map((t) => (
           <button
             key={t.syncId}
-            onClick={() => editable && setDrawer({ mode: 'edit', task: t })}
+            onClick={(e) => editable && setDrawer({ mode: 'edit', task: t, anchor: anchorFromEvent(e) })}
             disabled={!editable}
             style={{ display: 'flex', alignItems: 'center', gap: 10, ...glassCard(10), border: '1px solid rgba(255,255,255,0.10)', padding: '8px 12px', textAlign: 'left', cursor: editable ? 'pointer' : 'default', fontFamily: 'inherit', color: C.text, width: '100%' }}
           >
@@ -73,6 +73,7 @@ export function TaskListView(): JSX.Element {
           title="Nový úkol"
           epics={epics}
           projects={projects}
+          anchor={drawer.anchor}
           onClose={() => setDrawer({ mode: 'closed' })}
           onSubmit={async (input) => { await createTask(input); setDrawer({ mode: 'closed' }); }}
         />
@@ -84,6 +85,7 @@ export function TaskListView(): JSX.Element {
           projects={projects}
           initial={drawer.task}
           readOnly={!canEditTask(drawer.task.status)}
+          anchor={drawer.anchor}
           onClose={() => setDrawer({ mode: 'closed' })}
           onSubmit={async (input) => { await updateTask(drawer.task.syncId, input); setDrawer({ mode: 'closed' }); }}
           onDelete={async () => { await deleteTask(drawer.task.syncId); setDrawer({ mode: 'closed' }); }}
@@ -93,12 +95,13 @@ export function TaskListView(): JSX.Element {
   );
 }
 
-function TaskDrawer({ title, epics, projects, initial, readOnly, onClose, onSubmit, onDelete }: {
+function TaskDrawer({ title, epics, projects, initial, readOnly, anchor, onClose, onSubmit, onDelete }: {
   title: string;
   epics: EpicRow[];
   projects: ProjectRow[];
   initial?: TaskRow;
   readOnly?: boolean;
+  anchor?: SheetAnchor | null;
   onClose(): void;
   onSubmit(input: TaskWriteInput): Promise<void>;
   onDelete?(): Promise<void>;
@@ -138,7 +141,7 @@ function TaskDrawer({ title, epics, projects, initial, readOnly, onClose, onSubm
   }
 
   return (
-    <BottomSheet onClose={onClose}>
+    <BottomSheet onClose={onClose} anchor={anchor}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#f4f4f8' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>

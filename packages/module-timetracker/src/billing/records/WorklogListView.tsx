@@ -4,7 +4,7 @@ import { useWorklogMutations } from '@watchtower/data-supabase';
 import { groupWorklogsByDay } from '@watchtower/shared/billing/records/worklog-list.js';
 import type { WorklogRow } from '@watchtower/shared/billing/types.js';
 import { canEdit } from '@watchtower/data-supabase';
-import { addMonths, czechMonthLabel } from '@watchtower/ui-core';
+import { addMonths, czechMonthLabel, anchorFromEvent, type SheetAnchor } from '@watchtower/ui-core';
 import { formatHours, formatDateCz } from '@watchtower/ui-core';
 import { C } from '../reports/tokens.js';
 import { glassCard, ctaGradient, ctaGlow } from '@watchtower/ui-core';
@@ -14,8 +14,8 @@ const SOURCE_LABEL: Record<string, string> = { manual: 'manual', 'watchtower-aut
 
 type DrawerState =
   | { mode: 'closed' }
-  | { mode: 'create' }
-  | { mode: 'edit'; worklog: WorklogRow };
+  | { mode: 'create'; anchor: SheetAnchor | null }
+  | { mode: 'edit'; worklog: WorklogRow; anchor: SheetAnchor | null };
 
 export function WorklogListView(): JSX.Element {
   const { data, state, patchWorklogs } = useBilling();
@@ -44,7 +44,7 @@ export function WorklogListView(): JSX.Element {
         projectId={projectId}
         onProject={setProjectId}
         canAdd={editable}
-        onAdd={() => setDrawer({ mode: 'create' })}
+        onAdd={(e) => setDrawer({ mode: 'create', anchor: anchorFromEvent(e) })}
       />
       {!editable && (
         <div style={{ padding: '6px 16px', fontSize: 12, color: C.muted }}>jen pro čtení offline</div>
@@ -64,7 +64,7 @@ export function WorklogListView(): JSX.Element {
               {d.entries.map((w) => (
                 <button
                   key={w.syncId}
-                  onClick={() => editable && setDrawer({ mode: 'edit', worklog: w })}
+                  onClick={(e) => editable && setDrawer({ mode: 'edit', worklog: w, anchor: anchorFromEvent(e) })}
                   disabled={!editable}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, ...glassCard(10), border: '1px solid rgba(255,255,255,0.10)', padding: '8px 12px', textAlign: 'left', cursor: editable ? 'pointer' : 'default', fontFamily: 'inherit', color: C.text, width: '100%' }}
                 >
@@ -88,6 +88,7 @@ export function WorklogListView(): JSX.Element {
           title="Nový záznam"
           tasks={tasks}
           contracts={contracts}
+          anchor={drawer.anchor}
           onClose={() => setDrawer({ mode: 'closed' })}
           onSubmit={async (taskRow, input) => { await createWorklog(taskRow, input); setDrawer({ mode: 'closed' }); }}
         />
@@ -98,6 +99,7 @@ export function WorklogListView(): JSX.Element {
           tasks={tasks}
           contracts={contracts}
           initial={drawer.worklog}
+          anchor={drawer.anchor}
           onClose={() => setDrawer({ mode: 'closed' })}
           onSubmit={async (_taskRow, input) => { await updateWorklog(drawer.worklog.syncId, input); setDrawer({ mode: 'closed' }); }}
           onDelete={async () => { await deleteWorklog(drawer.worklog.syncId); setDrawer({ mode: 'closed' }); }}
@@ -110,7 +112,7 @@ export function WorklogListView(): JSX.Element {
 function MonthBar({ month, onPrev, onNext, onToday, projects, projectId, onProject, canAdd, onAdd }: {
   month: string; onPrev(): void; onNext(): void; onToday(): void;
   projects: { id: number; name: string }[]; projectId: number | undefined; onProject(id: number | undefined): void;
-  canAdd: boolean; onAdd(): void;
+  canAdd: boolean; onAdd(e: React.MouseEvent): void;
 }): JSX.Element {
   const stepBtn: React.CSSProperties = { width: 34, height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c9bdff', fontSize: 18, lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
   const flatBtn: React.CSSProperties = { height: 34, padding: '0 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c2c9d8', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
@@ -134,7 +136,7 @@ function MonthBar({ month, onPrev, onNext, onToday, projects, projectId, onProje
           <option value="">Všechny projekty</option>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name || '(bez názvu)'}</option>)}
         </select>
-        {canAdd && <button style={{ height: 36, padding: '0 16px', borderRadius: 9, border: 'none', background: ctaGradient, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: ctaGlow, display: 'inline-flex', alignItems: 'center', flexShrink: 0 }} onClick={onAdd}>+ Přidat</button>}
+        {canAdd && <button style={{ height: 36, padding: '0 16px', borderRadius: 9, border: 'none', background: ctaGradient, color: '#fff', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: ctaGlow, display: 'inline-flex', alignItems: 'center', flexShrink: 0 }} onClick={(e) => onAdd(e)}>+ Přidat</button>}
       </div>
     </div>
   );
