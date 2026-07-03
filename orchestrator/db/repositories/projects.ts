@@ -16,6 +16,8 @@ export interface ProjectRow {
   /** URL template for opening a task in its issue tracker. `{n}` → task number. */
   taskUrlTemplate: string | null;
   description: string | null;
+  /** Per-project opt-in: auto-log instance active time to this project. */
+  autoTrack: boolean;
   createdAt: string;
   /** epic_count joined at list time — 0 until Phase 15 lands epics CRUD. */
   epicCount: number;
@@ -33,6 +35,7 @@ export interface ProjectInput {
   jiraBoardUrl?: string | null;
   taskUrlTemplate?: string | null;
   description?: string | null;
+  autoTrack?: boolean;
 }
 
 export interface ProjectListFilter {
@@ -54,6 +57,7 @@ type DbRow = {
   jira_board_url: string | null;
   task_url_template: string | null;
   description: string | null;
+  auto_track: number;
   created_at: string;
   epic_count: number;
   total_minutes: number;
@@ -108,6 +112,7 @@ function toRow(r: DbRow): ProjectRow {
     jiraBoardUrl: r.jira_board_url,
     taskUrlTemplate: r.task_url_template,
     description: r.description,
+    autoTrack: r.auto_track === 1,
     createdAt: r.created_at,
     epicCount: r.epic_count,
     totalMinutes: r.total_minutes,
@@ -126,7 +131,7 @@ const DEFAULTS = {
 const LIST_SQL = `
   SELECT
     p.id, p.name, p.color, p.archived, p.kind, p.is_default,
-    p.folder_path, p.jira_globs, p.jira_board_url, p.task_url_template, p.description, p.created_at,
+    p.folder_path, p.jira_globs, p.jira_board_url, p.task_url_template, p.description, p.auto_track, p.created_at,
     (SELECT COUNT(*) FROM epics e WHERE e.project_id = p.id AND e.deleted_at IS NULL) AS epic_count,
     (SELECT COALESCE(SUM(w.minutes), 0)
        FROM worklogs w
@@ -188,12 +193,13 @@ export class ProjectsRepo {
       if (isDefault) this.clearDefault();
       const info = this.db
         .prepare(
-          `INSERT INTO projects (name, color, archived, is_billable, kind, is_default, folder_path, jira_globs, jira_board_url, task_url_template, description, sync_id, updated_at)
-           VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO projects (name, color, archived, is_billable, kind, is_default, folder_path, jira_globs, jira_board_url, task_url_template, description, auto_track, sync_id, updated_at)
+           VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           input.name, color, isBillable, kind, isDefault,
           input.folderPath ?? null, globs, boardUrl, taskUrl, input.description ?? null,
+          input.autoTrack ? 1 : 0,
           newSyncId(), nowIso(),
         ) as { lastInsertRowid: number | bigint };
       this.db.exec('COMMIT');
@@ -230,6 +236,7 @@ export class ProjectsRepo {
       push('task_url_template', normaliseTaskUrlTemplate(input.taskUrlTemplate));
     }
     if (input.description !== undefined) push('description', input.description);
+    if (input.autoTrack !== undefined) push('auto_track', input.autoTrack ? 1 : 0);
 
     if (input.isDefault !== undefined) {
       // The is_default change has to happen inside the same transaction as the

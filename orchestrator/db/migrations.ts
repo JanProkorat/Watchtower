@@ -342,6 +342,17 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       }
     },
   },
+  {
+    version: 17,
+    up: (db) => {
+      // Per-project opt-in for automatic time logging from instance activity
+      // (see docs/superpowers/specs/2026-07-03-project-time-autolog-design.md).
+      // Constant default 0 — a non-constant ADD COLUMN default diverges between
+      // node:sqlite (tests) and better-sqlite3 (prod); see memory
+      // sqlite-add-column-engine-divergence.
+      addColumnIfMissing(db, 'projects', 'auto_track', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

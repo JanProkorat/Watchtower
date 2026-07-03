@@ -470,6 +470,7 @@ export interface ProjectInputPayload {
   /** URL template for opening a task in its tracker. `{n}` → task number. */
   taskUrlTemplate?: string | null;
   description?: string | null;
+  autoTrack?: boolean;
 }
 
 export interface ProjectViewPayload {
@@ -485,6 +486,7 @@ export interface ProjectViewPayload {
   /** URL template for opening a task in its tracker. `{n}` → task number. */
   taskUrlTemplate: string | null;
   description: string | null;
+  autoTrack: boolean;
   createdAt: string;
   epicCount: number;
   totalMinutes: number;
