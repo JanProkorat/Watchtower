@@ -3,14 +3,18 @@
 Wakes a sleeping, wired Mac from the iPad. Unicast magic packet — no Apple
 multicast entitlement needed.
 
-## Build prerequisite (one-time, in Xcode)
-The native `WakePlugin.swift` lives at `apps/ipad/ios/App/App/WakePlugin.swift`
-but **`cap sync` does not add it to the App target** — until it is, the
-"Probudit Mac" button appears to work but sends nothing (the native plugin
-isn't compiled in). In Xcode: drag `WakePlugin.swift` into the **App** group
-(uncheck "Copy items if needed"; check target **App**), or right-click the App
-group → Add Files to "App…". No entitlement, Podfile, or AppDelegate change is
-needed — registration is automatic via `CAPBridgedPlugin` once it compiles in.
+## Build prerequisite (now committed — no manual Xcode step)
+The native `WakePlugin.swift` lives at `apps/ipad/ios/App/App/WakePlugin.swift`.
+`cap sync` does **not** add it to the App target, so historically the "Probudit
+Mac" button appeared to work but sent nothing (the plugin wasn't compiled in).
+As of #105 the file is **wired into `App.xcodeproj/project.pbxproj`** (build
+file + file reference + App group + Sources phase), so it compiles into the App
+target on a plain checkout — no manual drag needed. No entitlement, Podfile, or
+AppDelegate change is needed; registration is automatic via `CAPBridgedPlugin`.
+
+> If `cap sync` ever regenerates the project and drops the reference, re-add it:
+> in Xcode drag `WakePlugin.swift` into the **App** group (target **App**
+> checked), or restore the four `WakePlugin` entries in `project.pbxproj`.
 
 ## macOS (the Mac to wake)
 1. Connect the Mac to the router by **wired Ethernet** (USB-C dock). Wi-Fi WoL
