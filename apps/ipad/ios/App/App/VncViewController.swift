@@ -190,15 +190,33 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
         }
     }
 
+    // Finger travel (points) per discrete wheel click. Smaller = more sensitive.
+    private let wheelStepPx: CGFloat = 6
+    // Unconsumed scroll distance carried between pan callbacks (no motion lost).
+    private var scrollAccumulator: CGFloat = 0
+
     @objc private func handleScroll(_ gr: UIPanGestureRecognizer) {
         guard let conn = connection, let (x, y) = framebufferPoint(from: gr.location(in: imageView)) else { return }
-        let dy = gr.translation(in: imageView).y
-        guard abs(dy) > 8 else { return }
-        // RoyalVNCKit: mouseWheel(_:x:y:steps:) — natural-scroll direction is
-        // preserved (drag up = content up = wheel up).
-        let wheel: VNCMouseWheel = dy > 0 ? .up : .down
-        conn.mouseWheel(wheel, x: x, y: y, steps: 1)
-        gr.setTranslation(.zero, in: imageView)
+        switch gr.state {
+        case .began:
+            scrollAccumulator = 0
+        case .changed:
+            // Accumulate the incremental delta since the last callback, emit as
+            // many wheel clicks as fit, and keep the sub-step remainder so fast
+            // swipes scroll proportionally instead of losing motion (RoyalVNCKit
+            // mouseWheel loops `steps` discrete clicks). Natural-scroll direction:
+            // drag down (dy>0) = content down = wheel up.
+            scrollAccumulator += gr.translation(in: imageView).y
+            gr.setTranslation(.zero, in: imageView)
+            let raw = Int(scrollAccumulator / wheelStepPx)
+            guard raw != 0 else { return }
+            scrollAccumulator -= CGFloat(raw) * wheelStepPx
+            let wheel: VNCMouseWheel = raw > 0 ? .up : .down
+            let steps = min(abs(raw), 12) // cap a single fling burst
+            conn.mouseWheel(wheel, x: x, y: y, steps: UInt32(steps))
+        default:
+            break
+        }
     }
 
     @objc private func handleLongPress(_ gr: UILongPressGestureRecognizer) {
