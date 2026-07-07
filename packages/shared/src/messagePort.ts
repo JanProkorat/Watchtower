@@ -215,6 +215,8 @@ export interface OrchTaskGridResponse {
 
 export interface OrchContractInput {
   projectId: number;
+  /** Shared-contract member project ids. Omitted/length<=1 behaves as a solo contract. */
+  projectIds?: number[];
   effectiveFrom: string;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
@@ -242,6 +244,10 @@ export interface OrchContractView {
   projectedTotalMds: number | null;
   isActive: boolean;
   isCompleted: boolean;
+  /** Shared-contract group id, or null for a solo (single-project) contract. */
+  groupId: string | null;
+  /** Member project ids — `[projectId]` for a solo contract. */
+  projectIds: number[];
 }
 
 export interface OrchOverlapError {
@@ -249,6 +255,8 @@ export interface OrchOverlapError {
   conflictingId: number;
   conflictingFrom: string;
   conflictingTo: string | null;
+  conflictingProjectId: number;
+  conflictingProjectName: string;
 }
 
 export interface OrchWorklogListFilter {

@@ -312,6 +312,8 @@ export interface TaskGridResponsePayload {
 
 export interface ContractInputPayload {
   projectId: number;
+  /** Shared-contract member project ids. Omitted/length<=1 behaves as a solo contract. */
+  projectIds?: number[];
   effectiveFrom: string;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
@@ -340,6 +342,10 @@ export interface ContractViewPayload {
   projectedTotalMds: number | null;
   isActive: boolean;
   isCompleted: boolean;
+  /** Shared-contract group id, or null for a solo (single-project) contract. */
+  groupId: string | null;
+  /** Member project ids — `[projectId]` for a solo contract. */
+  projectIds: number[];
 }
 
 export interface WorklogListFilterPayload {
@@ -559,8 +565,8 @@ export type IpcResponse =
   | { kind: 'worklogs:update'; payload: { worklog: WorklogViewPayload } }
   | { kind: 'worklogs:delete'; payload: { ok: true } }
   | { kind: 'contracts:listForProject'; payload: { contracts: ContractViewPayload[] } }
-  | { kind: 'contracts:create'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null } }
-  | { kind: 'contracts:update'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null } }
+  | { kind: 'contracts:create'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null; conflictingProjectId: number; conflictingProjectName: string } }
+  | { kind: 'contracts:update'; payload: { contract: ContractViewPayload } | { error: 'overlap'; conflictingId: number; conflictingFrom: string; conflictingTo: string | null; conflictingProjectId: number; conflictingProjectName: string } }
   | { kind: 'contracts:delete'; payload: { ok: true } }
   | { kind: 'taskGrid:get'; payload: TaskGridResponsePayload }
   | { kind: 'daysOff:list'; payload: { daysOff: DayOffViewPayload[] } }
