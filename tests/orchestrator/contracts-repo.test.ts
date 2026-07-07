@@ -187,6 +187,17 @@ describe('ProjectRatesRepo', () => {
         }),
       ).not.toThrow();
     });
+
+    it('overlap error carries the conflicting project id', () => {
+      rates.create({ projectId, effectiveFrom: '2026-01-01', endDate: '2026-06-30', ...STANDARD_INPUT });
+      try {
+        rates.create({ projectId, effectiveFrom: '2026-03-01', endDate: '2026-09-30', ...STANDARD_INPUT });
+        throw new Error('expected overlap');
+      } catch (e) {
+        expect(e).toBeInstanceOf(RateOverlapError);
+        expect((e as RateOverlapError).conflictingProjectId).toBe(projectId);
+      }
+    });
   });
 
   describe('delete then recreate', () => {

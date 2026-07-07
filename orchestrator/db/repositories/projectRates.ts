@@ -56,7 +56,12 @@ function toRow(r: DbRow): ProjectRateRow {
 }
 
 export class RateOverlapError extends Error {
-  constructor(public conflictingId: number, public conflictingFrom: string, public conflictingTo: string | null) {
+  constructor(
+    public conflictingId: number,
+    public conflictingFrom: string,
+    public conflictingTo: string | null,
+    public conflictingProjectId: number,
+  ) {
     super(
       `Contract period overlaps with rate #${conflictingId} (${conflictingFrom} → ${
         conflictingTo ?? 'ongoing'
@@ -274,7 +279,7 @@ export class ProjectRatesRepo {
     const SENTINEL_END = '9999-12-31';
     const row = this.db
       .prepare(
-        `SELECT id, effective_from, end_date FROM contracts
+        `SELECT id, project_id, effective_from, end_date FROM contracts
           WHERE project_id = ?
             AND (? IS NULL OR id != ?)
             AND effective_from <= ?
@@ -289,9 +294,9 @@ export class ProjectRatesRepo {
         to ?? SENTINEL_END,
         SENTINEL_END,
         from,
-      ) as { id: number; effective_from: string; end_date: string | null } | undefined;
+      ) as { id: number; project_id: number; effective_from: string; end_date: string | null } | undefined;
     if (row) {
-      throw new RateOverlapError(row.id, row.effective_from, row.end_date);
+      throw new RateOverlapError(row.id, row.effective_from, row.end_date, projectId);
     }
   }
 }
