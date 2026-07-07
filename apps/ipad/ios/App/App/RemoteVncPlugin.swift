@@ -35,7 +35,7 @@ public class RemoteVncPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func disconnect(_ call: CAPPluginCall) {
         DispatchQueue.main.async { [weak self] in
-            self?.vc?.dismiss(animated: true)
+            self?.vc?.teardownAndDismiss()
             self?.vc = nil
             call.resolve()
         }

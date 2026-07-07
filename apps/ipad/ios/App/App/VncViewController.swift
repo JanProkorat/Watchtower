@@ -138,10 +138,16 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
         conn.connect()
     }
 
-    @objc private func backTapped() {
+    /// Disconnect the VNC session, dismiss the VC, and notify JS via onClosed.
+    /// Used by both the back button and a host-initiated disconnect().
+    func teardownAndDismiss() {
         connection?.disconnect()
         connection = nil
         dismiss(animated: true) { [weak self] in self?.onClosed?() }
+    }
+
+    @objc private func backTapped() {
+        teardownAndDismiss()
     }
 
     @objc private func toggleKeyboard() {
