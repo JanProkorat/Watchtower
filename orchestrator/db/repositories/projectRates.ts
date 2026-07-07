@@ -12,6 +12,7 @@ export interface ProjectRateRow {
   hoursPerDay: number;
   endDate: string | null;
   mdLimit: number | null;
+  contractGroupId: string | null;
   createdAt: string;
 }
 
@@ -23,6 +24,7 @@ export interface ProjectRateInput {
   hoursPerDay?: number;
   endDate?: string | null;
   mdLimit?: number | null;
+  contractGroupId?: string | null;
 }
 
 type DbRow = {
@@ -34,6 +36,7 @@ type DbRow = {
   hours_per_day: number;
   end_date: string | null;
   md_limit: number | null;
+  contract_group_id: string | null;
   created_at: string;
 };
 
@@ -47,6 +50,7 @@ function toRow(r: DbRow): ProjectRateRow {
     hoursPerDay: r.hours_per_day,
     endDate: r.end_date,
     mdLimit: r.md_limit,
+    contractGroupId: r.contract_group_id,
     createdAt: r.created_at,
   };
 }
@@ -79,7 +83,7 @@ export class ProjectRatesRepo {
     const rows = this.db
       .prepare(
         `SELECT id, project_id, effective_from, rate_type, rate_amount,
-                hours_per_day, end_date, md_limit, created_at
+                hours_per_day, end_date, md_limit, contract_group_id, created_at
            FROM contracts
           WHERE project_id = ?
             AND deleted_at IS NULL
@@ -93,7 +97,7 @@ export class ProjectRatesRepo {
     const row = this.db
       .prepare(
         `SELECT id, project_id, effective_from, rate_type, rate_amount,
-                hours_per_day, end_date, md_limit, created_at
+                hours_per_day, end_date, md_limit, contract_group_id, created_at
            FROM contracts WHERE id = ? AND deleted_at IS NULL`,
       )
       .get(id) as DbRow | undefined;
@@ -106,7 +110,7 @@ export class ProjectRatesRepo {
     const row = this.db
       .prepare(
         `SELECT id, project_id, effective_from, rate_type, rate_amount,
-                hours_per_day, end_date, md_limit, created_at
+                hours_per_day, end_date, md_limit, contract_group_id, created_at
            FROM contracts
           WHERE project_id = ?
             AND effective_from <= ?
@@ -124,63 +128,73 @@ export class ProjectRatesRepo {
     try {
       this.autoClosePrevious(input.projectId, input.effectiveFrom);
       this.assertNoOverlap(input.projectId, input.effectiveFrom, input.endDate ?? null, null);
-      // The table keeps a DB-level UNIQUE(project_id, effective_from) that still
-      // counts soft-deleted rows, so a tombstone left by a prior delete on this
-      // exact start date would make the INSERT fail with a raw UNIQUE error even
-      // though the overlap check (which ignores tombstones) passed. Resurrect
-      // that tombstone in place instead — reusing its sync_id so the future
-      // Postgres LWW push cleanly un-deletes the same row rather than colliding.
-      const tombstone = this.db
-        .prepare(
-          `SELECT id FROM contracts
-            WHERE project_id = ? AND effective_from = ? AND deleted_at IS NOT NULL`,
-        )
-        .get(input.projectId, input.effectiveFrom) as { id: number } | undefined;
-      let id: number;
-      if (tombstone) {
-        this.db
-          .prepare(
-            `UPDATE contracts
-                SET rate_type = ?, rate_amount = ?, hours_per_day = ?,
-                    end_date = ?, md_limit = ?, deleted_at = NULL, updated_at = ?
-              WHERE id = ?`,
-          )
-          .run(
-            input.rateType,
-            input.rateAmount,
-            input.hoursPerDay ?? 8,
-            input.endDate ?? null,
-            input.mdLimit ?? null,
-            nowIso(),
-            tombstone.id,
-          );
-        id = tombstone.id;
-      } else {
-        const info = this.db
-          .prepare(
-            `INSERT INTO contracts
-               (project_id, effective_from, rate_type, rate_amount,
-                hours_per_day, end_date, md_limit, sync_id, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .run(
-            input.projectId,
-            input.effectiveFrom,
-            input.rateType,
-            input.rateAmount,
-            input.hoursPerDay ?? 8,
-            input.endDate ?? null,
-            input.mdLimit ?? null,
-            newSyncId(), nowIso(),
-          ) as { lastInsertRowid: number | bigint };
-        id = Number(info.lastInsertRowid);
-      }
+      const id = this.insertOrResurrect(input);
       this.db.exec('COMMIT');
       return this.get(id)!;
     } catch (err) {
       this.db.exec('ROLLBACK');
       throw err;
     }
+  }
+
+  /**
+   * Insert one contract row (tombstone-resurrecting on the
+   * UNIQUE(project_id, effective_from) slot). Caller holds the transaction.
+   *
+   * The table keeps a DB-level UNIQUE(project_id, effective_from) that still
+   * counts soft-deleted rows, so a tombstone left by a prior delete on this
+   * exact start date would make the INSERT fail with a raw UNIQUE error even
+   * though the overlap check (which ignores tombstones) passed. Resurrect
+   * that tombstone in place instead — reusing its sync_id so the future
+   * Postgres LWW push cleanly un-deletes the same row rather than colliding.
+   */
+  private insertOrResurrect(input: ProjectRateInput): number {
+    const tombstone = this.db
+      .prepare(
+        `SELECT id FROM contracts
+          WHERE project_id = ? AND effective_from = ? AND deleted_at IS NOT NULL`,
+      )
+      .get(input.projectId, input.effectiveFrom) as { id: number } | undefined;
+    if (tombstone) {
+      this.db
+        .prepare(
+          `UPDATE contracts
+              SET rate_type = ?, rate_amount = ?, hours_per_day = ?, end_date = ?, md_limit = ?,
+                  contract_group_id = ?, deleted_at = NULL, updated_at = ?
+            WHERE id = ?`,
+        )
+        .run(
+          input.rateType,
+          input.rateAmount,
+          input.hoursPerDay ?? 8,
+          input.endDate ?? null,
+          input.mdLimit ?? null,
+          input.contractGroupId ?? null,
+          nowIso(),
+          tombstone.id,
+        );
+      return tombstone.id;
+    }
+    const info = this.db
+      .prepare(
+        `INSERT INTO contracts
+           (project_id, effective_from, rate_type, rate_amount, hours_per_day, end_date, md_limit,
+            contract_group_id, sync_id, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.projectId,
+        input.effectiveFrom,
+        input.rateType,
+        input.rateAmount,
+        input.hoursPerDay ?? 8,
+        input.endDate ?? null,
+        input.mdLimit ?? null,
+        input.contractGroupId ?? null,
+        newSyncId(),
+        nowIso(),
+      ) as { lastInsertRowid: number | bigint };
+    return Number(info.lastInsertRowid);
   }
 
   update(id: number, input: Partial<ProjectRateInput>): ProjectRateRow {

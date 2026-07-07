@@ -69,6 +69,17 @@ describe('ProjectRatesRepo', () => {
       expect(c.endDate).toBe('2026-06-30');
       expect(c.mdLimit).toBe(50);
     });
+
+    it('round-trips contractGroupId on a created contract', () => {
+      const c = rates.create({ projectId, effectiveFrom: '2026-01-01', contractGroupId: 'grp-1', ...STANDARD_INPUT });
+      expect(c.contractGroupId).toBe('grp-1');
+      expect(rates.get(c.id)?.contractGroupId).toBe('grp-1');
+    });
+
+    it('defaults contractGroupId to null for a solo contract', () => {
+      const c = rates.create({ projectId, effectiveFrom: '2026-02-01', ...STANDARD_INPUT });
+      expect(c.contractGroupId).toBeNull();
+    });
   });
 
   describe('auto-close behaviour', () => {
