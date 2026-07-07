@@ -109,7 +109,15 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
         let twoFingerPan = UIPanGestureRecognizer(target: self, action: #selector(handleScroll(_:)))
         twoFingerPan.minimumNumberOfTouches = 2
         twoFingerPan.maximumNumberOfTouches = 2
+        // Opt into indirect scroll events so a Magic Keyboard trackpad / mouse
+        // wheel two-finger scroll (delivered with 0 touches, not as a 2-finger
+        // touch pan) also drives handleScroll. Direct 2-finger touch still works.
+        if #available(iOS 13.4, *) { twoFingerPan.allowedScrollTypesMask = .all }
         imageView.addGestureRecognizer(twoFingerPan)
+        // Without this the single-finger pan grabs the first finger of a
+        // two-finger gesture and scroll never begins. Make the 1-finger pan
+        // wait for the 2-finger pan to fail (fast when only one finger is down).
+        pan.require(toFail: twoFingerPan)
 
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
         imageView.addGestureRecognizer(longPress)
@@ -124,7 +132,12 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
             isShared: true,
             isScalingEnabled: false,
             useDisplayLink: false,
-            inputMode: .none,
+            // NOT .none — RoyalVNCKit gates the ENTIRE input-send path
+            // (mouse buttons, move, wheel, keys) behind `inputMode != .none`
+            // (VNCConnection+Queue.swift). We send our own events from the
+            // gestures/keyboard here, so any non-.none mode works; this is the
+            // library default and needs no macOS accessibility permissions.
+            inputMode: .forwardKeyboardShortcutsIfNotInUseLocally,
             isClipboardRedirectionEnabled: false,
             colorDepth: .depth24Bit,
             frameEncodings: VNCFrameEncodingType.defaultFrameEncodings
@@ -190,8 +203,9 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
         }
     }
 
-    // Finger travel (points) per discrete wheel click. Smaller = more sensitive.
-    private let wheelStepPx: CGFloat = 6
+    // Finger/scroll travel (points) per discrete wheel click. Smaller = more
+    // sensitive (more clicks per drag).
+    private let wheelStepPx: CGFloat = 3
     // Unconsumed scroll distance carried between pan callbacks (no motion lost).
     private var scrollAccumulator: CGFloat = 0
 
