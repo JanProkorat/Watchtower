@@ -87,12 +87,20 @@ export function contractBurn(
     // periodEnd: for elapsed we cap at today when open-ended (source line 64).
     const periodEnd = rate.endDate ?? today;
 
-    // minutesLogged = sum effectiveMinutes for this project within [effectiveFrom, periodEnd]
+    // A shared contract's md_limit is one budget pooled across every project
+    // linked to the group — sum worklogs across all member ids, not just this
+    // rate's own project. Solo contracts (no group) fall back to the single
+    // project id (mirrors orchestrator/db/contractStatus.ts:forRate lines 67–73).
+    const memberIds = rate.contractGroupId
+      ? contracts.filter((c) => c.contractGroupId === rate.contractGroupId).map((c) => c.projectId)
+      : [rate.projectId];
+
+    // minutesLogged = sum effectiveMinutes across member projects within [effectiveFrom, periodEnd]
     // (source lines 72–87 — the SQL is replaced by an in-memory filter here).
     let minutesLogged = 0;
     for (const r of rows) {
       if (
-        r.projectId === rate.projectId &&
+        memberIds.includes(r.projectId) &&
         r.workDate >= rate.effectiveFrom &&
         r.workDate <= periodEnd &&
         r.projectKind === 'work'

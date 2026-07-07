@@ -142,7 +142,7 @@ async function fetchBillingDataset(): Promise<BillingDataset> {
 
   const [worklogsRaw, contractsResult, daysOffResult, projectsResult, tasksRaw, epicsRaw] = await Promise.all([
     worklogsPromise,
-    /* contracts */ supabase.from('contracts').select('sync_id,project_id,effective_from,end_date,rate_type,rate_amount,hours_per_day,md_limit').is('deleted_at', null),
+    /* contracts */ supabase.from('contracts').select('sync_id,project_id,effective_from,end_date,rate_type,rate_amount,hours_per_day,md_limit,contract_group_id').is('deleted_at', null),
     supabase.from('days_off').select('date,kind,sync_id').is('deleted_at', null),
     supabase.from('projects').select('id,name,color,kind,is_billable').is('deleted_at', null),
     tasksPromise,

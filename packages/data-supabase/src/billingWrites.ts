@@ -384,6 +384,10 @@ export function buildOptimisticContractRow(input: ContractWriteInput, syncId: st
     rateAmount: input.rateAmount,
     hoursPerDay: input.hoursPerDay,
     mdLimit: input.mdLimit,
+    // ContractWriteInput has no group-membership field yet — the iPad mutation
+    // layer for creating/editing shared-contract groups is Task 16's scope.
+    // Optimistic single-contract writes are always solo until then.
+    contractGroupId: null,
   };
 }
 
