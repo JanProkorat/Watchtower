@@ -102,6 +102,9 @@ describe('contractBurn', () => {
     expect(result).toHaveLength(2);
     for (const b of result) {
       expect(b.mdsUsed).toBe(2); // pooled: 480 + 480 = 960 min / 60 / 8 = 2
+      // Consumers (e.g. the iPad dashboard) need the group id to dedupe
+      // these pooled entries down to a single card.
+      expect(b.contractGroupId).toBe('grp-1');
     }
   });
 
@@ -112,5 +115,6 @@ describe('contractBurn', () => {
       today: '2026-06-05',
     });
     expect(b.mdsUsed).toBe(1); // only project 1's 480 min counts
+    expect(b.contractGroupId).toBeNull();
   });
 });

@@ -20,6 +20,14 @@ export interface ContractBurn {
   workdaysRemaining: number | null;
   totalWorkdays: number | null;
   endDate: string | null;
+  /**
+   * Shared-contract group id — null for a solo (non-pooled) contract.
+   * A pooled group returns one ContractBurn PER member project, all
+   * carrying the same pooled mdsUsed/mdLimit — consumers that render a
+   * card per entry (e.g. the iPad dashboard) must dedupe on this field,
+   * mirroring orchestrator/db/dashboardOverview.ts's seenGroups pattern.
+   */
+  contractGroupId: string | null;
 }
 
 function round2(n: number): number {
@@ -156,6 +164,7 @@ export function contractBurn(
       workdaysRemaining,
       totalWorkdays,
       endDate: rate.endDate,
+      contractGroupId: rate.contractGroupId,
     });
   }
 
