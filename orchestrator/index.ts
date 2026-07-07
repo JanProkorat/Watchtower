@@ -872,7 +872,11 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
         const input = req.payload.input;
         if (oldRow?.contractGroupId) {
           const groupId = oldRow.contractGroupId;
-          const ids = input.projectIds && input.projectIds.length > 0 ? input.projectIds : repo.listGroupMembers(groupId);
+          // Capture the OLD membership before updateGroup soft-deletes any
+          // dropped project's row — needed below to rebill projects that get
+          // unchecked from the group (updateGroup only returns kept+added rows).
+          const oldMembers = repo.listGroupMembers(groupId);
+          const ids = input.projectIds && input.projectIds.length > 0 ? input.projectIds : oldMembers;
           const rows = repo.updateGroup(groupId, termsOf(input, oldRow), ids);
           const first = rows[0];
           if (!first) throw new Error('updateGroup returned no rows');
@@ -882,6 +886,16 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           for (const r of rows) {
             const fromDate = r.effectiveFrom < oldRow.effectiveFrom ? r.effectiveFrom : oldRow.effectiveFrom;
             markWorklogsForRebill(handle!.db, r.projectId, fromDate, nowIso());
+          }
+          // A project unchecked from the group is soft-deleted by updateGroup
+          // but never appears in `rows` — without this it keeps stale
+          // earned_amount/resolved_rate from the old pooled terms. Rebill it
+          // too, anchored on the same old effectiveFrom every member shared.
+          const keptIds = new Set(rows.map((r) => r.projectId));
+          for (const projectId of oldMembers) {
+            if (!keptIds.has(projectId)) {
+              markWorklogsForRebill(handle!.db, projectId, oldRow.effectiveFrom, nowIso());
+            }
           }
           notifySync();
           return { contract: contractViewOf(first) };

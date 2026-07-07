@@ -5,6 +5,9 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { runMigrations, type SqliteLike } from '../../orchestrator/db/migrations.js';
 import { ProjectsRepo } from '../../orchestrator/db/repositories/projects.js';
+import { EpicsRepo } from '../../orchestrator/db/repositories/epics.js';
+import { TasksRepo } from '../../orchestrator/db/repositories/tasks.js';
+import { WorklogsRepo } from '../../orchestrator/db/repositories/worklogs.js';
 import { SyncService } from '../../orchestrator/sync/service.js';
 import { handleRequest, __setHandleForTests } from '../../orchestrator/index.js';
 import type { BootstrapHandle } from '../../orchestrator/bootstrap.js';
@@ -138,6 +141,45 @@ describe('contracts:* IPC handlers — solo vs shared groups', () => {
       payload: { projectId: projectB },
     })) as { contracts: unknown[] };
     expect(listB.contracts).toHaveLength(0);
+  });
+
+  it('update that drops a member from the group rebills that project too', async () => {
+    const created = (await handleRequest({
+      id: '4d',
+      kind: 'contracts:create',
+      payload: {
+        projectId: projectA,
+        projectIds: [projectA, projectB],
+        effectiveFrom: '2026-01-01',
+        ...STANDARD,
+      },
+    })) as { contract: { id: number; groupId: string | null } };
+
+    // A worklog on the soon-to-be-dropped project B, inside the contract
+    // window, with a stale (pre-bumped) updated_at so we can detect whether
+    // markWorklogsForRebill touched it.
+    const epics = new EpicsRepo(db);
+    const tasks = new TasksRepo(db);
+    const worklogs = new WorklogsRepo(db);
+    const epicB = epics.create({ projectId: projectB, name: 'Epic B' }).id;
+    const taskB = tasks.create({ epicId: epicB, number: 'B-1', title: 'Task B' }).id;
+    const worklogB = worklogs.create({ taskId: taskB, workDate: '2026-02-01', minutes: 60 }).id;
+    db.prepare('UPDATE worklogs SET updated_at = ? WHERE id = ?').run('2000-01-01T00:00:00.000Z', worklogB);
+
+    // Drop project B from the group (new membership is [A] only).
+    await handleRequest({
+      id: '4e',
+      kind: 'contracts:update',
+      payload: {
+        id: created.contract.id,
+        input: { projectIds: [projectA], rateAmount: 1700 },
+      },
+    });
+
+    const row = db.prepare('SELECT updated_at FROM worklogs WHERE id = ?').get(worklogB) as {
+      updated_at: string;
+    };
+    expect(row.updated_at).not.toBe('2000-01-01T00:00:00.000Z');
   });
 
   it('delete removes the whole group', async () => {
