@@ -40,7 +40,7 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(17);
+    expect(version.v).toBe(18);
   });
 
   it('v12 adds task_id column to instances', () => {
@@ -173,7 +173,7 @@ describe('migrations', () => {
     db.exec('DELETE FROM schema_version WHERE version > 12');
     expect(() => runMigrations(db as unknown as SqliteLike)).not.toThrow();
     const v = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(v.v).toBe(17);
+    expect(v.v).toBe(18);
   });
 
   it('v13 backfills sync_id + updated_at on pre-existing rows', () => {
@@ -269,5 +269,15 @@ describe('migrations', () => {
     const projectCols = (db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>).map(c => c.name);
     expect(contractCols).not.toContain('currency');
     expect(projectCols).not.toContain('currency');
+  });
+
+  it('v18 adds nullable contract_group_id + idx_contracts_group to contracts', () => {
+    runMigrations(db as unknown as SqliteLike);
+    const cols = (db.prepare(`PRAGMA table_info(contracts)`).all() as Array<{ name: string; notnull: number }>);
+    const col = cols.find((c) => c.name === 'contract_group_id');
+    expect(col).toBeDefined();
+    expect(col!.notnull).toBe(0); // nullable
+    const idx = db.prepare(`PRAGMA index_list(contracts)`).all() as Array<{ name: string }>;
+    expect(idx.some((i) => i.name === 'idx_contracts_group')).toBe(true);
   });
 });
