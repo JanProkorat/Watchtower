@@ -1,6 +1,7 @@
 import type { SqliteLike } from './migrations.js';
 import { ReportsService } from './reports.js';
 import { ContractStatusService } from './contractStatus.js';
+import { ProjectRatesRepo } from './repositories/projectRates.js';
 import type {
   DashboardActiveContractPayload,
   DashboardOverviewRequestPayload,
@@ -108,10 +109,22 @@ export class DashboardOverviewService {
       .all(todayDate, todayDate) as Row[];
 
     const svc = new ContractStatusService(this.db);
+    const ratesRepo = new ProjectRatesRepo(this.db);
+    // A shared contract pools its MD figures across every member project
+    // (Task 7), so every member's active-contract row reports the SAME
+    // pooled numbers. Without dedup, the same pool would be listed once per
+    // member project — track seen group ids and skip repeats. Solo
+    // contracts (contractGroupId === null) are never deduped.
+    const seenGroups = new Set<string>();
     const out: DashboardActiveContractPayload[] = [];
     for (const r of rows) {
       const contract = svc.forProject(r.project_id, todayDate);
       if (!contract) continue;
+      const groupId = ratesRepo.get(contract.rateId)?.contractGroupId ?? null;
+      if (groupId != null) {
+        if (seenGroups.has(groupId)) continue;
+        seenGroups.add(groupId);
+      }
       out.push({
         projectId: r.project_id,
         projectName: r.project_name,

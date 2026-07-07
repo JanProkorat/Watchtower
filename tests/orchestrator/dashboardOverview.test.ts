@@ -523,6 +523,40 @@ describe('DashboardOverviewService', () => {
       expect(res.activeContracts[0].contract.mdsUsed).toBe(1.5);
       expect(res.activeContracts[0].contract.mdsRemaining).toBe(98.5);
     });
+
+    it('surfaces a shared contract once, not once per member project', () => {
+      const a = projects.create({ name: 'Alpha', color: '#aaa', kind: 'work' });
+      const b = projects.create({ name: 'Bravo', color: '#bbb', kind: 'work' });
+      const solo = projects.create({ name: 'Solo', color: '#ccc', kind: 'work' });
+      rates.createGroup(
+        {
+          effectiveFrom: '2026-01-01',
+          rateType: 'daily',
+          rateAmount: 10000,
+          endDate: '2026-12-31',
+          mdLimit: 100,
+        },
+        [a.id, b.id],
+      );
+      rates.create({
+        projectId: solo.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 10000,
+        endDate: '2026-12-31',
+        mdLimit: 50,
+      });
+
+      const res = service.run({
+        projectId: null,
+        sprintAnchor: '2026-05-27',
+        todayDate: '2026-05-27',
+      });
+      // Alpha represents the group once; Bravo is deduped away. The solo
+      // contract on a third project still appears. (Solo's smaller mdLimit
+      // gives it a higher overshoot score at zero usage, so it sorts first.)
+      expect(res.activeContracts.map((c) => c.projectName)).toEqual(['Solo', 'Alpha']);
+    });
   });
 
   it('soft-deleted worklog disappears from today.minutes', () => {
