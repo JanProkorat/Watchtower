@@ -64,6 +64,15 @@ export class ContractStatusService {
     const periodEnd = rate.endDate ?? today; // for "elapsed" we cap at today
     const effectiveTo = rate.endDate ?? null;
 
+    // A shared contract's md_limit is one budget pooled across every project
+    // linked to the group — sum worklogs across all member ids, not just this
+    // rate's own project. Solo contracts (no group) fall back to the single
+    // project id, so this is a no-op superset of the pre-grouping behaviour.
+    const memberIds = rate.contractGroupId
+      ? this.rates.listGroupMembers(rate.contractGroupId)
+      : [rate.projectId];
+    const placeholders = memberIds.map(() => '?').join(', ');
+
     // Only billable worklogs (project.kind = 'work') count toward MD usage.
     // Uses EFFECTIVE_MINUTES (reported wins, tracked is the fallback) so the
     // contract MD figure shares the billable basis of the trend/earnings
@@ -76,13 +85,13 @@ export class ContractStatusService {
            JOIN tasks t  ON t.id = w.task_id
            JOIN epics e  ON e.id = t.epic_id
            JOIN projects p ON p.id = e.project_id
-          WHERE e.project_id = ?
+          WHERE e.project_id IN (${placeholders})
             AND p.kind = 'work'
             AND w.work_date >= ?
             AND w.work_date <= ?
             AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL`,
       )
-      .get(rate.projectId, rate.effectiveFrom, periodEnd) as { minutes: number };
+      .get(...memberIds, rate.effectiveFrom, periodEnd) as { minutes: number };
 
     const minutesLogged = row.minutes ?? 0;
     const mdsUsed = round2(minutesLogged / 60 / rate.hoursPerDay);

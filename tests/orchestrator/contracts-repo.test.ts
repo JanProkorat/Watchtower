@@ -475,6 +475,35 @@ describe('ContractStatusService', () => {
     expect(status?.workdaysRemaining).toBeNull();
     expect(status?.projectedTotalMds).toBeNull();
   });
+
+  it('pools MD usage across all projects in a shared contract group', () => {
+    // pA and pB share a group with mdLimit 30; log 8h on each → 2 MD total.
+    const pA = projects.create({ name: 'A', kind: 'work' }).id;
+    const pB = projects.create({ name: 'B', kind: 'work' }).id;
+    const seed = (p: number, mins: number) => {
+      const e = epics.create({ projectId: p, name: 'E' });
+      const t = tasks.create({ epicId: e.id, number: 'X', title: 'X' });
+      worklogs.create({ taskId: t.id, workDate: '2026-01-05', minutes: mins });
+    };
+    seed(pA, 8 * 60);
+    seed(pB, 8 * 60);
+    rates.createGroup(
+      {
+        effectiveFrom: '2026-01-01',
+        endDate: '2026-12-31',
+        mdLimit: 30,
+        ...STANDARD_INPUT,
+      },
+      [pA, pB],
+    );
+    const statusA = service.forProject(pA, '2026-06-30');
+    expect(statusA?.minutesLogged).toBe(2 * 8 * 60); // pooled, not just pA
+    expect(statusA?.mdsUsed).toBe(2);
+    expect(statusA?.mdsRemaining).toBe(28); // 30 - 2, same number on either project
+    const statusB = service.forProject(pB, '2026-06-30');
+    expect(statusB?.minutesLogged).toBe(statusA?.minutesLogged);
+    expect(statusB?.mdsRemaining).toBe(statusA?.mdsRemaining);
+  });
 });
 
 function round2(n: number): number {
