@@ -210,12 +210,16 @@ import type { ContractRow as ContractRowT, WorklogRow as WorklogRowT } from '@wa
 const cInput = { projectId: 3, effectiveFrom: '2026-01-01', endDate: null, rateType: 'hourly' as const, rateAmount: 100, hoursPerDay: 8, mdLimit: null };
 
 describe('buildContractInsert', () => {
-  it('shapes a full insert row (sync_id, project_id, tombstone clear, stamped updated_at)', () => {
+  it('shapes a full insert row (sync_id, project_id, tombstone clear, stamped updated_at, null group id by default)', () => {
     expect(buildContractInsert(cInput, { syncId: 'c1', now: '2026-06-29T10:00:00.000Z' })).toEqual({
       sync_id: 'c1', project_id: 3, effective_from: '2026-01-01', rate_type: 'hourly',
       rate_amount: 100, hours_per_day: 8, end_date: null, md_limit: null,
-      deleted_at: null, updated_at: '2026-06-29T10:00:00.000Z',
+      contract_group_id: null, deleted_at: null, updated_at: '2026-06-29T10:00:00.000Z',
     });
+  });
+  it('carries a provided groupId', () => {
+    const row = buildContractInsert(cInput, { syncId: 'c1', now: '2026-06-29T10:00:00.000Z', groupId: 'g1' });
+    expect(row.contract_group_id).toBe('g1');
   });
 });
 
@@ -244,11 +248,15 @@ describe('buildContractDelete', () => {
 });
 
 describe('buildOptimisticContractRow', () => {
-  it('builds a ContractRow from input + syncId', () => {
+  it('builds a ContractRow from input + syncId, defaulting to a null (solo) group id', () => {
     expect(buildOptimisticContractRow(cInput, 'c1')).toEqual({
       syncId: 'c1', projectId: 3, effectiveFrom: '2026-01-01', endDate: null,
       rateType: 'hourly', rateAmount: 100, hoursPerDay: 8, mdLimit: null,
+      contractGroupId: null,
     });
+  });
+  it('carries a provided groupId', () => {
+    expect(buildOptimisticContractRow(cInput, 'c1', 'g1').contractGroupId).toBe('g1');
   });
 });
 

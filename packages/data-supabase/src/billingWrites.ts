@@ -325,6 +325,8 @@ export interface ContractInsertRow {
   hours_per_day: number;
   end_date: string | null;
   md_limit: number | null;
+  /** Shared-contract group id — null for a solo (non-pooled) contract. */
+  contract_group_id: string | null;
   deleted_at: null;
   updated_at: string;
 }
@@ -339,7 +341,10 @@ export interface ContractUpdateRow {
   updated_at: string;
 }
 
-export function buildContractInsert(input: ContractWriteInput, opts: { syncId: string; now: string }): ContractInsertRow {
+export function buildContractInsert(
+  input: ContractWriteInput,
+  opts: { syncId: string; now: string; groupId?: string | null },
+): ContractInsertRow {
   return {
     sync_id: opts.syncId,
     project_id: input.projectId,
@@ -349,6 +354,7 @@ export function buildContractInsert(input: ContractWriteInput, opts: { syncId: s
     hours_per_day: input.hoursPerDay,
     end_date: input.endDate,
     md_limit: input.mdLimit,
+    contract_group_id: opts.groupId ?? null,
     deleted_at: null,
     updated_at: opts.now,
   };
@@ -374,7 +380,11 @@ export function buildContractDelete(now: string): { deleted_at: string; updated_
   return { deleted_at: now, updated_at: now };
 }
 
-export function buildOptimisticContractRow(input: ContractWriteInput, syncId: string): ContractRow {
+export function buildOptimisticContractRow(
+  input: ContractWriteInput,
+  syncId: string,
+  groupId: string | null = null,
+): ContractRow {
   return {
     syncId,
     projectId: input.projectId,
@@ -384,10 +394,9 @@ export function buildOptimisticContractRow(input: ContractWriteInput, syncId: st
     rateAmount: input.rateAmount,
     hoursPerDay: input.hoursPerDay,
     mdLimit: input.mdLimit,
-    // ContractWriteInput has no group-membership field yet — the iPad mutation
-    // layer for creating/editing shared-contract groups is Task 16's scope.
-    // Optimistic single-contract writes are always solo until then.
-    contractGroupId: null,
+    // Solo contracts (the default) carry no group id; useContractMutations'
+    // group create/update paths pass the shared group id explicitly.
+    contractGroupId: groupId,
   };
 }
 
