@@ -52,9 +52,6 @@ export function connectionToWsUrl(c: Connection): string {
   return `ws://${c.host}:${c.port}/ws`;
 }
 
-export function connectionToVncWsUrl(c: Connection): string {
-  return `ws://${c.host}:${c.port}/vnc`;
-}
 
 export async function saveConnection(store: ConnStore, c: Connection): Promise<void> {
   await store.set(KEY, JSON.stringify(c));
