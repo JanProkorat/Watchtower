@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { PortApi, type OrchRequest, type OrchResponse, type OrchPush } from '@watchtower/shared/messagePort.js';
+import { PortApi, type OrchRequest, type OrchResponse, type OrchPush, type OrchOverlapError } from '@watchtower/shared/messagePort.js';
 import { bootstrap, type BootstrapHandle } from './bootstrap.js';
 import { PtyManager } from './ptyManager.js';
 import { InstancesRepo } from './db/repositories/instances.js';
@@ -30,6 +30,7 @@ import {
   RateOverlapError,
   type ProjectRateInput,
   type ProjectRateRow,
+  type GroupTerms,
 } from './db/repositories/projectRates.js';
 import { ContractStatusService } from './db/contractStatus.js';
 import { markWorklogsForRebill } from './db/rebill.js';
@@ -85,6 +86,16 @@ process.on('uncaughtException', (err) => {
 
 let api: PortApi | null = null;
 let handle: BootstrapHandle | null = null;
+
+/**
+ * Test-only: inject a bootstrap handle so `handleRequest`'s db-backed cases
+ * can be exercised directly, without the real parentPort/utilityProcess/ws
+ * wiring that normally populates `handle` (see the `parentPort.on('message', ...)`
+ * listener near the bottom of this file). Production code never calls this.
+ */
+export function __setHandleForTests(h: BootstrapHandle | null): void {
+  handle = h;
+}
 
 let pushSink: ((msg: OrchPush) => void) | null = null;
 
@@ -272,6 +283,8 @@ function contractViewOf(rate: ProjectRateRow): {
   projectedTotalMds: number | null;
   isActive: boolean;
   isCompleted: boolean;
+  groupId: string | null;
+  projectIds: number[];
 } {
   const status = contractStatusService().forRate(rate);
   return {
@@ -293,6 +306,50 @@ function contractViewOf(rate: ProjectRateRow): {
     projectedTotalMds: status.projectedTotalMds,
     isActive: status.isActive,
     isCompleted: status.isCompleted,
+    groupId: rate.contractGroupId,
+    projectIds: rate.contractGroupId
+      ? projectRatesRepo().listGroupMembers(rate.contractGroupId)
+      : [rate.projectId],
+  };
+}
+
+/**
+ * Builds the `GroupTerms` shared by every member of a contract (group or
+ * solo). `fallback` supplies defaults for fields missing from a partial
+ * update payload — mirrors the per-field fallback that `ProjectRatesRepo.update`
+ * already does at the SQL level, but `updateGroup` needs a complete term set
+ * up front since it applies identical terms to every member row.
+ */
+function termsOf(
+  payload: {
+    effectiveFrom?: string;
+    rateType?: 'hourly' | 'daily';
+    rateAmount?: number;
+    hoursPerDay?: number;
+    endDate?: string | null;
+    mdLimit?: number | null;
+  },
+  fallback?: ProjectRateRow,
+): GroupTerms {
+  return {
+    effectiveFrom: payload.effectiveFrom ?? fallback!.effectiveFrom,
+    rateType: payload.rateType ?? fallback!.rateType,
+    rateAmount: payload.rateAmount ?? fallback!.rateAmount,
+    hoursPerDay: payload.hoursPerDay ?? fallback?.hoursPerDay,
+    endDate: payload.endDate !== undefined ? payload.endDate : fallback?.endDate ?? null,
+    mdLimit: payload.mdLimit !== undefined ? payload.mdLimit : fallback?.mdLimit ?? null,
+  };
+}
+
+/** Shapes a caught `RateOverlapError` into the wire overlap-error payload, resolving the conflicting project's name. */
+function overlapResponse(err: RateOverlapError): OrchOverlapError {
+  return {
+    error: 'overlap',
+    conflictingId: err.conflictingId,
+    conflictingFrom: err.conflictingFrom,
+    conflictingTo: err.conflictingTo,
+    conflictingProjectId: err.conflictingProjectId,
+    conflictingProjectName: new ProjectsRepo(handle!.db).get(err.conflictingProjectId)?.name ?? '',
   };
 }
 
@@ -787,20 +844,23 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     }
 
     case 'contracts:create': {
+      const payload = req.payload;
+      const ids = payload.projectIds && payload.projectIds.length > 0 ? payload.projectIds : [payload.projectId];
       try {
-        const row = projectRatesRepo().create(req.payload as ProjectRateInput);
+        if (ids.length > 1) {
+          const { rows } = projectRatesRepo().createGroup(termsOf(payload), ids);
+          const first = rows[0];
+          if (!first) throw new Error('createGroup returned no rows');
+          for (const r of rows) markWorklogsForRebill(handle!.db, r.projectId, r.effectiveFrom, nowIso());
+          notifySync();
+          return { contract: contractViewOf(first) };
+        }
+        const row = projectRatesRepo().create({ ...termsOf(payload), projectId: ids[0] ?? payload.projectId });
         markWorklogsForRebill(handle!.db, row.projectId, row.effectiveFrom, nowIso());
         notifySync();
         return { contract: contractViewOf(row) };
       } catch (err) {
-        if (err instanceof RateOverlapError) {
-          return {
-            error: 'overlap' as const,
-            conflictingId: err.conflictingId,
-            conflictingFrom: err.conflictingFrom,
-            conflictingTo: err.conflictingTo,
-          };
-        }
+        if (err instanceof RateOverlapError) return overlapResponse(err);
         throw err;
       }
     }
@@ -809,13 +869,27 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       try {
         const repo = projectRatesRepo();
         const oldRow = repo.get(req.payload.id);
-        const row = repo.update(
-          req.payload.id,
-          req.payload.input as Partial<ProjectRateInput>,
-        );
+        const input = req.payload.input;
+        if (oldRow?.contractGroupId) {
+          const groupId = oldRow.contractGroupId;
+          const ids = input.projectIds && input.projectIds.length > 0 ? input.projectIds : repo.listGroupMembers(groupId);
+          const rows = repo.updateGroup(groupId, termsOf(input, oldRow), ids);
+          const first = rows[0];
+          if (!first) throw new Error('updateGroup returned no rows');
+          // All group members shared `oldRow.effectiveFrom` prior to this edit
+          // (createGroup/updateGroup keep terms uniform across members), so it's
+          // the correct "old" anchor for every member's rebill window.
+          for (const r of rows) {
+            const fromDate = r.effectiveFrom < oldRow.effectiveFrom ? r.effectiveFrom : oldRow.effectiveFrom;
+            markWorklogsForRebill(handle!.db, r.projectId, fromDate, nowIso());
+          }
+          notifySync();
+          return { contract: contractViewOf(first) };
+        }
+        const row = repo.update(req.payload.id, input as Partial<ProjectRateInput>);
         // Use the earliest effective_from so moving a contract earlier also
         // re-bills the newly-covered range.
-        const newFrom = (req.payload.input as Partial<ProjectRateInput>).effectiveFrom;
+        const newFrom = input.effectiveFrom;
         const fromDate =
           oldRow && newFrom && newFrom < oldRow.effectiveFrom
             ? newFrom
@@ -824,14 +898,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
         notifySync();
         return { contract: contractViewOf(row) };
       } catch (err) {
-        if (err instanceof RateOverlapError) {
-          return {
-            error: 'overlap' as const,
-            conflictingId: err.conflictingId,
-            conflictingFrom: err.conflictingFrom,
-            conflictingTo: err.conflictingTo,
-          };
-        }
+        if (err instanceof RateOverlapError) return overlapResponse(err);
         throw err;
       }
     }
@@ -839,9 +906,18 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'contracts:delete': {
       const delRepo = projectRatesRepo();
       const delRow = delRepo.get(req.payload.id);
-      delRepo.delete(req.payload.id);
-      if (delRow) {
-        markWorklogsForRebill(handle!.db, delRow.projectId, delRow.effectiveFrom, nowIso());
+      if (delRow?.contractGroupId) {
+        const groupId = delRow.contractGroupId;
+        const members = delRepo.listGroupMembers(groupId);
+        delRepo.deleteGroup(groupId);
+        for (const projectId of members) {
+          markWorklogsForRebill(handle!.db, projectId, delRow.effectiveFrom, nowIso());
+        }
+      } else {
+        delRepo.delete(req.payload.id);
+        if (delRow) {
+          markWorklogsForRebill(handle!.db, delRow.projectId, delRow.effectiveFrom, nowIso());
+        }
       }
       notifySync();
       return { ok: true };
