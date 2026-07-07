@@ -136,17 +136,31 @@ const monthStepBtn: React.CSSProperties = {
   flexShrink: 0,
 };
 
+// Distinct member-project count for a shared-contract group (used by the
+// "Sdílená smlouva · N projektů" badge on grouped rows).
+function sharedMemberCount(contracts: ContractRow[], groupId: string): number {
+  const ids = new Set<number>();
+  for (const c of contracts) {
+    if (c.contractGroupId === groupId) ids.add(c.projectId);
+  }
+  return ids.size;
+}
+
 // ---------------------------------------------------------------------------
 // ContractDrawer — bottom-sheet for add / edit / delete
 // ---------------------------------------------------------------------------
 
-function ContractDrawer({ title, projectId, initial, anchor, onClose, onSubmit, onDelete }: {
+function ContractDrawer({ title, projectId, initial, anchor, sharableProjects, initialSharedProjectIds, onClose, onSubmit, onDelete }: {
   title: string;
   projectId: number;
   initial?: ContractRow;
   anchor?: SheetAnchor | null;
+  /** Other work-kind, non-archived projects eligible to share this contract with (excludes projectId). */
+  sharableProjects: { id: number; name: string }[];
+  /** Pre-populated membership when editing a grouped contract (excludes projectId). */
+  initialSharedProjectIds?: number[];
   onClose(): void;
-  onSubmit(input: ContractWriteInput): Promise<void>;
+  onSubmit(input: ContractWriteInput, projectIds: number[]): Promise<void>;
   onDelete?(): Promise<void>;
 }): JSX.Element {
   const [effectiveFrom, setEffectiveFrom] = useState(initial?.effectiveFrom ?? new Date().toISOString().slice(0, 10));
@@ -155,6 +169,7 @@ function ContractDrawer({ title, projectId, initial, anchor, onClose, onSubmit, 
   const [rateAmount, setRateAmount] = useState(initial ? String(initial.rateAmount) : '');
   const [hoursPerDay, setHoursPerDay] = useState(initial ? String(initial.hoursPerDay) : '8');
   const [mdLimit, setMdLimit] = useState(initial?.mdLimit != null ? String(initial.mdLimit) : '');
+  const [sharedProjectIds, setSharedProjectIds] = useState<number[]>(initialSharedProjectIds ?? []);
   const [saving, setSaving] = useState(false);
   // Phone width: stack the paired input rows (dates, rate+hours) vertically —
   // two side-by-side native iOS date pickers don't fit ~170px each.
@@ -175,15 +190,22 @@ function ContractDrawer({ title, projectId, initial, anchor, onClose, onSubmit, 
   async function submit() {
     setSaving(true);
     try {
-      await onSubmit({
-        projectId,
-        effectiveFrom,
-        endDate: endDate.trim() === '' ? null : endDate,
-        rateType,
-        rateAmount: rate,
-        hoursPerDay: hpd,
-        mdLimit: md,
-      });
+      // Distinct ids, current project always first — sharedProjectIds only
+      // ever comes from sharableProjects (which already excludes projectId),
+      // but de-dupe defensively.
+      const projectIds = [projectId, ...new Set(sharedProjectIds.filter((id) => id !== projectId))];
+      await onSubmit(
+        {
+          projectId,
+          effectiveFrom,
+          endDate: endDate.trim() === '' ? null : endDate,
+          rateType,
+          rateAmount: rate,
+          hoursPerDay: hpd,
+          mdLimit: md,
+        },
+        projectIds,
+      );
     } finally {
       setSaving(false);
     }
@@ -271,6 +293,47 @@ function ContractDrawer({ title, projectId, initial, anchor, onClose, onSubmit, 
           <div style={labelStyle}>MD limit (volitelné)</div>
           <input style={glassField} inputMode="decimal" value={mdLimit} onChange={(e) => setMdLimit(e.target.value)} />
         </div>
+
+        {/* Sdíleno s projekty — checkbox list of other work projects this
+            contract's terms should also apply to (shared-contract group). */}
+        {sharableProjects.length > 0 && (
+          <div>
+            <div style={labelStyle}>Sdíleno s projekty (volitelné)</div>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                maxHeight: 160,
+                overflowY: 'auto',
+                border: '1px solid rgba(255,255,255,0.10)',
+                borderRadius: 8,
+                padding: 8,
+              }}
+            >
+              {sharableProjects.map((p) => {
+                const checked = sharedProjectIds.includes(p.id);
+                return (
+                  <label
+                    key={p.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: glassText.primary, cursor: 'pointer' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        setSharedProjectIds((prev) =>
+                          e.target.checked ? [...prev, p.id] : prev.filter((id) => id !== p.id),
+                        )
+                      }
+                    />
+                    {p.name}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Footer actions */}
         <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
@@ -418,6 +481,14 @@ export function ProjectDetailView({
     projectRow?.name ??
     projectWorklogs[0]?.projectName ??
     `Projekt ${projectId}`;
+
+  // Other work-kind projects eligible to share a contract with — excludes
+  // the current project (the drawer adds it back implicitly) and non-`work`
+  // kinds (time-off projects can't bill). `allProjects` already excludes
+  // soft-deleted rows (see useBilling's `deleted_at is null` filter).
+  const sharableProjects = allProjects
+    .filter((p) => p.kind === 'work' && p.id !== projectId)
+    .map((p) => ({ id: p.id, name: p.name }));
 
   // Current month worklogs
   const monthWorklogs = projectWorklogs.filter((w) => w.workDate.slice(0, 7) === month);
@@ -665,6 +736,20 @@ export function ProjectDetailView({
 
                     {/* Period range */}
                     <div style={{ flex: 1, minWidth: 0 }}>
+                      {contract.contractGroupId != null && (
+                        <div
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            letterSpacing: 0.3,
+                            textTransform: 'uppercase',
+                            color: C.violetDim,
+                            marginBottom: 2,
+                          }}
+                        >
+                          Sdílená smlouva · {sharedMemberCount(allContracts, contract.contractGroupId)} projektů
+                        </div>
+                      )}
                       <div
                         style={{
                           fontSize: 12,
@@ -867,9 +952,10 @@ export function ProjectDetailView({
         <ContractDrawer
           title="Nová sazba"
           projectId={projectId}
+          sharableProjects={sharableProjects}
           anchor={drawer.anchor}
           onClose={() => setDrawer({ mode: 'closed' })}
-          onSubmit={async (input) => { await createContract(input); setDrawer({ mode: 'closed' }); }}
+          onSubmit={async (input, projectIds) => { await createContract(input, projectIds); setDrawer({ mode: 'closed' }); }}
         />
       )}
       {drawer.mode === 'edit' && (
@@ -877,9 +963,21 @@ export function ProjectDetailView({
           title="Upravit sazbu"
           projectId={projectId}
           initial={drawer.contract}
+          sharableProjects={sharableProjects}
+          initialSharedProjectIds={
+            drawer.contract.contractGroupId != null
+              ? [
+                  ...new Set(
+                    allContracts
+                      .filter((c) => c.contractGroupId === drawer.contract.contractGroupId)
+                      .map((c) => c.projectId),
+                  ),
+                ].filter((id) => id !== projectId)
+              : []
+          }
           anchor={drawer.anchor}
           onClose={() => setDrawer({ mode: 'closed' })}
-          onSubmit={async (input) => { await updateContract(drawer.contract.syncId, input); setDrawer({ mode: 'closed' }); }}
+          onSubmit={async (input, projectIds) => { await updateContract(drawer.contract.syncId, input, projectIds); setDrawer({ mode: 'closed' }); }}
           onDelete={async () => { await deleteContract(drawer.contract.syncId); setDrawer({ mode: 'closed' }); }}
         />
       )}
