@@ -20,7 +20,6 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
 
     private var connection: VNCConnection?
     private var fbSize: CGSize = .zero
-    private var authRejected = false
     private var pointerDown = false
 
     override func viewDidLoad() {
@@ -118,7 +117,6 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
 
     private func connect() {
         connection?.disconnect()
-        authRejected = false
         let settings = VNCConnection.Settings(
             isDebugLoggingEnabled: false,
             hostname: host,
@@ -258,7 +256,7 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
                 // rejected credential surfaces as a VNCError.authentication on
                 // the disconnected state's `error`.
                 let isAuthError = (state.error as? VNCError)?.isAuthenticationError ?? false
-                if isAuthError || self.authRejected {
+                if isAuthError {
                     self.onAuthFailed?()
                     self.dismiss(animated: true) { [weak self] in self?.onClosed?() }
                 } else {

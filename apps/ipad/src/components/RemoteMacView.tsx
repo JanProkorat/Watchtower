@@ -15,11 +15,8 @@ const store = {
 
 const isIos = Capacitor.getPlatform() === 'ios';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function RemoteMacView({ connection, immersive, onToggleImmersive }: {
+export function RemoteMacView({ connection }: {
   connection: Connection;
-  immersive: boolean;
-  onToggleImmersive: () => void;
 }) {
   useConnection(); // ensures we're inside the provider
   const [creds, setCreds] = useState<VncCreds | null>(null);

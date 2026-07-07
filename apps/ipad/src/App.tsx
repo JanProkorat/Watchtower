@@ -20,11 +20,8 @@ import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
 import { ToastStack, type ToastItem } from './components/ToastStack.js';
 
-// Lazy-loaded so their heavy dependency graphs stay off the startup critical
-// path. RemoteMacView pulls in noVNC, whose module has a TOP-LEVEL AWAIT (a
-// hardware H264-decode probe); statically importing it gated the entire React
-// mount on that probe, freezing the app for the first seconds. Neither module
-// is the startup (dashboard) view, so deferring them is free.
+// Lazy-loaded to code-split the Remote Mac module off the startup critical
+// path. Neither module is the startup (dashboard) view, so deferring them is free.
 const RemoteMacView = lazy(() =>
   import('./components/RemoteMacView.js').then((m) => ({ default: m.RemoteMacView })),
 );
@@ -338,12 +335,6 @@ function Shell({ connection }: ShellProps) {
     upload: async (req: JiraSyncRequestPayload) => await bridge.invoke('jira:sync', req) as JiraSyncResultPayload,
   }), [status, bridge]);
 
-  // Immersive (fullscreen) mode for the Remote Mac view — hides the rail so the
-  // remote screen fills the whole window. Only meaningful on the 'remote'
-  // module; auto-reset when navigating away so the rail can't get stuck hidden.
-  const [immersive, setImmersive] = useState(false);
-  useEffect(() => { if (activeModule !== 'remote') setImmersive(false); }, [activeModule]);
-
   // Select (focus) an instance and mark it seen — clears its tab ⚠️ and drops
   // it from the bell count. Used by the hub, push taps, and tab taps.
   // Stable (setActiveId is a state setter, acknowledge is memoized) so the
@@ -455,18 +446,16 @@ function Shell({ connection }: ShellProps) {
     >
       {/* Content row: shared left rail + module content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, position: 'relative' }}>
-        {/* Shared left rail — active across all modules. Hidden while the
-            Remote Mac view is in immersive (fullscreen) mode. */}
-        {!immersive && (
-          <Rail
-            active={activeModule}
-            billingSection={billingSection}
-            onSelect={setActiveModule}
-            onSelectBillingTab={selectBilling}
-            notificationCount={attention.length}
-            onOpenNotifications={() => setHubOpen(true)}
-          />
-        )}
+        {/* Shared left rail — active across all modules. The native VNC VC
+            is presented modally over the WebView, so the rail stays mounted. */}
+        <Rail
+          active={activeModule}
+          billingSection={billingSection}
+          onSelect={setActiveModule}
+          onSelectBillingTab={selectBilling}
+          notificationCount={attention.length}
+          onOpenNotifications={() => setHubOpen(true)}
+        />
 
         {/* Module content. Suspense covers the lazy modules (Remote Mac,
             Settings); the eager dashboard/instances views never suspend. */}
@@ -486,8 +475,6 @@ function Shell({ connection }: ShellProps) {
           ) : (
             <RemoteMacView
               connection={connection}
-              immersive={immersive}
-              onToggleImmersive={() => setImmersive((v) => !v)}
             />
           )}
         </Suspense>
