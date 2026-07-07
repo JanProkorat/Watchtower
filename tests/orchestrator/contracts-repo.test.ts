@@ -178,6 +178,44 @@ describe('ProjectRatesRepo', () => {
     });
   });
 
+  describe('delete then recreate', () => {
+    it('allows recreating a contract with the same effective_from after the original is deleted', () => {
+      const first = rates.create({
+        projectId,
+        effectiveFrom: '2026-01-01',
+        ...STANDARD_INPUT,
+      });
+      rates.delete(first.id);
+      // The soft-deleted row must not block a fresh contract on the same start
+      // date (the DB-level UNIQUE(project_id, effective_from) still holds the
+      // tombstone's slot; the repo has to work around it).
+      const second = rates.create({
+        projectId,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 12000,
+        hoursPerDay: 8,
+      });
+      expect(second.effectiveFrom).toBe('2026-01-01');
+      expect(second.rateType).toBe('daily');
+      expect(second.rateAmount).toBe(12000);
+      // Only the live contract shows up.
+      const live = rates.listForProject(projectId);
+      expect(live).toHaveLength(1);
+      expect(live[0]!.id).toBe(second.id);
+      expect(live[0]!.rateAmount).toBe(12000);
+    });
+
+    it('still rejects a duplicate effective_from when the original is live', () => {
+      rates.create({ projectId, effectiveFrom: '2026-01-01', endDate: '2026-06-30', ...STANDARD_INPUT });
+      // A second live contract sharing the exact start date overlaps — must be
+      // reported as an overlap, not a raw constraint failure.
+      expect(() =>
+        rates.create({ projectId, effectiveFrom: '2026-01-01', endDate: '2026-12-31', ...STANDARD_INPUT }),
+      ).toThrowError(RateOverlapError);
+    });
+  });
+
   describe('activeForProject', () => {
     it('returns the contract that contains the given date', () => {
       const c = rates.create({

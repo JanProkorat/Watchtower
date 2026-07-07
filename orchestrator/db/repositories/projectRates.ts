@@ -124,25 +124,59 @@ export class ProjectRatesRepo {
     try {
       this.autoClosePrevious(input.projectId, input.effectiveFrom);
       this.assertNoOverlap(input.projectId, input.effectiveFrom, input.endDate ?? null, null);
-      const info = this.db
+      // The table keeps a DB-level UNIQUE(project_id, effective_from) that still
+      // counts soft-deleted rows, so a tombstone left by a prior delete on this
+      // exact start date would make the INSERT fail with a raw UNIQUE error even
+      // though the overlap check (which ignores tombstones) passed. Resurrect
+      // that tombstone in place instead — reusing its sync_id so the future
+      // Postgres LWW push cleanly un-deletes the same row rather than colliding.
+      const tombstone = this.db
         .prepare(
-          `INSERT INTO contracts
-             (project_id, effective_from, rate_type, rate_amount,
-              hours_per_day, end_date, md_limit, sync_id, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `SELECT id FROM contracts
+            WHERE project_id = ? AND effective_from = ? AND deleted_at IS NOT NULL`,
         )
-        .run(
-          input.projectId,
-          input.effectiveFrom,
-          input.rateType,
-          input.rateAmount,
-          input.hoursPerDay ?? 8,
-          input.endDate ?? null,
-          input.mdLimit ?? null,
-          newSyncId(), nowIso(),
-        ) as { lastInsertRowid: number | bigint };
+        .get(input.projectId, input.effectiveFrom) as { id: number } | undefined;
+      let id: number;
+      if (tombstone) {
+        this.db
+          .prepare(
+            `UPDATE contracts
+                SET rate_type = ?, rate_amount = ?, hours_per_day = ?,
+                    end_date = ?, md_limit = ?, deleted_at = NULL, updated_at = ?
+              WHERE id = ?`,
+          )
+          .run(
+            input.rateType,
+            input.rateAmount,
+            input.hoursPerDay ?? 8,
+            input.endDate ?? null,
+            input.mdLimit ?? null,
+            nowIso(),
+            tombstone.id,
+          );
+        id = tombstone.id;
+      } else {
+        const info = this.db
+          .prepare(
+            `INSERT INTO contracts
+               (project_id, effective_from, rate_type, rate_amount,
+                hours_per_day, end_date, md_limit, sync_id, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .run(
+            input.projectId,
+            input.effectiveFrom,
+            input.rateType,
+            input.rateAmount,
+            input.hoursPerDay ?? 8,
+            input.endDate ?? null,
+            input.mdLimit ?? null,
+            newSyncId(), nowIso(),
+          ) as { lastInsertRowid: number | bigint };
+        id = Number(info.lastInsertRowid);
+      }
       this.db.exec('COMMIT');
-      return this.get(Number(info.lastInsertRowid))!;
+      return this.get(id)!;
     } catch (err) {
       this.db.exec('ROLLBACK');
       throw err;
