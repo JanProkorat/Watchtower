@@ -24,6 +24,9 @@ public class WakePlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        // Serial queue for both the connection callbacks and the timeout, so
+        // every path that touches `finished` runs on one thread — no lock needed.
+        let queue = DispatchQueue(label: "cz.watchtower.wake")
         let conn = NWConnection(host: NWEndpoint.Host(hostStr), port: port, using: .udp)
         var finished = false
         let finish: (Error?) -> Void = { err in
@@ -42,9 +45,25 @@ public class WakePlugin: CAPPlugin, CAPBridgedPlugin {
             case .cancelled:
                 break
             default:
+                // .waiting/.preparing/.setup: nothing to do here — the timeout
+                // below is the backstop. A UDP connection with no route to the
+                // target (e.g. an off-network DDNS host) can sit in .waiting
+                // indefinitely; without the timeout the JS promise never settled.
                 break
             }
         }
-        conn.start(queue: .global(qos: .userInitiated))
+        conn.start(queue: queue)
+
+        // Backstop: guarantee the promise settles even if the connection never
+        // reaches .ready or .failed (stuck .waiting, stalled DNS). Fire-and-forget
+        // WoL has nothing to retry, so failing fast is the right outcome.
+        queue.asyncAfter(deadline: .now() + wakeTimeoutSeconds) {
+            finish(NSError(domain: "WakePlugin", code: -1,
+                           userInfo: [NSLocalizedDescriptionKey: "wake timed out after \(Int(wakeTimeoutSeconds))s"]))
+        }
     }
 }
+
+// Enough for DNS resolution of a DDNS host on the away path, short enough that
+// the "Probudit Mac" button never hangs on "sending".
+private let wakeTimeoutSeconds: TimeInterval = 5
