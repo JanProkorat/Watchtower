@@ -268,6 +268,67 @@ describe('ProjectRatesRepo', () => {
       expect(rates.activeForProject(projectId, '2025-06-30')?.id).toBe(a.id);
     });
   });
+
+  describe('shared contract groups', () => {
+    let pA: number, pB: number, pC: number;
+    beforeEach(() => {
+      pA = projectId;
+      pB = projects.create({ name: 'B', kind: 'work' }).id;
+      pC = projects.create({ name: 'C', kind: 'work' }).id;
+    });
+
+    const TERMS = { effectiveFrom: '2026-01-01', rateType: 'hourly' as const, rateAmount: 1600, hoursPerDay: 8, endDate: null, mdLimit: 30 };
+
+    it('createGroup writes one row per project sharing a group id + identical terms', () => {
+      const { groupId, rows } = rates.createGroup(TERMS, [pA, pB, pC]);
+      expect(rows).toHaveLength(3);
+      for (const p of [pA, pB, pC]) {
+        const [row] = rates.listForProject(p);
+        expect(row!.contractGroupId).toBe(groupId);
+        expect(row!.rateAmount).toBe(1600);
+        expect(row!.mdLimit).toBe(30);
+      }
+      expect(rates.listGroupMembers(groupId).sort()).toEqual([pA, pB, pC].sort());
+    });
+
+    it('createGroup rejects and rolls back when a member project overlaps, naming the project', () => {
+      rates.create({ projectId: pB, effectiveFrom: '2026-03-01', ...STANDARD_INPUT }); // pB busy
+      try {
+        rates.createGroup(TERMS, [pA, pB, pC]);
+        throw new Error('expected overlap');
+      } catch (e) {
+        expect((e as RateOverlapError).conflictingProjectId).toBe(pB);
+      }
+      // rollback: pA and pC got nothing
+      expect(rates.listForProject(pA)).toHaveLength(0);
+      expect(rates.listForProject(pC)).toHaveLength(0);
+    });
+
+    it('updateGroup propagates term changes to all members', () => {
+      const { groupId } = rates.createGroup(TERMS, [pA, pB]);
+      rates.updateGroup(groupId, { ...TERMS, rateAmount: 2000, mdLimit: 50 }, [pA, pB]);
+      for (const p of [pA, pB]) {
+        const [row] = rates.listForProject(p);
+        expect(row!.rateAmount).toBe(2000);
+        expect(row!.mdLimit).toBe(50);
+      }
+    });
+
+    it('updateGroup adds a newly-listed project and removes an unlisted one', () => {
+      const { groupId } = rates.createGroup(TERMS, [pA, pB]);
+      rates.updateGroup(groupId, TERMS, [pA, pC]); // drop B, add C
+      expect(rates.listForProject(pB)).toHaveLength(0);
+      expect(rates.listForProject(pC)[0]!.contractGroupId).toBe(groupId);
+      expect(rates.listGroupMembers(groupId).sort()).toEqual([pA, pC].sort());
+    });
+
+    it('deleteGroup soft-deletes every member', () => {
+      const { groupId } = rates.createGroup(TERMS, [pA, pB, pC]);
+      rates.deleteGroup(groupId);
+      for (const p of [pA, pB, pC]) expect(rates.listForProject(p)).toHaveLength(0);
+      expect(rates.listGroupMembers(groupId)).toEqual([]);
+    });
+  });
 });
 
 describe('ContractStatusService', () => {
