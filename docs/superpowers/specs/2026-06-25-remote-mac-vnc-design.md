@@ -199,6 +199,11 @@ instance runs auth cmd → PreToolUse hook → watchtower-hook POST
 - Auth-inject relay hardening.
 - Audio / clipboard sync.
 
+> **Update 2026-07-07 (#86):** the "Native RoyalVNC plugin" upgrade path shipped.
+> The renderer is now native (direct TCP to host:5900, Apple type-30); noVNC and
+> the `/vnc` WS relay were removed. See
+> `docs/superpowers/specs/2026-07-07-native-royalvnc-remote-mac-design.md`.
+
 ---
 
 ## 9. Known constraints / risks
