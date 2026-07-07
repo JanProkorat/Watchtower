@@ -277,6 +277,28 @@ describe('ReportsService', () => {
       // Only the one with an explicit limit shows up.
       expect(rows.map((r) => r.projectName)).toEqual(['Has limit']);
     });
+
+    it('reports a shared contract once, not once per member project', () => {
+      const pA = projects.create({ name: 'Alpha', kind: 'work' });
+      const pB = projects.create({ name: 'Bravo', kind: 'work' });
+      const pSolo = projects.create({ name: 'Solo', kind: 'work' });
+      rates.createGroup(
+        { effectiveFrom: '2024-01-01', rateType: 'hourly', rateAmount: 1000, mdLimit: 100 },
+        [pA.id, pB.id],
+      );
+      rates.create({
+        projectId: pSolo.id,
+        effectiveFrom: '2024-01-01',
+        rateType: 'hourly',
+        rateAmount: 1000,
+        mdLimit: 50,
+      });
+
+      const rows = reports.contracts();
+      // Alpha (first member alphabetically) represents the group once; Bravo
+      // is deduped away. The solo contract on a third project still appears.
+      expect(rows.map((r) => r.projectName)).toEqual(['Alpha', 'Solo']);
+    });
   });
 
   describe('soft-delete regression', () => {

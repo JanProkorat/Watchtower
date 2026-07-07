@@ -227,4 +227,35 @@ describe('pullAll', () => {
     ).get(dayOffSyncId) as any;
     expect(daysOffRow.date).toBe('2026-07-04');
   });
+
+  it('round-trips contract_group_id through push and pull', async () => {
+    if (!reachable || !store) return;
+    const db = freshSqlite();
+
+    // Seed a contract locally, then stamp it with a contract_group_id
+    // (repo-level create doesn't expose it yet — that lands in a follow-up
+    // task; the sync engine must still carry whatever value is in the column).
+    const project = new ProjectsRepo(db).create({ name: 'Grouped P' });
+    const rate = new ProjectRatesRepo(db).create({
+      projectId: project.id,
+      effectiveFrom: '2026-01-01',
+      rateType: 'hourly',
+      rateAmount: 100,
+      hoursPerDay: 8,
+    });
+    db.prepare(`UPDATE contracts SET contract_group_id = ? WHERE id = ?`).run('grp-1', rate.id);
+    const contractSyncId = (db.prepare(
+      `SELECT sync_id FROM contracts WHERE id=?`
+    ).get(rate.id) as any).sync_id;
+
+    await pushAll(db, store);
+
+    const db2 = freshSqlite();
+    await pullAll(db2, store);
+
+    const pulled = db2.prepare(
+      `SELECT contract_group_id FROM contracts WHERE sync_id=?`
+    ).get(contractSyncId) as any;
+    expect(pulled.contract_group_id).toBe('grp-1');
+  });
 });

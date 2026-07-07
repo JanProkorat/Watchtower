@@ -45,6 +45,8 @@ export interface ContractRow {
   rateAmount: number;
   hoursPerDay: number;
   mdLimit: number | null;
+  /** Shared-contract group id — null for a solo (non-pooled) contract. */
+  contractGroupId: string | null;
 }
 
 export interface DayOffRow { date: string; kind: string; syncId: string }

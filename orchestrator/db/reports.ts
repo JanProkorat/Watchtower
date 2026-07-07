@@ -9,6 +9,7 @@ import {
   effectiveMinutes,
 } from './reportsSql.js';
 import { ContractStatusService, type ContractStatus } from './contractStatus.js';
+import { ProjectRatesRepo } from './repositories/projectRates.js';
 
 export type Granularity = 'day' | 'week' | 'month';
 
@@ -368,18 +369,29 @@ export class ReportsService {
       }>;
 
     const statusService = new ContractStatusService(this.db);
+    const ratesRepo = new ProjectRatesRepo(this.db);
+    // A shared contract pools its MD figures across every member project
+    // (Task 7), so every member's active-contract row reports the SAME
+    // pooled numbers. Without dedup, the same pool would be listed once per
+    // member project — track seen group ids and skip repeats. Solo
+    // contracts (contractGroupId === null) are never deduped.
+    const seenGroups = new Set<string>();
     const out: ContractsReportRow[] = [];
     for (const r of rows) {
       const c = statusService.forProject(r.project_id);
-      if (c) {
-        out.push({
-          projectId: r.project_id,
-          projectName: r.project_name,
-          projectColor: r.project_color,
-          archived: r.archived,
-          contract: c,
-        });
+      if (!c) continue;
+      const groupId = ratesRepo.get(c.rateId)?.contractGroupId ?? null;
+      if (groupId != null) {
+        if (seenGroups.has(groupId)) continue;
+        seenGroups.add(groupId);
       }
+      out.push({
+        projectId: r.project_id,
+        projectName: r.project_name,
+        projectColor: r.project_color,
+        archived: r.archived,
+        contract: c,
+      });
     }
     return out;
   }

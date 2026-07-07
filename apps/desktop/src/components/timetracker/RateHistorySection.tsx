@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Collapse,
   IconButton,
   LinearProgress,
@@ -14,7 +15,9 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import GroupsIcon from '@mui/icons-material/Groups';
 import { useContracts } from '../../state/useContracts.js';
+import { useProjects } from '../../state/useProjects.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { ContractDrawer } from './ContractDrawer.js';
 import { formatDateAbbrCz, formatDateCz } from '../../util/format.js';
@@ -66,10 +69,31 @@ function formatEarningsCzk(amount: number): string {
  */
 export function RateHistorySection({ projectId }: Props) {
   const state = useContracts(projectId);
+  const projectsState = useProjects();
   const { showError } = useToast();
   const [open, setOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<ContractViewPayload | null>(null);
+
+  // id -> name map for rendering shared-contract member names; sourced from
+  // the (active, non-archived) project list — good enough since a project
+  // archived after being added to a shared contract is an edge case we
+  // don't need to special-case here.
+  const projectNameById = useMemo(
+    () => new Map(projectsState.projects.map((p) => [p.id, p.name])),
+    [projectsState.projects],
+  );
+
+  // Other work projects eligible to share a contract with — excludes the
+  // current project (the drawer adds it back implicitly) and non-`work`
+  // kinds (time-off projects can't bill).
+  const sharableProjects = useMemo(
+    () =>
+      projectsState.projects
+        .filter((p) => p.kind === 'work' && p.id !== projectId)
+        .map((p) => ({ id: p.id, name: p.name })),
+    [projectsState.projects, projectId],
+  );
 
   const sorted = useMemo(
     () =>
@@ -154,7 +178,11 @@ export function RateHistorySection({ projectId }: Props) {
 
       {active && (
         <Box sx={{ px: 2.5, pb: open ? 0 : 2.5 }}>
-          <ActiveContractCard contract={active} bookedDaysOff={bookedDaysOff.length} />
+          <ActiveContractCard
+            contract={active}
+            bookedDaysOff={bookedDaysOff.length}
+            projectNameById={projectNameById}
+          />
         </Box>
       )}
 
@@ -183,7 +211,12 @@ export function RateHistorySection({ projectId }: Props) {
 
           <Stack spacing={1}>
             {sorted.map((c) => (
-              <RateRow key={c.id} contract={c} onEdit={() => openEdit(c)} />
+              <RateRow
+                key={c.id}
+                contract={c}
+                onEdit={() => openEdit(c)}
+                projectNameById={projectNameById}
+              />
             ))}
           </Stack>
         </Box>
@@ -193,6 +226,7 @@ export function RateHistorySection({ projectId }: Props) {
         open={drawerOpen}
         contract={editing}
         projectId={projectId}
+        allProjects={sharableProjects}
         onClose={() => setDrawerOpen(false)}
         onSubmit={async (input) => {
           if (editing) return state.update(editing.id, input);
@@ -214,12 +248,53 @@ export function RateHistorySection({ projectId }: Props) {
   );
 }
 
+/** Names of the contract's member projects other than the one it's shown on. */
+function sharedMemberNames(
+  contract: ContractViewPayload,
+  projectNameById: Map<number, string>,
+): string[] {
+  return contract.projectIds.map((id) => projectNameById.get(id) ?? `#${id}`);
+}
+
+function SharedContractBadge({
+  contract,
+  projectNameById,
+}: {
+  contract: ContractViewPayload;
+  projectNameById: Map<number, string>;
+}) {
+  if (contract.groupId == null) return null;
+  const names = sharedMemberNames(contract, projectNameById);
+  return (
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+      <Chip
+        icon={<GroupsIcon sx={{ fontSize: 16 }} />}
+        label={`Sdílená smlouva · ${contract.projectIds.length} projektů`}
+        size="small"
+        sx={{
+          height: 22,
+          fontSize: 11,
+          fontWeight: 600,
+          bgcolor: 'info.dark',
+          color: 'info.contrastText',
+          '& .MuiChip-icon': { color: 'info.contrastText', ml: 0.5 },
+        }}
+      />
+      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+        {names.join(', ')}
+      </Typography>
+    </Stack>
+  );
+}
+
 function ActiveContractCard({
   contract,
   bookedDaysOff,
+  projectNameById,
 }: {
   contract: ContractViewPayload;
   bookedDaysOff: number;
+  projectNameById: Map<number, string>;
 }) {
   const hasLimit = contract.mdLimit !== null && contract.mdLimit > 0;
   const used = contract.mdsUsed;
@@ -243,6 +318,11 @@ function ActiveContractCard({
         p: 2,
       }}
     >
+      {contract.groupId != null && (
+        <Box sx={{ mb: 1.5 }}>
+          <SharedContractBadge contract={contract} projectNameById={projectNameById} />
+        </Box>
+      )}
       {hasLimit && (
         <>
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
@@ -325,9 +405,11 @@ function StatBlock({
 function RateRow({
   contract,
   onEdit,
+  projectNameById,
 }: {
   contract: ContractViewPayload;
   onEdit(): void;
+  projectNameById: Map<number, string>;
 }) {
   const earnings = computeEarnings(contract);
   const unitHint =
@@ -338,11 +420,6 @@ function RateRow({
   return (
     <Box
       sx={{
-        display: 'grid',
-        gridTemplateColumns:
-          'minmax(170px, 1.2fr) minmax(160px, 1fr) minmax(80px, auto) minmax(120px, 1fr) auto',
-        gap: 2,
-        alignItems: 'center',
         px: 2,
         py: 1.5,
         border: 1,
@@ -351,54 +428,69 @@ function RateRow({
         bgcolor: 'background.default',
       }}
     >
-      <Box>
-        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-          {formatDateAbbrCz(contract.effectiveFrom)} → {formatDateAbbrCz(contract.endDate)}
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          Period
-        </Typography>
-      </Box>
-      <Box>
-        <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-          {formatRate(contract)}
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          {unitHint}
-        </Typography>
-      </Box>
-      {contract.mdLimit !== null && contract.mdLimit > 0 ? (
+      {contract.groupId != null && (
+        <Box sx={{ mb: 1 }}>
+          <SharedContractBadge contract={contract} projectNameById={projectNameById} />
+        </Box>
+      )}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns:
+            'minmax(170px, 1.2fr) minmax(160px, 1fr) minmax(80px, auto) minmax(120px, 1fr) auto',
+          gap: 2,
+          alignItems: 'center',
+        }}
+      >
         <Box>
-          <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-            {contract.mdLimit} MD
+          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+            {formatDateAbbrCz(contract.effectiveFrom)} → {formatDateAbbrCz(contract.endDate)}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            limit
+            Period
           </Typography>
         </Box>
-      ) : (
-        <Box />
-      )}
-      <Box sx={{ textAlign: 'right' }}>
-        <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-          {formatHours(contract.minutesLogged)}
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            color: contract.minutesLogged > 0 ? 'success.light' : 'text.disabled',
-            fontVariantNumeric: 'tabular-nums',
-            display: 'block',
-          }}
-        >
-          {contract.minutesLogged > 0 ? formatEarningsCzk(earnings) : '—'}
-        </Typography>
+        <Box>
+          <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+            {formatRate(contract)}
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            {unitHint}
+          </Typography>
+        </Box>
+        {contract.mdLimit !== null && contract.mdLimit > 0 ? (
+          <Box>
+            <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+              {contract.mdLimit} MD
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              limit
+            </Typography>
+          </Box>
+        ) : (
+          <Box />
+        )}
+        <Box sx={{ textAlign: 'right' }}>
+          <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+            {formatHours(contract.minutesLogged)}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{
+              color: contract.minutesLogged > 0 ? 'success.light' : 'text.disabled',
+              fontVariantNumeric: 'tabular-nums',
+              display: 'block',
+            }}
+          >
+            {contract.minutesLogged > 0 ? formatEarningsCzk(earnings) : '—'}
+          </Typography>
+        </Box>
+        <Tooltip title="Edit rate period">
+          <IconButton size="small" onClick={onEdit}>
+            <EditIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </Box>
-      <Tooltip title="Edit rate period">
-        <IconButton size="small" onClick={onEdit}>
-          <EditIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
     </Box>
   );
 }

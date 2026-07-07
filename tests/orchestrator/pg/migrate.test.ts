@@ -98,4 +98,12 @@ describe('runPgMigrations', () => {
       ),
     ).rejects.toThrow();
   });
+
+  it('adds contract_group_id to contracts', async () => {
+    if (!reachable || !store) return;
+    const { rows } = await store.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'contracts'`,
+    );
+    expect(rows.map((r) => r.column_name)).toContain('contract_group_id');
+  });
 });

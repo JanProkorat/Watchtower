@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useBilling } from '@watchtower/data-supabase';
 import { dashboardKpis } from '@watchtower/shared/billing/dashboard.js';
-import { contractBurn } from '@watchtower/shared/billing/contracts.js';
+import { contractBurn, type ContractBurn } from '@watchtower/shared/billing/contracts.js';
 import { activityHeatmap } from '@watchtower/shared/billing/heatmap.js';
 import { topProjects } from '@watchtower/shared/billing/earnings.js';
 import { formatCzk, formatHours, formatDateCz } from '@watchtower/ui-core';
@@ -411,9 +411,24 @@ export function DashboardView(): JSX.Element {
     const daysOff = data?.daysOff ?? [];
     const projects = data?.projects ?? [];
     const topList = topProjects(worklogs, month, 8);
+    // A shared contract's pooled budget comes back as one ContractBurn PER
+    // member project (all with the same pooled mdsUsed/mdLimit but a
+    // different projectName). Dedupe to a single card per group — mirrors
+    // orchestrator/db/dashboardOverview.ts's seenGroups pattern. Solo
+    // contracts (contractGroupId == null) are never deduped.
+    const rawBurns = contractBurn(contracts, worklogs, daysOff, projects, { today });
+    const seenGroups = new Set<string>();
+    const dedupedBurns: ContractBurn[] = [];
+    for (const b of rawBurns) {
+      if (b.contractGroupId != null) {
+        if (seenGroups.has(b.contractGroupId)) continue;
+        seenGroups.add(b.contractGroupId);
+      }
+      dedupedBurns.push(b);
+    }
     return {
       kpis: dashboardKpis(worklogs, { today }),
-      burns: contractBurn(contracts, worklogs, daysOff, projects, { today }),
+      burns: dedupedBurns,
       heatmap: activityHeatmap(worklogs, { today, windowDays: 30 }),
       top: topList,
       monthHasData: worklogs.some((r) => r.workDate.slice(0, 7) === month),

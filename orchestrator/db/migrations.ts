@@ -353,6 +353,15 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       addColumnIfMissing(db, 'projects', 'auto_track', 'INTEGER NOT NULL DEFAULT 0');
     },
   },
+  {
+    version: 18,
+    up: (db) => {
+      // Shared contracts (#<issue>): a nullable group id ties per-project contract
+      // rows that belong to one client contract. NULL = solo contract (unchanged).
+      addColumnIfMissing(db, 'contracts', 'contract_group_id', 'TEXT');
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_contracts_group ON contracts(contract_group_id)`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

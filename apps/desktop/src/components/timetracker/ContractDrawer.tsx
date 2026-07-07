@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Drawer,
@@ -23,12 +24,21 @@ interface OverlapInfo {
   conflictingId: number;
   conflictingFrom: string;
   conflictingTo: string | null;
+  conflictingProjectId: number;
+  conflictingProjectName: string;
+}
+
+interface SelectableProject {
+  id: number;
+  name: string;
 }
 
 interface Props {
   open: boolean;
   contract: ContractViewPayload | null;
   projectId: number;
+  /** Other work-kind, non-archived projects eligible to share this contract with. */
+  allProjects: SelectableProject[];
   onClose(): void;
   /**
    * Returns the saved contract on success or OverlapInfo when the range
@@ -46,6 +56,7 @@ interface Draft {
   rateAmount: string;
   hoursPerDay: string;
   mdLimit: string;
+  sharedProjectIds: number[];
 }
 
 function todayStr(): string {
@@ -67,10 +78,11 @@ function emptyDraft(): Draft {
     rateAmount: '',
     hoursPerDay: '8',
     mdLimit: '',
+    sharedProjectIds: [],
   };
 }
 
-function draftOf(c: ContractViewPayload): Draft {
+function draftOf(c: ContractViewPayload, projectId: number): Draft {
   return {
     effectiveFrom: c.effectiveFrom,
     endDate: c.endDate ?? '',
@@ -78,6 +90,7 @@ function draftOf(c: ContractViewPayload): Draft {
     rateAmount: c.rateAmount.toString(),
     hoursPerDay: c.hoursPerDay.toString(),
     mdLimit: c.mdLimit != null ? c.mdLimit.toString() : '',
+    sharedProjectIds: c.projectIds.filter((id) => id !== projectId),
   };
 }
 
@@ -85,18 +98,30 @@ function isOverlapResult(r: unknown): r is OverlapInfo {
   return typeof r === 'object' && r != null && 'conflictingId' in r;
 }
 
-export function ContractDrawer({ open, contract, projectId, onClose, onSubmit, onDelete }: Props) {
+export function ContractDrawer({
+  open,
+  contract,
+  projectId,
+  allProjects,
+  onClose,
+  onSubmit,
+  onDelete,
+}: Props) {
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setDraft(contract ? draftOf(contract) : emptyDraft());
+      setDraft(contract ? draftOf(contract, projectId) : emptyDraft());
       setError(null);
       setSubmitting(false);
     }
-  }, [open, contract]);
+  }, [open, contract, projectId]);
+
+  // Other work projects eligible to share this contract — never includes
+  // the current project (that one is implicit).
+  const sharableProjects = allProjects.filter((p) => p.id !== projectId);
 
   const isEdit = contract !== null;
   const rateAmountNum = Number(draft.rateAmount);
@@ -123,6 +148,7 @@ export function ContractDrawer({ open, contract, projectId, onClose, onSubmit, o
           : null;
       const input: ContractInputPayload = {
         projectId,
+        projectIds: [projectId, ...draft.sharedProjectIds],
         effectiveFrom: draft.effectiveFrom,
         rateType: draft.rateType,
         rateAmount: rateAmountNum,
@@ -132,11 +158,7 @@ export function ContractDrawer({ open, contract, projectId, onClose, onSubmit, o
       };
       const result = await onSubmit(input);
       if (isOverlapResult(result)) {
-        setError(
-          `Date range overlaps with contract #${result.conflictingId} (${result.conflictingFrom} → ${
-            result.conflictingTo ?? 'ongoing'
-          }). Contracts on the same project must not overlap.`,
-        );
+        setError(`Překryv smlouvy u projektu ${result.conflictingProjectName}`);
       } else {
         onClose();
       }
@@ -264,6 +286,21 @@ export function ContractDrawer({ open, contract, projectId, onClose, onSubmit, o
             inputProps={{ min: 0, step: 1 }}
             helperText="Total man-days budgeted for this contract period"
             fullWidth
+          />
+
+          <Autocomplete
+            multiple
+            options={sharableProjects}
+            value={sharableProjects.filter((p) => draft.sharedProjectIds.includes(p.id))}
+            onChange={(_, next) =>
+              setDraft({ ...draft, sharedProjectIds: next.map((p) => p.id) })
+            }
+            getOptionLabel={(p) => p.name}
+            isOptionEqualToValue={(a, b) => a.id === b.id}
+            noOptionsText="Žádné další projekty"
+            renderInput={(params) => (
+              <TextField {...params} label="Sdíleno s projekty (volitelné)" size="small" />
+            )}
           />
 
           {isEdit && contract && (

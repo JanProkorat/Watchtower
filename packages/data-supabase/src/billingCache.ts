@@ -150,6 +150,7 @@ export type RawContractRow = {
   rate_amount: number;
   hours_per_day: number;
   md_limit: number | null;
+  contract_group_id?: string | null;
 };
 
 export function mapContractRow(raw: RawContractRow): ContractRow {
@@ -162,6 +163,7 @@ export function mapContractRow(raw: RawContractRow): ContractRow {
     rateAmount: raw.rate_amount,
     hoursPerDay: raw.hours_per_day,
     mdLimit: raw.md_limit ?? null,
+    contractGroupId: raw.contract_group_id ?? null,
   };
 }
 

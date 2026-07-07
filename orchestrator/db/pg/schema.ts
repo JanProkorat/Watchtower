@@ -267,4 +267,11 @@ DO $$ BEGIN
 END $$;`,
     ],
   },
+  {
+    version: 10,
+    up: [
+      `ALTER TABLE contracts ADD COLUMN IF NOT EXISTS contract_group_id TEXT;`,
+      `CREATE INDEX IF NOT EXISTS idx_contracts_group ON contracts(contract_group_id);`,
+    ],
+  },
 ];

@@ -4,7 +4,7 @@ import type { WorklogRow, ContractRow, ProjectRow } from '../../../packages/shar
 
 const contract = (o: Partial<ContractRow> = {}): ContractRow => ({
   syncId: 'c-test', projectId: 1, effectiveFrom: '2026-06-01', endDate: '2026-06-30', rateType: 'hourly',
-  rateAmount: 1500, hoursPerDay: 8, mdLimit: 20, ...o,
+  rateAmount: 1500, hoursPerDay: 8, mdLimit: 20, contractGroupId: null, ...o,
 });
 const wl = (workDate: string, effectiveMinutes: number, projectId = 1): WorklogRow => ({
   syncId: workDate, workDate, minutes: effectiveMinutes, effectiveMinutes, earnedAmount: 0,
@@ -86,5 +86,35 @@ describe('contractBurn', () => {
     );
     expect(b.workdaysRemaining).toBe(0);
     expect(b.mdsUsed).toBe(1);
+  });
+
+  it('shared-contract group: mdsUsed pools worklogs across every member project', () => {
+    // Two contracts share group 'grp-1' — one on project 1, one on project 2.
+    // Each project logs 480 min on a separate day; mdsUsed on BOTH rows must
+    // reflect the pooled total (2 MDs), not just its own project's minutes.
+    const groupContracts = [
+      contract({ projectId: 1, contractGroupId: 'grp-1' }),
+      contract({ syncId: 'c-test-2', projectId: 2, contractGroupId: 'grp-1' }),
+    ];
+    const rows = [wl('2026-06-01', 480, 1), wl('2026-06-02', 480, 2)];
+    const projects = [proj({ id: 1 }), proj({ id: 2, name: 'Project 2' })];
+    const result = contractBurn(groupContracts, rows, [], projects, { today: '2026-06-05' });
+    expect(result).toHaveLength(2);
+    for (const b of result) {
+      expect(b.mdsUsed).toBe(2); // pooled: 480 + 480 = 960 min / 60 / 8 = 2
+      // Consumers (e.g. the iPad dashboard) need the group id to dedupe
+      // these pooled entries down to a single card.
+      expect(b.contractGroupId).toBe('grp-1');
+    }
+  });
+
+  it('solo contract (no contractGroupId): still counts only its own project', () => {
+    // A worklog on a different project must NOT bleed into a solo contract's burn.
+    const rows = [wl('2026-06-01', 480, 1), wl('2026-06-02', 480, 2)];
+    const [b] = contractBurn([contract({ projectId: 1, contractGroupId: null })], rows, [], [proj()], {
+      today: '2026-06-05',
+    });
+    expect(b.mdsUsed).toBe(1); // only project 1's 480 min counts
+    expect(b.contractGroupId).toBeNull();
   });
 });

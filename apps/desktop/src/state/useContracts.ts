@@ -8,6 +8,8 @@ export interface OverlapErrorInfo {
   conflictingId: number;
   conflictingFrom: string;
   conflictingTo: string | null;
+  conflictingProjectId: number;
+  conflictingProjectName: string;
 }
 
 export interface ContractsState {
@@ -65,6 +67,8 @@ export function useContracts(projectId: number): ContractsState {
           conflictingId: res.conflictingId,
           conflictingFrom: res.conflictingFrom,
           conflictingTo: res.conflictingTo,
+          conflictingProjectId: res.conflictingProjectId,
+          conflictingProjectName: res.conflictingProjectName,
         };
       }
       await refresh();
@@ -81,6 +85,8 @@ export function useContracts(projectId: number): ContractsState {
           conflictingId: res.conflictingId,
           conflictingFrom: res.conflictingFrom,
           conflictingTo: res.conflictingTo,
+          conflictingProjectId: res.conflictingProjectId,
+          conflictingProjectName: res.conflictingProjectName,
         };
       }
       await refresh();

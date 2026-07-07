@@ -335,6 +335,7 @@ describe('mapContractRow', () => {
     expect(mapContractRow(raw)).toEqual({
       syncId: 'c1', projectId: 3, effectiveFrom: '2026-01-01', endDate: null,
       rateType: 'hourly', rateAmount: 100, hoursPerDay: 8, mdLimit: null,
+      contractGroupId: null,
     });
   });
 });

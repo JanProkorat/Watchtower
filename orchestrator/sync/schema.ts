@@ -158,6 +158,7 @@ export const SYNCED_TABLES: SyncTable[] = [
       { name: 'hours_per_day', kind: 'numeric' },
       { name: 'end_date', kind: 'date' },
       { name: 'md_limit', kind: 'numeric' },
+      { name: 'contract_group_id', kind: 'text' },
       { name: 'created_at', kind: 'ts' },
       { name: 'updated_at', kind: 'ts' },
       { name: 'deleted_at', kind: 'ts' },
