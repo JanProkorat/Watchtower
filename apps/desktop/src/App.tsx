@@ -207,6 +207,10 @@ export function App() {
     setActiveModule('instances');
     void doSpawn(cwd, 'shell');
   };
+  const spawnClaudeForCwd = (cwd: string) => {
+    setActiveModule('instances');
+    void doSpawn(cwd, 'claude');
+  };
   const cwdForTab = (id: TabId): string | null => {
     const parsed = parseTabId(id);
     if (parsed.kind === 'project') {
@@ -492,8 +496,7 @@ export function App() {
                   <ModuleTimeTracker
                     view={billingView.view}
                     onSelectProject={billingView.selectProject}
-                    onActivateInstance={switchToInstance}
-                    onOpenNewInstanceForCwd={switchToNewInstanceForCwd}
+                    onOpenInstanceForCwd={spawnClaudeForCwd}
                     onOpenTerminalForCwd={spawnTerminalForCwd}
                   />
                 )}
@@ -527,12 +530,6 @@ export function App() {
                           onAddSession={(tabId) => {
                             const cwd = cwdForTab(tabId as TabId);
                             if (cwd) void doSpawn(cwd);
-                          }}
-                          dashboardOnOpen={(id) => switchToInstance(id)}
-                          dashboardOnKill={(id) => void kill(id)}
-                          dashboardOnRemove={(id) => {
-                            const inst = instances.find((i) => i.id === id);
-                            handleRemove(id, inst ? !['finished', 'crashed', 'suspended'].includes(inst.status) : false);
                           }}
                           dashboardOnNew={() => setNewOpen(true)}
                         />

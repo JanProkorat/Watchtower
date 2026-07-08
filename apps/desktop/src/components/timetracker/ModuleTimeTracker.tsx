@@ -8,10 +8,8 @@ interface Props {
   view: TimeTrackerView;
   /** Switch the projects-tab selection. */
   onSelectProject(projectId: number | null): void;
-  /** Switch to Instances and focus the given instance. */
-  onActivateInstance(id: string): void;
-  /** Switch to Instances and open the New-instance modal pre-filled. */
-  onOpenNewInstanceForCwd(cwd: string): void;
+  /** Switch to Instances and spawn a claude session in the given folder. */
+  onOpenInstanceForCwd(cwd: string): void;
   /** Switch to Instances and spawn a plain shell in the given folder. */
   onOpenTerminalForCwd?(cwd: string): void;
 }
@@ -24,8 +22,7 @@ interface Props {
 export function ModuleTimeTracker({
   view,
   onSelectProject,
-  onActivateInstance,
-  onOpenNewInstanceForCwd,
+  onOpenInstanceForCwd,
   onOpenTerminalForCwd,
 }: Props) {
   // Small top padding applied uniformly to every Billing sub-page so the
@@ -36,16 +33,11 @@ export function ModuleTimeTracker({
         <ProjectsPage
           selectedProjectId={view.projectId}
           onSelectProject={onSelectProject}
-          onActivateInstance={onActivateInstance}
-          onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
+          onOpenInstanceForCwd={onOpenInstanceForCwd}
           onOpenTerminalForCwd={onOpenTerminalForCwd}
         />
       ) : (
-        <ListMode
-          tab={view.tab}
-          onActivateInstance={onActivateInstance}
-          onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
-        />
+        <ListMode tab={view.tab} />
       )}
     </Box>
   );

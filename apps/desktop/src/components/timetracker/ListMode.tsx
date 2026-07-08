@@ -8,8 +8,6 @@ import { BoardTab } from './BoardTab.js';
 
 interface Props {
   tab: Exclude<ListTab, 'projects'>;
-  onActivateInstance(id: string): void;
-  onOpenNewInstanceForCwd(cwd: string): void;
 }
 
 /**

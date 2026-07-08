@@ -31,7 +31,6 @@ const TRAFFIC_LIGHT_INSET = '78px';
 interface TabButtonProps {
   id: string;
   label: string;
-  isDashboard: boolean;
   active: boolean;
   draggable: boolean;
   accent?: string;
@@ -49,7 +48,6 @@ interface TabButtonProps {
 function TabButton({
   id,
   label,
-  isDashboard,
   active,
   draggable,
   accent,
@@ -93,31 +91,30 @@ function TabButton({
         flexShrink: 0,
       }}
     >
-      {!isDashboard &&
-        (attention ? (
-          <Tooltip title="A session here needs your attention" placement="bottom">
-            <WarningRoundedIcon
-              aria-label={`${label} needs your attention`}
-              sx={{
-                fontSize: 20,
-                // Explicit yellow (theme `warning.main` is amber); a touch
-                // deeper in light mode so it stays legible on the white strip.
-                color: (theme) => (theme.palette.mode === 'dark' ? '#facc15' : '#eab308'),
-                flexShrink: 0,
-              }}
-            />
-          </Tooltip>
-        ) : (
-          <Box
+      {attention ? (
+        <Tooltip title="A session here needs your attention" placement="bottom">
+          <WarningRoundedIcon
+            aria-label={`${label} needs your attention`}
             sx={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              backgroundColor: dotColor(id, accent),
+              fontSize: 20,
+              // Explicit yellow (theme `warning.main` is amber); a touch
+              // deeper in light mode so it stays legible on the white strip.
+              color: (theme) => (theme.palette.mode === 'dark' ? '#facc15' : '#eab308'),
               flexShrink: 0,
             }}
           />
-        ))}
+        </Tooltip>
+      ) : (
+        <Box
+          sx={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: dotColor(id, accent),
+            flexShrink: 0,
+          }}
+        />
+      )}
       <span>{label}</span>
       {onHide && (
         <Tooltip title="Hide from workspace (keep instances running)" placement="bottom">
@@ -241,7 +238,10 @@ export function TabStrip({
   onHideTab,
   onNew,
 }: Props) {
-  const ids = tabs.map((t) => t.id);
+  // The dashboard tab id is the workspace's empty-state fallback leaf, not a
+  // user-facing tab — never render it in the strip.
+  const visibleTabs = tabs.filter((t) => t.id !== DASHBOARD_TAB_ID);
+  const ids = visibleTabs.map((t) => t.id);
   const [ctxMenu, setCtxMenu] = useState<{ id: TabId; x: number; y: number } | null>(null);
 
   return (
@@ -263,7 +263,7 @@ export function TabStrip({
       {/* No DndContext here — App provides one so a tab drag can also drop on workspace leaves. */}
       <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
         <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
-          {tabs.map((t) => (
+          {visibleTabs.map((t) => (
             <Box
               key={t.id}
               onContextMenu={(e) => {
@@ -274,20 +274,13 @@ export function TabStrip({
               <SortableTab
                 id={t.id}
                 label={t.label}
-                isDashboard={t.id === DASHBOARD_TAB_ID}
                 accent={t.color ?? undefined}
                 mounted={workspaceActive && mountedTabIds.has(t.id)}
                 attention={attentionTabIds.has(t.id)}
                 active={focusedTabId === t.id}
                 onClick={() => onSelect(t.id)}
-                onHide={
-                  t.id === DASHBOARD_TAB_ID || !mountedTabIds.has(t.id)
-                    ? undefined
-                    : () => onHideTab(t.id)
-                }
-                onClose={
-                  t.id === DASHBOARD_TAB_ID ? undefined : () => onCloseTab(t.id)
-                }
+                onHide={!mountedTabIds.has(t.id) ? undefined : () => onHideTab(t.id)}
+                onClose={() => onCloseTab(t.id)}
               />
             </Box>
           ))}

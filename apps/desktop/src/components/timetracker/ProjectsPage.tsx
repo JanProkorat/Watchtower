@@ -9,8 +9,7 @@ import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 interface Props {
   selectedProjectId: number | null;
   onSelectProject(projectId: number | null): void;
-  onActivateInstance(id: string): void;
-  onOpenNewInstanceForCwd(cwd: string): void;
+  onOpenInstanceForCwd(cwd: string): void;
   onOpenTerminalForCwd?(cwd: string): void;
 }
 
@@ -31,8 +30,7 @@ interface Props {
 export function ProjectsPage({
   selectedProjectId,
   onSelectProject,
-  onActivateInstance,
-  onOpenNewInstanceForCwd,
+  onOpenInstanceForCwd,
   onOpenTerminalForCwd,
 }: Props) {
   const projectsState = useProjects();
@@ -110,8 +108,7 @@ export function ProjectsPage({
               onSelectProject(null);
               await projectsState.refresh();
             }}
-            onActivateInstance={onActivateInstance}
-            onOpenNewInstanceForCwd={onOpenNewInstanceForCwd}
+            onOpenInstanceForCwd={onOpenInstanceForCwd}
             onOpenTerminalForCwd={onOpenTerminalForCwd}
           />
         ) : (

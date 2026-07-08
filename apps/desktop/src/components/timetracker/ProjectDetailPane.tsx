@@ -19,9 +19,7 @@ import TerminalIcon from '@mui/icons-material/Terminal';
 import CodeIcon from '@mui/icons-material/Code';
 import { useProject } from '../../state/useProject.js';
 import { useContracts } from '../../state/useContracts.js';
-import { useInstanceLauncher } from '../../state/useInstanceLauncher.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
-import { InstancesLaunchModal } from './InstancesLaunchModal.js';
 import { RateHistorySection } from './RateHistorySection.js';
 import { EpicsTreeView } from './EpicsTreeView.js';
 import type {
@@ -40,8 +38,7 @@ interface Props {
   refreshTick?: number;
   onEdit(project: ProjectViewPayload): void;
   onDeleted(): void;
-  onActivateInstance(id: string): void;
-  onOpenNewInstanceForCwd(cwd: string): void;
+  onOpenInstanceForCwd(cwd: string): void;
   onOpenTerminalForCwd?(cwd: string): void;
 }
 
@@ -78,8 +75,7 @@ export function ProjectDetailPane({
   refreshTick = 0,
   onEdit,
   onDeleted,
-  onActivateInstance,
-  onOpenNewInstanceForCwd,
+  onOpenInstanceForCwd,
   onOpenTerminalForCwd,
 }: Props) {
   const state = useProject(projectId);
@@ -89,10 +85,6 @@ export function ProjectDetailPane({
   }, [refreshTick]);
   const contracts = useContracts(projectId);
   const { showError } = useToast();
-  const launcher = useInstanceLauncher({
-    onActivateInstance,
-    onSpawnNew: onOpenNewInstanceForCwd,
-  });
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
   const activeContract = useMemo(
@@ -158,7 +150,7 @@ export function ProjectDetailPane({
   };
 
   const launchInstances = project.folderPath
-    ? () => void launcher.launch(project.name, project.folderPath!)
+    ? () => onOpenInstanceForCwd(project.folderPath!)
     : null;
 
   const openInVSCode = project.folderPath
@@ -349,16 +341,6 @@ export function ProjectDetailPane({
           Delete project
         </MenuItem>
       </Menu>
-
-      <InstancesLaunchModal
-        open={launcher.pending !== null}
-        projectName={launcher.pending?.projectName ?? ''}
-        cwd={launcher.pending?.cwd ?? ''}
-        runningInstances={launcher.pending?.runningInstances ?? []}
-        onClose={launcher.dismiss}
-        onActivateInstance={onActivateInstance}
-        onSpawnNew={onOpenNewInstanceForCwd}
-      />
     </Box>
   );
 }
