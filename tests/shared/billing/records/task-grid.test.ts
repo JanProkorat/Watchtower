@@ -60,6 +60,31 @@ describe('buildTaskGrid', () => {
     expect(g.monthTotalMinutes).toBe(20);
   });
 
+  it('projectIds keeps rows from every selected project; empty = all', () => {
+    const rows = [
+      wl({ projectId: 1, taskNumber: 'A-1', workDate: '2026-06-05', minutes: 20 }),
+      wl({ projectId: 2, taskNumber: 'B-1', workDate: '2026-06-05', minutes: 60 }),
+      wl({ projectId: 3, taskNumber: 'C-1', workDate: '2026-06-05', minutes: 30 }),
+    ];
+    const multi = buildTaskGrid(rows, { month: '2026-06', projectIds: [1, 3] });
+    expect(multi.tasks.map((t) => t.projectId).sort()).toEqual([1, 3]);
+    expect(multi.monthTotalMinutes).toBe(50); // 20 + 30, project 2 excluded
+
+    const all = buildTaskGrid(rows, { month: '2026-06', projectIds: [] });
+    expect(all.tasks).toHaveLength(3);
+    expect(all.monthTotalMinutes).toBe(110);
+  });
+
+  it('projectIds takes precedence over the legacy projectId when both are set', () => {
+    const rows = [
+      wl({ projectId: 1, taskNumber: 'A-1', workDate: '2026-06-05', minutes: 20 }),
+      wl({ projectId: 2, taskNumber: 'B-1', workDate: '2026-06-05', minutes: 60 }),
+    ];
+    const g = buildTaskGrid(rows, { month: '2026-06', projectId: 1, projectIds: [2] });
+    expect(g.tasks.map((t) => t.projectId)).toEqual([2]);
+    expect(g.monthTotalMinutes).toBe(60);
+  });
+
   it('excludes non-billable earnings from totals but still counts the minutes', () => {
     const rows = [
       wl({ taskNumber: 'X-1', workDate: '2026-06-01', minutes: 60, earnedAmount: 1000, isBillable: true }),

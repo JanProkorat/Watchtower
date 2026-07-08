@@ -127,7 +127,7 @@ function monthBounds(year: number, month: number): { from: string; to: string; d
 export class TaskGridService {
   constructor(private db: SqliteLike) {}
 
-  get(year: number, month: number, projectId?: number): TaskGridResponse {
+  get(year: number, month: number, projectIds?: number[]): TaskGridResponse {
     const { from, to, daysInMonth } = monthBounds(year, month);
     const publicHolidays = holidaysInRange(from, to);
     const daysOff = new DaysOffRepo(this.db).listInRange(from, to);
@@ -135,9 +135,10 @@ export class TaskGridService {
     const workdays = workdayDates(from, to, daysOffSet);
     const monthCapacityMinutes = workdays.length * 8 * 60;
 
-    // 1. Fetch worklogs in the period scoped to the optional project.
-    //    Both tracked + reported come back so the client can flip between
-    //    them without re-fetching. Earnings always use reported (billing).
+    // 1. Fetch worklogs in the period scoped to the optional project set.
+    //    Empty/undefined projectIds = all projects. Both tracked + reported
+    //    come back so the client can flip between them without re-fetching.
+    //    Earnings always use reported (billing).
     const worklogParams: unknown[] = [from, to];
     let worklogSql =
       `SELECT w.task_id, p.id AS project_id, w.work_date,
@@ -149,9 +150,9 @@ export class TaskGridService {
          JOIN projects p ON p.id = e.project_id
         WHERE w.work_date >= ? AND w.work_date <= ?
           AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL`;
-    if (projectId !== undefined) {
-      worklogSql += ' AND p.id = ?';
-      worklogParams.push(projectId);
+    if (projectIds !== undefined && projectIds.length > 0) {
+      worklogSql += ` AND p.id IN (${projectIds.map(() => '?').join(',')})`;
+      worklogParams.push(...projectIds);
     }
     const worklogs = this.db.prepare(worklogSql).all(...worklogParams) as WorklogPeriodRow[];
 

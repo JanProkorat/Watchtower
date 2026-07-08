@@ -191,7 +191,7 @@ describe('TaskGridService', () => {
     expect(res.tasks[0]?.totalTracked).toBe(75);
   });
 
-  it('projectId filter narrows the grid to one project', () => {
+  it('projectIds filter narrows the grid to one project', () => {
     const projectA = s.projectsRepo.create({ name: 'A', kind: 'work' });
     const projectB = s.projectsRepo.create({ name: 'B', kind: 'work' });
     const epicA = s.epicsRepo.create({ projectId: projectA.id, name: 'EA' });
@@ -201,11 +201,45 @@ describe('TaskGridService', () => {
     s.worklogsRepo.create({ taskId: taskA.id, workDate: '2026-05-05', minutes: 60 });
     s.worklogsRepo.create({ taskId: taskB.id, workDate: '2026-05-05', minutes: 90 });
 
-    const res = s.service.get(2026, 5, projectA.id);
+    const res = s.service.get(2026, 5, [projectA.id]);
     expect(res.tasks.length).toBe(1);
     expect(res.tasks[0]?.projectName).toBe('A');
     expect(res.dailyTotalsReported).toEqual({ 5: 60 });
     expect(res.dailyTotalsTracked).toEqual({ 5: 60 });
+  });
+
+  it('projectIds filter keeps every selected project (multi-select)', () => {
+    const projectA = s.projectsRepo.create({ name: 'A', kind: 'work' });
+    const projectB = s.projectsRepo.create({ name: 'B', kind: 'work' });
+    const projectC = s.projectsRepo.create({ name: 'C', kind: 'work' });
+    const epicA = s.epicsRepo.create({ projectId: projectA.id, name: 'EA' });
+    const epicB = s.epicsRepo.create({ projectId: projectB.id, name: 'EB' });
+    const epicC = s.epicsRepo.create({ projectId: projectC.id, name: 'EC' });
+    const taskA = s.tasksRepo.create({ epicId: epicA.id, number: 'A-1', title: 'A' });
+    const taskB = s.tasksRepo.create({ epicId: epicB.id, number: 'B-1', title: 'B' });
+    const taskC = s.tasksRepo.create({ epicId: epicC.id, number: 'C-1', title: 'C' });
+    s.worklogsRepo.create({ taskId: taskA.id, workDate: '2026-05-05', minutes: 60 });
+    s.worklogsRepo.create({ taskId: taskB.id, workDate: '2026-05-05', minutes: 90 });
+    s.worklogsRepo.create({ taskId: taskC.id, workDate: '2026-05-05', minutes: 30 });
+
+    const res = s.service.get(2026, 5, [projectA.id, projectC.id]);
+    expect(res.tasks.map((t) => t.projectName).sort()).toEqual(['A', 'C']);
+    expect(res.dailyTotalsReported).toEqual({ 5: 90 }); // 60 + 30, B excluded
+  });
+
+  it('empty projectIds array behaves like no filter (all projects)', () => {
+    const projectA = s.projectsRepo.create({ name: 'A', kind: 'work' });
+    const projectB = s.projectsRepo.create({ name: 'B', kind: 'work' });
+    const epicA = s.epicsRepo.create({ projectId: projectA.id, name: 'EA' });
+    const epicB = s.epicsRepo.create({ projectId: projectB.id, name: 'EB' });
+    const taskA = s.tasksRepo.create({ epicId: epicA.id, number: 'A-1', title: 'A' });
+    const taskB = s.tasksRepo.create({ epicId: epicB.id, number: 'B-1', title: 'B' });
+    s.worklogsRepo.create({ taskId: taskA.id, workDate: '2026-05-05', minutes: 60 });
+    s.worklogsRepo.create({ taskId: taskB.id, workDate: '2026-05-05', minutes: 90 });
+
+    const res = s.service.get(2026, 5, []);
+    expect(res.tasks.length).toBe(2);
+    expect(res.dailyTotalsReported).toEqual({ 5: 150 });
   });
 
   it('sorts tasks by task number using natural-numeric comparison', () => {
