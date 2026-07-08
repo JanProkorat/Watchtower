@@ -15,7 +15,7 @@ import {
 } from './db/migrateTimetracker.js';
 import { startWsBridge, type WsBridgeHandle } from './wsBridge.js';
 import type { OrchRequest } from '@watchtower/shared/messagePort.js';
-import { createPgStore, type PgStore } from './db/pg/pool.js';
+import { createPgStore, evaluateHubGuard, type PgStore } from './db/pg/pool.js';
 import { runPgMigrations } from './db/pg/migrate.js';
 import { SyncService } from './sync/service.js';
 import { SettingsRepo } from './db/repositories/settings.js';
@@ -93,7 +93,16 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
 
   // Optional Postgres hub. Construction never connects eagerly — a bad URL only
   // surfaces on first query, so an outage can't block startup.
-  const pg = createPgStore();
+  //
+  // Cross-environment guard: refuse the hub when the local data store and the
+  // resolved hub belong to different environments (the `WATCHTOWER_ENV=production
+  // npm run dev` footgun — dev SQLite would migrate/push into prod). A blocked
+  // hub stays null, so the desktop runs SQLite-only and never dials the wrong DB.
+  const hubGuard = evaluateHubGuard({ supportDir: opts.supportDir });
+  const pg = hubGuard.allow ? createPgStore() : null;
+  if (!hubGuard.allow) {
+    console.warn(`[orchestrator] Supabase hub disabled: ${hubGuard.reason}`);
+  }
   if (pg) {
     try { await runPgMigrations(pg); }
     catch (err) { console.error('[orchestrator] pg migrations failed (sync dormant):', err); }

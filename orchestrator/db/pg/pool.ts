@@ -1,4 +1,5 @@
 import pg from 'pg';
+import path from 'node:path';
 
 // node-postgres parses Postgres DATE (OID 1082) into a JS Date at local
 // midnight, then any .toISOString() call converts to UTC — shifting the date
@@ -27,6 +28,55 @@ export function defaultPgUrl(): string | undefined {
   if (process.env.WATCHTOWER_PG_URL) return process.env.WATCHTOWER_PG_URL;
   if (process.env.WATCHTOWER_DEV_URL) return DEV_PG_URL;
   return undefined;
+}
+
+export interface HubGuardResult {
+  /** Whether the Postgres hub may be used for this (data-store, hub) pairing. */
+  allow: boolean;
+  /** Human-readable explanation when blocked; empty string when allowed. */
+  reason: string;
+}
+
+/**
+ * Refuse to open the Supabase hub when the local data store and the hub belong
+ * to different environments — the footgun being a `WATCHTOWER_ENV=production
+ * npm run dev` session, which reads the scrambled *dev* SQLite (support dir
+ * `…-dev`) yet resolves WATCHTOWER_PG_URL to the *prod* Supabase project, and
+ * would migrate + push dev data straight into production.
+ *
+ * Signals (all already set by the run scripts, so no new config to remember):
+ * - `WATCHTOWER_DEV_URL` is present iff this is a dev (unpackaged) session — a
+ *   packaged build never sets it, so packaged runs are trusted and never blocked.
+ * - The support-dir basename carries the *data* environment (`…-dev` → dev).
+ * - `WATCHTOWER_ENV` carries the *hub* environment the `.env` picker resolved.
+ *
+ * A mismatch blocks the hub (sync + migrations stay dormant, SQLite-only) unless
+ * `WATCHTOWER_ALLOW_ENV_MISMATCH=1` is set as an explicit escape hatch.
+ */
+export function evaluateHubGuard(input: {
+  supportDir: string;
+  env?: NodeJS.ProcessEnv;
+}): HubGuardResult {
+  const env = input.env ?? process.env;
+
+  // Only a dev (unpackaged) session can cross environments; packaged builds get
+  // their config from the user's shell/launchd env and are trusted as-is.
+  if (!env.WATCHTOWER_DEV_URL) return { allow: true, reason: '' };
+  if (env.WATCHTOWER_ALLOW_ENV_MISMATCH === '1') return { allow: true, reason: '' };
+
+  const dataEnv = path.basename(input.supportDir).endsWith('-dev') ? 'development' : 'production';
+  const hubEnv = env.WATCHTOWER_ENV === 'production' ? 'production' : 'development';
+
+  if (dataEnv !== hubEnv) {
+    return {
+      allow: false,
+      reason:
+        `local data is '${dataEnv}' (${input.supportDir}) but the Supabase hub is ` +
+        `'${hubEnv}' — refusing to migrate/sync across environments. ` +
+        `Set WATCHTOWER_ALLOW_ENV_MISMATCH=1 to override.`,
+    };
+  }
+  return { allow: true, reason: '' };
 }
 
 /**
