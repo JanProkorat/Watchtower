@@ -273,6 +273,60 @@ export class ProjectRatesRepo {
     }
   }
 
+  /**
+   * Promotes an existing SOLO contract into a shared group. The existing row
+   * becomes the group anchor — its `contract_group_id` is stamped and its terms
+   * propagated in place — and every other project in `projectIds` gets a row via
+   * `insertOrResurrect` (so a tombstone left on the same start date is reused
+   * rather than colliding with UNIQUE(project_id, effective_from)). One
+   * transaction, overlap-checked like `createGroup`; rolls back on conflict.
+   *
+   * `projectIds` is the full target membership and is expected to include the
+   * anchor row's own project (the drawer always sends it first).
+   */
+  promoteToGroup(existingId: number, terms: GroupTerms, projectIds: number[]): { groupId: string; rows: ProjectRateRow[] } {
+    const existing = this.get(existingId);
+    if (!existing) throw new Error(`project_rate ${existingId} not found`);
+    const groupId = newSyncId();
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const ids: number[] = [];
+      for (const projectId of projectIds) {
+        if (projectId === existing.projectId) {
+          // Anchor row: propagate terms + stamp the group id in place. Overlap
+          // check excludes this row (it may keep the same effective_from).
+          this.assertNoOverlap(projectId, terms.effectiveFrom, terms.endDate ?? null, existingId);
+          this.db
+            .prepare(
+              `UPDATE contracts SET effective_from = ?, end_date = ?, rate_type = ?, rate_amount = ?, hours_per_day = ?, md_limit = ?, contract_group_id = ?, updated_at = ? WHERE id = ?`,
+            )
+            .run(
+              terms.effectiveFrom,
+              terms.endDate ?? null,
+              terms.rateType,
+              terms.rateAmount,
+              terms.hoursPerDay ?? 8,
+              terms.mdLimit ?? null,
+              groupId,
+              nowIso(),
+              existingId,
+            );
+          ids.push(existingId);
+        } else {
+          // Newly added member — same path as create/createGroup.
+          this.autoClosePrevious(projectId, terms.effectiveFrom);
+          this.assertNoOverlap(projectId, terms.effectiveFrom, terms.endDate ?? null, null);
+          ids.push(this.insertOrResurrect({ ...terms, projectId, contractGroupId: groupId }));
+        }
+      }
+      this.db.exec('COMMIT');
+      return { groupId, rows: ids.map((id) => this.get(id)!) };
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
   /** Live (non-deleted) project ids currently sharing `groupId`. */
   listGroupMembers(groupId: string): number[] {
     return (
