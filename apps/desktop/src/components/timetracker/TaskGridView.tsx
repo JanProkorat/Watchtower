@@ -114,7 +114,12 @@ export function TaskGridView({ projectId }: Props) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1); // 1-based
-  const [projectFilter, setProjectFilter] = useState<number | null>(projectId ?? null);
+  // Multi-select project filter. Empty = all projects. When the grid is
+  // scoped to a single project (the `projectId` prop), the filter is hidden
+  // and this state is unused.
+  const [projectFilters, setProjectFilters] = useState<number[]>(
+    projectId !== undefined ? [projectId] : [],
+  );
   const [projects, setProjects] = useState<ProjectViewPayload[]>([]);
   /**
    * Which value the grid displays in every cell + total. Reported is the
@@ -167,8 +172,12 @@ export function TaskGridView({ projectId }: Props) {
   const grid = useTaskGrid(
     year,
     month,
-    projectId ?? projectFilter ?? undefined,
+    projectId !== undefined ? [projectId] : projectFilters,
   );
+
+  // First selected project — used to pre-fill single-project dialogs (Log
+  // work, Sync to Jira) when the grid shows multiple projects.
+  const primaryProjectId = projectId ?? projectFilters[0] ?? null;
 
   // Load projects once on mount. In list mode the first load also snaps the
   // filter to the project marked is_default = 1 so the grid lands on the
@@ -182,7 +191,7 @@ export function TaskGridView({ projectId }: Props) {
       if (projectId === undefined && !initialProjectSelectionDoneRef.current) {
         initialProjectSelectionDoneRef.current = true;
         const def = r.projects.find((p) => p.isDefault);
-        if (def) setProjectFilter(def.id);
+        if (def) setProjectFilters([def.id]);
       }
     });
   }, [projectId]);
@@ -400,16 +409,35 @@ export function TaskGridView({ projectId }: Props) {
           <TextField
             select
             size="small"
-            label="Project"
-            value={projectFilter ?? ''}
-            onChange={(e) =>
-              setProjectFilter(e.target.value === '' ? null : Number(e.target.value))
-            }
-            sx={{ minWidth: 200 }}
+            label="Projects"
+            InputLabelProps={{ shrink: true }}
+            value={projectFilters.map(String)}
+            onChange={(e) => {
+              // multiple select hands back string[] of selected values.
+              const raw = e.target.value as unknown as string[];
+              setProjectFilters(raw.map(Number));
+            }}
+            SelectProps={{
+              multiple: true,
+              displayEmpty: true,
+              renderValue: (selected) => {
+                const ids = (selected as string[]).map(Number);
+                if (ids.length === 0) return 'All projects';
+                const names = ids
+                  .map((id) => projects.find((p) => p.id === id)?.name)
+                  .filter((n): n is string => Boolean(n));
+                return names.join(', ');
+              },
+            }}
+            sx={{ minWidth: 200, maxWidth: 320 }}
           >
-            <MenuItem value="">All projects</MenuItem>
             {projects.map((p) => (
-              <MenuItem key={p.id} value={p.id}>
+              <MenuItem key={p.id} value={String(p.id)}>
+                <Checkbox
+                  size="small"
+                  checked={projectFilters.includes(p.id)}
+                  sx={{ ml: -1, mr: 0.5 }}
+                />
                 {p.name}
               </MenuItem>
             ))}
@@ -479,7 +507,7 @@ export function TaskGridView({ projectId }: Props) {
           startIcon={<AccessTimeIcon fontSize="small" />}
           onClick={() => {
             setWorklogDrawerEditing(null);
-            setWorklogDrawerProjectId(projectId ?? projectFilter ?? null);
+            setWorklogDrawerProjectId(primaryProjectId);
             setWorklogDrawerTaskId(null);
             setWorklogDrawerWorkDate(null);
             setWorklogDrawerOpen(true);
@@ -660,7 +688,7 @@ export function TaskGridView({ projectId }: Props) {
         open={jiraSyncOpen}
         initialFrom={dayjs(new Date(year, month - 1, 1))}
         initialTo={dayjs(new Date(year, month, 0))}
-        initialProjectId={projectId ?? projectFilter ?? null}
+        initialProjectId={primaryProjectId}
         projects={projects}
         onClose={() => setJiraSyncOpen(false)}
         onSynced={() => {

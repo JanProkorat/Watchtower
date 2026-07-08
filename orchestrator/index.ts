@@ -938,9 +938,9 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     }
 
     case 'taskGrid:get': {
-      const { year, month, projectId } = req.payload;
+      const { year, month, projectIds } = req.payload;
       const service = new TaskGridService(handle!.db);
-      return service.get(year, month, projectId);
+      return service.get(year, month, projectIds);
     }
 
     case 'daysOff:list':

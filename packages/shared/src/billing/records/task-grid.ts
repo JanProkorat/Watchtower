@@ -28,7 +28,16 @@ export function buildTaskGrid(
   rows: WorklogRow[],
   opts: {
     month: string;
+    /**
+     * Single-project filter. Kept for back-compat; when `projectIds` is also
+     * supplied and non-empty, `projectIds` wins.
+     */
     projectId?: number;
+    /**
+     * Multi-project filter. Empty/undefined = all projects; otherwise only
+     * rows whose `projectId` is in the list are kept.
+     */
+    projectIds?: number[];
     /**
      * Expected-time lookup keyed by `${projectId}:${taskNumber ?? ''}` (the
      * same key this builder buckets tasks under). Value is the already-resolved
@@ -38,7 +47,14 @@ export function buildTaskGrid(
     estimatesByKey?: Map<string, number | null>;
   },
 ): TaskGridResult {
-  const { month, projectId, estimatesByKey } = opts;
+  const { month, projectId, projectIds, estimatesByKey } = opts;
+  // projectIds (when non-empty) takes precedence over the legacy single filter.
+  const projectFilter: Set<number> | null =
+    projectIds && projectIds.length > 0
+      ? new Set(projectIds)
+      : projectId !== undefined
+        ? new Set([projectId])
+        : null;
   const parts = month.split('-').map(Number);
   const y = parts[0]!;
   const m = parts[1]!;
@@ -52,7 +68,7 @@ export function buildTaskGrid(
 
   for (const r of rows) {
     if (r.workDate.slice(0, 7) !== month) continue;
-    if (projectId !== undefined && r.projectId !== projectId) continue;
+    if (projectFilter !== null && !projectFilter.has(r.projectId)) continue;
     const dayIdx = Number(r.workDate.slice(8, 10)) - 1;
     const key = `${r.projectId}:${r.taskNumber ?? ''}`;
     let row = byTask.get(key);

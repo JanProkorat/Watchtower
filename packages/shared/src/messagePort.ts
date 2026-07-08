@@ -48,7 +48,7 @@ export type OrchRequest =
   | { id: string; kind: 'contracts:create'; payload: OrchContractInput }
   | { id: string; kind: 'contracts:update'; payload: { id: number; input: Partial<OrchContractInput> } }
   | { id: string; kind: 'contracts:delete'; payload: { id: number } }
-  | { id: string; kind: 'taskGrid:get'; payload: { year: number; month: number; projectId?: number } }
+  | { id: string; kind: 'taskGrid:get'; payload: { year: number; month: number; projectIds?: number[] } }
   | { id: string; kind: 'daysOff:list'; payload: Record<string, never> }
   | { id: string; kind: 'daysOff:listInRange'; payload: { from: string; to: string } }
   | { id: string; kind: 'daysOff:upsert'; payload: OrchDayOffInput }

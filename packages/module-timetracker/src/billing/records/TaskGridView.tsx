@@ -36,7 +36,9 @@ export function TaskGridView(): JSX.Element {
   // is visible before horizontal scroll (iPad keeps the roomier layout).
   const isNarrow = useIsNarrow();
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [projectId, setProjectId] = useState<number | undefined>(undefined);
+  // Multi-select project filter. Empty = all projects.
+  const [projectIds, setProjectIds] = useState<number[]>([]);
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [sheet, setSheet] = useState<Sheet>({ mode: 'closed' });
   const worklogs = data?.worklogs ?? [];
   const projects = data?.projects ?? [];
@@ -68,7 +70,7 @@ export function TaskGridView(): JSX.Element {
     tasks.map((t) => [`${t.projectId}:${t.taskNumber ?? ''}`, t.estimatedMinutes]),
   );
 
-  const g = buildTaskGrid(worklogs, { month, projectId, estimatesByKey });
+  const g = buildTaskGrid(worklogs, { month, projectIds, estimatesByKey });
   const dayHeaders = Array.from({ length: g.daysInMonth }, (_, i) => i + 1);
   const hrs = (min: number) => (min === 0 ? '' : (min / 60).toFixed(1).replace('.', ','));
 
@@ -102,7 +104,7 @@ export function TaskGridView(): JSX.Element {
   const daysOffSet = new Set(daysOff.filter((d) => d.date >= monthStart && d.date <= monthEnd).map((d) => d.date));
   const workdays = workdayDates(monthStart, monthEnd, daysOffSet);
   const capacityMinutes = workdays.length * 8 * 60;
-  const filteredWl = projectId === undefined ? worklogs : worklogs.filter((w) => w.projectId === projectId);
+  const filteredWl = projectIds.length === 0 ? worklogs : worklogs.filter((w) => projectIds.includes(w.projectId));
   const billableProjectIds = [...new Set(filteredWl.filter((w) => w.isBillable && w.projectId).map((w) => w.projectId))];
   let expectedCzk = 0;
   for (const date of workdays) {
@@ -144,15 +146,52 @@ export function TaskGridView(): JSX.Element {
           <div style={{ flex: 1 }} />
           <button style={flatBtn} onClick={() => setMonth(new Date().toISOString().slice(0, 7))}>Dnes</button>
         </div>
-        {/* Row 2: full-width project filter */}
-        <select
-          value={projectId ?? ''}
-          onChange={(e) => setProjectId(e.target.value === '' ? undefined : Number(e.target.value))}
-          style={{ width: '100%', height: 36, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c2c9d8', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}
-        >
-          <option value="">Všechny projekty</option>
-          {projects.map((p) => <option key={p.id} value={p.id}>{p.name || '(bez názvu)'}</option>)}
-        </select>
+        {/* Row 2: full-width multi-select project filter (empty = all projects) */}
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => setProjectMenuOpen((o) => !o)}
+            style={{ width: '100%', height: 36, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c2c9d8', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}
+          >
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {projectIds.length === 0
+                ? 'Všechny projekty'
+                : projects.filter((p) => projectIds.includes(p.id)).map((p) => p.name || '(bez názvu)').join(', ')}
+            </span>
+            <span style={{ flexShrink: 0, color: C.muted, fontSize: 10 }}>{projectMenuOpen ? '▲' : '▼'}</span>
+          </button>
+          {projectMenuOpen && (
+            <>
+              {/* Click-catcher so a tap anywhere else closes the panel. */}
+              <div onClick={() => setProjectMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, zIndex: 21, maxHeight: 280, overflowY: 'auto', borderRadius: 10, border: '1px solid rgba(255,255,255,0.14)', background: '#191a24', boxShadow: '0 12px 32px rgba(0,0,0,0.5)', padding: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setProjectIds([])}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 40, padding: '0 10px', borderRadius: 7, border: 'none', background: 'transparent', color: '#c2c9d8', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <span style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${projectIds.length === 0 ? C.violet : 'rgba(255,255,255,0.3)'}`, background: projectIds.length === 0 ? C.violet : 'transparent', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11 }}>{projectIds.length === 0 ? '✓' : ''}</span>
+                  Všechny projekty
+                </button>
+                {projects.map((p) => {
+                  const checked = projectIds.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setProjectIds((prev) => (prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id]))}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 40, padding: '0 10px', borderRadius: 7, border: 'none', background: 'transparent', color: '#d7dbe6', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      <span style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${checked ? C.violet : 'rgba(255,255,255,0.3)'}`, background: checked ? C.violet : 'transparent', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11 }}>{checked ? '✓' : ''}</span>
+                      {p.color && <span style={{ width: 7, height: 7, borderRadius: '50%', background: p.color, flexShrink: 0 }} />}
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name || '(bez názvu)'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* legend — matches the prototype's non-working-day key */}

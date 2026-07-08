@@ -49,7 +49,7 @@ export type IpcRequest =
   | { kind: 'contracts:create'; payload: ContractInputPayload }
   | { kind: 'contracts:update'; payload: { id: number; input: Partial<ContractInputPayload> } }
   | { kind: 'contracts:delete'; payload: { id: number } }
-  | { kind: 'taskGrid:get'; payload: { year: number; month: number; projectId?: number } }
+  | { kind: 'taskGrid:get'; payload: { year: number; month: number; projectIds?: number[] } }
   | { kind: 'daysOff:list'; payload: Record<string, never> }
   | { kind: 'daysOff:listInRange'; payload: { from: string; to: string } }
   | { kind: 'daysOff:upsert'; payload: DayOffInputPayload }
