@@ -900,6 +900,22 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           notifySync();
           return { contract: contractViewOf(first) };
         }
+        // Solo → shared-group promotion: the contract has no group yet, but the
+        // edit lists more than one project (the user added shared members via
+        // the drawer). Mint a group anchored on this row and attach the added
+        // projects. Without this, the plain update below silently drops
+        // `projectIds` and no link is created.
+        if (oldRow && input.projectIds && input.projectIds.length > 1) {
+          const rows = repo.promoteToGroup(req.payload.id, termsOf(input, oldRow), input.projectIds).rows;
+          const first = rows.find((r) => r.id === req.payload.id) ?? rows[0];
+          if (!first) throw new Error('promoteToGroup returned no rows');
+          for (const r of rows) {
+            const fromDate = r.effectiveFrom < oldRow.effectiveFrom ? r.effectiveFrom : oldRow.effectiveFrom;
+            markWorklogsForRebill(handle!.db, r.projectId, fromDate, nowIso());
+          }
+          notifySync();
+          return { contract: contractViewOf(first) };
+        }
         const row = repo.update(req.payload.id, input as Partial<ProjectRateInput>);
         // Use the earliest effective_from so moving a contract earlier also
         // re-bills the newly-covered range.

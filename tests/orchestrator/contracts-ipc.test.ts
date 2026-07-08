@@ -182,6 +182,87 @@ describe('contracts:* IPC handlers — solo vs shared groups', () => {
     expect(row.updated_at).not.toBe('2000-01-01T00:00:00.000Z');
   });
 
+  it('update promotes a SOLO contract into a shared group when projectIds adds a member', async () => {
+    // Start from a plain solo contract (single projectId, no projectIds).
+    const created = (await handleRequest({
+      id: '6a',
+      kind: 'contracts:create',
+      payload: { projectId: projectA, effectiveFrom: '2026-01-01', ...STANDARD },
+    })) as { contract: { id: number; groupId: string | null } };
+    expect(created.contract.groupId).toBeNull();
+
+    // Edit it and add project B via the shared-projects multi-select.
+    const updated = (await handleRequest({
+      id: '6b',
+      kind: 'contracts:update',
+      payload: {
+        id: created.contract.id,
+        input: { projectIds: [projectA, projectB], rateAmount: 1700 },
+      },
+    })) as { contract: { groupId: string | null; projectIds: number[]; rateAmount: number } };
+
+    // A group must now exist, spanning both projects.
+    expect(updated.contract.groupId).not.toBeNull();
+    expect(updated.contract.projectIds.slice().sort()).toEqual([projectA, projectB].sort());
+    expect(updated.contract.rateAmount).toBe(1700);
+
+    // Both projects list the same shared contract.
+    const listA = (await handleRequest({
+      id: '6c',
+      kind: 'contracts:listForProject',
+      payload: { projectId: projectA },
+    })) as { contracts: Array<{ groupId: string | null }> };
+    const listB = (await handleRequest({
+      id: '6d',
+      kind: 'contracts:listForProject',
+      payload: { projectId: projectB },
+    })) as { contracts: Array<{ groupId: string | null }> };
+    expect(listA.contracts[0].groupId).toBe(updated.contract.groupId);
+    expect(listB.contracts[0].groupId).toBe(updated.contract.groupId);
+  });
+
+  it('solo→group promotion resurrects a tombstoned contract on the added project (same effective_from)', async () => {
+    // Anchor solo contract on A.
+    const created = (await handleRequest({
+      id: '7a',
+      kind: 'contracts:create',
+      payload: { projectId: projectA, effectiveFrom: '2026-07-01', ...STANDARD },
+    })) as { contract: { id: number } };
+
+    // Project B already had a contract at the SAME effective_from that was
+    // deleted — leaving a tombstone that the DB-level UNIQUE(project_id,
+    // effective_from) still counts. A naive INSERT would collide here.
+    const bSolo = (await handleRequest({
+      id: '7b',
+      kind: 'contracts:create',
+      payload: { projectId: projectB, effectiveFrom: '2026-07-01', ...STANDARD },
+    })) as { contract: { id: number } };
+    await handleRequest({ id: '7c', kind: 'contracts:delete', payload: { id: bSolo.contract.id } });
+
+    // Promote A's solo contract into a group that includes B — must resurrect
+    // B's tombstone rather than throw a UNIQUE error.
+    const updated = (await handleRequest({
+      id: '7d',
+      kind: 'contracts:update',
+      payload: {
+        id: created.contract.id,
+        input: { projectIds: [projectA, projectB] },
+      },
+    })) as { contract: { groupId: string | null; projectIds: number[] }; error?: string };
+
+    expect(updated.error).toBeUndefined();
+    expect(updated.contract.groupId).not.toBeNull();
+    expect(updated.contract.projectIds.slice().sort()).toEqual([projectA, projectB].sort());
+
+    const listB = (await handleRequest({
+      id: '7e',
+      kind: 'contracts:listForProject',
+      payload: { projectId: projectB },
+    })) as { contracts: Array<{ groupId: string | null }> };
+    expect(listB.contracts).toHaveLength(1);
+    expect(listB.contracts[0].groupId).toBe(updated.contract.groupId);
+  });
+
   it('delete removes the whole group', async () => {
     const created = (await handleRequest({
       id: '5a',
