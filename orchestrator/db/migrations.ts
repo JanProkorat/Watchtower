@@ -362,6 +362,23 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       db.exec(`CREATE INDEX IF NOT EXISTS idx_contracts_group ON contracts(contract_group_id)`);
     },
   },
+  {
+    version: 19,
+    up: (db) => {
+      // "Pinned" projects: the former single-"default" flag becomes a
+      // multi-select preselection for the task-grid + dashboard filters.
+      // Drop the partial-unique index that enforced at-most-one default, then
+      // rename the column. RENAME COLUMN has no IF EXISTS, so guard on the old
+      // column still being present (replay-safe; a fresh install that already
+      // has is_pinned is a no-op). The column-level CHECK (is_default IN (0,1))
+      // travels with the rename and becomes CHECK (is_pinned IN (0,1)).
+      db.exec(`DROP INDEX IF EXISTS idx_projects_is_default`);
+      const cols = (db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>).map((c) => c.name);
+      if (cols.includes('is_default') && !cols.includes('is_pinned')) {
+        db.exec(`ALTER TABLE projects RENAME COLUMN is_default TO is_pinned`);
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

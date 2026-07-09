@@ -47,13 +47,13 @@ export function ProjectsPage({
     ? null
     : projectsState.projects.find((p) => p.id === editingId) ?? null;
 
-  // Auto-select once the list loads: prefer default, fall back to first.
+  // Auto-select once the list loads: prefer pinned, fall back to first.
   // We only nudge the selection when nothing is set or when the previously
   // selected project no longer exists (e.g. archived / deleted).
   const fallbackId = useMemo(() => {
     if (projectsState.projects.length === 0) return null;
     return (
-      projectsState.projects.find((p) => p.isDefault)?.id ??
+      projectsState.projects.find((p) => p.isPinned)?.id ??
       projectsState.projects[0]!.id
     );
   }, [projectsState.projects]);

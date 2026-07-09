@@ -117,9 +117,9 @@ export function ProjectDetailPane({
 
   const project = state.project;
 
-  const toggleDefault = async () => {
+  const togglePinned = async () => {
     try {
-      await state.update({ isDefault: !project.isDefault });
+      await state.update({ isPinned: !project.isPinned });
     } catch (err) {
       showError(toastMessage(err));
     }
@@ -230,9 +230,9 @@ export function ProjectDetailPane({
               </Box>
 
               <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
-                <Tooltip title={project.isDefault ? 'Default project' : 'Make default'}>
-                  <IconButton size="small" onClick={() => void toggleDefault()}>
-                    {project.isDefault ? (
+                <Tooltip title={project.isPinned ? 'Pinned' : 'Pin project'}>
+                  <IconButton size="small" onClick={() => void togglePinned()}>
+                    {project.isPinned ? (
                       <StarIcon sx={{ color: 'warning.main' }} />
                     ) : (
                       <StarBorderIcon sx={{ color: 'text.disabled' }} />

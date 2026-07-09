@@ -40,30 +40,47 @@ interface TopProjectRow {
   minutes: number;
 }
 
-function projectClause(projectId: number | null): { sql: string; params: number[] } {
-  if (projectId == null) return { sql: '', params: [] };
-  return { sql: ' AND p.id = ?', params: [projectId] };
+function projectClause(projectIds: number[]): { sql: string; params: number[] } {
+  if (projectIds.length === 0) return { sql: '', params: [] };
+  const placeholders = projectIds.map(() => '?').join(', ');
+  return { sql: ` AND p.id IN (${placeholders})`, params: projectIds };
 }
 
 export class DashboardOverviewService {
   constructor(private readonly db: SqliteLike) {}
 
   run(req: DashboardOverviewRequestPayload): DashboardOverviewResponsePayload {
-    const { projectId, sprintAnchor, todayDate } = req;
+    const { sprintAnchor, todayDate } = req;
+    // Precedence: projectIds[] wins when non-empty; else the legacy single
+    // projectId; else empty = all projects.
+    const projectIds =
+      req.projectIds && req.projectIds.length > 0
+        ? req.projectIds
+        : req.projectId != null
+          ? [req.projectId]
+          : [];
     const reports = new ReportsService(this.db);
 
-    const todayEarned = reports.earnings(todayDate, todayDate, projectId ?? undefined).totalEarned;
+    // earnings() filters by one project (or all). Across a multi-project
+    // selection the earned totals are additive — each worklog belongs to
+    // exactly one project — so sum per selected project.
+    const earnedBetween = (from: string, to: string): number =>
+      projectIds.length === 0
+        ? reports.earnings(from, to).totalEarned
+        : projectIds.reduce((sum, pid) => sum + reports.earnings(from, to, pid).totalEarned, 0);
+
+    const todayEarned = earnedBetween(todayDate, todayDate);
     const monthFrom = todayDate.slice(0, 7) + '-01';
     const monthTo = lastDayOfMonth(todayDate);
-    const monthEarned = reports.earnings(monthFrom, monthTo, projectId ?? undefined).totalEarned;
+    const monthEarned = earnedBetween(monthFrom, monthTo);
 
-    const sprint = this.sprintFor(sprintAnchor, projectId);
-    const sprintEarned = reports.earnings(sprint.fromDate, sprint.toDate, projectId ?? undefined).totalEarned;
+    const sprint = this.sprintFor(sprintAnchor, projectIds);
+    const sprintEarned = earnedBetween(sprint.fromDate, sprint.toDate);
 
-    const today = { minutes: this.sumForDate(todayDate, projectId), earned: todayEarned };
-    const month = { minutes: this.sumForMonth(todayDate, projectId), earned: monthEarned };
-    const heatmap30d = this.heatmap30d(todayDate, projectId);
-    const topProjects = this.topProjects(todayDate, projectId);
+    const today = { minutes: this.sumForDate(todayDate, projectIds), earned: todayEarned };
+    const month = { minutes: this.sumForMonth(todayDate, projectIds), earned: monthEarned };
+    const heatmap30d = this.heatmap30d(todayDate, projectIds);
+    const topProjects = this.topProjects(todayDate, projectIds);
     const activeContracts = this.activeContracts(todayDate);
     return {
       today,
@@ -142,8 +159,8 @@ export class DashboardOverviewService {
     return out;
   }
 
-  private sumForDate(date: string, projectId: number | null): number {
-    const pc = projectClause(projectId);
+  private sumForDate(date: string, projectIds: number[]): number {
+    const pc = projectClause(projectIds);
     const sql = `
       SELECT COALESCE(SUM(w.minutes), 0) AS minutes
       FROM worklogs w
@@ -157,9 +174,9 @@ export class DashboardOverviewService {
     return row?.minutes ?? 0;
   }
 
-  private sumForMonth(todayDate: string, projectId: number | null): number {
+  private sumForMonth(todayDate: string, projectIds: number[]): number {
     const ym = todayDate.slice(0, 7);
-    const pc = projectClause(projectId);
+    const pc = projectClause(projectIds);
     const sql = `
       SELECT COALESCE(SUM(w.minutes), 0) AS minutes
       FROM worklogs w
@@ -173,11 +190,11 @@ export class DashboardOverviewService {
     return row?.minutes ?? 0;
   }
 
-  private sprintFor(sprintAnchor: string, projectId: number | null) {
+  private sprintFor(sprintAnchor: string, projectIds: number[]) {
     const startDate = readStringSetting(this.db, 'dashboard.sprint.startDate', '2026-01-05');
     const lengthDays = readIntSetting(this.db, 'dashboard.sprint.lengthDays', 14);
     const { fromDate, toDate } = sprintWindow(sprintAnchor, startDate, lengthDays);
-    const pc = projectClause(projectId);
+    const pc = projectClause(projectIds);
     const sql = `
       SELECT w.id,
              t.number AS task_number,
@@ -218,10 +235,10 @@ export class DashboardOverviewService {
     return { fromDate, toDate, lengthDays, totalMinutes, days };
   }
 
-  private heatmap30d(todayDate: string, projectId: number | null) {
+  private heatmap30d(todayDate: string, projectIds: number[]) {
     const fromDate = addDays(todayDate, -29);
     const toDate = todayDate;
-    const pc = projectClause(projectId);
+    const pc = projectClause(projectIds);
     const sql = `
       SELECT w.work_date, SUM(w.minutes) AS minutes
       FROM worklogs w
@@ -245,9 +262,9 @@ export class DashboardOverviewService {
     return { fromDate, toDate, days, stats };
   }
 
-  private topProjects(todayDate: string, projectId: number | null): DashboardTopProjectPayload[] {
+  private topProjects(todayDate: string, projectIds: number[]): DashboardTopProjectPayload[] {
     const ym = todayDate.slice(0, 7);
-    const pc = projectClause(projectId);
+    const pc = projectClause(projectIds);
     const sql = `
       SELECT p.id AS project_id, p.name AS project_name, p.color AS project_color,
              SUM(w.minutes) AS minutes

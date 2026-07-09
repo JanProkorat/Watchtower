@@ -40,7 +40,7 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(18);
+    expect(version.v).toBe(19);
   });
 
   it('v12 adds task_id column to instances', () => {
@@ -173,7 +173,7 @@ describe('migrations', () => {
     db.exec('DELETE FROM schema_version WHERE version > 12');
     expect(() => runMigrations(db as unknown as SqliteLike)).not.toThrow();
     const v = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(v.v).toBe(18);
+    expect(v.v).toBe(19);
   });
 
   it('v13 backfills sync_id + updated_at on pre-existing rows', () => {
@@ -279,5 +279,25 @@ describe('migrations', () => {
     expect(col!.notnull).toBe(0); // nullable
     const idx = db.prepare(`PRAGMA index_list(contracts)`).all() as Array<{ name: string }>;
     expect(idx.some((i) => i.name === 'idx_contracts_group')).toBe(true);
+  });
+
+  it('v19 renames is_default → is_pinned and allows multiple pinned projects', () => {
+    runMigrations(db as unknown as SqliteLike);
+
+    const cols = (db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>).map(
+      (c) => c.name,
+    );
+    expect(cols).toContain('is_pinned');
+    expect(cols).not.toContain('is_default');
+
+    // The partial-unique index is gone: two pinned projects can coexist.
+    db.exec(
+      `INSERT INTO projects (name, sync_id, updated_at, is_pinned) VALUES ('A', 'sa', '2026-01-01T00:00:00.000Z', 1)`,
+    );
+    db.exec(
+      `INSERT INTO projects (name, sync_id, updated_at, is_pinned) VALUES ('B', 'sb', '2026-01-01T00:00:00.000Z', 1)`,
+    );
+    const n = db.prepare(`SELECT COUNT(*) AS c FROM projects WHERE is_pinned = 1`).get() as { c: number };
+    expect(n.c).toBe(2);
   });
 });

@@ -57,7 +57,7 @@ describe('InstancesRepo taskId', () => {
   // task_id FK on instances is satisfiable.
   function seedTask(): number {
     db.prepare(
-      `INSERT INTO projects (name, color, archived, is_billable, kind, is_default)
+      `INSERT INTO projects (name, color, archived, is_billable, kind, is_pinned)
        VALUES ('P', '#fff', 0, 1, 'work', 0)`,
     ).run();
     const projId = (db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id;

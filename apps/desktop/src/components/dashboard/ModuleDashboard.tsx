@@ -15,27 +15,27 @@ import { TopProjectsCard } from './TopProjectsCard.js';
 import { ActiveContractsCard } from './ActiveContractsCard.js';
 import { TokenUsageCard } from './TokenUsageCard.js';
 
-const FILTER_KEY = 'watchtower.dashboard.projectId';
+const FILTER_KEY = 'watchtower.dashboard.projectIds';
 
 function todayIso(): string {
   return dayjs().format('YYYY-MM-DD');
 }
 
-function readPersistedProject(): number | null {
+function readPersistedProjects(): number[] | null {
   try {
     const v = localStorage.getItem(FILTER_KEY);
-    if (!v) return null;
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? n : null;
+    if (v === null) return null; // never persisted → caller seeds pinned
+    const arr = JSON.parse(v) as unknown;
+    if (!Array.isArray(arr)) return [];
+    return arr.map(Number).filter((n) => Number.isFinite(n) && n > 0);
   } catch {
     return null;
   }
 }
 
-function persistProject(id: number | null) {
+function persistProjects(ids: number[]) {
   try {
-    if (id == null) localStorage.removeItem(FILTER_KEY);
-    else localStorage.setItem(FILTER_KEY, String(id));
+    localStorage.setItem(FILTER_KEY, JSON.stringify(ids));
   } catch { /* best-effort */ }
 }
 
@@ -58,7 +58,7 @@ export function ModuleDashboard({
 }: ModuleDashboardProps) {
   const [today, setToday] = useState<string>(todayIso);
   const [sprintAnchor, setSprintAnchor] = useState<string>(today);
-  const [projectId, setProjectId] = useState<number | null>(readPersistedProject);
+  const [projectIds, setProjectIds] = useState<number[]>(() => readPersistedProjects() ?? []);
   const [defaultSeeded, setDefaultSeeded] = useState(false);
   const projectsState = useProjects();
   const tokenUsage = useTokenUsage();
@@ -73,33 +73,31 @@ export function ModuleDashboard({
     return () => clearInterval(t);
   }, []);
 
-  // Seed default project on first load if no persisted selection.
+  // Seed all pinned projects on first load, but only if nothing was ever
+  // persisted (so we never override an explicit "All projects" [] the user
+  // chose). Wait for projects to load before deciding.
   useEffect(() => {
     if (defaultSeeded) return;
-    if (projectId != null) {
-      setDefaultSeeded(true);
-      return;
-    }
-    // Only seed if nothing was ever persisted (so we don't override an explicit
-    // "All projects" choice the user made).
+    if (projectsState.projects.length === 0) return;
     let persisted: string | null = null;
     try {
       persisted = localStorage.getItem(FILTER_KEY);
     } catch { /* ignore */ }
-    if (persisted !== null) {
-      setDefaultSeeded(true);
-      return;
-    }
-    const def = projectsState.projects.find((p) => p.isDefault);
-    if (def) setProjectId(def.id);
     setDefaultSeeded(true);
-  }, [defaultSeeded, projectId, projectsState.projects]);
+    if (persisted !== null) return; // explicit choice (including []) preserved
+    const pinned = projectsState.projects.filter((p) => p.isPinned).map((p) => p.id);
+    if (pinned.length > 0) setProjectIds(pinned);
+  }, [defaultSeeded, projectsState.projects]);
 
+  // Persist only AFTER seeding has resolved — otherwise the initial [] would be
+  // written before the seed effect reads it, making the seed think the user
+  // had explicitly chosen "All projects".
   useEffect(() => {
-    persistProject(projectId);
-  }, [projectId]);
+    if (!defaultSeeded) return;
+    persistProjects(projectIds);
+  }, [defaultSeeded, projectIds]);
 
-  const overview = useDashboardOverview(projectId, sprintAnchor, today);
+  const overview = useDashboardOverview(projectIds, sprintAnchor, today);
 
   // useProjects() defaults to the 'active' filter — server returns only non-archived rows.
   const projectList = projectsState.projects;
@@ -126,8 +124,8 @@ export function ModuleDashboard({
     >
       <DashboardHeader
         projects={projectList}
-        projectId={projectId}
-        onProjectChange={setProjectId}
+        projectIds={projectIds}
+        onProjectsChange={setProjectIds}
         todayDate={today}
       />
 

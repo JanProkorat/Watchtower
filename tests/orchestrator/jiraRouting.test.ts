@@ -13,7 +13,7 @@ function project(overrides: Partial<ProjectViewPayload>): ProjectViewPayload {
     color: '#7aa7ff',
     archived: false,
     kind: 'work',
-    isDefault: false,
+    isPinned: false,
     folderPath: null,
     jiraGlobs: [],
     description: null,
