@@ -48,7 +48,7 @@ interface DraftState {
   name: string;
   color: string;
   kind: 'work' | 'time_off';
-  isDefault: boolean;
+  isPinned: boolean;
   folderPath: string;
   autoTrack: boolean;
   jiraGlobs: string[];
@@ -62,7 +62,7 @@ function emptyDraft(): DraftState {
     name: '',
     color: COLOR_PALETTE[0]!,
     kind: 'work',
-    isDefault: false,
+    isPinned: false,
     folderPath: '',
     autoTrack: false,
     jiraGlobs: [],
@@ -78,7 +78,7 @@ function draftOf(project: ProjectViewPayload | null): DraftState {
     name: project.name,
     color: project.color,
     kind: project.kind,
-    isDefault: project.isDefault,
+    isPinned: project.isPinned,
     folderPath: project.folderPath ?? '',
     autoTrack: project.autoTrack,
     jiraGlobs: project.jiraGlobs.length > 0 ? project.jiraGlobs : [],
@@ -167,11 +167,11 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
           <FormControlLabel
             control={
               <Checkbox
-                checked={draft.isDefault}
-                onChange={(e) => setDraft({ ...draft, isDefault: e.target.checked })}
+                checked={draft.isPinned}
+                onChange={(e) => setDraft({ ...draft, isPinned: e.target.checked })}
               />
             }
-            label="Default project"
+            label="Pinned"
             sx={{ mr: 0 }}
           />
 
@@ -443,7 +443,7 @@ function toInput(draft: DraftState): ProjectInputPayload {
     name: draft.name.trim(),
     color: draft.color,
     kind: draft.kind,
-    isDefault: draft.isDefault,
+    isPinned: draft.isPinned,
     folderPath: draft.folderPath.trim() ? draft.folderPath.trim() : null,
     autoTrack: draft.autoTrack,
     jiraGlobs: draft.jiraGlobs.filter((g) => g.trim() !== ''),

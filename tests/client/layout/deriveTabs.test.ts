@@ -18,7 +18,7 @@ const proj = (id: number, folderPath: string | null, color = '#0af'): ProjectVie
     color,
     archived: false,
     kind: 'work',
-    isDefault: false,
+    isPinned: false,
     folderPath,
     jiraGlobs: [],
     jiraBoardUrl: null,

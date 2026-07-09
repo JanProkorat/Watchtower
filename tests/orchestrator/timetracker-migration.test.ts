@@ -190,10 +190,13 @@ describe('migrateTimetracker', () => {
     expect(tableCount(target, 'days_off')).toBe(1);
 
     // Primary keys preserved (FK integrity check)
-    const proj = target.prepare(`SELECT id, name, is_default FROM projects ORDER BY id`).all() as Array<{ id: number; name: string; is_default: number }>;
+    // is_pinned is intentionally NOT carried over from the legacy source's
+    // is_default column (see migrateTimetracker.ts COLUMNS.projects comment)
+    // — legacy imports always land unpinned, regardless of the source value.
+    const proj = target.prepare(`SELECT id, name, is_pinned FROM projects ORDER BY id`).all() as Array<{ id: number; name: string; is_pinned: number }>;
     expect(proj).toEqual([
-      { id: 1, name: 'PPS Capacity Planning', is_default: 1 },
-      { id: 2, name: 'Watchtower', is_default: 0 },
+      { id: 1, name: 'PPS Capacity Planning', is_pinned: 0 },
+      { id: 2, name: 'Watchtower', is_pinned: 0 },
     ]);
 
     // Source renamed, not deleted
@@ -308,15 +311,16 @@ describe('migrations · v3 adds TimeTracker tables', () => {
     db.close();
   });
 
-  it('creates the partial unique indexes on projects.is_default and worklogs.(source, external_id)', () => {
+  it('creates the partial unique index on worklogs.(source, external_id); projects.is_pinned allows multiple (v19)', () => {
     const db = new DatabaseSync(dbPath);
     runMigrations(db as unknown as SqliteLike);
 
-    // Two projects with is_default = 1 should violate the partial unique index
-    db.prepare(`INSERT INTO projects (id, name, is_default) VALUES (1, 'A', 1)`).run();
+    // v19 dropped the partial unique index on is_pinned — multiple projects
+    // can be pinned simultaneously (see migrations.test.ts's v19 test).
+    db.prepare(`INSERT INTO projects (id, name, is_pinned) VALUES (1, 'A', 1)`).run();
     expect(() =>
-      db.prepare(`INSERT INTO projects (id, name, is_default) VALUES (2, 'B', 1)`).run(),
-    ).toThrow();
+      db.prepare(`INSERT INTO projects (id, name, is_pinned) VALUES (2, 'B', 1)`).run(),
+    ).not.toThrow();
 
     // Two worklogs with the same (source, external_id) should also violate
     db.prepare(`INSERT INTO epics (id, project_id, name) VALUES (1, 1, 'E')`).run();

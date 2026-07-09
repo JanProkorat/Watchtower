@@ -34,7 +34,7 @@ describe('ProjectsRepo', () => {
       expect(p.color).toBe('#1976d2');
       expect(p.kind).toBe('work');
       expect(p.archived).toBe(false);
-      expect(p.isDefault).toBe(false);
+      expect(p.isPinned).toBe(false);
       expect(p.folderPath).toBeNull();
       expect(p.jiraGlobs).toEqual([]);
       expect(p.jiraBoardUrl).toBeNull();
@@ -73,28 +73,22 @@ describe('ProjectsRepo', () => {
     });
   });
 
-  describe('default flag', () => {
-    it('only one project can be default at a time — second create clears the first', () => {
-      const a = repo.create({ name: 'A', isDefault: true });
-      const b = repo.create({ name: 'B', isDefault: true });
-      expect(repo.get(a.id)?.isDefault).toBe(false);
-      expect(repo.get(b.id)?.isDefault).toBe(true);
+  describe('pinned flag', () => {
+    it('allows multiple pinned projects and does not clear others', () => {
+      const a = repo.create({ name: 'A', isPinned: true });
+      const b = repo.create({ name: 'B', isPinned: true });
+      expect(repo.get(a.id)!.isPinned).toBe(true);
+      expect(repo.get(b.id)!.isPinned).toBe(true);
+
+      const c = repo.update(a.id, { isPinned: false });
+      expect(c.isPinned).toBe(false);
+      expect(repo.get(b.id)!.isPinned).toBe(true); // unaffected
     });
 
-    it('update can promote another project to default (clears previous in the same txn)', () => {
-      const a = repo.create({ name: 'A', isDefault: true });
-      const b = repo.create({ name: 'B' });
-      repo.update(b.id, { isDefault: true });
-      expect(repo.get(a.id)?.isDefault).toBe(false);
-      expect(repo.get(b.id)?.isDefault).toBe(true);
-    });
-
-    it('archiving the default project clears the flag', () => {
-      const a = repo.create({ name: 'A', isDefault: true });
+    it('unpins on archive', () => {
+      const a = repo.create({ name: 'A', isPinned: true });
       repo.archive(a.id, true);
-      const fresh = repo.get(a.id);
-      expect(fresh?.archived).toBe(true);
-      expect(fresh?.isDefault).toBe(false);
+      expect(repo.get(a.id)!.isPinned).toBe(false);
     });
   });
 
@@ -158,7 +152,7 @@ describe('ProjectsRepo', () => {
 
   describe('list + filters', () => {
     beforeEach(() => {
-      repo.create({ name: 'Watchtower', color: '#7aa7ff', kind: 'work', isDefault: true });
+      repo.create({ name: 'Watchtower', color: '#7aa7ff', kind: 'work', isPinned: true });
       repo.create({ name: 'PPS Capacity Planning', color: '#f0a868', kind: 'work' });
       repo.create({ name: 'Personal Time off', color: '#9e9e9e', kind: 'time_off' });
       const archived = repo.create({ name: 'Old Project', color: '#444' });

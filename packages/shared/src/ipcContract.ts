@@ -137,8 +137,10 @@ export interface HeatmapDatumPayload {
 }
 
 export interface DashboardOverviewRequestPayload {
-  /** Optional project filter; null = all projects. */
-  projectId: number | null;
+  /** @deprecated legacy single-project filter; null = all. Prefer projectIds. */
+  projectId?: number | null;
+  /** Multi-project filter; empty/absent = all projects. Wins over projectId. */
+  projectIds?: number[];
   /** Any ISO date inside the target sprint (YYYY-MM-DD). Server computes the sprint window. */
   sprintAnchor: string;
   /** ISO YYYY-MM-DD in the user's local tz, sent by renderer so the orchestrator
@@ -469,7 +471,7 @@ export interface ProjectInputPayload {
   name: string;
   color?: string;
   kind?: 'work' | 'time_off';
-  isDefault?: boolean;
+  isPinned?: boolean;
   folderPath?: string | null;
   jiraGlobs?: string[];
   jiraBoardUrl?: string | null;
@@ -485,7 +487,7 @@ export interface ProjectViewPayload {
   color: string;
   archived: boolean;
   kind: 'work' | 'time_off';
-  isDefault: boolean;
+  isPinned: boolean;
   folderPath: string | null;
   jiraGlobs: string[];
   jiraBoardUrl: string | null;

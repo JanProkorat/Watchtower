@@ -79,7 +79,7 @@ export const SYNCED_TABLES: SyncTable[] = [
       { name: 'rate_type', kind: 'text' },
       { name: 'rate_amount', kind: 'numeric' },
       { name: 'hours_per_day', kind: 'numeric' },
-      { name: 'is_default', kind: 'bool' },
+      { name: 'is_pinned', kind: 'bool' },
       { name: 'folder_path', kind: 'text' },
       { name: 'jira_globs', kind: 'json' },
       { name: 'description', kind: 'text' },

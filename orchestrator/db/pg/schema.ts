@@ -274,4 +274,22 @@ END $$;`,
       `CREATE INDEX IF NOT EXISTS idx_contracts_group ON contracts(contract_group_id);`,
     ],
   },
+  {
+    version: 11,
+    up: [
+      // Pinned projects: drop the one-default partial-unique index and rename
+      // the column to match SQLite. Guarded rename (Postgres has no
+      // RENAME COLUMN IF EXISTS) so a fresh DB that already reached is_pinned
+      // is a no-op; the version guard prevents re-runs on existing DBs.
+      `DROP INDEX IF EXISTS idx_projects_is_default;`,
+      `DO $$ BEGIN
+         IF EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name = 'projects' AND column_name = 'is_default')
+            AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name = 'projects' AND column_name = 'is_pinned') THEN
+           ALTER TABLE projects RENAME COLUMN is_default TO is_pinned;
+         END IF;
+       END $$;`,
+    ],
+  },
 ];

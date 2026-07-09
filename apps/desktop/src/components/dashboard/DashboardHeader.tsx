@@ -1,15 +1,15 @@
-import { Box, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Box, Checkbox, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 import { formatWeekdayDateLongCz } from '../../util/format.js';
 
 export interface DashboardHeaderProps {
   projects: ProjectViewPayload[];
-  projectId: number | null;
-  onProjectChange(next: number | null): void;
+  projectIds: number[];
+  onProjectsChange(next: number[]): void;
   todayDate: string;
 }
 
-export function DashboardHeader({ projects, projectId, onProjectChange, todayDate }: DashboardHeaderProps) {
+export function DashboardHeader({ projects, projectIds, onProjectsChange, todayDate }: DashboardHeaderProps) {
   return (
     <Stack
       direction={{ xs: 'column', md: 'row' }}
@@ -30,14 +30,34 @@ export function DashboardHeader({ projects, projectId, onProjectChange, todayDat
         <TextField
           select
           size="small"
-          label="Project"
-          value={projectId ?? ''}
-          onChange={(e) => onProjectChange(e.target.value === '' ? null : Number(e.target.value))}
-          sx={{ minWidth: 220 }}
+          label="Projects"
+          InputLabelProps={{ shrink: true }}
+          value={projectIds.map(String)}
+          onChange={(e) => {
+            const raw = e.target.value as unknown as string[];
+            onProjectsChange(raw.map(Number));
+          }}
+          SelectProps={{
+            multiple: true,
+            displayEmpty: true,
+            renderValue: (selected) => {
+              const ids = (selected as string[]).map(Number);
+              if (ids.length === 0) return 'All projects';
+              const names = ids
+                .map((id) => projects.find((p) => p.id === id)?.name)
+                .filter((n): n is string => Boolean(n));
+              return names.join(', ');
+            },
+          }}
+          sx={{ minWidth: 220, maxWidth: 340 }}
         >
-          <MenuItem value="">All projects</MenuItem>
           {projects.map((p) => (
-            <MenuItem key={p.id} value={p.id}>
+            <MenuItem key={p.id} value={String(p.id)}>
+              <Checkbox
+                size="small"
+                checked={projectIds.includes(p.id)}
+                sx={{ ml: -1, mr: 0.5 }}
+              />
               <Stack direction="row" alignItems="center" spacing={1}>
                 <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: p.color }} />
                 <span>{p.name}</span>

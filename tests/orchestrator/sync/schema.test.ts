@@ -61,4 +61,11 @@ describe('value transforms', () => {
   it('DERIVERS has a worklogs entry that is a factory function', () => {
     expect(typeof DERIVERS['worklogs']).toBe('function');
   });
+
+  it('projects sync registry uses is_pinned, not is_default', () => {
+    const projects = SYNCED_TABLES.find((t) => t.name === 'projects')!;
+    const names = projects.columns.map((c) => c.name);
+    expect(names).toContain('is_pinned');
+    expect(names).not.toContain('is_default');
+  });
 });

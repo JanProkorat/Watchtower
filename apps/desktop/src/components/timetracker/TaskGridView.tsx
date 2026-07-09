@@ -180,8 +180,8 @@ export function TaskGridView({ projectId }: Props) {
   const primaryProjectId = projectId ?? projectFilters[0] ?? null;
 
   // Load projects once on mount. In list mode the first load also snaps the
-  // filter to the project marked is_default = 1 so the grid lands on the
-  // user's working project instead of the costlier "All projects" scan. In
+  // filter to every project marked is_pinned = 1 so the grid lands on the
+  // user's working project(s) instead of the costlier "All projects" scan. In
   // single-project mode the list is still fetched so the Sync-to-Jira dialog
   // can populate its project dropdown.
   const initialProjectSelectionDoneRef = useRef(false);
@@ -190,8 +190,8 @@ export function TaskGridView({ projectId }: Props) {
       setProjects(r.projects);
       if (projectId === undefined && !initialProjectSelectionDoneRef.current) {
         initialProjectSelectionDoneRef.current = true;
-        const def = r.projects.find((p) => p.isDefault);
-        if (def) setProjectFilters([def.id]);
+        const pinned = r.projects.filter((p) => p.isPinned).map((p) => p.id);
+        if (pinned.length > 0) setProjectFilters(pinned);
       }
     });
   }, [projectId]);

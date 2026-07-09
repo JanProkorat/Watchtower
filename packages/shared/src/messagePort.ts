@@ -417,7 +417,7 @@ export interface OrchProjectInput {
   name: string;
   color?: string;
   kind?: 'work' | 'time_off';
-  isDefault?: boolean;
+  isPinned?: boolean;
   folderPath?: string | null;
   jiraGlobs?: string[];
   description?: string | null;
@@ -429,7 +429,7 @@ export interface OrchProjectView {
   color: string;
   archived: boolean;
   kind: 'work' | 'time_off';
-  isDefault: boolean;
+  isPinned: boolean;
   folderPath: string | null;
   jiraGlobs: string[];
   description: string | null;
