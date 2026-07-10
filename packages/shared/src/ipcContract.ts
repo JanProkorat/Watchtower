@@ -79,7 +79,14 @@ export type IpcRequest =
   | { kind: 'tokens:usage'; payload: Record<string, never> }
   | { kind: 'openExternalUrl'; payload: { url: string } }
   | { kind: 'terminalFocus'; payload: { instanceId: string } }
-  | { kind: 'push:registerDevice'; payload: { token: string; platform: string } };
+  | { kind: 'push:registerDevice'; payload: { token: string; platform: string } }
+  | { kind: 'prs:list'; payload: Record<string, never> }
+  | { kind: 'prs:refresh'; payload: { devopsPat?: string } }
+  | { kind: 'prs:diff'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPat?: string } }
+  | { kind: 'reviews:getDevopsConfig'; payload: Record<string, never> }
+  | { kind: 'reviews:setDevopsConfig'; payload: { orgBaseUrl: string; repos: DevopsRepoConfigPayload[] } }
+  | { kind: 'devops:setPat'; payload: { pat: string } }
+  | { kind: 'devops:hasPat'; payload: Record<string, never> };
 
 export interface RunningInstancePayload {
   id: string;
@@ -500,6 +507,43 @@ export interface ProjectViewPayload {
   totalMinutes: number;
 }
 
+// ─── Reviews (PR listing + diff) ───
+export type PrHost = 'github' | 'azdo';
+
+export interface PullRequestPayload {
+  host: PrHost;
+  repoKey: string;
+  repoLabel: string;
+  number: number;
+  title: string;
+  author: string;
+  sourceBranch: string;
+  targetBranch: string;
+  url: string;
+  updatedAt: string;
+  reviewable: boolean; // false when repo not cloned locally
+}
+
+export interface DiffLinePayload {
+  kind: 'add' | 'del' | 'ctx' | 'hunk';
+  oldNo: number | null;
+  newNo: number | null;
+  text: string;
+}
+
+export interface DiffFilePayload {
+  path: string;
+  additions: number;
+  deletions: number;
+  lines: DiffLinePayload[];
+}
+
+export interface DevopsRepoConfigPayload {
+  orgBaseUrl: string;
+  project: string;
+  repo: string;
+}
+
 export type IpcResponse =
   | { kind: 'ping'; payload: { now: number; main: number; orch: number } }
   | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
@@ -600,7 +644,14 @@ export type IpcResponse =
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
-  | { kind: 'push:registerDevice'; payload: { ok: true } };
+  | { kind: 'push:registerDevice'; payload: { ok: true } }
+  | { kind: 'prs:list'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
+  | { kind: 'prs:refresh'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
+  | { kind: 'prs:diff'; payload: { files: DiffFilePayload[] } }
+  | { kind: 'reviews:getDevopsConfig'; payload: { orgBaseUrl: string; repos: DevopsRepoConfigPayload[]; hasPat: boolean } }
+  | { kind: 'reviews:setDevopsConfig'; payload: { ok: true } }
+  | { kind: 'devops:setPat'; payload: { ok: true } }
+  | { kind: 'devops:hasPat'; payload: { hasPat: boolean } };
 
 export interface AgentRowPayload {
   name: string;
@@ -772,6 +823,8 @@ export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'openInVSCode',
   'openExternalUrl',
   'board:signIn',
+  'devops:setPat',
+  'devops:hasPat',
 ]);
 
 export interface WatchtowerBridge {

@@ -75,7 +75,25 @@ export type OrchRequest =
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
   | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } }
-  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } };
+  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } }
+  | { id: string; kind: 'prs:list'; payload: Record<string, never> }
+  | { id: string; kind: 'prs:refresh'; payload: { devopsPat?: string } }
+  | {
+      id: string;
+      kind: 'prs:diff';
+      payload: {
+        host: import('./ipcContract.js').PrHost;
+        repoKey: string;
+        prNumber: number;
+        devopsPat?: string;
+      };
+    }
+  | { id: string; kind: 'reviews:getDevopsConfig'; payload: Record<string, never> }
+  | {
+      id: string;
+      kind: 'reviews:setDevopsConfig';
+      payload: { orgBaseUrl: string; repos: import('./ipcContract.js').DevopsRepoConfigPayload[] };
+    };
 
 export interface OrchRunningInstance {
   id: string;
@@ -543,7 +561,25 @@ export type OrchResponse =
     }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'terminalFocus'; payload: { ok: true } }
-  | { kind: 'push:registerDevice'; payload: { ok: true } };
+  | { kind: 'push:registerDevice'; payload: { ok: true } }
+  | {
+      kind: 'prs:list';
+      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null };
+    }
+  | {
+      kind: 'prs:refresh';
+      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null };
+    }
+  | { kind: 'prs:diff'; payload: { files: import('./ipcContract.js').DiffFilePayload[] } }
+  | {
+      kind: 'reviews:getDevopsConfig';
+      payload: {
+        orgBaseUrl: string;
+        repos: import('./ipcContract.js').DevopsRepoConfigPayload[];
+        hasPat: boolean;
+      };
+    }
+  | { kind: 'reviews:setDevopsConfig'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
