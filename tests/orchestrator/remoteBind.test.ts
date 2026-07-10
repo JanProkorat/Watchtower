@@ -21,8 +21,16 @@ describe('resolveWsRemoteBind auto', () => {
     expect(resolveWsRemoteBind({ WATCHTOWER_WS_HOST: '100.1.2.3', WATCHTOWER_WS_PORT: '9000' }, IF as never))
       .toEqual({ host: '100.1.2.3', port: 9000 });
   });
-  it('returns null when unset', () => {
-    expect(resolveWsRemoteBind({}, IF as never)).toBeNull();
+  it('defaults to auto when unset (reachable by default)', () => {
+    expect(resolveWsRemoteBind({}, IF as never))
+      .toEqual({ host: '100.97.12.34', port: 7445 });
+  });
+  it('honours an explicit localhost opt-out verbatim', () => {
+    expect(resolveWsRemoteBind({ WATCHTOWER_WS_HOST: '127.0.0.1' }, IF as never))
+      .toEqual({ host: '127.0.0.1', port: 7445 });
+  });
+  it('returns null when no external interface exists (offline → caller keeps localhost)', () => {
+    expect(resolveWsRemoteBind({}, { lo0: IF.lo0 } as never)).toBeNull();
   });
   it('excludes 100.64/10 boundaries correctly (100.63 is NOT tailscale, 100.64 IS)', () => {
     const edge = { a: [{ address: '100.63.0.1', family: 'IPv4', internal: false }], b: [{ address: '100.64.0.1', family: 'IPv4', internal: false }] };
