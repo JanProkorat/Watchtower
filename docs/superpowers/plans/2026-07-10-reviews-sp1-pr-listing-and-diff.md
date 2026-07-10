@@ -180,7 +180,7 @@ describe('parseUnifiedDiff', () => {
   it('assigns line numbers: ctx and add advance newNo, del advances oldNo', () => {
     const [f] = parseUnifiedDiff(SAMPLE);
     const add = f.lines.find((l) => l.kind === 'add' && l.text.includes('const c'))!;
-    expect(add.newNo).toBe(4);
+    expect(add.newNo).toBe(3); // const c = 4; is the 3rd line of the new file
     expect(add.oldNo).toBeNull();
     const del = f.lines.find((l) => l.kind === 'del')!;
     expect(del.oldNo).toBe(2);
