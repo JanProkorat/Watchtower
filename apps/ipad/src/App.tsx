@@ -2,7 +2,8 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { Preferences } from '@capacitor/preferences';
 import { PushNotifications } from '@capacitor/push-notifications';
 import {
-  parseConnection, loadConnection, saveConnection, type Connection,
+  loadConnection, connectionToFormState, emptyConnectionFormState, commitConnectionEdit,
+  type Connection, type ConnectionFormState,
 } from './connection.js';
 import { ConnectionProvider, useConnection } from './state/connectionContext.js';
 import { InstancesDataProvider, useInstancesData } from './state/instancesData.js';
@@ -18,6 +19,7 @@ import { groupInstancesByProject } from '@watchtower/shared/groupInstances.js';
 import { SpawnModal } from './components/SpawnModal.js';
 import { NotificationHub } from './components/NotificationHub.js';
 import { WakeButton } from './components/WakeButton.js';
+import { ConnectionFields } from './components/ConnectionFields.js';
 import { ToastStack, type ToastItem } from './components/ToastStack.js';
 
 // Lazy-loaded to code-split the Remote Mac module off the startup critical
@@ -287,9 +289,10 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
 
 interface ShellProps {
   connection: Connection;
+  onConnectionChange: (c: Connection) => void;
 }
 
-function Shell({ connection }: ShellProps) {
+function Shell({ connection, onConnectionChange }: ShellProps) {
   const [activeModule, setActiveModule] = useState<RailModule>('dashboard');
   const [billingSection, setBillingSection] = useState<BillingSection>('earnings');
   const { activeId, setActiveId } = useActiveTerminal();
@@ -471,7 +474,7 @@ function Shell({ connection }: ShellProps) {
           ) : activeModule === 'dashboard' || activeModule === 'billing' ? (
             <BillingArea module={activeModule} section={billingSection} boardActions={boardActions} />
           ) : activeModule === 'settings' ? (
-            <SettingsModule />
+            <SettingsModule connection={connection} onConnectionChange={onConnectionChange} />
           ) : (
             <RemoteMacView
               connection={connection}
@@ -528,7 +531,7 @@ interface ConnectionFormProps {
 }
 
 function ConnectionForm({ onConnected }: ConnectionFormProps) {
-  const [form, setForm] = useState({ host: '', port: '7445', token: '', mac: '', lanIp: '', wanHost: '', wanPort: '' });
+  const [form, setForm] = useState<ConnectionFormState>(emptyConnectionFormState());
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
@@ -536,10 +539,7 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
   useEffect(() => {
     void loadConnection(store).then((c) => {
       if (c) {
-        setForm({
-          host: c.host, port: String(c.port), token: c.token,
-          mac: c.mac ?? '', lanIp: c.lanIp ?? '', wanHost: c.wanHost ?? '', wanPort: c.wanPort ? String(c.wanPort) : '',
-        });
+        setForm(connectionToFormState(c));
         // Auto-connect if we have a saved connection.
         onConnected(c);
       }
@@ -550,25 +550,11 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
 
   async function handleConnect() {
     setError(null);
-    const parsed = parseConnection(form);
-    if (!parsed.ok) { setError(parsed.error); return; }
     setConnecting(true);
-    try {
-      await saveConnection(store, parsed.value);
-      onConnected(parsed.value);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setConnecting(false);
-    }
+    const r = await commitConnectionEdit(store, form);
+    if (!r.ok) { setError(r.error); setConnecting(false); return; }
+    onConnected(r.value);
   }
-
-  const parsedForWake = parseConnection(form);
-  const wakeConnection = parsedForWake.ok
-    ? parsedForWake.value
-    : { host: form.host, port: 0, token: form.token,
-        mac: form.mac.trim() || undefined, lanIp: form.lanIp.trim() || undefined,
-        wanHost: form.wanHost.trim() || undefined,
-        wanPort: form.wanPort.trim() ? Number(form.wanPort) : undefined };
 
   return (
     <main
@@ -591,39 +577,7 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
         Watchtower
       </h1>
       <div style={{ ...glassPanel({ radius: 18 }), display: 'grid', gap: 10, width: '100%', maxWidth: 380, padding: 20 }}>
-        <input
-          placeholder="Mac LAN host"
-          value={form.host}
-          onChange={(e) => setForm({ ...form, host: e.target.value })}
-          style={inputStyle}
-        />
-        <input
-          placeholder="port"
-          value={form.port}
-          onChange={(e) => setForm({ ...form, port: e.target.value })}
-          style={inputStyle}
-        />
-        <input
-          placeholder="token"
-          type="password"
-          value={form.token}
-          onChange={(e) => setForm({ ...form, token: e.target.value })}
-          style={inputStyle}
-        />
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.10)', margin: '6px 0', paddingTop: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: text.muted, marginBottom: 8 }}>Probuzení (Wake-on-LAN)</div>
-          <div style={{ display: 'grid', gap: 10 }}>
-            <input placeholder="MAC adresa (AA:BB:CC:DD:EE:FF)" value={form.mac}
-              onChange={(e) => setForm({ ...form, mac: e.target.value })} style={inputStyle} />
-            <input placeholder="LAN IP Macu (doma)" value={form.lanIp}
-              onChange={(e) => setForm({ ...form, lanIp: e.target.value })} style={inputStyle} />
-            <input placeholder="DDNS host (mimo síť)" value={form.wanHost}
-              onChange={(e) => setForm({ ...form, wanHost: e.target.value })} style={inputStyle} />
-            <input placeholder="DDNS port (výchozí 9)" value={form.wanPort}
-              onChange={(e) => setForm({ ...form, wanPort: e.target.value })} style={inputStyle} />
-            <WakeButton connection={wakeConnection} />
-          </div>
-        </div>
+        <ConnectionFields form={form} onChange={setForm} />
         <button
           onClick={() => void handleConnect()}
           disabled={connecting}
@@ -661,17 +615,6 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  padding: '10px 12px',
-  borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.13)',
-  backgroundColor: 'rgba(255,255,255,0.07)',
-  color: text.primary,
-  fontSize: 14,
-  fontFamily: 'system-ui, sans-serif',
-  outline: 'none',
-};
-
 // ---------------------------------------------------------------------------
 // App — top-level gate: connection form → module layout
 // ---------------------------------------------------------------------------
@@ -686,7 +629,7 @@ export function App() {
   return (
     <ConnectionProvider connection={connection}>
       <InstancesDataProvider>
-        <Shell connection={connection} />
+        <Shell connection={connection} onConnectionChange={setConnection} />
       </InstancesDataProvider>
     </ConnectionProvider>
   );

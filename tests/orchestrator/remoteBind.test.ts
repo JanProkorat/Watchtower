@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveWsRemoteBind } from '../../orchestrator/remoteBind.js';
+import { resolveWsRemoteBind, formatIpadConnectionInfo, isTailscale } from '../../orchestrator/remoteBind.js';
 
 const IF = {
   en0: [{ address: '192.168.1.50', family: 'IPv4', internal: false }],
@@ -36,5 +36,21 @@ describe('resolveWsRemoteBind auto', () => {
     const edge = { a: [{ address: '100.63.0.1', family: 'IPv4', internal: false }], b: [{ address: '100.64.0.1', family: 'IPv4', internal: false }] };
     expect(resolveWsRemoteBind({ WATCHTOWER_WS_HOST: 'auto' }, edge as never))
       .toEqual({ host: '100.64.0.1', port: 7445 });
+  });
+});
+
+describe('formatIpadConnectionInfo', () => {
+  it('annotates a Tailscale host as off-network reachable', () => {
+    const line = formatIpadConnectionInfo({ host: '100.101.102.103', port: 7445, token: 't' });
+    expect(line).toContain('Tailscale');
+    expect(line).toContain('ws://100.101.102.103:7445/ws');
+  });
+  it('does not annotate a plain LAN host', () => {
+    const line = formatIpadConnectionInfo({ host: '192.168.0.52', port: 7445, token: 't' });
+    expect(line).not.toContain('Tailscale');
+  });
+  it('isTailscale detects the CGNAT range', () => {
+    expect(isTailscale('100.64.0.1')).toBe(true);
+    expect(isTailscale('192.168.0.52')).toBe(false);
   });
 });

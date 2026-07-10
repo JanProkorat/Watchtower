@@ -6,7 +6,7 @@ const DEFAULT_WS_PORT = 7445;
 /**
  * A Tailscale address is in the CGNAT range 100.64.0.0/10 (100.64.0.0–100.127.255.255).
  */
-function isTailscale(addr: string): boolean {
+export function isTailscale(addr: string): boolean {
   const m = /^(\d+)\.(\d+)\./.exec(addr);
   if (!m) return false;
   const a = Number(m[1]); const b = Number(m[2]);
@@ -49,5 +49,6 @@ export function resolveWsRemoteBind(
 }
 
 export function formatIpadConnectionInfo(opts: { host: string; port: number; token: string }): string {
-  return `[orchestrator] iPad connect → ws://${opts.host}:${opts.port}/ws  token: ${opts.token}`;
+  const scope = isTailscale(opts.host) ? ' (Tailscale — reachable off-network)' : '';
+  return `[orchestrator] iPad connect${scope} → ws://${opts.host}:${opts.port}/ws  token: ${opts.token}`;
 }
