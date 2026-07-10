@@ -3,6 +3,7 @@ import { Box, ButtonBase, IconButton, Tooltip, Typography } from '@mui/material'
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
+import RateReviewIcon from '@mui/icons-material/RateReview';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -27,7 +28,7 @@ import type { ThemeMode } from '../theme.js';
 import type { ListTab } from '../util/timetrackerUrl.js';
 import type { SettingsTab } from '../util/settingsUrl.js';
 
-export type ModuleId = 'dashboard' | 'instances' | 'billing' | 'settings';
+export type ModuleId = 'dashboard' | 'instances' | 'billing' | 'reviews' | 'settings';
 
 interface RailItem {
   id: ModuleId;
@@ -40,6 +41,7 @@ const ITEMS: RailItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <SpaceDashboardIcon fontSize="small" />, enabled: true },
   { id: 'instances', label: 'Instances', icon: <TerminalIcon fontSize="small" />, enabled: true },
   { id: 'billing', label: 'Billing', icon: <RequestQuoteIcon fontSize="small" />, enabled: true },
+  { id: 'reviews', label: 'Reviews', icon: <RateReviewIcon fontSize="small" />, enabled: true },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="small" />, enabled: true },
 ];
 
