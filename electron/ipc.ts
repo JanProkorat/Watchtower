@@ -7,6 +7,7 @@ import { getMainWindow, createMainWindow } from './window.js';
 import { getOrchestrator } from './orchestratorHost.js';
 import { fireMacNotification, fireTestNotification } from './notifications.js';
 import { runBoardSignIn } from './boardSignIn.js';
+import { setPat, hasPat, getPat } from './devopsPat.js';
 
 export function registerIpc(): void {
   // Push events from the orchestrator are forwarded to the renderer verbatim;
@@ -92,6 +93,29 @@ export function registerIpc(): void {
         }
         await shell.openExternal(url);
         return { ok: true };
+      }
+
+      if (kind === 'devops:setPat') {
+        const { pat } = payload as { pat: string };
+        await setPat(pat);
+        return { ok: true };
+      }
+
+      if (kind === 'devops:hasPat') {
+        return { hasPat: await hasPat() };
+      }
+
+      if (kind === 'prs:refresh' || kind === 'prs:diff') {
+        const pat = await getPat();
+        return orch.invoke(kind as 'prs:refresh', {
+          ...(payload as object),
+          devopsPat: pat ?? undefined,
+        } as never);
+      }
+
+      if (kind === 'reviews:getDevopsConfig') {
+        const res = await orch.invoke('reviews:getDevopsConfig', payload as Record<string, never>);
+        return { ...res, hasPat: await hasPat() };
       }
 
       if (ELECTRON_ONLY_KINDS.has(kind)) {
