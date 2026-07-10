@@ -90,6 +90,10 @@ export async function commitConnectionEdit(
 ): Promise<{ ok: true; value: Connection } | { ok: false; error: string }> {
   const parsed = parseConnection(form);
   if (!parsed.ok) return parsed;
-  await saveConnection(store, parsed.value);
+  try {
+    await saveConnection(store, parsed.value);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   return parsed;
 }

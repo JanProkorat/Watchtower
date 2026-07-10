@@ -104,4 +104,9 @@ describe('commitConnectionEdit', () => {
     expect(r).toEqual({ ok: false, error: 'Host is required' });
     expect(await loadConnection(store)).toBeNull();
   });
+  it('returns an error instead of throwing when the store write fails', async () => {
+    const store = { get: async () => null, set: async () => { throw new Error('quota'); } };
+    const r = await commitConnectionEdit(store, { ...emptyConnectionFormState(), host: 'h', token: 't' });
+    expect(r).toEqual({ ok: false, error: 'quota' });
+  });
 });
