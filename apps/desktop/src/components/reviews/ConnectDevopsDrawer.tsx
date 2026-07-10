@@ -14,20 +14,32 @@ export function ConnectDevopsDrawer({ open, onClose, onSaved }: { open: boolean;
     if (!open) return;
     setError(null); setPat('');
     void (async () => {
-      const cfg = await window.watchtower.invoke('reviews:getDevopsConfig', {});
-      setOrgBaseUrl(cfg.orgBaseUrl);
-      setReposText(cfg.repos.map((r) => `${r.project}/${r.repo}`).join('\n'));
-      setHasPat(cfg.hasPat);
+      try {
+        const cfg = await window.watchtower.invoke('reviews:getDevopsConfig', {});
+        setOrgBaseUrl(cfg.orgBaseUrl);
+        setReposText(cfg.repos.map((r) => `${r.project}/${r.repo}`).join('\n'));
+        setHasPat(cfg.hasPat);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     })();
   }, [open]);
 
   const save = async () => {
     setSaving(true); setError(null);
     try {
-      const repos: DevopsRepoConfigPayload[] = reposText.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
-        const [project, repo] = l.split('/');
-        return { orgBaseUrl, project: project!, repo: repo! };
-      });
+      const repos: DevopsRepoConfigPayload[] = [];
+      for (const raw of reposText.split('\n')) {
+        const line = raw.trim();
+        if (!line) continue;
+        const parts = line.split('/').map((s) => s.trim());
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+          setError(`Neplatný řádek repozitáře: "${line}" (očekává se formát project/repo)`);
+          setSaving(false);
+          return;
+        }
+        repos.push({ orgBaseUrl, project: parts[0], repo: parts[1] });
+      }
       await window.watchtower.invoke('reviews:setDevopsConfig', { orgBaseUrl, repos });
       if (pat.trim()) await window.watchtower.invoke('devops:setPat', { pat: pat.trim() });
       onSaved(); onClose();
