@@ -289,9 +289,10 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
 
 interface ShellProps {
   connection: Connection;
+  onConnectionChange: (c: Connection) => void;
 }
 
-function Shell({ connection }: ShellProps) {
+function Shell({ connection, onConnectionChange }: ShellProps) {
   const [activeModule, setActiveModule] = useState<RailModule>('dashboard');
   const [billingSection, setBillingSection] = useState<BillingSection>('earnings');
   const { activeId, setActiveId } = useActiveTerminal();
@@ -473,7 +474,7 @@ function Shell({ connection }: ShellProps) {
           ) : activeModule === 'dashboard' || activeModule === 'billing' ? (
             <BillingArea module={activeModule} section={billingSection} boardActions={boardActions} />
           ) : activeModule === 'settings' ? (
-            <SettingsModule />
+            <SettingsModule connection={connection} onConnectionChange={onConnectionChange} />
           ) : (
             <RemoteMacView
               connection={connection}
@@ -628,7 +629,7 @@ export function App() {
   return (
     <ConnectionProvider connection={connection}>
       <InstancesDataProvider>
-        <Shell connection={connection} />
+        <Shell connection={connection} onConnectionChange={setConnection} />
       </InstancesDataProvider>
     </ConnectionProvider>
   );
