@@ -7,3 +7,15 @@ export interface GithubRepoConfig {
   nwo: string;
   localClonePath: string | null;
 }
+
+export interface AzdoRepoConfig {
+  host: 'azdo';
+  repoKey: string;
+  repoLabel: string;
+  orgBaseUrl: string;
+  project: string;
+  repo: string;
+  localClonePath: string | null;
+}
+
+export type HttpGet = (url: string, pat: string) => Promise<unknown>;
