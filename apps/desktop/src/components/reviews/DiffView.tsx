@@ -1,0 +1,38 @@
+import { useState } from 'react';
+import { Box, Typography } from '@mui/material';
+import type { DiffFilePayload } from '@watchtower/shared/ipcContract.js';
+
+export function DiffView({ files }: { files: DiffFilePayload[] }): JSX.Element {
+  const [active, setActive] = useState(0);
+  if (files.length === 0) return <Typography sx={{ p: 2, color: 'text.secondary', fontSize: 13 }}>Žádné změny k zobrazení.</Typography>;
+  const file = files[Math.min(active, files.length - 1)]!;
+  return (
+    <Box sx={{ display: 'flex', height: '100%', minHeight: 0 }}>
+      <Box sx={{ width: 176, flexShrink: 0, borderRight: 1, borderColor: 'divider', overflow: 'auto', py: 1 }}>
+        <Typography sx={{ px: 1.5, py: 0.5, fontSize: 9.5, letterSpacing: '.06em', textTransform: 'uppercase', color: 'text.secondary' }}>
+          {files.length} souborů
+        </Typography>
+        {files.map((f, i) => (
+          <Box key={f.path} onClick={() => setActive(i)}
+            sx={{ px: 1.5, py: 0.5, fontSize: 11, cursor: 'pointer', display: 'flex', gap: 0.75,
+              bgcolor: i === active ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' } }}>
+            <Box component="span" sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.path.split('/').pop()}</Box>
+            <Box component="span" sx={{ color: 'success.main', fontSize: 10 }}>+{f.additions}</Box>
+            <Box component="span" sx={{ color: 'error.main', fontSize: 10 }}>−{f.deletions}</Box>
+          </Box>
+        ))}
+      </Box>
+      <Box sx={{ flex: 1, overflow: 'auto', fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11 }}>
+        <Typography sx={{ position: 'sticky', top: 0, px: 1.5, py: 1, bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider', fontFamily: 'inherit', fontSize: 11 }}>{file.path}</Typography>
+        {file.lines.map((l, i) => (
+          <Box key={i} sx={{ display: 'flex', px: 1.5, lineHeight: 1.6,
+            bgcolor: l.kind === 'add' ? 'success.main' : l.kind === 'del' ? 'error.main' : l.kind === 'hunk' ? 'action.hover' : 'transparent',
+            ...(l.kind === 'add' || l.kind === 'del' ? { bgcolor: (t) => `${t.palette[l.kind === 'add' ? 'success' : 'error'].main}22` } : {}) }}>
+            <Box component="span" sx={{ width: 40, color: 'text.secondary', textAlign: 'right', pr: 1.5, userSelect: 'none', flexShrink: 0 }}>{l.newNo ?? l.oldNo ?? ''}</Box>
+            <Box component="span" sx={{ whiteSpace: 'pre', color: l.kind === 'hunk' ? 'primary.main' : 'text.primary' }}>{l.text}</Box>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+}
