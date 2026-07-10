@@ -40,4 +40,45 @@ describe('parseUnifiedDiff', () => {
     expect(del.oldNo).toBe(2);
     expect(del.newNo).toBeNull();
   });
+
+  it('skips trailing newline; does not create phantom empty ctx line', () => {
+    const diff = `diff --git a/test.ts b/test.ts
+index 1111111..2222222 100644
+--- a/test.ts
++++ b/test.ts
+@@ -1,2 +1,2 @@
+ line 1
+ line 2
+`;
+    const files = parseUnifiedDiff(diff);
+    const lines = files[0]!.lines;
+    // Should not have a phantom empty ctx line
+    expect(lines.every((l) => !(l.kind === 'ctx' && l.text === ''))).toBe(true);
+    // The actual last parsed line should be ctx 'line 2'
+    expect(lines.at(-1)).toEqual({
+      kind: 'ctx',
+      oldNo: 2,
+      newNo: 2,
+      text: 'line 2'
+    });
+  });
+
+  it('skips marker lines starting with backslash-space', () => {
+    const diff = `diff --git a/test.ts b/test.ts
+index 1111111..2222222 100644
+--- a/test.ts
++++ b/test.ts
+@@ -1,3 +1,2 @@
+ line 1
+-line 2
+ line 3
+\\ No newline at end of file
+`;
+    const files = parseUnifiedDiff(diff);
+    const lines = files[0]!.lines;
+    // Parser should skip the marker line entirely
+    // Expected: hunk + ctx(line1) + del(line2) + ctx(line3) = 4 lines
+    expect(lines.length).toBe(4);
+    expect(lines.some((l) => l.text.includes('No newline'))).toBe(false);
+  });
 });

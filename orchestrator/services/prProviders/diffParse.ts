@@ -11,7 +11,16 @@ export function parseUnifiedDiff(raw: string): DiffFilePayload[] {
   let oldNo = 0;
   let newNo = 0;
 
-  for (const line of raw.split('\n')) {
+  const lines = raw.split('\n');
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx]!;
+
+    // Skip "\ No newline at end of file" marker lines
+    if (line.startsWith('\\ ')) continue;
+
+    // Skip the final empty element from split() if the input ended with \n
+    if (line === '' && idx === lines.length - 1) continue;
+
     if (line.startsWith('diff --git')) {
       cur = null;
       continue;
