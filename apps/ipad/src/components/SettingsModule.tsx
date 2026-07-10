@@ -29,14 +29,28 @@ export function SettingsModule({ connection, onConnectionChange }: {
   const [form, setForm] = useState<ConnectionFormState>(() => connectionToFormState(connection));
   const [connError, setConnError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Editing the form invalidates any prior save/error status message.
+  function handleFormChange(next: ConnectionFormState) {
+    setForm(next);
+    if (saved) setSaved(false);
+    if (connError) setConnError(null);
+  }
 
   async function handleSave() {
+    if (saving) return; // guard against double-tap while the save is in flight
     setConnError(null);
     setSaved(false);
-    const r = await commitConnectionEdit(store, form);
-    if (!r.ok) { setConnError(r.error); return; }
-    onConnectionChange(r.value);
-    setSaved(true);
+    setSaving(true);
+    try {
+      const r = await commitConnectionEdit(store, form);
+      if (!r.ok) { setConnError(r.error); return; }
+      onConnectionChange(r.value);
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -99,15 +113,16 @@ export function SettingsModule({ connection, onConnectionChange }: {
             Pro přístup mimo domácí síť zadejte Tailscale název Macu jako host.
           </div>
           <div style={{ display: 'grid', gap: 10 }}>
-            <ConnectionFields form={form} onChange={setForm} />
+            <ConnectionFields form={form} onChange={handleFormChange} />
           </div>
           {connError && <div style={{ fontSize: 12, color: '#ff8a8a' }}>{connError}</div>}
           {saved && <div style={{ fontSize: 12, color: '#9be7c0' }}>Uloženo, připojuji…</div>}
-          <button onClick={() => void handleSave()} style={{
+          <button onClick={() => void handleSave()} disabled={saving} style={{
             alignSelf: 'flex-start', padding: '9px 16px', borderRadius: 11, border: 'none',
-            background: ctaGradient, boxShadow: ctaGlow, color: '#fff', fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', fontFamily: 'inherit', WebkitTapHighlightColor: 'transparent',
-          }}>Uložit a připojit</button>
+            background: saving ? 'rgba(124,109,240,0.35)' : ctaGradient, boxShadow: saving ? 'none' : ctaGlow,
+            color: saving ? text.muted : '#fff', fontSize: 13, fontWeight: 600,
+            cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', WebkitTapHighlightColor: 'transparent',
+          }}>{saving ? 'Ukládám…' : 'Uložit a připojit'}</button>
         </div>
 
         <div style={{ fontSize: 12, color: text.dim }}>Další nastavení připravujeme.</div>
