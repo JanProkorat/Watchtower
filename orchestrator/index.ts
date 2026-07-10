@@ -63,9 +63,11 @@ import { JiraSyncService } from './services/jiraSync.js';
 import { JiraBoardService } from './services/jiraBoard.js';
 import { fetchTokenUsage } from './services/tokenUsage.js';
 import { AutoTimeLogger } from './services/autoTimeLogger.js';
+import { ReviewsService } from './services/reviews.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
+import type { PrHost, DevopsRepoConfigPayload } from '@watchtower/shared/ipcContract.js';
 import { buildPtySpawnConfig, planBootAction } from './shellPolicy.js';
 import type { InstanceKind } from './shellPolicy.js';
 import { PtySizeOwnership } from './ptySizeOwnership.js';
@@ -196,6 +198,22 @@ function repo(): InstancesRepo {
 
 function projectsRepo(): ProjectsRepo {
   return new ProjectsRepo(handle!.db);
+}
+
+let _reviews: ReviewsService | null = null;
+// Unlike the other repo/service accessors above (which are cheap to
+// re-construct per request), ReviewsService caches the last `refresh()`
+// result in-memory (`list()` just reads that cache) — it MUST be a true
+// singleton or every `prs:list` call after a `prs:refresh` would see an
+// empty cache from a freshly-constructed instance.
+function reviewsSvc(): ReviewsService {
+  if (!_reviews) {
+    _reviews = new ReviewsService({
+      db: handle!.db,
+      projects: () => projectsRepo().list({}).map((p) => ({ id: p.id, name: p.name, folder_path: p.folderPath ?? null })),
+    });
+  }
+  return _reviews;
 }
 
 function epicsRepo(): EpicsRepo {
@@ -1117,6 +1135,27 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'push:registerDevice':
       new PushDevicesRepo(handle!.db).register(req.payload.token, req.payload.platform, Date.now());
       return { ok: true };
+
+    case 'prs:list':
+      return reviewsSvc().list();
+    case 'prs:refresh':
+      return reviewsSvc().refresh(req.payload.devopsPat);
+    case 'prs:diff': {
+      const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPat?: string };
+      return { files: await reviewsSvc().diff(p.host, p.repoKey, p.prNumber, p.devopsPat) };
+    }
+    case 'reviews:getDevopsConfig': {
+      const c = reviewsSvc().getDevopsConfig();
+      // hasPat truth lives in electron-main (it owns safeStorage); main
+      // overrides this field before returning to the renderer. `false` is
+      // a safe orchestrator-side default.
+      return { orgBaseUrl: c.orgBaseUrl, repos: c.repos, hasPat: false };
+    }
+    case 'reviews:setDevopsConfig': {
+      const p = req.payload as { orgBaseUrl: string; repos: DevopsRepoConfigPayload[] };
+      reviewsSvc().setDevopsConfig(p);
+      return { ok: true };
+    }
 
   }
 }
