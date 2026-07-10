@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Watchtower — Reviews module (cross-repo PR review) prototype</title>
+<!--
+  Watchtower macOS desktop app — "Reviews" module design prototype.
+  Decision artifact for the cross-repo PR review feature.
+  Covers all three sub-projects in one mockup:
+    (1) PR listing  (2) Review runner  (3) Post-back
+  Self-contained static mockup, presentation only. Matches the approved
+  Liquid Glass direction (glass chrome, readable content) from
+  docs/prototypes/desktop-liquid-glass-translucency.html.
+  Palette from apps/desktop/src/theme.ts (dark).
+-->
+<style>
+  :root{
+    --purple:#7c5cff; --purple-soft:#9a87f5; --purple-val:#b3a4ff;
+    --cyan:#22d3ee;
+    --bg:#0a0b0f; --paper:#13151c; --content:rgba(13,15,21,.96);
+    --text:#e5e7eb; --muted:#9aa3b2; --faint:#6b7488;
+    --divider:rgba(255,255,255,.08);
+    --card:rgba(255,255,255,.045); --card-bd:rgba(255,255,255,.09);
+    --err:#ef4444; --warn:#f59e0b; --info:#38bdf8; --ok:#22c55e;
+    --azure:#3b8fe0; --github:#c9cfda;
+    --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; padding:34px 24px 60px; background:#0c0d13; color:var(--text);
+    font-family:var(--font); -webkit-font-smoothing:antialiased; }
+  .doc{ max-width:1120px; margin:0 auto; }
+  h1{ font-size:23px; font-weight:700; letter-spacing:-.02em; margin:0 0 6px; }
+  .lede{ font-size:13.5px; color:var(--muted); line-height:1.55; margin:0 0 22px; max-width:760px; }
+  .lede b{ color:#d7dbe4; font-weight:600; }
+  h2.sec{ font-size:12px; text-transform:uppercase; letter-spacing:.09em; color:var(--faint);
+    margin:34px 0 12px; font-weight:700; }
+
+  /* build-order legend */
+  .legend{ display:flex; gap:10px; flex-wrap:wrap; margin:0 0 8px; }
+  .step{ flex:1 1 300px; border:1px solid var(--card-bd); border-radius:13px; padding:13px 15px;
+    background:linear-gradient(180deg,rgba(124,92,255,.07),rgba(255,255,255,.02)); }
+  .step .n{ display:inline-flex; align-items:center; justify-content:center; width:20px;height:20px;
+    border-radius:50%; background:var(--purple); color:#fff; font-size:11px; font-weight:700; margin-right:7px; }
+  .step h4{ margin:0 0 4px; font-size:13.5px; font-weight:600; display:flex; align-items:center; }
+  .step .tag{ margin-left:auto; font-size:10px; color:var(--purple-val); border:1px solid rgba(124,92,255,.35);
+    padding:1px 7px; border-radius:20px; }
+  .step p{ margin:0; font-size:12px; color:var(--muted); line-height:1.5; }
+
+  /* wallpaper stage so vibrancy can bleed through */
+  .stage{ position:relative; padding:26px; border-radius:18px; margin-bottom:8px;
+    background:
+      radial-gradient(60% 80% at 12% 8%, #6a4ea8 0%, transparent 55%),
+      radial-gradient(70% 90% at 92% 16%, #2f7fb5 0%, transparent 55%),
+      radial-gradient(80% 90% at 72% 100%, #c75b86 0%, transparent 55%),
+      linear-gradient(135deg,#3a2f6e,#1c3a52 60%,#7a3f63); }
+
+  /* app window */
+  .win{ position:relative; border-radius:13px; overflow:hidden;
+    box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08);
+    background:rgba(20,22,30,.72);
+    backdrop-filter:blur(40px) saturate(1.5) brightness(1.05);
+    -webkit-backdrop-filter:blur(40px) saturate(1.5) brightness(1.05); }
+
+  /* title bar + global instance tabs */
+  .tbar{ display:flex; align-items:center; gap:12px; height:38px; padding:0 14px;
+    border-bottom:1px solid var(--divider); }
+  .lights{ display:flex; gap:7px; }
+  .lights i{ width:11px;height:11px;border-radius:50%;display:block; }
+  .lights .r{ background:#ff5f57; } .lights .y{ background:#febc2e; } .lights .g{ background:#28c840; }
+  .gtabs{ display:flex; gap:6px; margin-left:6px; }
+  .gtab{ font-size:11px; color:#c3c9d6; padding:5px 10px; border-radius:8px; display:flex; align-items:center; gap:6px; }
+  .gtab .gd{ width:6px;height:6px;border-radius:50%; background:#6b7488; }
+  .gtab.on{ color:#fff; background:rgba(255,255,255,.14); }
+  .gtab.on .gd{ background:var(--purple-soft); box-shadow:0 0 7px var(--purple-soft); }
+
+  .lower{ display:flex; height:560px; }
+
+  /* sidebar rail */
+  .rail{ width:186px; flex-shrink:0; padding:12px 10px; display:flex; flex-direction:column; gap:3px;
+    border-right:1px solid rgba(255,255,255,.07); }
+  .brand{ display:flex; align-items:center; gap:9px; padding:4px 8px 12px; margin-bottom:5px;
+    border-bottom:1px solid var(--divider); }
+  .brand .lg{ width:22px;height:22px;border-radius:6px;
+    background:conic-gradient(from 200deg,#4dd0e1,#1abc9c,#2980b9,#4dd0e1); }
+  .brand span{ font-size:13px; font-weight:600; }
+  .ni{ display:flex; align-items:center; gap:10px; height:32px; padding:0 10px; border-radius:9px;
+    font-size:12px; color:#aeb6c8; }
+  .ni .ic{ width:16px;height:16px;border-radius:5px; background:rgba(255,255,255,.16);
+    display:flex; align-items:center; justify-content:center; font-size:10px; }
+  .ni.on{ color:#fff; background:rgba(124,92,255,.22);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(124,92,255,.32); }
+  .ni.on .ic{ background:var(--purple-soft); }
+  .ni .badge{ margin-left:auto; font-size:10px; background:rgba(124,92,255,.3); color:#e7e1ff;
+    border-radius:20px; padding:1px 7px; font-weight:600; }
+
+  /* content canvas — near-solid, readable */
+  .content{ flex:1; background:var(--content); display:flex; flex-direction:column; overflow:hidden; }
+  .chead{ display:flex; align-items:center; gap:12px; padding:15px 18px 12px; }
+  .chead h5{ margin:0; font-size:16px; font-weight:600; }
+  .chead .sub{ font-size:11px; color:var(--muted); }
+  .grow{ flex:1; }
+  .btn{ font-size:11.5px; font-weight:600; border-radius:9px; padding:6px 12px; border:1px solid var(--card-bd);
+    background:rgba(255,255,255,.05); color:#dfe3ea; display:inline-flex; align-items:center; gap:6px; cursor:default; }
+  .btn.primary{ background:linear-gradient(180deg,#8a6bff,#6d4fe6); border-color:transparent; color:#fff;
+    box-shadow:0 2px 10px rgba(124,92,255,.4); }
+  .btn.sm{ padding:4px 10px; font-size:11px; }
+
+  /* filter bar */
+  .filters{ display:flex; align-items:center; gap:8px; padding:0 18px 12px; border-bottom:1px solid var(--divider); }
+  .chipf{ font-size:11px; color:var(--muted); padding:4px 11px; border-radius:20px; border:1px solid var(--divider); }
+  .chipf.on{ color:#fff; background:rgba(255,255,255,.08); border-color:transparent; }
+  .search{ margin-left:auto; font-size:11px; color:var(--faint); background:rgba(255,255,255,.04);
+    border:1px solid var(--divider); border-radius:8px; padding:5px 10px; width:190px; }
+
+  /* PR list */
+  .list{ overflow:auto; padding:6px 0; }
+  .grp{ font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--faint);
+    padding:12px 18px 6px; display:flex; align-items:center; gap:8px; }
+  .row{ display:flex; align-items:center; gap:12px; padding:9px 18px; border-bottom:1px solid rgba(255,255,255,.04);
+    cursor:default; }
+  .row:hover{ background:rgba(255,255,255,.03); }
+  .row.active{ background:rgba(124,92,255,.12); box-shadow:inset 2px 0 0 var(--purple); }
+  .host{ font-size:9.5px; font-weight:700; letter-spacing:.03em; padding:2px 6px; border-radius:5px; flex-shrink:0; width:52px; text-align:center; }
+  .host.gh{ background:rgba(201,207,218,.14); color:var(--github); }
+  .host.az{ background:rgba(59,143,224,.18); color:var(--azure); }
+  .prmeta{ min-width:0; flex:1; }
+  .prtitle{ font-size:12.5px; color:#eef0f4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .prtitle .num{ color:var(--faint); font-variant-numeric:tabular-nums; margin-right:6px; }
+  .prsub{ font-size:10.5px; color:var(--muted); margin-top:2px; display:flex; align-items:center; gap:8px; }
+  .prsub .repo{ color:#b8bfcd; font-weight:500; }
+  .prsub .br{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9.5px;
+    background:rgba(255,255,255,.05); padding:1px 5px; border-radius:4px; }
+  .ava{ width:18px;height:18px;border-radius:50%; flex-shrink:0; font-size:9px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; color:#12131a; }
+  .rev-state{ font-size:10px; flex-shrink:0; display:flex; align-items:center; gap:5px; width:104px; justify-content:flex-end; }
+  .dot{ width:6px;height:6px;border-radius:50%; }
+  .rev-state.none{ color:var(--faint); }
+  .rev-state.done{ color:#c7f5d4; } .rev-state.done .dot{ background:var(--ok); box-shadow:0 0 6px var(--ok); }
+  .rev-state.run{ color:#ffe3b0; } .rev-state.run .dot{ background:var(--warn); box-shadow:0 0 6px var(--warn); animation:pulse 1.2s infinite; }
+  @keyframes pulse{ 50%{ opacity:.35; } }
+  .row .go{ flex-shrink:0; }
+
+  /* ===== annotation badges tying regions to sub-projects ===== */
+  .anno{ position:absolute; z-index:5; background:var(--purple); color:#fff; font-size:11px; font-weight:700;
+    border-radius:20px; padding:3px 10px; box-shadow:0 4px 14px rgba(0,0,0,.4); white-space:nowrap; }
+  .anno .n{ background:#fff; color:var(--purple); border-radius:50%; width:16px;height:16px; display:inline-flex;
+    align-items:center; justify-content:center; font-size:10px; margin-right:6px; vertical-align:middle; }
+
+  /* ===== review drawer (stage B) ===== */
+  .winB .lower{ position:relative; }
+  .drawer{ position:absolute; top:0; right:0; bottom:0; width:520px; background:#0d0f15;
+    border-left:1px solid var(--divider); box-shadow:-14px 0 40px rgba(0,0,0,.45);
+    display:flex; flex-direction:column; }
+  .scrim{ position:absolute; inset:0; background:rgba(0,0,0,.32); }
+  .dhead{ padding:14px 18px; border-bottom:1px solid var(--divider); }
+  .dhead .top{ display:flex; align-items:center; gap:9px; }
+  .dhead h6{ margin:0; font-size:13.5px; font-weight:600; }
+  .dhead .path{ font-size:11px; color:var(--muted); margin-top:5px; display:flex; align-items:center; gap:8px; }
+  .dstate{ margin:11px 0 0; font-size:11px; display:flex; align-items:center; gap:8px; color:#c7f5d4; }
+  .dstate .dot{ background:var(--ok); box-shadow:0 0 6px var(--ok); }
+
+  .dbody{ flex:1; overflow:auto; padding:14px 18px; }
+  .summary{ font-size:12px; color:#cdd3de; line-height:1.55; background:var(--card); border:1px solid var(--card-bd);
+    border-radius:11px; padding:12px 13px; margin-bottom:16px; }
+  .summary .mh{ font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); margin-bottom:6px; font-weight:700; }
+  .fcount{ font-size:11px; color:var(--muted); margin:0 0 9px; display:flex; align-items:center; gap:10px; }
+  .fcount b{ color:#e5e7eb; }
+
+  .finding{ display:flex; gap:10px; padding:11px 12px; border:1px solid var(--card-bd); border-radius:11px;
+    margin-bottom:9px; background:rgba(255,255,255,.025); }
+  .finding.sel{ border-color:rgba(124,92,255,.5); background:rgba(124,92,255,.08); }
+  .chk{ width:16px;height:16px;border-radius:5px; border:1.5px solid var(--faint); flex-shrink:0; margin-top:1px; }
+  .chk.on{ background:var(--purple); border-color:var(--purple); position:relative; }
+  .chk.on::after{ content:"✓"; color:#fff; font-size:11px; position:absolute; top:-2px; left:2px; }
+  .fmain{ min-width:0; flex:1; }
+  .frow1{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .sev{ font-size:9px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:2px 6px; border-radius:5px; }
+  .sev.err{ background:rgba(239,68,68,.16); color:#ff9a9a; }
+  .sev.warn{ background:rgba(245,158,11,.16); color:#ffcf85; }
+  .sev.info{ background:rgba(56,189,248,.16); color:#9bdcff; }
+  .cat{ font-size:10px; color:var(--faint); }
+  .floc{ margin-left:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px; color:var(--purple-val); }
+  .ftext{ font-size:12px; color:#dde1ea; line-height:1.5; }
+  .fsnip{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px; color:#c4b6ff;
+    background:rgba(124,92,255,.08); border-left:2px solid var(--purple); padding:5px 9px; border-radius:0 6px 6px 0; margin-top:7px; white-space:pre; overflow:auto; }
+
+  /* post-back footer (sub-project 3) */
+  .dfoot{ padding:12px 18px; border-top:1px solid var(--divider); display:flex; align-items:center; gap:12px;
+    background:rgba(124,92,255,.06); }
+  .dfoot .selinfo{ font-size:11.5px; color:var(--muted); }
+  .dfoot .selinfo b{ color:#e5e7eb; }
+  .dfoot .grow{ flex:1; }
+
+  /* drawer tab strip */
+  .tabs{ display:flex; gap:4px; padding:8px 14px 0; border-bottom:1px solid var(--divider); }
+  .tab{ font-size:11.5px; color:var(--muted); padding:7px 12px; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:6px; }
+  .tab em{ font-style:normal; font-size:10px; background:rgba(255,255,255,.08); padding:0 6px; border-radius:20px; color:#cfd4de; }
+  .tab.on{ color:#fff; background:rgba(124,92,255,.14); box-shadow:inset 0 -2px 0 var(--purple); }
+
+  /* diff view */
+  .diffwrap{ display:flex; height:100%; min-height:0; }
+  .filetree{ width:176px; flex-shrink:0; border-right:1px solid var(--divider); overflow:auto; padding:8px 0; }
+  .ftgrp{ font-size:9.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); padding:8px 12px 4px; }
+  .ftitem{ font-size:11px; padding:5px 12px; color:#c3c9d6; display:flex; align-items:center; gap:7px; white-space:nowrap; }
+  .ftitem.on{ background:rgba(124,92,255,.14); color:#fff; box-shadow:inset 2px 0 0 var(--purple); }
+  .ftitem .nm{ overflow:hidden; text-overflow:ellipsis; flex:1; }
+  .ftitem .add{ color:#5fd88a; font-variant-numeric:tabular-nums; font-size:10px; }
+  .ftitem .del{ color:#ff8f8f; font-variant-numeric:tabular-nums; font-size:10px; }
+  .ftitem .fdot{ width:6px;height:6px;border-radius:50%; background:var(--err); box-shadow:0 0 6px var(--err); flex-shrink:0; }
+  .diffcol{ flex:1; overflow:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px; padding-bottom:8px; }
+  .dfile{ font-size:11px; color:#dfe3ea; padding:9px 12px; border-bottom:1px solid var(--divider); font-family:var(--font); position:sticky; top:0; background:#0d0f15; }
+  .hunk{ background:rgba(124,92,255,.08); color:var(--purple-val); padding:3px 12px; border-bottom:1px solid var(--divider); }
+  .dl{ display:flex; line-height:1.6; }
+  .dl .ln{ width:40px; color:var(--faint); text-align:right; padding-right:12px; flex-shrink:0; user-select:none; }
+  .dl .tx{ white-space:pre; color:#c6ccd8; padding-right:12px; }
+  .dl.add{ background:rgba(34,197,94,.1); } .dl.add .tx{ color:#c7f5d4; }
+  .dl.del{ background:rgba(239,68,68,.1); } .dl.del .tx{ color:#ffc9c9; }
+  .finline{ display:flex; align-items:center; gap:7px; margin:3px 12px 7px 52px; font-size:10.5px; font-family:var(--font);
+    color:#ff9a9a; background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.28); border-radius:7px; padding:5px 10px; }
+  .finline .sev{ background:rgba(239,68,68,.2); }
+
+  .cap{ font-size:11.5px; color:var(--muted); margin:10px 2px 0; line-height:1.5; }
+  .cap b{ color:#cdd3de; }
+  .flow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11.5px; color:var(--muted); margin:6px 0 0; }
+  .flow .pill{ background:var(--card); border:1px solid var(--card-bd); border-radius:20px; padding:4px 11px; color:#d7dbe4; }
+  .flow .arr{ color:var(--faint); }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <h1>Reviews — cross-repo PR review module</h1>
+  <p class="lede">A new top-level module (peer of Instances / TimeTracker / Settings) that lists <b>all open PRs across every project repo</b> — GitHub via&nbsp;<code>gh</code>, Škoda Azure&nbsp;DevOps (PPS, Spot) via REST&nbsp;+&nbsp;PAT — and lets you fire a <b>review agent</b> at any of them. The agent checks out the PR branch in a throwaway git worktree, reviews with full repo context, and returns a <b>markdown report + structured findings</b>. You can also open any PR to <b>read its diff in-app</b> before deciding to review, and each finding links straight to its diff line. You read the report first; posting findings back to the PR is an explicit, opt-in second step.</p>
+
+  <h2 class="sec">Build order — three independently shippable sub-projects</h2>
+  <div class="legend">
+    <div class="step"><h4><span class="n">1</span>PR listing + diff<span class="tag">ship first</span></h4>
+      <p>Both host adapters + normalized PR model + list UI, refresh, and the in-app <b>Diff tab</b>. A unified PR inbox you can read on day one — zero write risk.</p></div>
+    <div class="step"><h4><span class="n">2</span>Review runner<span class="tag">core</span></h4>
+      <p>Worktree checkout → headless review agent → report drawer. Persists to a <code>pr_reviews</code> table (migration v6).</p></div>
+    <div class="step"><h4><span class="n">3</span>Post-back<span class="tag">opt-in</span></h4>
+      <p>Push selected findings to the PR as inline comments / a review, on GitHub or DevOps. Designed once the read side is proven.</p></div>
+  </div>
+
+  <!-- ================= STAGE A : PR LISTING ================= -->
+  <h2 class="sec">Sub-project 1 · The Reviews tab — all open PRs</h2>
+  <div class="stage">
+    <div class="anno" style="top:70px; left:210px;"><span class="n">1</span>PR listing</div>
+    <div class="win">
+      <div class="tbar">
+        <div class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+        <div class="gtabs">
+          <div class="gtab on"><span class="gd"></span>Watchtower</div>
+          <div class="gtab"><span class="gd"></span>PPS&nbsp;tech</div>
+          <div class="gtab"><span class="gd"></span>Spot</div>
+        </div>
+      </div>
+      <div class="lower">
+        <div class="rail">
+          <div class="brand"><div class="lg"></div><span>Watchtower</span></div>
+          <div class="ni"><span class="ic">▦</span>Instances</div>
+          <div class="ni on"><span class="ic">⌾</span>Reviews<span class="badge">6</span></div>
+          <div class="ni"><span class="ic">◷</span>TimeTracker</div>
+          <div class="ni"><span class="ic">⚙</span>Settings</div>
+        </div>
+        <div class="content">
+          <div class="chead">
+            <h5>Reviews</h5>
+            <span class="sub">6 open · synced 2 min ago</span>
+            <span class="grow"></span>
+            <span class="btn sm">↻ Refresh</span>
+          </div>
+          <div class="filters">
+            <span class="chipf on">All hosts</span>
+            <span class="chipf">GitHub</span>
+            <span class="chipf">Azure DevOps</span>
+            <span class="chipf">Reviewed</span>
+            <span class="search">Search PRs…</span>
+          </div>
+          <div class="list">
+            <div class="grp">GitHub</div>
+
+            <div class="row">
+              <span class="host gh">GH</span>
+              <span class="prmeta">
+                <div class="prtitle"><span class="num">#165</span>feat(reviews): PR-listing adapter + normalized model</div>
+                <div class="prsub"><span class="repo">Watchtower</span> · <span class="ava" style="background:#9a87f5">JP</span> jan · <span class="br">reviews-165</span> · 2h</div>
+              </span>
+              <span class="rev-state none"><span class="dot" style="background:#4b5164"></span>not reviewed</span>
+              <span class="btn primary sm go">Review ▸</span>
+            </div>
+
+            <div class="row">
+              <span class="host gh">GH</span>
+              <span class="prmeta">
+                <div class="prtitle"><span class="num">#163</span>fix: worklog DATE shifts back one day on pull in TZ&gt;UTC</div>
+                <div class="prsub"><span class="repo">Watchtower</span> · <span class="ava" style="background:#22d3ee">JP</span> jan · <span class="br">fix-date-shift</span> · 1d</div>
+              </span>
+              <span class="rev-state done"><span class="dot"></span>3 findings</span>
+              <span class="btn sm go">Open report</span>
+            </div>
+
+            <div class="row">
+              <span class="host gh">GH</span>
+              <span class="prmeta">
+                <div class="prtitle"><span class="num">#48</span>chore: bump deps &amp; drop legacy noVNC relay</div>
+                <div class="prsub"><span class="repo">dotfiles</span> · <span class="ava" style="background:#f59e0b">DB</span> dependabot · <span class="br">deps/2026-07</span> · 3d</div>
+              </span>
+              <span class="rev-state none"><span class="dot" style="background:#4b5164"></span>not reviewed</span>
+              <span class="btn primary sm go">Review ▸</span>
+            </div>
+
+            <div class="grp">Azure DevOps · Škoda</div>
+
+            <div class="row active">
+              <span class="host az">AZ</span>
+              <span class="prmeta">
+                <div class="prtitle"><span class="num">!4821</span>TEH-2044 — refactor NC program handler (null-safety)</div>
+                <div class="prsub"><span class="repo">PPS / technology</span> · <span class="ava" style="background:#3b8fe0">MK</span> m.kral · <span class="br">feature/TEH-2044</span> · 3h</div>
+              </span>
+              <span class="rev-state run"><span class="dot"></span>reviewing…</span>
+              <span class="btn sm go">View ▸</span>
+            </div>
+
+            <div class="row">
+              <span class="host az">AZ</span>
+              <span class="prmeta">
+                <div class="prtitle"><span class="num">!4805</span>VYR-1990 — capacity recalculation on operation change</div>
+                <div class="prsub"><span class="repo">PPS / capacity-planning</span> · <span class="ava" style="background:#22c55e">PN</span> p.novak · <span class="br">feature/VYR-1990</span> · 1d</div>
+              </span>
+              <span class="rev-state done"><span class="dot"></span>5 findings</span>
+              <span class="btn sm go">Open report</span>
+            </div>
+
+            <div class="row">
+              <span class="host az">AZ</span>
+              <span class="prmeta">
+                <div class="prtitle"><span class="num">!612</span>feat: shift-planning grid virtualization</div>
+                <div class="prsub"><span class="repo">Spot</span> · <span class="ava" style="background:#ef4444">JS</span> j.svec · <span class="br">feat/shift-grid</span> · 5h</div>
+              </span>
+              <span class="rev-state none"><span class="dot" style="background:#4b5164"></span>not reviewed</span>
+              <span class="btn primary sm go">Review ▸</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap">Flat, scannable list grouped by host. Each row shows <b>host badge · PR number + title · repo · author · branch · age</b>, plus a <b>review-state</b> column (not reviewed / reviewing… / N findings) so the tab doubles as a review tracker. The sidebar badge counts open PRs. <b>Refresh</b> re-queries both hosts on demand.</p>
+
+  <!-- ================= STAGE C : DIFF TAB (still sub-project 1) ================= -->
+  <h2 class="sec">Sub-project 1 · Read the diff yourself — the Diff tab</h2>
+  <div class="stage">
+    <div class="anno" style="top:70px; right:392px;"><span class="n">1</span>Diff — no agent needed</div>
+    <div class="win winB">
+      <div class="tbar">
+        <div class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+        <div class="gtabs">
+          <div class="gtab on"><span class="gd"></span>Watchtower</div>
+          <div class="gtab"><span class="gd"></span>PPS&nbsp;tech</div>
+          <div class="gtab"><span class="gd"></span>Spot</div>
+        </div>
+      </div>
+      <div class="lower">
+        <div class="rail">
+          <div class="brand"><div class="lg"></div><span>Watchtower</span></div>
+          <div class="ni"><span class="ic">▦</span>Instances</div>
+          <div class="ni on"><span class="ic">⌾</span>Reviews<span class="badge">6</span></div>
+          <div class="ni"><span class="ic">◷</span>TimeTracker</div>
+          <div class="ni"><span class="ic">⚙</span>Settings</div>
+        </div>
+        <div class="content">
+          <div class="chead"><h5>Reviews</h5><span class="sub">6 open · synced 2 min ago</span></div>
+          <div class="filters"><span class="chipf on">All hosts</span><span class="chipf">GitHub</span><span class="chipf">Azure DevOps</span><span class="search">Search PRs…</span></div>
+          <div class="list" style="opacity:.5">
+            <div class="grp">Azure DevOps · Škoda</div>
+            <div class="row"><span class="host az">AZ</span><span class="prmeta"><div class="prtitle"><span class="num">!4821</span>TEH-2044 — refactor NC program handler</div></span></div>
+            <div class="row"><span class="host az">AZ</span><span class="prmeta"><div class="prtitle"><span class="num">!4805</span>VYR-1990 — capacity recalculation</div></span></div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+
+        <!-- DIFF DRAWER -->
+        <div class="drawer">
+          <div class="dhead">
+            <div class="top">
+              <span class="host az">AZ</span>
+              <h6>!4821 · TEH-2044 — refactor NC program handler</h6>
+            </div>
+            <div class="path"><span class="repo">PPS / technology</span> · <span class="br" style="font-family:ui-monospace,Menlo,monospace;font-size:10px;background:rgba(255,255,255,.05);padding:1px 5px;border-radius:4px">feature/TEH-2044 → develop</span> · m.kral</div>
+            <div class="dstate" style="color:var(--muted)"><span class="dot" style="background:#4b5164;box-shadow:none"></span>Not yet reviewed · <span style="color:var(--purple-val)">Run review ▸</span></div>
+          </div>
+
+          <div class="tabs">
+            <span class="tab on">Diff <em>42</em></span>
+            <span class="tab">Report</span>
+          </div>
+
+          <div class="dbody" style="padding:0">
+            <div class="diffwrap">
+              <div class="filetree">
+                <div class="ftgrp">42 files changed</div>
+                <div class="ftitem on"><span class="fdot"></span><span class="nm">NcProgramHandler.cs</span><span class="add">+18</span><span class="del">−4</span></div>
+                <div class="ftitem"><span class="nm" style="margin-left:13px">CapacityService.cs</span><span class="add">+6</span><span class="del">−2</span></div>
+                <div class="ftitem"><span class="nm" style="margin-left:13px">OperationMapper.cs</span><span class="add">+2</span><span class="del">−0</span></div>
+                <div class="ftitem"><span class="nm" style="margin-left:13px">NcProgramTests.cs</span><span class="add">+54</span><span class="del">−1</span></div>
+                <div class="ftitem"><span class="nm" style="margin-left:13px;color:var(--faint)">…38 more files</span></div>
+              </div>
+              <div class="diffcol">
+                <div class="dfile">src/Handlers/NcProgramHandler.cs</div>
+                <div class="hunk">@@ -138,6 +138,10 @@ public void Handle(Order order)</div>
+                <div class="dl"><span class="ln">138</span><span class="tx">    context.Load(order);</span></div>
+                <div class="dl"><span class="ln">139</span><span class="tx">    _log.Info($"handling {order.Id}");</span></div>
+                <div class="dl add"><span class="ln">140</span><span class="tx">    var first = order.Operations.First();</span></div>
+                <div class="finline"><span class="sev err">error</span>Null NC-program list dereferenced when the order has no operations · <span style="color:#cbb6ff">Report → this line</span></div>
+                <div class="dl add"><span class="ln">141</span><span class="tx">    return Map(first);</span></div>
+                <div class="dl del"><span class="ln"></span><span class="tx">    return MapLegacy(order);</span></div>
+                <div class="dl"><span class="ln">142</span><span class="tx">}</span></div>
+                <div class="hunk">@@ -204,4 +208,12 @@ private Dto Map(Operation op)</div>
+                <div class="dl add"><span class="ln">208</span><span class="tx">    var dto = new Dto {</span></div>
+                <div class="dl add"><span class="ln">209</span><span class="tx">        Code = op.Code, Name = op.Name,</span></div>
+                <div class="dl add"><span class="ln">210</span><span class="tx">        Machine = op.Machine?.Code,</span></div>
+                <div class="dl add"><span class="ln">211</span><span class="tx">    };</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap">Open <b>any</b> PR — reviewed or not — to read the diff in-app: a changed-file tree (with +/− counts) beside a syntax-highlighted unified diff. No worktree or agent is required just to look, so this is part of the read-only first slice. Once a review exists, findings surface <b>inline on the diff</b> and each finding in the Report tab links to its exact line (and back).</p>
+
+  <!-- ================= STAGE B : REVIEW RUNNER + POST-BACK ================= -->
+  <h2 class="sec">Sub-projects 2 &amp; 3 · Review report + optional post-back</h2>
+  <div class="stage">
+    <div class="anno" style="top:70px; right:400px;"><span class="n">2</span>Review runner</div>
+    <div class="anno" style="bottom:34px; right:150px;"><span class="n">3</span>Post-back</div>
+    <div class="win winB">
+      <div class="tbar">
+        <div class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+        <div class="gtabs">
+          <div class="gtab on"><span class="gd"></span>Watchtower</div>
+          <div class="gtab"><span class="gd"></span>PPS&nbsp;tech</div>
+          <div class="gtab"><span class="gd"></span>Spot</div>
+        </div>
+      </div>
+      <div class="lower">
+        <div class="rail">
+          <div class="brand"><div class="lg"></div><span>Watchtower</span></div>
+          <div class="ni"><span class="ic">▦</span>Instances</div>
+          <div class="ni on"><span class="ic">⌾</span>Reviews<span class="badge">6</span></div>
+          <div class="ni"><span class="ic">◷</span>TimeTracker</div>
+          <div class="ni"><span class="ic">⚙</span>Settings</div>
+        </div>
+        <div class="content">
+          <div class="chead"><h5>Reviews</h5><span class="sub">6 open · synced 2 min ago</span></div>
+          <div class="filters"><span class="chipf on">All hosts</span><span class="chipf">GitHub</span><span class="chipf">Azure DevOps</span><span class="search">Search PRs…</span></div>
+          <div class="list" style="opacity:.5">
+            <div class="grp">Azure DevOps · Škoda</div>
+            <div class="row"><span class="host az">AZ</span><span class="prmeta"><div class="prtitle"><span class="num">!4821</span>TEH-2044 — refactor NC program handler</div></span></div>
+            <div class="row"><span class="host az">AZ</span><span class="prmeta"><div class="prtitle"><span class="num">!4805</span>VYR-1990 — capacity recalculation</div></span></div>
+          </div>
+        </div>
+        <div class="scrim"></div>
+
+        <!-- REVIEW DRAWER -->
+        <div class="drawer">
+          <div class="dhead">
+            <div class="top">
+              <span class="host az">AZ</span>
+              <h6>!4821 · TEH-2044 — refactor NC program handler</h6>
+            </div>
+            <div class="path"><span class="repo">PPS / technology</span> · <span class="br" style="font-family:ui-monospace,Menlo,monospace;font-size:10px;background:rgba(255,255,255,.05);padding:1px 5px;border-radius:4px">feature/TEH-2044 → develop</span> · m.kral</div>
+            <div class="dstate"><span class="dot"></span>Reviewed in worktree · 42 files · 3 findings · finished 14:52</div>
+          </div>
+
+          <div class="tabs">
+            <span class="tab">Diff <em>42</em></span>
+            <span class="tab on">Report <em>3</em></span>
+          </div>
+
+          <div class="dbody">
+            <div class="summary">
+              <div class="mh">Summary</div>
+              The refactor cleanly separates NC-program parsing from persistence and adds guard clauses for empty operation lists. Test coverage is solid. Two correctness issues remain around null handling on orders with no operations, and one hot-loop recomputation worth hoisting before merge.
+            </div>
+
+            <div class="fcount"><b>3 findings</b> · <span>select the ones to post back</span> · <b>2</b> selected</div>
+
+            <div class="finding sel">
+              <span class="chk on"></span>
+              <div class="fmain">
+                <div class="frow1"><span class="sev err">error</span><span class="cat">correctness</span><span class="floc">NcProgramHandler.cs:142</span></div>
+                <div class="ftext">Null NC-program list is dereferenced when an order has no operations — <code>order.Operations</code> can be null here, not just empty.</div>
+                <div class="fsnip">var first = order.Operations.First();  // NRE when null</div>
+              </div>
+            </div>
+
+            <div class="finding sel">
+              <span class="chk on"></span>
+              <div class="fmain">
+                <div class="frow1"><span class="sev warn">warn</span><span class="cat">efficiency</span><span class="floc">CapacityService.cs:88</span></div>
+                <div class="ftext">Full capacity graph is recomputed inside the per-operation loop; hoist the build outside the loop (O(n²) → O(n)).</div>
+              </div>
+            </div>
+
+            <div class="finding">
+              <span class="chk"></span>
+              <div class="fmain">
+                <div class="frow1"><span class="sev info">info</span><span class="cat">simplification</span><span class="floc">NcProgramHandler.cs:210</span></div>
+                <div class="ftext">Mapping logic is duplicated with <code>OperationMapper</code>; consider extracting to reuse the existing mapper.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-PROJECT 3: post-back footer -->
+          <div class="dfoot">
+            <span class="selinfo"><b>2</b> of 3 findings selected</span>
+            <span class="grow"></span>
+            <span class="btn sm">Copy markdown</span>
+            <span class="btn primary sm">↥ Post 2 comments to !4821</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>Review runner (2):</b> firing <b>Review ▸</b> spins a throwaway git worktree at the PR branch in the local clone, runs a headless review agent with full repo context, and streams the result into this drawer as a persisted report (summary + structured findings, each with severity · category · <code>file:line</code>). <b>Post-back (3):</b> tick the findings worth sharing and push them to the PR as inline comments — host-aware (GitHub review / DevOps threads). "Copy markdown" is the always-available escape hatch.</p>
+
+  <h2 class="sec">End-to-end flow</h2>
+  <div class="flow">
+    <span class="pill">Refresh</span><span class="arr">→</span>
+    <span class="pill">gh + DevOps REST</span><span class="arr">→</span>
+    <span class="pill">normalized PR list</span><span class="arr">→</span>
+    <span class="pill">view diff (in-app)</span><span class="arr">→</span>
+    <span class="pill">Review ▸</span><span class="arr">→</span>
+    <span class="pill">worktree @ PR branch</span><span class="arr">→</span>
+    <span class="pill">headless review agent</span><span class="arr">→</span>
+    <span class="pill">report + findings (persisted)</span><span class="arr">→</span>
+    <span class="pill">select</span><span class="arr">→</span>
+    <span class="pill">post to PR (opt-in)</span>
+  </div>
+
+</div>
+</body>
+</html>
