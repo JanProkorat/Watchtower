@@ -47,4 +47,11 @@ describe('ReviewsService', () => {
     const res = await svc.refresh(undefined);
     expect(res.pullRequests.every((p) => p.host === 'github')).toBe(true);
   });
+  it('refresh() throws an aggregated error when every repo fails and nothing was fetched', async () => {
+    const svc = new ReviewsService({
+      ...deps(),
+      listGithub: async () => { throw new Error('gh: command not found'); },
+    });
+    await expect(svc.refresh(undefined)).rejects.toThrow(/selhalo/);
+  });
 });

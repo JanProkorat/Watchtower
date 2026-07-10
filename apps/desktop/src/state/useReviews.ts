@@ -41,13 +41,20 @@ export function useReviews() {
     try {
       const res = await window.watchtower.invoke(kind, {});
       setPullRequests(res.pullRequests); setSyncedAt(res.syncedAt);
-    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+      return res;
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); return null; }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { void load('prs:list').then(() => { /* auto-refresh on first open */ }); }, [load]);
-
   const refresh = useCallback(() => load('prs:refresh'), [load]);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await load('prs:list');
+      if (res && res.syncedAt === null) await refresh();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const loadDiff = useCallback(async (pr: PullRequestPayload): Promise<DiffFilePayload[]> => {
     const res = await window.watchtower.invoke('prs:diff', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
     return res.files;

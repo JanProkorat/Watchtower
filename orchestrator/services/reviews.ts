@@ -47,7 +47,7 @@ export class ReviewsService {
 
   getDevopsConfig() {
     const c = this.readConfig();
-    return { orgBaseUrl: c.orgBaseUrl, repos: c.repos, hasPatFlag: false };
+    return { orgBaseUrl: c.orgBaseUrl, repos: c.repos };
   }
   setDevopsConfig(cfg: DevopsStored): void {
     this.settings.set(CONFIG_KEY, JSON.stringify({ orgBaseUrl: cfg.orgBaseUrl, repos: cfg.repos }));
@@ -75,16 +75,22 @@ export class ReviewsService {
 
   async refresh(devopsPat: string | undefined) {
     const results: PullRequestPayload[] = [];
+    const errors: string[] = [];
     for (const r of await this.githubRepos()) {
-      try { results.push(...(await this.listGithub(r))); } catch { /* degrade: skip repo */ }
+      try { results.push(...(await this.listGithub(r))); }
+      catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
     }
     if (devopsPat) {
       for (const r of this.azdoRepos()) {
-        try { results.push(...(await this.listAzdo(r, devopsPat))); } catch { /* degrade */ }
+        try { results.push(...(await this.listAzdo(r, devopsPat))); }
+        catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
       }
     }
     this.cache = results;
     this.syncedAt = isoNow();
+    if (results.length === 0 && errors.length > 0) {
+      throw new Error(`Načtení PR selhalo:\n${errors.join('\n')}`);
+    }
     return this.list();
   }
 

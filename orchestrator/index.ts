@@ -1145,11 +1145,10 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       return { files: await reviewsSvc().diff(p.host, p.repoKey, p.prNumber, p.devopsPat) };
     }
     case 'reviews:getDevopsConfig': {
-      const c = reviewsSvc().getDevopsConfig();
       // hasPat truth lives in electron-main (it owns safeStorage); main
       // overrides this field before returning to the renderer. `false` is
       // a safe orchestrator-side default.
-      return { orgBaseUrl: c.orgBaseUrl, repos: c.repos, hasPat: false };
+      return { ...reviewsSvc().getDevopsConfig(), hasPat: false };
     }
     case 'reviews:setDevopsConfig': {
       const p = req.payload as { orgBaseUrl: string; repos: DevopsRepoConfigPayload[] };
