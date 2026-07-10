@@ -2,7 +2,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseConnection, connectionToWsUrl, loadConnection, saveConnection,
+  connectionToFormState, emptyConnectionFormState, commitConnectionEdit,
+  type ConnStore, type Connection,
 } from '../../apps/ipad/src/connection.js';
+
+function fakeStore(): ConnStore & { data: Map<string, string> } {
+  const data = new Map<string, string>();
+  return { data, get: async (k) => data.get(k) ?? null, set: async (k, v) => { data.set(k, v); } };
+}
 
 describe('parseConnection', () => {
   it('accepts a valid host/port/token', () => {
@@ -68,6 +75,33 @@ describe('persistence', () => {
   });
   it('returns null when nothing is stored', async () => {
     const store = { get: async () => null, set: async () => {} };
+    expect(await loadConnection(store)).toBeNull();
+  });
+});
+
+describe('connectionToFormState', () => {
+  it('round-trips a full connection to strings', () => {
+    const c: Connection = { host: 'h', port: 7445, token: 't', wanHost: 'ddns', wanPort: 9 };
+    const f = connectionToFormState(c);
+    expect(f).toMatchObject({ host: 'h', port: '7445', token: 't', wanHost: 'ddns', wanPort: '9', mac: '', lanIp: '' });
+  });
+  it('emptyConnectionFormState defaults port to 7445', () => {
+    expect(emptyConnectionFormState().port).toBe('7445');
+  });
+});
+
+describe('commitConnectionEdit', () => {
+  it('persists a valid edit and returns the value', async () => {
+    const store = fakeStore();
+    const form = { ...emptyConnectionFormState(), host: 'mac.ts.net', token: 'tok' };
+    const r = await commitConnectionEdit(store, form);
+    expect(r.ok).toBe(true);
+    expect(await loadConnection(store)).toEqual({ host: 'mac.ts.net', port: 7445, token: 'tok' });
+  });
+  it('does not persist an invalid edit', async () => {
+    const store = fakeStore();
+    const r = await commitConnectionEdit(store, { ...emptyConnectionFormState(), host: '', token: 't' });
+    expect(r).toEqual({ ok: false, error: 'Host is required' });
     expect(await loadConnection(store)).toBeNull();
   });
 });
