@@ -1294,13 +1294,13 @@ function respawnIncompleteRowsOnBoot(): void {
       buildContext: (instanceId, cwd, kind) => {
         const name = cwd.split('/').filter(Boolean).pop() || instanceId;
         const title =
-          kind === 'waiting-permission' ? `${name} — čeká na povolení` :
-          kind === 'crashed' ? `${name} — pád procesu` :
-          `${name} — čeká na vstup`;
+          kind === 'waiting-permission' ? `${name} — permission needed` :
+          kind === 'crashed' ? `${name} — instance stopped` :
+          `${name} — waiting for you`;
         const body =
-          kind === 'waiting-permission' ? 'Claude potřebuje vaše rozhodnutí o povolení.' :
-          kind === 'crashed' ? 'Claude process neočekávaně skončil.' :
-          'Claude dokončil práci a čeká na váš vstup.';
+          kind === 'waiting-permission' ? 'Claude needs your permission to continue.' :
+          kind === 'crashed' ? 'A Claude instance has stopped.' :
+          'Claude is waiting for your input.';
         return { title, body };
       },
     });

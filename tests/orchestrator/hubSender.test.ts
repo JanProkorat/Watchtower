@@ -9,7 +9,7 @@ function deps(over = {}) {
     listTokens: async () => ['tokA', 'tokB'],
     removeToken: (t: string) => removed.push(t),
     sendApns: async (_c: any, token: string, msg: any) => { sent.push({ token, data: msg.data }); return token === 'tokB' ? { ok: false, status: 410, reason: 'Unregistered' } : { ok: true, status: 200 }; },
-    buildContext: () => ({ title: 'api', body: 'čeká na povolení' }),
+    buildContext: () => ({ title: 'api', body: 'permission needed' }),
     ...over,
   };
   return { base, sent, removed };
