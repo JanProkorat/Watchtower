@@ -379,6 +379,28 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       }
     },
   },
+  {
+    version: 20,
+    up: (db) => {
+      // Reviews SP2 Task 1: pr_reviews stores one row per review-agent run
+      // against a PR, keyed by (host, repo_key, pr_number). status transitions
+      // running -> done | error; finished_at is set on either terminal state.
+      db.exec(`CREATE TABLE IF NOT EXISTS pr_reviews (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        host          TEXT    NOT NULL,
+        repo_key      TEXT    NOT NULL,
+        pr_number     INTEGER NOT NULL,
+        head_sha      TEXT    NOT NULL,
+        status        TEXT    NOT NULL,
+        summary       TEXT,
+        findings_json TEXT,
+        error         TEXT,
+        created_at    TEXT    NOT NULL,
+        finished_at   TEXT
+      )`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_pr_reviews_pr ON pr_reviews(host, repo_key, pr_number)`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {
