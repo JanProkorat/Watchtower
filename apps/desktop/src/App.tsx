@@ -374,72 +374,6 @@ export function App() {
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
-              <TabStrip
-                tabs={tabs}
-                mountedTabIds={mountedTabIds}
-                attentionTabIds={attentionTabIds}
-                workspaceActive={activeModule === 'instances'}
-                // Only highlight the focused tab while the Instances module is
-                // showing — on other pages the workspace isn't visible, so no
-                // tab should read as selected.
-                focusedTabId={activeModule === 'instances' ? focusedTab : null}
-                onSelect={(id) => {
-                  // A tab collapsed by hiding all its sessions still shows in
-                  // the strip. Clicking it should bring the window back with
-                  // content, so un-hide its sessions before mounting — but only
-                  // when the tab is actually collapsed (not currently mounted),
-                  // so the sole-pane "N hidden" tray keeps working untouched.
-                  const clicked = tabs.find((tab) => tab.id === id);
-                  if (
-                    clicked &&
-                    clicked.columnOrder.length === 0 &&
-                    clicked.hiddenInstanceIds.length > 0 &&
-                    !findLeafByTabId(layout.root, id)
-                  ) {
-                    for (const hid of clicked.hiddenInstanceIds) unhideInstance(hid);
-                  }
-                  selectGlobalTab(id, {
-                    setActiveModule,
-                    ensureMounted: (tid) =>
-                      ensureTabMountedAndFocused({ layout, actions: layoutActions }, tid),
-                    setActive,
-                    focusedInstanceIdForTab: (tid) =>
-                      tabs.find((t) => t.id === tid)?.focusedInstanceId ?? null,
-                  });
-                }}
-                onContextSplit={(id, dir) => {
-                  // Splitting only makes sense inside the workspace, so a split
-                  // triggered from the global bar (possibly while another module
-                  // is showing) first brings the Instances module forward.
-                  setActiveModule('instances');
-                  if (!layout.focusedLeafId) return;
-                  // Don't duplicate a tab into a second leaf — the xterm host can
-                  // only attach to one slot, so the second leaf steals the
-                  // terminal and the first goes blank. If the tab is already
-                  // mounted, focus it instead.
-                  const existing = findLeafByTabId(layout.root, id);
-                  if (existing) {
-                    layoutActions.focusLeaf(existing.id);
-                    return;
-                  }
-                  layoutActions.splitLeafAt(layout.focusedLeafId, dir, 'after', id);
-                }}
-                onContextNewInstance={(id) => {
-                  const cwd = cwdForTab(id);
-                  if (cwd) switchToNewInstanceForCwd(cwd);
-                }}
-                canSpawnInTab={(id) => cwdForTab(id) !== null}
-                onCloseTab={handleCloseTab}
-                onCloseInWorkspace={(id) => {
-                  const node = findLeafByTabId(layout.root, id);
-                  if (node) layoutActions.unmountLeafAt(node.id);
-                }}
-                onHideTab={(id) => {
-                  const node = findLeafByTabId(layout.root, id);
-                  if (node) layoutActions.unmountLeafAt(node.id);
-                }}
-                onNew={() => setNewOpen(true)}
-              />
             {orchDown && (
               <Box
                 sx={{
@@ -510,6 +444,65 @@ export function App() {
                     minHeight: 0,
                   }}
                 >
+                  <TabStrip
+                    tabs={tabs}
+                    mountedTabIds={mountedTabIds}
+                    attentionTabIds={attentionTabIds}
+                    workspaceActive={activeModule === 'instances'}
+                    focusedTabId={activeModule === 'instances' ? focusedTab : null}
+                    onSelect={(id) => {
+                      // A tab collapsed by hiding all its sessions still shows in
+                      // the strip. Clicking it should bring the window back with
+                      // content, so un-hide its sessions before mounting — but only
+                      // when the tab is actually collapsed (not currently mounted),
+                      // so the sole-pane "N hidden" tray keeps working untouched.
+                      const clicked = tabs.find((tab) => tab.id === id);
+                      if (
+                        clicked &&
+                        clicked.columnOrder.length === 0 &&
+                        clicked.hiddenInstanceIds.length > 0 &&
+                        !findLeafByTabId(layout.root, id)
+                      ) {
+                        for (const hid of clicked.hiddenInstanceIds) unhideInstance(hid);
+                      }
+                      selectGlobalTab(id, {
+                        setActiveModule,
+                        ensureMounted: (tid) =>
+                          ensureTabMountedAndFocused({ layout, actions: layoutActions }, tid),
+                        setActive,
+                        focusedInstanceIdForTab: (tid) =>
+                          tabs.find((t) => t.id === tid)?.focusedInstanceId ?? null,
+                      });
+                    }}
+                    onContextSplit={(id, dir) => {
+                      setActiveModule('instances');
+                      if (!layout.focusedLeafId) return;
+                      // Don't duplicate a tab into a second leaf — the xterm host can
+                      // only attach to one slot, so the second leaf steals the
+                      // terminal and the first goes blank. If already mounted, focus it.
+                      const existing = findLeafByTabId(layout.root, id);
+                      if (existing) {
+                        layoutActions.focusLeaf(existing.id);
+                        return;
+                      }
+                      layoutActions.splitLeafAt(layout.focusedLeafId, dir, 'after', id);
+                    }}
+                    onContextNewInstance={(id) => {
+                      const cwd = cwdForTab(id);
+                      if (cwd) switchToNewInstanceForCwd(cwd);
+                    }}
+                    canSpawnInTab={(id) => cwdForTab(id) !== null}
+                    onCloseTab={handleCloseTab}
+                    onCloseInWorkspace={(id) => {
+                      const node = findLeafByTabId(layout.root, id);
+                      if (node) layoutActions.unmountLeafAt(node.id);
+                    }}
+                    onHideTab={(id) => {
+                      const node = findLeafByTabId(layout.root, id);
+                      if (node) layoutActions.unmountLeafAt(node.id);
+                    }}
+                    onNew={() => setNewOpen(true)}
+                  />
                   <SlotRegistryProvider>
                       {layoutLoaded && (
                         <WorkspaceRoot

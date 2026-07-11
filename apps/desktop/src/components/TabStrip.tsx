@@ -9,7 +9,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { TabId, TabRecord } from '@watchtower/shared/layout.js';
 import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 import { tabAccent } from '../util/tabAccent.js';
-import { glassSurface, accentWash, accentRing, accentActiveText, statusDot } from '../theme/glass.js';
+import { glassFloating, accentWash, accentRing, accentActiveText, statusDot } from '../theme/glass.js';
 
 // Outer tab dot is locked to the project's accent color (or a hash-based
 // palette pick for ad-hoc cwd tabs). Per-session attention status is
@@ -17,17 +17,6 @@ import { glassSurface, accentWash, accentRing, accentActiveText, statusDot } fro
 function dotColor(id: string, accent: string | undefined): string {
   return tabAccent(id, accent);
 }
-
-// The strip doubles as the frameless macOS title bar (window.ts sets
-// titleBarStyle: 'hiddenInset'), so the empty regions must drag the window
-// while the tabs and buttons stay clickable. -webkit-app-region inherits in
-// Electron: the container is `drag`, interactive children opt out via `no-drag`.
-// WebkitAppRegion isn't in React's CSSProperties typings, hence the cast.
-const DRAG_REGION = { WebkitAppRegion: 'drag' } as unknown as CSSProperties;
-const NO_DRAG_REGION = { WebkitAppRegion: 'no-drag' } as unknown as CSSProperties;
-
-// Clears the traffic-light buttons that hiddenInset keeps at the top-left.
-const TRAFFIC_LIGHT_INSET = '78px';
 
 interface TabButtonProps {
   id: string;
@@ -66,7 +55,7 @@ function TabButton({
     <Box
       ref={dragRef}
       onClick={onClick}
-      style={{ ...(dragStyle ?? {}), ...NO_DRAG_REGION }}
+      style={dragStyle}
       {...(dragListeners ?? {})}
       role="tab"
       aria-selected={active}
@@ -104,9 +93,9 @@ function TabButton({
         </Tooltip>
       ) : (
         <Box
-          // Active → project-accent dot with glow; otherwise the project dot when
-          // the tab is mounted, a muted dot when it's only a collapsed tab.
-          sx={statusDot(active ? 'active' : 'idle', mounted ? dotColor(id, accent) : undefined, theme)}
+          // Always show the project-accent dot (never grey); it glows when the
+          // tab is active, and sits flat but colorful otherwise.
+          sx={statusDot(active ? 'active' : 'idle', dotColor(id, accent), theme)}
         />
       )}
       <span>{label}</span>
@@ -233,11 +222,6 @@ export function TabStrip({
   onNew,
 }: Props) {
   const theme = useTheme();
-  // glassSurface is the single source of truth for frosted fill + blur + border.
-  // Decision: TabStrip uses glassSurface directly (not via MuiAppBar component);
-  // the MuiAppBar override in theme.ts is updated to also derive from glassSurface
-  // so both stay in sync and neither is dead + divergent.
-  const glass = glassSurface(theme);
   // The dashboard tab id is the workspace's empty-state fallback leaf, not a
   // user-facing tab — never render it in the strip.
   const visibleTabs = tabs.filter((t) => t.id !== DASHBOARD_TAB_ID);
@@ -246,17 +230,15 @@ export function TabStrip({
 
   return (
     <Box
-      style={DRAG_REGION}
       sx={{
         display: 'flex',
         alignItems: 'center',
-        minHeight: 40,
-        pl: TRAFFIC_LIGHT_INSET,
-        // Glass frosted bar — glassSurface provides fill, backdropFilter, border, boxShadow.
-        // Border is overridden to only draw the bottom edge (the top is the window chrome).
-        ...glass,
-        border: 'none',
-        borderBottom: `1px solid ${theme.palette.divider}`,
+        minHeight: 44,
+        // Floating frosted pill bar for the instance/project tabs (iPad tab
+        // strip). Sits at the top of the Instances content, gutter all around.
+        ...glassFloating(theme, { radius: 14, elevation: 1 }),
+        m: '8px',
+        px: 0.75,
         flexShrink: 0,
         overflowX: 'auto',
         overflowY: 'hidden',
@@ -293,8 +275,7 @@ export function TabStrip({
         <IconButton
           onClick={onNew}
           size="small"
-          style={NO_DRAG_REGION}
-          sx={{ mr: 1, color: 'text.secondary', ':hover': { color: 'primary.main' } }}
+          sx={{ mr: 0.5, color: 'text.secondary', ':hover': { color: 'primary.main' } }}
         >
           <AddIcon fontSize="small" />
         </IconButton>

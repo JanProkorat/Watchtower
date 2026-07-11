@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Box, ButtonBase, IconButton, Tooltip, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
@@ -230,10 +230,11 @@ export function ModuleRail({
     <Box
       sx={{
         width: expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH,
-        // Floating frosted panel — lifts off the OS vibrancy backdrop; the gutter
-        // margin lets the ambient background show around it (iPad rail language).
-        ...glassFloating(theme, { radius: 20, elevation: 1 }),
-        m: '10px 8px 10px 10px',
+        // Full-height floating frosted panel. Hugs the window's top-left corner
+        // (margin 0 there) so the macOS traffic lights sit on a flat area of the
+        // rail, and floats on the right + bottom so the vibrancy shows around it.
+        ...glassFloating(theme, { radius: 12, elevation: 1 }),
+        m: '0 8px 8px 0',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'stretch',
@@ -245,6 +246,11 @@ export function ModuleRail({
         overflow: 'hidden',
       }}
     >
+      {/* Top drag strip — hosts the macOS traffic lights (drawn by the OS at
+          x12/y14) and keeps the window draggable now that the old title bar is
+          gone. Interactive rail rows below are outside this region, so they
+          stay clickable. */}
+      <Box style={{ WebkitAppRegion: 'drag' } as CSSProperties} sx={{ height: 30, flexShrink: 0 }} />
       <Box
         sx={{
           display: 'flex',
