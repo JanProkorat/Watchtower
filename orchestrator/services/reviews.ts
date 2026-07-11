@@ -1,9 +1,10 @@
 import { execFile } from 'node:child_process';
 import type { SqliteLike } from '../db/migrations.js';
 import type { PrHost, PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
-import type { GithubRepoConfig, AzdoRepoConfig } from './prProviders/types.js';
+import type { GithubRepoConfig, AzdoRepoConfig, Exec } from './prProviders/types.js';
 import { listGithubPrs, fetchGithubDiff, fetchGithubComments, parseGitRemoteNwo } from './prProviders/github.js';
 import { listAzdoPrs, fetchAzdoDiff, fetchAzdoComments, parseAzureRemote } from './prProviders/azureDevops.js';
+import { defaultExec } from './prProviders/exec.js';
 
 export interface ReviewsDeps {
   db: SqliteLike;
@@ -11,11 +12,20 @@ export interface ReviewsDeps {
   listAzdo?: (repo: AzdoRepoConfig, pat: string) => Promise<PullRequestPayload[]>;
   gitRemote?: (cwd: string) => Promise<string | null>;
   projects?: () => Array<{ id: number; name: string; folder_path: string | null }>;
+  exec?: Exec;
 }
 
 const realGitRemote = (cwd: string) => new Promise<string | null>((resolve) => {
   execFile('git', ['remote', 'get-url', 'origin'], { cwd, timeout: 5_000 }, (err, out) => resolve(err ? null : out.trim()));
 });
+
+/** Resolved target for the review runner: a local clone + the src/tgt refs fetched into it. */
+export interface ResolvedReviewTarget {
+  clonePath: string;
+  baseRef: string;
+  headSha: string;
+  pr: { title: string; sourceBranch: string; targetBranch: string };
+}
 
 export class ReviewsService {
   private cache: PullRequestPayload[] = [];
@@ -24,12 +34,14 @@ export class ReviewsService {
   private listAzdo: (r: AzdoRepoConfig, pat: string) => Promise<PullRequestPayload[]>;
   private gitRemote: (cwd: string) => Promise<string | null>;
   private projectsFn: () => Array<{ id: number; name: string; folder_path: string | null }>;
+  private exec: Exec;
 
   constructor(deps: ReviewsDeps) {
     this.listGithub = deps.listGithub ?? ((r) => listGithubPrs(r));
     this.listAzdo = deps.listAzdo ?? ((r, pat) => listAzdoPrs(r, pat));
     this.gitRemote = deps.gitRemote ?? realGitRemote;
     this.projectsFn = deps.projects ?? (() => []);
+    this.exec = deps.exec ?? defaultExec;
   }
 
   private async resolveRepos(): Promise<{ github: GithubRepoConfig[]; azdo: AzdoRepoConfig[] }> {
@@ -106,6 +118,40 @@ export class ReviewsService {
     const repo = azdo.find((r) => r.repoKey === repoKey);
     const pat = repo ? devopsPats?.[repo.devopsHost] : undefined;
     return repo && pat ? fetchAzdoComments(repo, prNumber, pat) : [];
+  }
+
+  /**
+   * Resolve a (host, repoKey, prNumber) into everything the review runner needs:
+   * the local clone path, the fetched base ref, and the head sha to check out.
+   * Fetches both the PR's source and target branches from `origin` into a
+   * private ref namespace (`refs/wt-review/{src,tgt}`) — same mechanism the
+   * azdo diff fetch already uses, generalized to also cover github (whose
+   * branches live on `origin` too since `localClonePath` is the user's own
+   * clone). Returns null if the repo, the PR, or the local clone is missing,
+   * or if the git fetch/rev-parse fails.
+   */
+  async resolveRepoAndPr(host: PrHost, repoKey: string, prNumber: number): Promise<ResolvedReviewTarget | null> {
+    const { github, azdo } = await this.resolveRepos();
+    const repo = host === 'github'
+      ? github.find((r) => r.repoKey === repoKey)
+      : azdo.find((r) => r.repoKey === repoKey);
+    if (!repo || !repo.localClonePath) return null;
+    const pr = this.cache.find((p) => p.host === host && p.repoKey === repoKey && p.number === prNumber);
+    if (!pr || !pr.sourceBranch || !pr.targetBranch) return null;
+    const clonePath = repo.localClonePath;
+    try {
+      await this.exec('git', ['-C', clonePath, 'fetch', '--no-tags', '--force', 'origin',
+        `+${pr.sourceBranch}:refs/wt-review/src`, `+${pr.targetBranch}:refs/wt-review/tgt`]);
+      const headSha = (await this.exec('git', ['-C', clonePath, 'rev-parse', 'refs/wt-review/src'])).trim();
+      return {
+        clonePath,
+        baseRef: 'refs/wt-review/tgt',
+        headSha,
+        pr: { title: pr.title, sourceBranch: pr.sourceBranch, targetBranch: pr.targetBranch },
+      };
+    } catch {
+      return null;
+    }
   }
 
   async projectRepo(projectId: number): Promise<{ host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null }> {

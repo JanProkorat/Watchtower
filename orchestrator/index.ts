@@ -64,10 +64,12 @@ import { JiraBoardService } from './services/jiraBoard.js';
 import { fetchTokenUsage } from './services/tokenUsage.js';
 import { AutoTimeLogger } from './services/autoTimeLogger.js';
 import { ReviewsService } from './services/reviews.js';
+import { runReview } from './services/prReview.js';
+import { PrReviewsRepo, type PrReviewRow } from './db/repositories/prReviews.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
-import type { PrHost } from '@watchtower/shared/ipcContract.js';
+import type { PrHost, PrReviewPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
 import { buildPtySpawnConfig, planBootAction } from './shellPolicy.js';
 import type { InstanceKind } from './shellPolicy.js';
 import { PtySizeOwnership } from './ptySizeOwnership.js';
@@ -214,6 +216,26 @@ function reviewsSvc(): ReviewsService {
     });
   }
   return _reviews;
+}
+
+function prReviewsRepo(): PrReviewsRepo {
+  return new PrReviewsRepo(handle!.db);
+}
+
+function reviewPayloadOf(row: PrReviewRow): PrReviewPayload {
+  return {
+    id: row.id,
+    host: row.host as PrHost,
+    repoKey: row.repo_key,
+    prNumber: row.pr_number,
+    headSha: row.head_sha,
+    status: row.status,
+    summary: row.summary,
+    findings: row.findings_json ? (JSON.parse(row.findings_json) as PrFindingPayload[]) : [],
+    error: row.error,
+    createdAt: row.created_at,
+    finishedAt: row.finished_at,
+  };
 }
 
 function epicsRepo(): EpicsRepo {
@@ -1150,6 +1172,39 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     }
     case 'reviews:projectRepo':
       return reviewsSvc().projectRepo((req.payload as { projectId: number }).projectId);
+
+    case 'prReview:start': {
+      const p = req.payload;
+      const target = await reviewsSvc().resolveRepoAndPr(p.host, p.repoKey, p.prNumber);
+      if (!target) {
+        throw new Error(`Cannot resolve repo/PR for review: ${p.host}:${p.repoKey}#${p.prNumber}`);
+      }
+      const reviews = prReviewsRepo();
+      const id = reviews.start(p.host, p.repoKey, p.prNumber, target.headSha);
+      emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'running', message: 'Reviewing...' } });
+      // Fire-and-forget: the caller gets `reviewId` immediately and follows
+      // progress via the prReviewProgress/prReviewDone pushes.
+      runReview(target.clonePath, target.baseRef, target.headSha, target.pr)
+        .then(({ summary, findings }) => {
+          reviews.finish(id, summary, JSON.stringify(findings));
+          emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'done', message: summary } });
+          emitPush({ kind: 'prReviewDone', payload: { reviewId: id } });
+        })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          reviews.fail(id, msg);
+          emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'error', message: msg } });
+        });
+      return { reviewId: id };
+    }
+
+    case 'prReview:get': {
+      const row = prReviewsRepo().get(req.payload.reviewId);
+      return { review: row ? reviewPayloadOf(row) : null };
+    }
+
+    case 'prReview:list':
+      return { reviews: prReviewsRepo().list(req.payload.repoKey).map(reviewPayloadOf) };
 
   }
 }
