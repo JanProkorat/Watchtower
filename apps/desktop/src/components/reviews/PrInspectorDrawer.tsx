@@ -33,7 +33,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
     // The report tab needs the latest review as soon as the drawer opens, so its tab
     // label can show a finding count without waiting for the user to click it. Runs
     // independently of the diff/comments load so a slow review lookup can't stall them.
-    void openReviewFor(pr).catch(() => undefined);
+    void openReviewFor(pr).catch((e) => showError(e instanceof Error ? e.message : String(e)));
   }, [pr, loadDiff, loadComments, openReviewFor]);
 
   const handleRun = (): void => {

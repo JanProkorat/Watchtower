@@ -118,9 +118,16 @@ export function useReviews() {
 
   // Kick off a fresh review run for the open PR and start tracking its reviewId.
   const runReview = useCallback(async (pr: PullRequestPayload): Promise<number> => {
+    // Capture the token before the await — if the user switches PRs (which bumps
+    // openReviewTokenRef via openReviewFor) while startReview is in flight, we must
+    // not repoint openReviewIdRef at this (now stale) review: doing so would let
+    // PR A's later prReviewProgress/prReviewDone pushes clobber PR B's open review.
+    const token = openReviewTokenRef.current;
     setReviewRunning(true);
     const reviewId = await startReview(pr);
-    openReviewIdRef.current = reviewId;
+    if (token === openReviewTokenRef.current) {
+      openReviewIdRef.current = reviewId;
+    }
     return reviewId;
   }, [startReview]);
 
