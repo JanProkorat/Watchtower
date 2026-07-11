@@ -6,7 +6,8 @@ import { PrRow } from './PrRow.js';
 import { PrInspectorDrawer } from './PrInspectorDrawer.js';
 
 export function ModuleReviews(): JSX.Element {
-  const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments } = useReviews();
+  const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
+    review, reviewRunning, openReviewFor, runReview } = useReviews();
   const [host, setHost] = useState<HostFilter>('all');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<PullRequestPayload | null>(null);
@@ -47,7 +48,8 @@ export function ModuleReviews(): JSX.Element {
         </Box>
       ))}
 
-      <PrInspectorDrawer pr={open} onClose={() => setOpen(null)} loadDiff={loadDiff} loadComments={loadComments} />
+      <PrInspectorDrawer pr={open} onClose={() => setOpen(null)} loadDiff={loadDiff} loadComments={loadComments}
+        review={review} reviewRunning={reviewRunning} openReviewFor={openReviewFor} runReview={runReview} />
     </Box>
   );
 }

@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrHost } from '@watchtower/shared/ipcContract.js';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrHost, PrReviewPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
 
 export type HostFilter = 'all' | 'github' | 'azdo';
 const HOST_LABEL: Record<PrHost, string> = { github: 'GitHub', azdo: 'Azure DevOps · Škoda' };
+
+const SEVERITY_ORDER: Record<PrFindingPayload['severity'], number> = { error: 0, warn: 1, info: 2 };
+
+export function sortFindings(findings: PrFindingPayload[]): PrFindingPayload[] {
+  return [...findings].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+}
 
 export function sortByUpdatedDesc(prs: PullRequestPayload[]): PullRequestPayload[] {
   return [...prs].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
@@ -65,5 +71,76 @@ export function useReviews() {
     return res.threads;
   }, []);
 
-  return { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments };
+  // ─── PR review agent (Report tab) ───
+  const [review, setReview] = useState<PrReviewPayload | null>(null);
+  const [reviewRunning, setReviewRunning] = useState(false);
+  // The review currently shown in the drawer. Pushes for other reviewIds (e.g. a
+  // review kicked off for a PR the user has since closed) are ignored.
+  const openReviewIdRef = useRef<number | null>(null);
+  // Bumped on every openReviewFor call so a slow lookup for a PR the user has since
+  // navigated away from can't clobber the (already newer) state with stale data.
+  const openReviewTokenRef = useRef(0);
+
+  const startReview = useCallback(async (pr: PullRequestPayload): Promise<number> => {
+    const res = await window.watchtower.invoke('prReview:start', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
+    return res.reviewId;
+  }, []);
+
+  const getReview = useCallback(async (reviewId: number): Promise<PrReviewPayload | null> => {
+    const res = await window.watchtower.invoke('prReview:get', { reviewId });
+    return res.review;
+  }, []);
+
+  const listReviews = useCallback(async (repoKey?: string): Promise<PrReviewPayload[]> => {
+    const res = await window.watchtower.invoke('prReview:list', { repoKey });
+    return res.reviews;
+  }, []);
+
+  const latestReviewFor = useCallback(async (pr: PullRequestPayload): Promise<PrReviewPayload | null> => {
+    const reviews = await listReviews(pr.repoKey);
+    return reviews.find((r) => r.host === pr.host && r.prNumber === pr.number) ?? null;
+  }, [listReviews]);
+
+  // Load (or reload) the review shown for a PR — call when the Report tab / drawer opens.
+  const openReviewFor = useCallback(async (pr: PullRequestPayload): Promise<void> => {
+    // Clear immediately so switching PRs never flashes the previous PR's review
+    // while the (async) lookup for the new one is still in flight.
+    const token = ++openReviewTokenRef.current;
+    openReviewIdRef.current = null;
+    setReview(null);
+    setReviewRunning(false);
+    const found = await latestReviewFor(pr);
+    if (token !== openReviewTokenRef.current) return; // a newer openReviewFor call has since won
+    openReviewIdRef.current = found?.id ?? null;
+    setReview(found);
+    setReviewRunning(found?.status === 'running');
+  }, [latestReviewFor]);
+
+  // Kick off a fresh review run for the open PR and start tracking its reviewId.
+  const runReview = useCallback(async (pr: PullRequestPayload): Promise<number> => {
+    setReviewRunning(true);
+    const reviewId = await startReview(pr);
+    openReviewIdRef.current = reviewId;
+    return reviewId;
+  }, [startReview]);
+
+  useEffect(() => {
+    const offDone = window.watchtower.on('prReviewDone', (p) => {
+      if (p.reviewId !== openReviewIdRef.current) return;
+      void getReview(p.reviewId).then((r) => { setReview(r); setReviewRunning(false); });
+    });
+    const offProgress = window.watchtower.on('prReviewProgress', (p) => {
+      if (p.reviewId !== openReviewIdRef.current) return;
+      setReviewRunning(p.status === 'running');
+      if (p.status === 'error') {
+        void getReview(p.reviewId).then((r) => setReview(r));
+      }
+    });
+    return () => { offDone(); offProgress(); };
+  }, [getReview]);
+
+  return {
+    pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
+    review, reviewRunning, openReviewFor, runReview, startReview, getReview, listReviews, latestReviewFor,
+  };
 }

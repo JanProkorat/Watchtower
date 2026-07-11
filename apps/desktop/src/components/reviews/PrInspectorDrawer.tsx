@@ -1,19 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Drawer, Box, Typography, Tabs, Tab, Alert, CircularProgress, Stack } from '@mui/material';
-import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
+import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrReviewPayload } from '@watchtower/shared/ipcContract.js';
 import { DiffView } from './DiffView.js';
 import { CommentThread } from './CommentThread.js';
+import { ReviewReport } from './ReviewReport.js';
+import { useToast } from '../../state/useToast.js';
 
-export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments }: {
+export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview }: {
   pr: PullRequestPayload | null; onClose(): void;
   loadDiff(pr: PullRequestPayload): Promise<DiffFilePayload[]>;
   loadComments(pr: PullRequestPayload): Promise<PrCommentThreadPayload[]>;
+  review: PrReviewPayload | null;
+  reviewRunning: boolean;
+  openReviewFor(pr: PullRequestPayload): Promise<void>;
+  runReview(pr: PullRequestPayload): Promise<number>;
 }): JSX.Element {
   const [tab, setTab] = useState(0);
   const [files, setFiles] = useState<DiffFilePayload[]>([]);
   const [threads, setThreads] = useState<PrCommentThreadPayload[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showError } = useToast();
 
   useEffect(() => {
     if (!pr) return;
@@ -23,7 +30,16 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments }: {
       // A comments-fetch failure must not blank the diff — degrade to 0 threads.
       loadComments(pr).then(setThreads).catch(() => setThreads([])),
     ]).finally(() => setLoading(false));
-  }, [pr, loadDiff, loadComments]);
+    // The report tab needs the latest review as soon as the drawer opens, so its tab
+    // label can show a finding count without waiting for the user to click it. Runs
+    // independently of the diff/comments load so a slow review lookup can't stall them.
+    void openReviewFor(pr).catch(() => undefined);
+  }, [pr, loadDiff, loadComments, openReviewFor]);
+
+  const handleRun = (): void => {
+    if (!pr) return;
+    runReview(pr).catch((e) => showError(e instanceof Error ? e.message : String(e)));
+  };
 
   return (
     <Drawer anchor="right" open={pr != null} onClose={onClose} PaperProps={{ sx: { width: 'min(1200px, 92vw)', maxWidth: '92vw', display: 'flex', flexDirection: 'column' } }}>
@@ -40,7 +56,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments }: {
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 1, minHeight: 40 }}>
             <Tab label={`Diff${files.length ? ` (${files.length})` : ''}`} sx={{ minHeight: 40 }} />
             <Tab label={`Comments (${threads.length})`} sx={{ minHeight: 40 }} />
-            <Tab label="Report" sx={{ minHeight: 40 }} />
+            <Tab label={`Report${review?.status === 'done' ? ` (${review.findings.length})` : ''}`} sx={{ minHeight: 40 }} />
           </Tabs>
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {tab === 0 && (
@@ -76,9 +92,9 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments }: {
               </Box>
             )}
             {tab === 2 && (
-              <Typography sx={{ p: 2, color: 'text.secondary', fontSize: 13 }}>
-                No review yet. Running the review agent comes in the next step (SP2).
-              </Typography>
+              <Box sx={{ height: '100%', overflow: 'auto' }}>
+                <ReviewReport pr={pr} review={review} running={reviewRunning} onRun={handleRun} />
+              </Box>
             )}
           </Box>
         </>
