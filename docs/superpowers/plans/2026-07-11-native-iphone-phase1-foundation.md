@@ -246,7 +246,7 @@ git commit -m "feat(ios): scaffold WatchtowerCore package + XcodeGen iPhone app 
 
 ### Task 2: Theme palette + hex color initializer
 
-The one piece of Phase-1 theme with real logic worth a test: a `Color(hex:)` initializer. Ships the shared `Palette` all later views read from.
+The one piece of Phase-1 theme with real logic worth a test: hex parsing. We factor the parse into a host-agnostic pure function `hexRGB(_:)` (no UIKit/AppKit — so `swift test` compiles and runs on the macOS host), and `Color(hex:)` wraps it. Ships the shared `Palette` all later views read from.
 
 **Files:**
 - Create: `swift/WatchtowerCore/Sources/WatchtowerCore/Theme/Palette.swift`
@@ -254,56 +254,68 @@ The one piece of Phase-1 theme with real logic worth a test: a `Color(hex:)` ini
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `Color(hex: String)` initializer; `enum Palette` with static `Color`s: `baseBg`, `textPrimary`, `textMuted`, `textDim`, `accent`, `accentIcon`; `Palette.ctaGradient: LinearGradient`.
+- Produces: `func hexRGB(_ hex: String) -> (red: Double, green: Double, blue: Double)?` (internal — visible to tests via `@testable import`); `Color(hex: String)` initializer; `enum Palette` with static `Color`s: `baseBg`, `textPrimary`, `textMuted`, `textDim`, `accent`, `accentIcon`; `Palette.ctaGradient: LinearGradient`.
 
-- [ ] **Step 1: Write the failing test**
+> **Do NOT use `UIColor`/`NSColor` in the test.** `swift test` runs on the macOS host where `UIColor` does not exist. Assert on `hexRGB(_:)`'s `Double` components directly — that is the real logic and it is platform-free.
+
+- [ ] **Step 1: Write the failing tests**
 
 `PaletteTests.swift`:
 ```swift
 import XCTest
-import SwiftUI
 @testable import WatchtowerCore
 
 final class PaletteTests: XCTestCase {
-    func testHexParsesToComponents() {
-        let c = Color(hex: "#7c6df0")
-        let ui = UIColor(c)
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        ui.getRed(&r, green: &g, blue: &b, alpha: &a)
-        XCTAssertEqual(r, 0x7c / 255, accuracy: 0.01)
-        XCTAssertEqual(g, 0x6d / 255, accuracy: 0.01)
-        XCTAssertEqual(b, 0xf0 / 255, accuracy: 0.01)
-        XCTAssertEqual(a, 1.0, accuracy: 0.01)
+    func testHexParsesToComponents() throws {
+        let c = try XCTUnwrap(hexRGB("#7c6df0"))
+        XCTAssertEqual(c.red, 0x7c / 255.0, accuracy: 0.001)
+        XCTAssertEqual(c.green, 0x6d / 255.0, accuracy: 0.001)
+        XCTAssertEqual(c.blue, 0xf0 / 255.0, accuracy: 0.001)
     }
 
-    func testPaletteAccentMatchesToken() {
-        XCTAssertEqual(UIColor(Palette.accent), UIColor(Color(hex: "#7c6df0")))
+    func testHexAcceptsNoHashPrefix() {
+        XCTAssertEqual(hexRGB("7c6df0")?.red, hexRGB("#7c6df0")?.red)
+    }
+
+    func testMalformedHexReturnsNil() {
+        XCTAssertNil(hexRGB("#zzzzzz"))  // non-hex
+        XCTAssertNil(hexRGB("#12345"))   // wrong length
+        XCTAssertNil(hexRGB(""))         // empty
     }
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run tests to verify they fail**
 
 Run: `cd swift/WatchtowerCore && swift test --filter PaletteTests`
-Expected: FAIL — `Color(hex:)` / `Palette` are undefined.
+Expected: FAIL — `hexRGB` is undefined.
 
 - [ ] **Step 3: Implement `Palette.swift`**
 
 ```swift
 import SwiftUI
 
+/// Parse a `#RRGGBB` (or `RRGGBB`) hex string into sRGB components in 0...1.
+/// Returns nil on malformed input. Host-agnostic (no UIKit/AppKit) so it is
+/// unit-testable under `swift test` on macOS.
+func hexRGB(_ hex: String) -> (red: Double, green: Double, blue: Double)? {
+    let s = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+    guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
+    return (
+        red: Double((v >> 16) & 0xff) / 255,
+        green: Double((v >> 8) & 0xff) / 255,
+        blue: Double(v & 0xff) / 255
+    )
+}
+
 public extension Color {
-    /// Parse a `#RRGGBB` (or `RRGGBB`) hex string. Falls back to clear on bad input.
+    /// Parse a `#RRGGBB` hex string. Falls back to clear on bad input.
     init(hex: String) {
-        let s = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
-        guard s.count == 6, let v = UInt32(s, radix: 16) else { self = .clear; return }
-        self.init(
-            .sRGB,
-            red: Double((v >> 16) & 0xff) / 255,
-            green: Double((v >> 8) & 0xff) / 255,
-            blue: Double(v & 0xff) / 255,
-            opacity: 1
-        )
+        if let c = hexRGB(hex) {
+            self.init(.sRGB, red: c.red, green: c.green, blue: c.blue, opacity: 1)
+        } else {
+            self = .clear
+        }
     }
 }
 
