@@ -28,7 +28,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import type { ThemeMode } from '../theme.js';
 import type { ListTab } from '../util/timetrackerUrl.js';
 import type { SettingsTab } from '../util/settingsUrl.js';
-import { glassFloating } from '../theme/glass.js';
+import { glassFloating, accentWash, accentRing, accentIconColor } from '../theme/glass.js';
 
 export type ModuleId = 'dashboard' | 'instances' | 'billing' | 'reviews' | 'settings';
 
@@ -151,14 +151,11 @@ export function ModuleRail({
   onToggleMode,
 }: Props) {
   const theme = useTheme();
-  // Active nav item: purple wash background + 1px ring matching the prototype
-  // (#s-rail: --chip background + 0 0 0 1px rgba(154,135,245,.30) ring).
-  // Dark: chip = rgba(154,135,245,.24); light: chip = rgba(109,95,224,.16).
-  const isDark = theme.palette.mode === 'dark';
-  const activeItemBg = isDark ? 'rgba(154,135,245,0.24)' : 'rgba(109,95,224,0.16)';
-  const activeItemRing = isDark ? 'rgba(154,135,245,0.30)' : 'rgba(109,95,224,0.25)';
-  // Accent icon color for active item (--acc token from prototype).
-  const accentColor = theme.palette.primary.main;
+  // Active nav item styling — derived from the theme accent (see glass.ts), so
+  // the rail, TabStrip, and SessionTabBar share one active-state language.
+  const activeItemBg = accentWash(theme);
+  const activeItemRingShadow = accentRing(theme);
+  const accentColor = accentIconColor(theme);
 
   const [expanded, setExpanded] = useState<boolean>(() => readPersistedBool(STORAGE_KEY, true));
   const [billingExpanded, setBillingExpanded] = useState<boolean>(() =>
@@ -330,7 +327,7 @@ export function ModuleRail({
               // Active: purple wash fill + 1px purple ring (prototype #s-rail .nav.on).
               backgroundColor: isActive ? activeItemBg : 'transparent',
               boxShadow: isActive
-                ? `inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 1px ${activeItemRing}`
+                ? activeItemRingShadow
                 : 'none',
               transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
               ':hover': {
@@ -437,7 +434,7 @@ export function ModuleRail({
                     // Active sub-item: same purple wash + ring as parent items.
                     backgroundColor: subActive ? activeItemBg : 'transparent',
                     boxShadow: subActive
-                      ? `inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 1px ${activeItemRing}`
+                      ? activeItemRingShadow
                       : 'none',
                     transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
                     ':hover': {

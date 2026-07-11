@@ -59,7 +59,7 @@ export const darkTheme = createTheme({
   ...shared,
   palette: {
     mode: 'dark',
-    primary: { main: '#7c5cff' },
+    primary: { main: '#38bdf8' },
     secondary: { main: '#22d3ee' },
     success: { main: '#22c55e' },
     warning: { main: '#f59e0b' },
@@ -140,7 +140,7 @@ export const lightTheme = createTheme({
   ...shared,
   palette: {
     mode: 'light',
-    primary: { main: '#6e54e0' },
+    primary: { main: '#0284c7' },
     secondary: { main: '#0ea5b7' },
     success: { main: '#16a34a' },
     warning: { main: '#d97706' },

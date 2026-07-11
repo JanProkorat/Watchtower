@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { glassSurface, glassFill } from '../../../apps/desktop/src/theme/glass.js';
+import {
+  glassSurface,
+  glassFill,
+  GLASS_FILL_DARK_RGB,
+  GLASS_FILL_DARK_OPACITY_MAX,
+} from '../../../apps/desktop/src/theme/glass.js';
 import type { Theme } from '@mui/material/styles';
 
 /** Minimal theme stub — glassSurface only reads theme.palette.mode. */
@@ -34,8 +39,8 @@ describe('glassSurface', () => {
 
   it('dark mode uses dark fill rgba', () => {
     const result = glassSurface(makeTheme('dark'));
-    // Fill must be a rgba based on the dark glass token (60,64,86).
-    expect(result.backgroundColor).toMatch(/^rgba\(60,64,86,/);
+    // Fill must be a rgba based on the dark glass token.
+    expect(result.backgroundColor).toMatch(new RegExp(`^rgba\\(${GLASS_FILL_DARK_RGB},`));
   });
 
   it('light mode uses light fill rgba', () => {
@@ -50,12 +55,12 @@ describe('glassSurface', () => {
     expect(base.backgroundColor).not.toBe(elevated.backgroundColor);
   });
 
-  it('fill opacity does not exceed 0.72 in dark mode regardless of elevation', () => {
+  it('fill opacity does not exceed the dark max regardless of elevation', () => {
     const result = glassSurface(makeTheme('dark'), { elevation: 100 });
-    const match = result.backgroundColor.match(/rgba\(60,64,86,([\d.]+)\)/);
+    const match = result.backgroundColor.match(new RegExp(`rgba\\(${GLASS_FILL_DARK_RGB},([\\d.]+)\\)`));
     expect(match).not.toBeNull();
     const opacity = parseFloat(match![1]);
-    expect(opacity).toBeLessThanOrEqual(0.72);
+    expect(opacity).toBeLessThanOrEqual(GLASS_FILL_DARK_OPACITY_MAX);
   });
 
   it('fill opacity does not exceed 0.85 in light mode regardless of elevation', () => {

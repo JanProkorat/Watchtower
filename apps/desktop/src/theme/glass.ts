@@ -1,4 +1,4 @@
-import type { Theme } from '@mui/material/styles';
+import { type Theme, alpha } from '@mui/material/styles';
 
 export interface GlassSurfaceOptions {
   /** 0 = base (default). Higher values slightly increase fill opacity and shadow. */
@@ -27,9 +27,10 @@ export interface GlassFillStyle {
  *   dark  paper → rgba(GLASS_FILL_DARK_RGB,  GLASS_FILL_DARK_OPACITY)
  *   light paper → rgba(GLASS_FILL_LIGHT_RGB, GLASS_FILL_LIGHT_OPACITY)
  */
-export const GLASS_FILL_DARK_RGB = '60,64,86';
-export const GLASS_FILL_DARK_OPACITY = 0.34;
-export const GLASS_FILL_DARK_OPACITY_MAX = 0.72;
+// Cool blue-slate frosted fill (ocean palette). Sits over the ambient glow.
+export const GLASS_FILL_DARK_RGB = '44,54,74';
+export const GLASS_FILL_DARK_OPACITY = 0.36;
+export const GLASS_FILL_DARK_OPACITY_MAX = 0.74;
 
 export const GLASS_FILL_LIGHT_RGB = '255,255,255';
 export const GLASS_FILL_LIGHT_OPACITY = 0.50;
@@ -148,29 +149,50 @@ export function glassFloating(
   };
 }
 
-// The purple wash + ring below mirror the tuned values the ModuleRail already
-// uses inline (its active nav item), so the rail, instance TabStrip, and
-// SessionTabBar all read as one consistent active-state language.
+// The active-state language (rail, instance TabStrip, SessionTabBar) is derived
+// from theme.palette.primary, so re-theming the accent only touches theme.ts.
 
 /** Translucent accent wash behind an active nav item / tab (iPad `accentWash`). */
 export function accentWash(theme: Theme): string {
-  return theme.palette.mode === 'dark' ? 'rgba(154,135,245,0.24)' : 'rgba(109,95,224,0.16)';
+  return alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.18 : 0.12);
 }
 
 /** Ring highlight around an active nav item — inset top highlight + accent frame. */
 export function accentRing(theme: Theme): string {
-  const ring = theme.palette.mode === 'dark' ? 'rgba(154,135,245,0.30)' : 'rgba(109,95,224,0.25)';
+  const ring = alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.42 : 0.3);
   return `inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 1px ${ring}`;
 }
 
-/** Icon tint for an active nav item (iPad `accentIcon` → theme primary). */
+/** Icon tint for an active nav item (lighter accent in dark, saturated in light). */
 export function accentIconColor(theme: Theme): string {
-  return theme.palette.primary.main;
+  return theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.main;
 }
 
 /** Text color for an active nav item / tab (white in dark, saturated primary in light). */
 export function accentActiveText(theme: Theme): string {
   return theme.palette.mode === 'dark' ? '#ffffff' : theme.palette.primary.main;
+}
+
+/**
+ * Full-window ambient background — a faint brand glow over a lifted near-black
+ * (dark) / soft tint (light). This is what stops the app reading as flat,
+ * depressing black behind the frosted chrome. Ocean-blue glows in dark mode.
+ */
+export function ambientBackground(theme: Theme): string {
+  const p = theme.palette.primary.main;
+  if (theme.palette.mode === 'dark') {
+    return (
+      `radial-gradient(58% 52% at 2% 0%, ${alpha(p, 0.18)}, transparent 60%),` +
+      `radial-gradient(64% 60% at 100% 4%, ${alpha(theme.palette.info.main, 0.13)}, transparent 55%),` +
+      `radial-gradient(82% 82% at 92% 100%, ${alpha(theme.palette.secondary.main, 0.1)}, transparent 58%),` +
+      `#0a0d13`
+    );
+  }
+  return (
+    `radial-gradient(58% 52% at 2% 0%, ${alpha(p, 0.12)}, transparent 60%),` +
+    `radial-gradient(64% 60% at 100% 4%, ${alpha(theme.palette.info.main, 0.08)}, transparent 55%),` +
+    `#eef2f7`
+  );
 }
 
 /** Amber used for the attention (needs-input) status dot, matching the iPad. */

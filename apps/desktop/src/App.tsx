@@ -27,6 +27,7 @@ import {
 import { arrayMove } from '@dnd-kit/sortable';
 import 'dayjs/locale/cs';
 import { darkTheme, lightTheme } from './theme.js';
+import { ambientBackground } from './theme/glass.js';
 import { useThemeMode } from './state/useThemeMode.js';
 import { useActiveModule } from './state/useActiveModule.js';
 import { ToastProvider } from './state/useToast.js';
@@ -386,7 +387,7 @@ export function App() {
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="cs">
         <ToastProvider>
-          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', background: (t) => ambientBackground(t) }}>
             <DndContext
               sensors={dndSensors}
               onDragStart={handleDragStart}
