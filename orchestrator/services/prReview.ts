@@ -58,12 +58,16 @@ export function parseReviewOutput(stdout: string): { summary: string; findings: 
     return fail();
   }
 
+  if (envelope === null || typeof envelope !== 'object') return fail();
+
   if (envelope.is_error) return fail();
 
   let parsed: { summary?: unknown; findings?: unknown };
   if (typeof envelope.result === 'string') {
     try {
-      parsed = JSON.parse(envelope.result) as { summary?: unknown; findings?: unknown };
+      const inner = JSON.parse(envelope.result);
+      if (inner === null || typeof inner !== 'object') return fail();
+      parsed = inner as { summary?: unknown; findings?: unknown };
     } catch {
       return fail();
     }

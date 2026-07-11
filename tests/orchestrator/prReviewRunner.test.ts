@@ -54,6 +54,15 @@ describe('parseReviewOutput', () => {
     const envelope = JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'not json' });
     expect(() => parseReviewOutput(envelope)).toThrow(/could not parse review output/);
   });
+
+  it('throws a clear error when the outer envelope is a JSON null literal', () => {
+    expect(() => parseReviewOutput('null')).toThrow(/could not parse review output/);
+  });
+
+  it('throws a clear error when the inner result is a JSON null literal', () => {
+    const envelope = JSON.stringify({ is_error: false, result: 'null' });
+    expect(() => parseReviewOutput(envelope)).toThrow(/could not parse review output/);
+  });
 });
 
 describe('buildReviewPrompt', () => {
