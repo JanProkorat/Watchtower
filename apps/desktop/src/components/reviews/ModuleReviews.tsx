@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Box, Typography, Alert, Chip, TextField, Button, Stack, CircularProgress } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { useReviews, applyPrFilter, groupPrsByHost, type HostFilter } from '../../state/useReviews.js';
 import type { PullRequestPayload } from '@watchtower/shared/ipcContract.js';
 import { PrRow } from './PrRow.js';
 import { PrInspectorDrawer } from './PrInspectorDrawer.js';
+import { glassSurface } from '../../theme/glass.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 
 export function ModuleReviews(): JSX.Element {
   const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
     review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments } = useReviews();
   const { showError } = useToast();
+  const theme = useTheme();
   const [host, setHost] = useState<HostFilter>('all');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<PullRequestPayload | null>(null);
@@ -46,11 +49,15 @@ export function ModuleReviews(): JSX.Element {
       {groups.map((g) => (
         <Box key={g.host} sx={{ mb: 2 }}>
           <Typography sx={{ fontSize: 10, letterSpacing: '.07em', textTransform: 'uppercase', color: 'text.secondary', mb: 0.5 }}>{g.label}</Typography>
-          <Stack spacing={0.25}>{g.prs.map((pr) => (
-            <PrRow key={`${pr.repoKey}-${pr.number}`} pr={pr} nowMs={nowMs} onOpen={setOpen} reviewState={reviewStateFor(pr)}
-              onReview={(p) => { setOpen(p); void runReview(p).catch((e) => showError(toastMessage(e))); }}
-              onCancel={(p) => void cancelReview(p).catch((e) => showError(toastMessage(e)))} />
-          ))}</Stack>
+          {/* One frosted panel per host group — glassSurface = a single blur pass
+              for the whole list; the PrRows inside stay bare (hover only). */}
+          <Box sx={{ ...glassSurface(theme, { elevation: 1 }), borderRadius: 2, p: 0.75 }}>
+            <Stack spacing={0.25}>{g.prs.map((pr) => (
+              <PrRow key={`${pr.repoKey}-${pr.number}`} pr={pr} nowMs={nowMs} onOpen={setOpen} reviewState={reviewStateFor(pr)}
+                onReview={(p) => { setOpen(p); void runReview(p).catch((e) => showError(toastMessage(e))); }}
+                onCancel={(p) => void cancelReview(p).catch((e) => showError(toastMessage(e)))} />
+            ))}</Stack>
+          </Box>
         </Box>
       ))}
 

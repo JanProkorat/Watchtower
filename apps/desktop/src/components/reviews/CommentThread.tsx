@@ -1,5 +1,7 @@
 import { Box, Typography, Chip, Link } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import type { PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
+import { glassFill } from '../../theme/glass.js';
 
 export function formatCommentDate(iso: string): string {
   if (!iso) return '';
@@ -43,9 +45,11 @@ function renderCommentBody(body: string): JSX.Element {
 }
 
 export function CommentThread({ thread }: { thread: PrCommentThreadPayload }): JSX.Element {
+  const theme = useTheme();
   return (
-    <Box sx={{ bgcolor: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.09)',
-      borderRadius: 2, p: 1.25, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+    // Repeating comment card — glassFill (no per-card blur; sits over the
+    // already-frosted drawer/diff backdrop) and theme-aware for light + dark.
+    <Box sx={{ ...glassFill(theme, { elevation: 2 }), borderRadius: 2, p: 1.25 }}>
       {thread.file && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
           <Typography component="span" sx={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: 'primary.main' }}>
