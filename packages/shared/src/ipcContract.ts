@@ -85,6 +85,9 @@ export type IpcRequest =
   | { kind: 'prs:diff'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
   | { kind: 'prs:comments'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
   | { kind: 'reviews:projectRepo'; payload: { projectId: number } }
+  | { kind: 'prReview:start'; payload: { host: PrHost; repoKey: string; prNumber: number } }
+  | { kind: 'prReview:get'; payload: { reviewId: number } }
+  | { kind: 'prReview:list'; payload: { repoKey?: string } }
   | { kind: 'devops:setPat'; payload: { host: string; pat: string } }
   | { kind: 'devops:hasPat'; payload: { host: string } };
 
@@ -547,6 +550,29 @@ export interface PrCommentThreadPayload {
   comments: PrCommentPayload[];
 }
 
+export interface PrFindingPayload {
+  file: string;
+  line: number;
+  severity: 'error' | 'warn' | 'info';
+  category: string;
+  summary: string;
+  detail?: string;
+}
+
+export interface PrReviewPayload {
+  id: number;
+  host: PrHost;
+  repoKey: string;
+  prNumber: number;
+  headSha: string;
+  status: 'running' | 'done' | 'error';
+  summary: string | null;
+  findings: PrFindingPayload[];
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
 export type IpcResponse =
   | { kind: 'ping'; payload: { now: number; main: number; orch: number } }
   | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
@@ -654,7 +680,10 @@ export type IpcResponse =
   | { kind: 'prs:comments'; payload: { threads: PrCommentThreadPayload[] } }
   | { kind: 'reviews:projectRepo'; payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null } }
   | { kind: 'devops:setPat'; payload: { ok: true } }
-  | { kind: 'devops:hasPat'; payload: { hasPat: boolean } };
+  | { kind: 'devops:hasPat'; payload: { hasPat: boolean } }
+  | { kind: 'prReview:start'; payload: { reviewId: number } }
+  | { kind: 'prReview:get'; payload: { review: PrReviewPayload | null } }
+  | { kind: 'prReview:list'; payload: { reviews: PrReviewPayload[] } };
 
 export interface AgentRowPayload {
   name: string;
@@ -818,7 +847,9 @@ export type IpcPush =
   | {
       kind: 'orchestratorCrashed';
       payload: { code: number | null; restarting: boolean };
-    };
+    }
+  | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
+  | { kind: 'prReviewDone'; payload: { reviewId: number } };
 
 export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'chooseDirectory',

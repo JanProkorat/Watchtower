@@ -98,7 +98,14 @@ export type OrchRequest =
         devopsPats?: Record<string, string>;
       };
     }
-  | { id: string; kind: 'reviews:projectRepo'; payload: { projectId: number } };
+  | { id: string; kind: 'reviews:projectRepo'; payload: { projectId: number } }
+  | {
+      id: string;
+      kind: 'prReview:start';
+      payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number };
+    }
+  | { id: string; kind: 'prReview:get'; payload: { reviewId: number } }
+  | { id: string; kind: 'prReview:list'; payload: { repoKey?: string } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -580,7 +587,10 @@ export type OrchResponse =
   | {
       kind: 'reviews:projectRepo';
       payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null };
-    };
+    }
+  | { kind: 'prReview:start'; payload: { reviewId: number } }
+  | { kind: 'prReview:get'; payload: { review: import('./ipcContract.js').PrReviewPayload | null } }
+  | { kind: 'prReview:list'; payload: { reviews: import('./ipcContract.js').PrReviewPayload[] } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
@@ -593,7 +603,9 @@ export type OrchPush =
   | { kind: 'clearAttention'; payload: { instanceId: string } }
   | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
   | { kind: 'badge'; payload: { count: number } }
-  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
+  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
+  | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
+  | { kind: 'prReviewDone'; payload: { reviewId: number } };
 
 type AnyPort = {
   postMessage(data: unknown): void;
