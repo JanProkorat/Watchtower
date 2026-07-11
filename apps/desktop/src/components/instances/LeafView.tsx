@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react';
-import { Box, Typography, useTheme } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ColumnSlot } from './ColumnSlot.js';
 import { SessionTabBar } from './SessionTabBar.js';
@@ -38,7 +38,6 @@ export function LeafView({
   // Live pane percentages from the column PanelGroup, so the session tabs above
   // can track the resize handle instead of staying at fixed equal widths.
   const [columnSizes, setColumnSizes] = useState<number[]>([]);
-  const theme = useTheme();
 
   if (tab.kind === 'dashboard') {
     return (
@@ -125,7 +124,10 @@ export function LeafView({
         onAddSession={onAddSession}
         onSetTask={onSetTask}
       />
-      <Box sx={{ flex: 1, minHeight: 0 }}>
+      {/* Outer gutter so the instance cards float clear of the module edges and
+          the SessionTabBar above; the transparent resize handles below become
+          the inter-card gap, letting the vibrancy backdrop show between cards. */}
+      <Box sx={{ flex: 1, minHeight: 0, p: '8px' }}>
         <PanelGroup
           direction="horizontal"
           autoSaveId={`columns-${tab.id}`}
@@ -136,9 +138,9 @@ export function LeafView({
               {idx > 0 && (
                 <PanelResizeHandle
                   style={{
-                    width: 6,
-                    // Use theme divider so the hairline is visible in both dark and light mode.
-                    background: theme.palette.divider,
+                    // Transparent gap between cards — the backdrop shows through.
+                    width: 12,
+                    background: 'transparent',
                     cursor: 'col-resize',
                   }}
                 />
