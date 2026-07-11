@@ -34,4 +34,43 @@ describe('AttentionThreadDrawer', () => {
     fireEvent.click(screen.getByText('Open in terminal'));
     expect(open).toHaveBeenCalledWith('i1');
   });
+
+  it('a crashed thread is non-replyable: shows a stopped note, hides option chips, disables Send, and never calls sendReply', () => {
+    const crashedThread = {
+      instanceId: 'i2', label: 'wt', kind: 'crashed', unanswered: true, closed: false,
+      messages: [{
+        syncId: 'c2', instanceId: 'i2', projectLabel: 'wt', role: 'claude', kind: 'crashed',
+        body: 'Instance crashed', options: [{ number: 1, label: 'Restart' }], replyTo: null, injectedAt: null, closedAt: null, createdAt: '1',
+      }],
+    } as any;
+
+    sendReply.mockClear();
+    render(<AttentionThreadDrawer thread={crashedThread} onClose={() => {}} />);
+
+    expect(screen.getByText(/stopped/i)).toBeTruthy();
+    expect(screen.queryByText('Restart')).toBeNull();
+
+    const textarea = screen.getByPlaceholderText('Write a reply…') as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(true);
+
+    const sendButton = screen.getByText('Send') as HTMLButtonElement;
+    expect(sendButton.disabled).toBe(true);
+    fireEvent.click(sendButton);
+    expect(sendReply).not.toHaveBeenCalled();
+  });
+
+  it('still renders "Open in terminal" for a crashed thread (inspect/restart is valid)', () => {
+    const open = vi.fn();
+    const crashedThread = {
+      instanceId: 'i2', label: 'wt', kind: 'crashed', unanswered: true, closed: false,
+      messages: [{
+        syncId: 'c2', instanceId: 'i2', projectLabel: 'wt', role: 'claude', kind: 'crashed',
+        body: 'Instance crashed', options: [], replyTo: null, injectedAt: null, closedAt: null, createdAt: '1',
+      }],
+    } as any;
+
+    render(<AttentionThreadDrawer thread={crashedThread} onClose={() => {}} openInTerminal={open} />);
+    fireEvent.click(screen.getByText('Open in terminal'));
+    expect(open).toHaveBeenCalledWith('i2');
+  });
 });

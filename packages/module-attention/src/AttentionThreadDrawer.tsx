@@ -45,9 +45,13 @@ export function AttentionThreadDrawer({ thread, onClose, openInTerminal, anchor 
 
   const latestClaudeMessage = findLatestClaudeMessage(thread.messages);
   const latestClaudeSyncId = latestClaudeMessage?.syncId ?? null;
-  const latestOptions = latestClaudeMessage?.options ?? [];
+  // A crashed instance has no pty left to receive a reply — the thread stays
+  // visible in the bell (groupThreads/mergeAttention are untouched) but the
+  // composer must not offer a reply that would silently vanish.
+  const crashed = thread.kind === 'crashed';
+  const latestOptions = crashed ? [] : (latestClaudeMessage?.options ?? []);
 
-  const canSend = !pending && !thread.closed && latestClaudeSyncId != null;
+  const canSend = !pending && !thread.closed && !crashed && latestClaudeSyncId != null;
 
   async function sendOption(optionNumber: number) {
     if (!canSend || latestClaudeSyncId == null) return;
@@ -120,6 +124,11 @@ export function AttentionThreadDrawer({ thread, onClose, openInTerminal, anchor 
                 {o.label}
               </button>
             ))}
+          </div>
+        )}
+        {crashed && (
+          <div style={{ fontSize: 12.5, color: text.muted }}>
+            This instance has stopped — you can't reply here.
           </div>
         )}
         <textarea
