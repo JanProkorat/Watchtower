@@ -1144,6 +1144,10 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> };
       return { files: await reviewsSvc().diff(p.host, p.repoKey, p.prNumber, p.devopsPats) };
     }
+    case 'prs:comments': {
+      const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> };
+      return { threads: await reviewsSvc().comments(p.host, p.repoKey, p.prNumber, p.devopsPats) };
+    }
     case 'reviews:projectRepo':
       return reviewsSvc().projectRepo((req.payload as { projectId: number }).projectId);
 

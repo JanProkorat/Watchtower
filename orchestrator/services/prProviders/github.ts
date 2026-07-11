@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import type { PullRequestPayload, DiffFilePayload } from '@watchtower/shared/ipcContract.js';
+import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
 import type { Exec, GithubRepoConfig } from './types.js';
 import { parseUnifiedDiff } from './diffParse.js';
 
@@ -44,4 +44,27 @@ export async function listGithubPrs(repo: GithubRepoConfig, exec: Exec = default
 export async function fetchGithubDiff(repo: GithubRepoConfig, prNumber: number, exec: Exec = defaultExec): Promise<DiffFilePayload[]> {
   const out = await exec('gh', ['pr', 'diff', String(prNumber), '--repo', repo.nwo]);
   return parseUnifiedDiff(out);
+}
+
+export function parseGithubComments(reviewJson: string, convoJson: string): PrCommentThreadPayload[] {
+  const threads: PrCommentThreadPayload[] = [];
+  // inline review comments: path + line
+  const review = JSON.parse(reviewJson) as Array<{ id: number; path?: string; line?: number | null; original_line?: number | null; body: string; user?: { login?: string }; created_at?: string }>;
+  for (const c of review) {
+    threads.push({ id: `r${c.id}`, file: c.path ?? null, line: c.line ?? c.original_line ?? null, status: null,
+      comments: [{ author: c.user?.login ?? 'unknown', date: c.created_at ?? '', body: c.body ?? '' }] });
+  }
+  // conversation (issue) comments: no file/line
+  const convo = (JSON.parse(convoJson) as { comments?: Array<{ author?: { login?: string }; body?: string; createdAt?: string }> }).comments ?? [];
+  for (const c of convo) {
+    threads.push({ id: `c${threads.length}`, file: null, line: null, status: null,
+      comments: [{ author: c.author?.login ?? 'unknown', date: c.createdAt ?? '', body: c.body ?? '' }] });
+  }
+  return threads;
+}
+
+export async function fetchGithubComments(repo: GithubRepoConfig, prNumber: number, exec: Exec = defaultExec): Promise<PrCommentThreadPayload[]> {
+  const reviewJson = await exec('gh', ['api', `repos/${repo.nwo}/pulls/${prNumber}/comments`, '--paginate']).catch(() => '[]');
+  const convoJson = await exec('gh', ['pr', 'view', String(prNumber), '--repo', repo.nwo, '--json', 'comments']).catch(() => '{"comments":[]}');
+  return parseGithubComments(reviewJson, convoJson);
 }

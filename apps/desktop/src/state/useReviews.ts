@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { PullRequestPayload, DiffFilePayload, PrHost } from '@watchtower/shared/ipcContract.js';
+import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrHost } from '@watchtower/shared/ipcContract.js';
 
 export type HostFilter = 'all' | 'github' | 'azdo';
 const HOST_LABEL: Record<PrHost, string> = { github: 'GitHub', azdo: 'Azure DevOps · Škoda' };
@@ -60,5 +60,10 @@ export function useReviews() {
     return res.files;
   }, []);
 
-  return { pullRequests, syncedAt, loading, error, refresh, loadDiff };
+  const loadComments = useCallback(async (pr: PullRequestPayload): Promise<PrCommentThreadPayload[]> => {
+    const res = await window.watchtower.invoke('prs:comments', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
+    return res.threads;
+  }, []);
+
+  return { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments };
 }

@@ -1,22 +1,29 @@
 import { useEffect, useState } from 'react';
-import { Drawer, Box, Typography, Tabs, Tab, Alert, CircularProgress } from '@mui/material';
-import type { PullRequestPayload, DiffFilePayload } from '@watchtower/shared/ipcContract.js';
+import { Drawer, Box, Typography, Tabs, Tab, Alert, CircularProgress, Stack } from '@mui/material';
+import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
 import { DiffView } from './DiffView.js';
+import { CommentThread } from './CommentThread.js';
 
-export function PrInspectorDrawer({ pr, onClose, loadDiff }: {
+export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments }: {
   pr: PullRequestPayload | null; onClose(): void;
   loadDiff(pr: PullRequestPayload): Promise<DiffFilePayload[]>;
+  loadComments(pr: PullRequestPayload): Promise<PrCommentThreadPayload[]>;
 }): JSX.Element {
   const [tab, setTab] = useState(0);
   const [files, setFiles] = useState<DiffFilePayload[]>([]);
+  const [threads, setThreads] = useState<PrCommentThreadPayload[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!pr) return;
-    setTab(0); setFiles([]); setError(null); setLoading(true);
-    void loadDiff(pr).then(setFiles).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoading(false));
-  }, [pr, loadDiff]);
+    setTab(0); setFiles([]); setThreads([]); setError(null); setLoading(true);
+    void Promise.all([
+      loadDiff(pr).then(setFiles).catch((e) => setError(e instanceof Error ? e.message : String(e))),
+      // A comments-fetch failure must not blank the diff — degrade to 0 threads.
+      loadComments(pr).then(setThreads).catch(() => setThreads([])),
+    ]).finally(() => setLoading(false));
+  }, [pr, loadDiff, loadComments]);
 
   return (
     <Drawer anchor="right" open={pr != null} onClose={onClose} PaperProps={{ sx: { width: 'min(1200px, 92vw)', maxWidth: '92vw', display: 'flex', flexDirection: 'column' } }}>
@@ -32,6 +39,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff }: {
           </Box>
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 1, minHeight: 40 }}>
             <Tab label={`Diff${files.length ? ` (${files.length})` : ''}`} sx={{ minHeight: 40 }} />
+            <Tab label={`Komentáře (${threads.length})`} sx={{ minHeight: 40 }} />
             <Tab label="Report" sx={{ minHeight: 40 }} />
           </Tabs>
           <Box sx={{ flex: 1, minHeight: 0 }}>
@@ -39,10 +47,35 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff }: {
               <>
                 {error && <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>}
                 {loading && <Box sx={{ p: 2 }}><CircularProgress size={20} /></Box>}
-                {!loading && !error && <DiffView files={files} />}
+                {!loading && !error && <DiffView files={files} threads={threads} />}
               </>
             )}
             {tab === 1 && (
+              <Box sx={{ p: 2, height: '100%', overflow: 'auto' }}>
+                {loading && <CircularProgress size={20} />}
+                {!loading && threads.length === 0 && (
+                  <Typography color="text.secondary">Žádné komentáře.</Typography>
+                )}
+                {!loading && threads.length > 0 && (() => {
+                  const general = threads.filter((t) => t.file == null);
+                  const anchored = threads.filter((t) => t.file != null);
+                  return (
+                    <Stack spacing={1}>
+                      {general.length > 0 && (
+                        <>
+                          <Typography sx={{ fontSize: 10, letterSpacing: '.07em', textTransform: 'uppercase', color: 'text.secondary' }}>
+                            Obecné
+                          </Typography>
+                          {general.map((t) => <CommentThread key={t.id} thread={t} />)}
+                        </>
+                      )}
+                      {anchored.map((t) => <CommentThread key={t.id} thread={t} />)}
+                    </Stack>
+                  );
+                })()}
+              </Box>
+            )}
+            {tab === 2 && (
               <Typography sx={{ p: 2, color: 'text.secondary', fontSize: 13 }}>
                 Zatím bez recenze. Spuštění review agenta přijde v dalším kroku (SP2).
               </Typography>

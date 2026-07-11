@@ -105,7 +105,7 @@ export function registerIpc(): void {
         return { hasPat: await hasPat((payload as { host: string }).host) };
       }
 
-      if (kind === 'prs:refresh' || kind === 'prs:diff') {
+      if (kind === 'prs:refresh' || kind === 'prs:diff' || kind === 'prs:comments') {
         return orch.invoke(kind as 'prs:refresh', {
           ...(payload as object),
           devopsPats: await getPats(),

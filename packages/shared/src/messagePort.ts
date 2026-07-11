@@ -88,6 +88,16 @@ export type OrchRequest =
         devopsPats?: Record<string, string>;
       };
     }
+  | {
+      id: string;
+      kind: 'prs:comments';
+      payload: {
+        host: import('./ipcContract.js').PrHost;
+        repoKey: string;
+        prNumber: number;
+        devopsPats?: Record<string, string>;
+      };
+    }
   | { id: string; kind: 'reviews:projectRepo'; payload: { projectId: number } };
 
 export interface OrchRunningInstance {
@@ -566,6 +576,7 @@ export type OrchResponse =
       payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null };
     }
   | { kind: 'prs:diff'; payload: { files: import('./ipcContract.js').DiffFilePayload[] } }
+  | { kind: 'prs:comments'; payload: { threads: import('./ipcContract.js').PrCommentThreadPayload[] } }
   | {
       kind: 'reviews:projectRepo';
       payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null };

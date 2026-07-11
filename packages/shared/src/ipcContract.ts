@@ -83,6 +83,7 @@ export type IpcRequest =
   | { kind: 'prs:list'; payload: Record<string, never> }
   | { kind: 'prs:refresh'; payload: { devopsPats?: Record<string, string> } }
   | { kind: 'prs:diff'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
+  | { kind: 'prs:comments'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
   | { kind: 'reviews:projectRepo'; payload: { projectId: number } }
   | { kind: 'devops:setPat'; payload: { host: string; pat: string } }
   | { kind: 'devops:hasPat'; payload: { host: string } };
@@ -537,6 +538,15 @@ export interface DiffFilePayload {
   lines: DiffLinePayload[];
 }
 
+export interface PrCommentPayload { author: string; date: string; body: string; }
+export interface PrCommentThreadPayload {
+  id: string;
+  file: string | null;   // repo-relative path, or null for general PR comments
+  line: number | null;   // 1-based line (right side), or null
+  status: string | null; // e.g. 'active' | 'fixed' | 'closed' (azdo); null for github
+  comments: PrCommentPayload[];
+}
+
 export type IpcResponse =
   | { kind: 'ping'; payload: { now: number; main: number; orch: number } }
   | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
@@ -641,6 +651,7 @@ export type IpcResponse =
   | { kind: 'prs:list'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
   | { kind: 'prs:refresh'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
   | { kind: 'prs:diff'; payload: { files: DiffFilePayload[] } }
+  | { kind: 'prs:comments'; payload: { threads: PrCommentThreadPayload[] } }
   | { kind: 'reviews:projectRepo'; payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null } }
   | { kind: 'devops:setPat'; payload: { ok: true } }
   | { kind: 'devops:hasPat'; payload: { hasPat: boolean } };

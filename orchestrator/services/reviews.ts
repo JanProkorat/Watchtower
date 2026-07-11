@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process';
 import type { SqliteLike } from '../db/migrations.js';
-import type { PrHost, PullRequestPayload, DiffFilePayload } from '@watchtower/shared/ipcContract.js';
+import type { PrHost, PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
 import type { GithubRepoConfig, AzdoRepoConfig } from './prProviders/types.js';
-import { listGithubPrs, fetchGithubDiff, parseGitRemoteNwo } from './prProviders/github.js';
-import { listAzdoPrs, fetchAzdoDiff, parseAzureRemote } from './prProviders/azureDevops.js';
+import { listGithubPrs, fetchGithubDiff, fetchGithubComments, parseGitRemoteNwo } from './prProviders/github.js';
+import { listAzdoPrs, fetchAzdoDiff, fetchAzdoComments, parseAzureRemote } from './prProviders/azureDevops.js';
 
 export interface ReviewsDeps {
   db: SqliteLike;
@@ -95,6 +95,17 @@ export class ReviewsService {
     const pat = repo ? devopsPats?.[repo.devopsHost] : undefined;
     if (!repo || !pat) return [];
     return fetchAzdoDiff(repo, prNumber, pat);
+  }
+
+  async comments(host: PrHost, repoKey: string, prNumber: number, devopsPats: Record<string, string> | undefined): Promise<PrCommentThreadPayload[]> {
+    const { github, azdo } = await this.resolveRepos();
+    if (host === 'github') {
+      const repo = github.find((r) => r.repoKey === repoKey);
+      return repo ? fetchGithubComments(repo, prNumber) : [];
+    }
+    const repo = azdo.find((r) => r.repoKey === repoKey);
+    const pat = repo ? devopsPats?.[repo.devopsHost] : undefined;
+    return repo && pat ? fetchAzdoComments(repo, prNumber, pat) : [];
   }
 
   async projectRepo(projectId: number): Promise<{ host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null }> {

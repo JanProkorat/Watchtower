@@ -1,4 +1,4 @@
-import type { PullRequestPayload, DiffFilePayload } from '@watchtower/shared/ipcContract.js';
+import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
 import type { AzdoRepoConfig, HttpGet } from './types.js';
 import { parseUnifiedDiff } from './diffParse.js';
 
@@ -60,4 +60,30 @@ export async function fetchAzdoDiff(repo: AzdoRepoConfig, prNumber: number, pat:
   const paths = (changes.changeEntries ?? []).map((c) => c.item?.path).filter(Boolean) as string[];
   const raw = paths.map((p) => `diff --git a${p} b${p}\n--- a${p}\n+++ b${p}\n`).join('');
   return parseUnifiedDiff(raw);
+}
+
+export async function fetchAzdoComments(repo: AzdoRepoConfig, prNumber: number, pat: string, get: HttpGet = defaultGet): Promise<PrCommentThreadPayload[]> {
+  const url = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}/threads?${API}`;
+  const data = (await get(url, pat)) as { value?: Array<{
+    id: number; status?: string; isDeleted?: boolean;
+    threadContext?: { filePath?: string; rightFileStart?: { line?: number }; leftFileStart?: { line?: number } };
+    comments?: Array<{ author?: { displayName?: string; uniqueName?: string }; content?: string; publishedDate?: string; commentType?: string; isDeleted?: boolean }>;
+  }> };
+  const threads: PrCommentThreadPayload[] = [];
+  for (const t of data.value ?? []) {
+    if (t.isDeleted) continue;
+    const comments = (t.comments ?? [])
+      .filter((c) => !c.isDeleted && c.commentType !== 'system' && (c.content ?? '').trim() !== '')
+      .map((c) => ({ author: c.author?.displayName ?? c.author?.uniqueName ?? 'unknown', date: c.publishedDate ?? '', body: c.content ?? '' }));
+    if (comments.length === 0) continue;
+    const fp = t.threadContext?.filePath ?? null;
+    threads.push({
+      id: String(t.id),
+      file: fp ? fp.replace(/^\//, '') : null,
+      line: t.threadContext?.rightFileStart?.line ?? t.threadContext?.leftFileStart?.line ?? null,
+      status: t.status ?? null,
+      comments,
+    });
+  }
+  return threads;
 }
