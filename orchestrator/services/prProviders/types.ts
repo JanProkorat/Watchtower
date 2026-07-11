@@ -1,4 +1,4 @@
-export type Exec = (cmd: string, args: string[], opts?: { cwd?: string }) => Promise<string>;
+export type Exec = (cmd: string, args: string[], opts?: { cwd?: string; timeoutMs?: number }) => Promise<string>;
 
 export interface GithubRepoConfig {
   host: 'github';
