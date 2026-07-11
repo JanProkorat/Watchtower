@@ -16,11 +16,17 @@ extension SupabaseClient: DependencyKey {
         // require Info.plist secrets (mirrors the JS getSupabase() lazy guard).
         let client = LockIsolated<Supabase.SupabaseClient?>(nil)
         @Sendable func c() throws -> Supabase.SupabaseClient {
-            if let existing = client.value { return existing }
-            let cfg = try SupabaseConfig.load(from: Bundle.main.infoDictionary ?? [:])
-            let made = Supabase.SupabaseClient(supabaseURL: cfg.url, supabaseKey: cfg.anonKey)
-            client.setValue(made)
-            return made
+            // Check-and-install atomically: reading the cached client and
+            // storing a newly-built one happen inside a single lock acquisition,
+            // so two concurrent first-callers can't each build a distinct client
+            // and split auth state.
+            try client.withValue { current in
+                if let existing = current { return existing }
+                let cfg = try SupabaseConfig.load(from: Bundle.main.infoDictionary ?? [:])
+                let made = Supabase.SupabaseClient(supabaseURL: cfg.url, supabaseKey: cfg.anonKey)
+                current = made
+                return made
+            }
         }
         return SupabaseClient(
             currentSessionExists: {
