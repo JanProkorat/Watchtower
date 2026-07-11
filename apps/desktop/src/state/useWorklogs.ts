@@ -13,24 +13,22 @@ function asLockedError(
     : null;
 }
 
-export type PeriodPreset = 'today' | 'week' | 'month' | 'all';
-export type SourceFilter = 'all' | 'manual' | 'watchtower-auto' | 'jira-sync';
-
 export interface WorklogsState {
   worklogs: WorklogViewPayload[];
   loading: boolean;
   error: string | null;
   filter: {
-    period: PeriodPreset;
-    source: SourceFilter;
+    /** Inclusive date range (YYYY-MM-DD), like the Reports page. */
+    from: string;
+    to: string;
     search: string;
     /** When non-null, list is server-side narrowed to this project. */
     projectId: number | null;
     /** Optional epic narrowing (project detail · Worklogs tab). */
     epicId: number | null;
   };
-  setPeriod(p: PeriodPreset): void;
-  setSource(s: SourceFilter): void;
+  setFrom(d: string): void;
+  setTo(d: string): void;
   setSearch(q: string): void;
   setProjectId(id: number | null): void;
   setEpicId(id: number | null): void;
@@ -50,34 +48,27 @@ function ymd(d: Date): string {
   );
 }
 
-function periodToDateRange(p: PeriodPreset): { from?: string; to?: string } {
-  if (p === 'all') return {};
-  const today = new Date();
-  if (p === 'today') {
-    const t = ymd(today);
-    return { from: t, to: t };
-  }
-  if (p === 'week') {
-    const d = new Date(today);
-    // Monday-first week (Czech / ISO convention)
-    const offset = (d.getDay() + 6) % 7;
-    d.setDate(d.getDate() - offset);
-    return { from: ymd(d), to: ymd(today) };
-  }
-  // month
-  const first = new Date(today.getFullYear(), today.getMonth(), 1);
-  return { from: ymd(first), to: ymd(today) };
+function todayYmd(): string {
+  return ymd(new Date());
+}
+
+function daysAgoYmd(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return ymd(d);
 }
 
 interface InitialFilter {
   projectId?: number | null;
   epicId?: number | null;
-  period?: PeriodPreset;
+  from?: string;
+  to?: string;
 }
 
 export function useWorklogs(initial: InitialFilter = {}): WorklogsState {
-  const [period, setPeriod] = useState<PeriodPreset>(initial.period ?? 'week');
-  const [source, setSource] = useState<SourceFilter>('all');
+  // Default to the last 7 days (inclusive), matching the old "this week" span.
+  const [from, setFrom] = useState<string>(initial.from ?? daysAgoYmd(6));
+  const [to, setTo] = useState<string>(initial.to ?? todayYmd());
   const [search, setSearch] = useState<string>('');
   const [projectId, setProjectId] = useState<number | null>(initial.projectId ?? null);
   const [epicId, setEpicId] = useState<number | null>(initial.epicId ?? null);
@@ -87,17 +78,15 @@ export function useWorklogs(initial: InitialFilter = {}): WorklogsState {
   const [error, setError] = useState<string | null>(null);
 
   const ipcFilter = useMemo((): WorklogListFilterPayload => {
-    const { from, to } = periodToDateRange(period);
     const f: WorklogListFilterPayload = {};
     if (from) f.from = from;
     if (to) f.to = to;
-    if (source !== 'all') f.source = source;
     if (projectId != null) f.projectId = projectId;
     if (epicId != null) f.epicId = epicId;
     const q = search.trim();
     if (q) f.search = q;
     return f;
-  }, [period, source, projectId, epicId, search]);
+  }, [from, to, projectId, epicId, search]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -152,9 +141,9 @@ export function useWorklogs(initial: InitialFilter = {}): WorklogsState {
     worklogs,
     loading,
     error,
-    filter: { period, source, search, projectId, epicId },
-    setPeriod,
-    setSource,
+    filter: { from, to, search, projectId, epicId },
+    setFrom,
+    setTo,
     setSearch,
     setProjectId,
     setEpicId,

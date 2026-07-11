@@ -12,15 +12,14 @@ import {
   Typography,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs, { type Dayjs } from 'dayjs';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { glassFill } from '../../theme/glass.js';
-import {
-  useWorklogs,
-  type PeriodPreset,
-  type SourceFilter,
-} from '../../state/useWorklogs.js';
+import { useWorklogs } from '../../state/useWorklogs.js';
+import { CZ_DATE_FORMAT } from '../../util/format.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
 import { WorklogDrawer } from './WorklogDrawer.js';
@@ -136,32 +135,20 @@ export function WorklogsList({ projectId }: Props) {
             ))}
           </TextField>
         )}
-        <TextField
-          select
-          size="small"
-          label="Period"
-          value={state.filter.period}
-          onChange={(e) => state.setPeriod(e.target.value as PeriodPreset)}
-          sx={{ minWidth: 140 }}
-        >
-          <MenuItem value="today">Today</MenuItem>
-          <MenuItem value="week">This week</MenuItem>
-          <MenuItem value="month">This month</MenuItem>
-          <MenuItem value="all">All time</MenuItem>
-        </TextField>
-        <TextField
-          select
-          size="small"
-          label="Source"
-          value={state.filter.source}
-          onChange={(e) => state.setSource(e.target.value as SourceFilter)}
-          sx={{ minWidth: 140 }}
-        >
-          <MenuItem value="all">Any source</MenuItem>
-          <MenuItem value="manual">Manual</MenuItem>
-          <MenuItem value="watchtower-auto">Watchtower auto</MenuItem>
-          <MenuItem value="jira-sync">Jira sync</MenuItem>
-        </TextField>
+        <DatePicker
+          label="From"
+          value={dayjs(state.filter.from)}
+          onChange={(v: Dayjs | null) => v && state.setFrom(v.format('YYYY-MM-DD'))}
+          format={CZ_DATE_FORMAT}
+          slotProps={{ textField: { size: 'small', sx: { minWidth: 150 } } }}
+        />
+        <DatePicker
+          label="To"
+          value={dayjs(state.filter.to)}
+          onChange={(v: Dayjs | null) => v && state.setTo(v.format('YYYY-MM-DD'))}
+          format={CZ_DATE_FORMAT}
+          slotProps={{ textField: { size: 'small', sx: { minWidth: 150 } } }}
+        />
         <TextField
           size="small"
           placeholder="Search comment / key / title…"
