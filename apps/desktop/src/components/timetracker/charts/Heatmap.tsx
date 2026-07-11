@@ -30,7 +30,7 @@ interface Props {
   onStats?: (s: HeatmapStats) => void;
 }
 
-const DOW_LABELS = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
+const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function computeHeatmapStats(data: HeatmapDatum[]): HeatmapStats {
   const map = new Map(data.map((d) => [d.date, d.minutes]));

@@ -63,9 +63,14 @@ import { JiraSyncService } from './services/jiraSync.js';
 import { JiraBoardService } from './services/jiraBoard.js';
 import { fetchTokenUsage } from './services/tokenUsage.js';
 import { AutoTimeLogger } from './services/autoTimeLogger.js';
+import { ReviewsService } from './services/reviews.js';
+import { runReview } from './services/prReview.js';
+import { postGithubComment, postAzdoComment } from './services/prProviders/postComment.js';
+import { PrReviewsRepo, type PrReviewRow } from './db/repositories/prReviews.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
+import type { PrHost, PrReviewPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
 import { buildPtySpawnConfig, planBootAction } from './shellPolicy.js';
 import type { InstanceKind } from './shellPolicy.js';
 import { PtySizeOwnership } from './ptySizeOwnership.js';
@@ -196,6 +201,57 @@ function repo(): InstancesRepo {
 
 function projectsRepo(): ProjectsRepo {
   return new ProjectsRepo(handle!.db);
+}
+
+let _reviews: ReviewsService | null = null;
+// Unlike the other repo/service accessors above (which are cheap to
+// re-construct per request), ReviewsService caches the last `refresh()`
+// result in-memory (`list()` just reads that cache) — it MUST be a true
+// singleton or every `prs:list` call after a `prs:refresh` would see an
+// empty cache from a freshly-constructed instance.
+function reviewsSvc(): ReviewsService {
+  if (!_reviews) {
+    _reviews = new ReviewsService({
+      db: handle!.db,
+      projects: () => projectsRepo().list({}).map((p) => ({ id: p.id, name: p.name, folder_path: p.folderPath ?? null })),
+    });
+  }
+  return _reviews;
+}
+
+function prReviewsRepo(): PrReviewsRepo {
+  return new PrReviewsRepo(handle!.db);
+}
+
+// Tracks the AbortController for each in-flight review by reviewId so
+// `prReview:cancel` can abort the underlying claude process. Entries are
+// removed once the review's runReview() promise settles (success or failure).
+const runningReviews = new Map<number, AbortController>();
+// Reviews currently mid-postComments — guards against a double-click (or two
+// interleaved IPC requests) posting the same findings twice even if the
+// renderer's own re-entrancy guard is bypassed.
+const postingReviews = new Set<number>();
+
+function reviewPayloadOf(row: PrReviewRow): PrReviewPayload {
+  let findings: PrFindingPayload[] = [];
+  try {
+    findings = row.findings_json ? (JSON.parse(row.findings_json) as PrFindingPayload[]) : [];
+  } catch {
+    findings = [];
+  }
+  return {
+    id: row.id,
+    host: row.host as PrHost,
+    repoKey: row.repo_key,
+    prNumber: row.pr_number,
+    headSha: row.head_sha,
+    status: row.status,
+    summary: row.summary,
+    findings,
+    error: row.error,
+    createdAt: row.created_at,
+    finishedAt: row.finished_at,
+  };
 }
 
 function epicsRepo(): EpicsRepo {
@@ -1118,6 +1174,125 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       new PushDevicesRepo(handle!.db).register(req.payload.token, req.payload.platform, Date.now());
       return { ok: true };
 
+    case 'prs:list':
+      return reviewsSvc().list();
+    case 'prs:refresh':
+      return reviewsSvc().refresh((req.payload as { devopsPats?: Record<string, string> }).devopsPats);
+    case 'prs:diff': {
+      const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> };
+      return { files: await reviewsSvc().diff(p.host, p.repoKey, p.prNumber, p.devopsPats) };
+    }
+    case 'prs:comments': {
+      const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> };
+      return { threads: await reviewsSvc().comments(p.host, p.repoKey, p.prNumber, p.devopsPats) };
+    }
+    case 'reviews:projectRepo':
+      return reviewsSvc().projectRepo((req.payload as { projectId: number }).projectId);
+
+    case 'prReview:start': {
+      const p = req.payload;
+      const target = await reviewsSvc().resolveRepoAndPr(p.host, p.repoKey, p.prNumber);
+      if (!target) {
+        throw new Error(`Cannot resolve repo/PR for review: ${p.host}:${p.repoKey}#${p.prNumber}`);
+      }
+      const reviews = prReviewsRepo();
+      const id = reviews.start(p.host, p.repoKey, p.prNumber, target.headSha);
+      emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'running', message: 'Reviewing...' } });
+      const ac = new AbortController();
+      runningReviews.set(id, ac);
+      // Fire-and-forget: the caller gets `reviewId` immediately and follows
+      // progress via the prReviewProgress/prReviewDone pushes.
+      // Azure DevOps PRs are Škoda work read by a Czech-speaking team, so their
+      // review findings are written in Czech; GitHub PRs stay English.
+      runReview(target.clonePath, target.baseRef, target.headSha, target.pr, {}, ac.signal, p.host === 'azdo' ? 'cs' : 'en')
+        .then(({ summary, findings }) => {
+          reviews.finish(id, summary, JSON.stringify(findings));
+          emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'done', message: summary } });
+          emitPush({ kind: 'prReviewDone', payload: { reviewId: id } });
+        })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          reviews.fail(id, msg);
+          emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'error', message: msg } });
+        })
+        .finally(() => { runningReviews.delete(id); });
+      return { reviewId: id };
+    }
+
+    case 'prReview:get': {
+      const row = prReviewsRepo().get(req.payload.reviewId);
+      return { review: row ? reviewPayloadOf(row) : null };
+    }
+
+    case 'prReview:list':
+      return { reviews: prReviewsRepo().list(req.payload.repoKey).map(reviewPayloadOf) };
+
+    case 'prReview:cancel': {
+      const ac = runningReviews.get(req.payload.reviewId);
+      if (ac) ac.abort();
+      // Do NOT fail() the row here — aborting makes runReview() throw 'Cancelled',
+      // which the .catch above already routes through the normal fail()+push path.
+      return { ok: true };
+    }
+
+    case 'prReview:postComments': {
+      const p = req.payload;
+      const reviewId = p.reviewId;
+      if (postingReviews.has(reviewId)) {
+        return { posted: 0, skipped: p.findingIndexes.length, errors: ['already posting'] };
+      }
+      postingReviews.add(reviewId);
+      try {
+        const reviews = prReviewsRepo();
+        const row = reviews.get(reviewId);
+        if (!row) throw new Error(`Review not found: ${reviewId}`);
+        let findings: PrFindingPayload[];
+        try {
+          findings = JSON.parse(row.findings_json ?? '[]') as PrFindingPayload[];
+        } catch {
+          throw new Error(`Review ${reviewId} has malformed findings JSON`);
+        }
+        const { github, azdo } = await reviewsSvc().resolveRepos();
+        const githubRepo = row.host === 'github' ? github.find((r) => r.repoKey === row.repo_key) : undefined;
+        const azdoRepo = row.host === 'azdo' ? azdo.find((r) => r.repoKey === row.repo_key) : undefined;
+        if (!githubRepo && !azdoRepo) throw new Error(`Cannot resolve repo for review: ${row.host}:${row.repo_key}`);
+
+        let posted = 0;
+        let skipped = 0;
+        const errors: string[] = [];
+        for (const i of [...new Set(p.findingIndexes)]) {
+          const f = findings[i];
+          if (i < 0 || !f) { skipped++; continue; }
+          if (f.posted === true) { skipped++; continue; }
+          // Findings carry repo-relative paths; strip any accidental leading
+          // slash before handing them to either host's poster.
+          const file = f.file.replace(/^\/+/, '');
+          try {
+            if (githubRepo) {
+              await postGithubComment(githubRepo.nwo, row.pr_number, row.head_sha, { ...f, file });
+            } else if (azdoRepo) {
+              const pat = p.devopsPats?.[azdoRepo.devopsHost];
+              if (!pat) {
+                errors.push(`${f.file}:${f.line}: chybí PAT`);
+                continue;
+              }
+              await postAzdoComment(azdoRepo.apiBase, azdoRepo.repo, row.pr_number, { ...f, file }, pat);
+            }
+            f.posted = true;
+            posted++;
+          } catch (e) {
+            errors.push(`${f.file}:${f.line}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        reviews.updateFindings(reviewId, JSON.stringify(findings));
+        emitPush({ kind: 'prReviewDone', payload: { reviewId } });
+        return { posted, skipped, errors };
+      } finally {
+        postingReviews.delete(reviewId);
+      }
+    }
+
   }
 }
 
@@ -1284,6 +1459,12 @@ function respawnIncompleteRowsOnBoot(): void {
       const hub = readHubConfig(new SettingsRepo(handle!.db));
       return { escalateMs: hub.escalateMs, triggers: hub.triggers, armEnabled: hub.enabled };
     }, onEscalate);
+    // Any pr_reviews row still 'running' belonged to the previous orchestrator
+    // process and its in-memory runReview() promise is gone — sweep it to
+    // 'error' so it isn't a permanent dead-end (PR list stuck "reviewing…",
+    // Report drawer spinning with no Re-run button). Mirrors the instance
+    // recovery pass just below.
+    prReviewsRepo().failStuckRunning('Interrupted by restart');
     // Respawn after api is ready so the resumed pty's first output/exit can
     // push through to the renderer immediately.
     respawnIncompleteRowsOnBoot();

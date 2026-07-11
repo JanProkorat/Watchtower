@@ -79,7 +79,19 @@ export type IpcRequest =
   | { kind: 'tokens:usage'; payload: Record<string, never> }
   | { kind: 'openExternalUrl'; payload: { url: string } }
   | { kind: 'terminalFocus'; payload: { instanceId: string } }
-  | { kind: 'push:registerDevice'; payload: { token: string; platform: string } };
+  | { kind: 'push:registerDevice'; payload: { token: string; platform: string } }
+  | { kind: 'prs:list'; payload: Record<string, never> }
+  | { kind: 'prs:refresh'; payload: { devopsPats?: Record<string, string> } }
+  | { kind: 'prs:diff'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
+  | { kind: 'prs:comments'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
+  | { kind: 'reviews:projectRepo'; payload: { projectId: number } }
+  | { kind: 'prReview:start'; payload: { host: PrHost; repoKey: string; prNumber: number } }
+  | { kind: 'prReview:get'; payload: { reviewId: number } }
+  | { kind: 'prReview:list'; payload: { repoKey?: string } }
+  | { kind: 'prReview:cancel'; payload: { reviewId: number } }
+  | { kind: 'prReview:postComments'; payload: { reviewId: number; findingIndexes: number[]; devopsPats?: Record<string, string> } }
+  | { kind: 'devops:setPat'; payload: { host: string; pat: string } }
+  | { kind: 'devops:hasPat'; payload: { host: string } };
 
 export interface RunningInstancePayload {
   id: string;
@@ -500,6 +512,70 @@ export interface ProjectViewPayload {
   totalMinutes: number;
 }
 
+// ─── Reviews (PR listing + diff) ───
+export type PrHost = 'github' | 'azdo';
+
+export interface PullRequestPayload {
+  host: PrHost;
+  repoKey: string;
+  repoLabel: string;
+  number: number;
+  title: string;
+  author: string;
+  sourceBranch: string;
+  targetBranch: string;
+  url: string;
+  updatedAt: string;
+  reviewable: boolean; // false when repo not cloned locally
+}
+
+export interface DiffLinePayload {
+  kind: 'add' | 'del' | 'ctx' | 'hunk';
+  oldNo: number | null;
+  newNo: number | null;
+  text: string;
+}
+
+export interface DiffFilePayload {
+  path: string;
+  additions: number;
+  deletions: number;
+  lines: DiffLinePayload[];
+}
+
+export interface PrCommentPayload { author: string; date: string; body: string; }
+export interface PrCommentThreadPayload {
+  id: string;
+  file: string | null;   // repo-relative path, or null for general PR comments
+  line: number | null;   // 1-based line (right side), or null
+  status: string | null; // e.g. 'active' | 'fixed' | 'closed' (azdo); null for github
+  comments: PrCommentPayload[];
+}
+
+export interface PrFindingPayload {
+  file: string;
+  line: number;
+  severity: 'error' | 'warn' | 'info';
+  category: string;
+  summary: string;
+  detail?: string;
+  posted?: boolean;
+}
+
+export interface PrReviewPayload {
+  id: number;
+  host: PrHost;
+  repoKey: string;
+  prNumber: number;
+  headSha: string;
+  status: 'running' | 'done' | 'error';
+  summary: string | null;
+  findings: PrFindingPayload[];
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
 export type IpcResponse =
   | { kind: 'ping'; payload: { now: number; main: number; orch: number } }
   | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
@@ -600,7 +676,19 @@ export type IpcResponse =
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
-  | { kind: 'push:registerDevice'; payload: { ok: true } };
+  | { kind: 'push:registerDevice'; payload: { ok: true } }
+  | { kind: 'prs:list'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
+  | { kind: 'prs:refresh'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
+  | { kind: 'prs:diff'; payload: { files: DiffFilePayload[] } }
+  | { kind: 'prs:comments'; payload: { threads: PrCommentThreadPayload[] } }
+  | { kind: 'reviews:projectRepo'; payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null } }
+  | { kind: 'devops:setPat'; payload: { ok: true } }
+  | { kind: 'devops:hasPat'; payload: { hasPat: boolean } }
+  | { kind: 'prReview:start'; payload: { reviewId: number } }
+  | { kind: 'prReview:get'; payload: { review: PrReviewPayload | null } }
+  | { kind: 'prReview:list'; payload: { reviews: PrReviewPayload[] } }
+  | { kind: 'prReview:cancel'; payload: { ok: true } }
+  | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } };
 
 export interface AgentRowPayload {
   name: string;
@@ -764,7 +852,9 @@ export type IpcPush =
   | {
       kind: 'orchestratorCrashed';
       payload: { code: number | null; restarting: boolean };
-    };
+    }
+  | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
+  | { kind: 'prReviewDone'; payload: { reviewId: number } };
 
 export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'chooseDirectory',
@@ -772,6 +862,8 @@ export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'openInVSCode',
   'openExternalUrl',
   'board:signIn',
+  'devops:setPat',
+  'devops:hasPat',
 ]);
 
 export interface WatchtowerBridge {

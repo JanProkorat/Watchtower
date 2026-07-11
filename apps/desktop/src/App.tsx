@@ -45,6 +45,7 @@ import { FirstRunWizard } from './components/FirstRunWizard.js';
 import { ModuleSettings } from './components/settings/ModuleSettings.js';
 import { ModuleTimeTracker } from './components/timetracker/ModuleTimeTracker.js';
 import { ModuleDashboard } from './components/dashboard/ModuleDashboard.js';
+import { ModuleReviews } from './components/reviews/ModuleReviews.js';
 import { SlotRegistryProvider } from './components/instances/SlotRegistry.js';
 import { TerminalPool } from './components/instances/TerminalPool.js';
 import { WorkspaceRoot } from './components/instances/WorkspaceRoot.js';
@@ -492,6 +493,7 @@ export function App() {
                   />
                 )}
                 {activeModule === 'settings' && <ModuleSettings view={settingsView.view} />}
+                {activeModule === 'reviews' && <ModuleReviews />}
                 {activeModule === 'billing' && (
                   <ModuleTimeTracker
                     view={billingView.view}

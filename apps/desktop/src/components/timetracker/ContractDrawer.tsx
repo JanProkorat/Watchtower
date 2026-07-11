@@ -158,7 +158,7 @@ export function ContractDrawer({
       };
       const result = await onSubmit(input);
       if (isOverlapResult(result)) {
-        setError(`Překryv smlouvy u projektu ${result.conflictingProjectName}`);
+        setError(`Contract overlaps with project ${result.conflictingProjectName}`);
       } else {
         onClose();
       }
@@ -297,9 +297,9 @@ export function ContractDrawer({
             }
             getOptionLabel={(p) => p.name}
             isOptionEqualToValue={(a, b) => a.id === b.id}
-            noOptionsText="Žádné další projekty"
+            noOptionsText="No other projects"
             renderInput={(params) => (
-              <TextField {...params} label="Sdíleno s projekty (volitelné)" size="small" />
+              <TextField {...params} label="Shared with projects (optional)" size="small" />
             )}
           />
 

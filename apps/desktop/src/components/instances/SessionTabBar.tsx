@@ -298,7 +298,7 @@ export function SessionTabBar({
               setCtxSession(null);
             }}
           >
-            Přiřadit k úkolu…
+            Assign to task…
           </MenuItem>,
           ctxSession?.taskId != null && (
             <MenuItem
@@ -309,7 +309,7 @@ export function SessionTabBar({
                 setCtxSession(null);
               }}
             >
-              Zrušit přiřazení
+              Clear assignment
             </MenuItem>
           ),
           <Divider key="divider" />,
@@ -321,7 +321,7 @@ export function SessionTabBar({
             setCtxSession(null);
           }}
         >
-          Skrýt relaci
+          Hide session
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -330,7 +330,7 @@ export function SessionTabBar({
             setCtxSession(null);
           }}
         >
-          Zavřít relaci
+          Close session
         </MenuItem>
       </Menu>
 

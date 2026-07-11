@@ -127,7 +127,7 @@ export function InstanceTaskPickerDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Přiřadit k úkolu</DialogTitle>
+      <DialogTitle>Assign to task</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Autocomplete
@@ -138,10 +138,10 @@ export function InstanceTaskPickerDialog({
               setSelectedProjectId(v?.id ?? null);
             }}
             renderInput={(params) => (
-              <TextField {...params} label="Projekt" size="small" />
+              <TextField {...params} label="Project" size="small" />
             )}
             isOptionEqualToValue={(a, b) => a.id === b.id}
-            noOptionsText="Žádné projekty"
+            noOptionsText="No projects"
           />
           <Autocomplete
             options={epics}
@@ -153,10 +153,10 @@ export function InstanceTaskPickerDialog({
             }}
             disabled={selectedProjectId == null}
             renderInput={(params) => (
-              <TextField {...params} label="Epic (volitelné)" size="small" />
+              <TextField {...params} label="Epic (optional)" size="small" />
             )}
             isOptionEqualToValue={(a, b) => a.id === b.id}
-            noOptionsText="Žádné epicy"
+            noOptionsText="No epics"
           />
           <Autocomplete
             options={filteredTasks}
@@ -165,10 +165,10 @@ export function InstanceTaskPickerDialog({
             onChange={(_, v) => setSelectedTaskId(v?.id ?? null)}
             disabled={selectedProjectId == null}
             renderInput={(params) => (
-              <TextField {...params} label="Úkol" size="small" />
+              <TextField {...params} label="Task" size="small" />
             )}
             isOptionEqualToValue={(a, b) => a.id === b.id}
-            noOptionsText="Žádné úkoly"
+            noOptionsText="No tasks"
           />
         </Stack>
       </DialogContent>
@@ -182,10 +182,10 @@ export function InstanceTaskPickerDialog({
             }}
             sx={{ mr: 'auto' }}
           >
-            Zrušit přiřazení
+            Clear assignment
           </Button>
         )}
-        <Button onClick={onClose}>Zrušit</Button>
+        <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained"
           disabled={!canAssign}
@@ -196,7 +196,7 @@ export function InstanceTaskPickerDialog({
             }
           }}
         >
-          Přiřadit
+          Assign
         </Button>
       </DialogActions>
     </Dialog>

@@ -15,6 +15,7 @@ import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import RemoveIcon from '@mui/icons-material/Close';
 import type { ProjectInputPayload, ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
+import { DevopsPatField } from '../reviews/DevopsPatField.js';
 
 const COLOR_PALETTE = [
   '#7aa7ff',
@@ -285,6 +286,8 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
             minRows={3}
             fullWidth
           />
+
+          {project !== null && <DevopsPatField projectId={project.id} />}
         </Box>
 
         <Box

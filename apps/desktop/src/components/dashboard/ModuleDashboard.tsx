@@ -131,7 +131,7 @@ export function ModuleDashboard({
 
       {projectsState.error && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          Nepodařilo se načíst projekty: {projectsState.error}
+          Failed to load projects: {projectsState.error}
         </Alert>
       )}
 

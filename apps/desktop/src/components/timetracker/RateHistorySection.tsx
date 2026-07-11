@@ -269,7 +269,7 @@ function SharedContractBadge({
     <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
       <Chip
         icon={<GroupsIcon sx={{ fontSize: 16 }} />}
-        label={`Sdílená smlouva · ${contract.projectIds.length} projektů`}
+        label={`Shared contract · ${contract.projectIds.length} projects`}
         size="small"
         sx={{
           height: 22,
