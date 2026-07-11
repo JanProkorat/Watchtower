@@ -13,9 +13,9 @@ describe('buildAttentionList', () => {
     ];
     const projects = [{ id: 1, name: 'API', folderPath: '/Users/jan/Projects/api' }];
     expect(buildAttentionList(instances as never, projects as never)).toEqual([
-      { instanceId: 'a', label: 'API', reason: 'čeká na povolení' },          // project name
-      { instanceId: 'c', label: 'fitness', reason: 'dokončeno, čeká na vstup' }, // cwd basename fallback
-      { instanceId: 'd', label: 'z', reason: 'spadlo' },
+      { instanceId: 'a', label: 'API', reason: 'waiting for permission' },     // project name
+      { instanceId: 'c', label: 'fitness', reason: 'waiting for input' },      // cwd basename fallback
+      { instanceId: 'd', label: 'z', reason: 'crashed' },
     ]);
   });
   it('returns empty when nothing needs attention', () => {
