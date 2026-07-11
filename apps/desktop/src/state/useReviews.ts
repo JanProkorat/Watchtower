@@ -10,6 +10,15 @@ export function sortFindings(findings: PrFindingPayload[]): PrFindingPayload[] {
   return [...findings].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
 }
 
+// The most severe (error > warn > info) severity present in a list of findings, or null if empty.
+export function worstSeverity(findings: PrFindingPayload[]): PrFindingPayload['severity'] | null {
+  let worst: PrFindingPayload['severity'] | null = null;
+  for (const f of findings) {
+    if (worst === null || SEVERITY_ORDER[f.severity] < SEVERITY_ORDER[worst]) worst = f.severity;
+  }
+  return worst;
+}
+
 export function sortByUpdatedDesc(prs: PullRequestPayload[]): PullRequestPayload[] {
   return [...prs].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
@@ -101,6 +110,38 @@ export function useReviews() {
     return reviews.find((r) => r.host === pr.host && r.prNumber === pr.number) ?? null;
   }, [listReviews]);
 
+  // ─── Review state for the PR list (grey/amber/green/red dot + finding count) ───
+  const [reviewStates, setReviewStates] = useState<Map<string, PrReviewPayload>>(new Map());
+
+  const loadReviewStates = useCallback(async (): Promise<void> => {
+    // No repoKey → all repos, ordered id DESC (newest first), so the first row seen
+    // per (host, repoKey, prNumber) key is that PR's latest review.
+    const reviews = await listReviews();
+    const map = new Map<string, PrReviewPayload>();
+    for (const r of reviews) {
+      const key = `${r.host}:${r.repoKey}:${r.prNumber}`;
+      if (!map.has(key)) map.set(key, r);
+    }
+    setReviewStates(map);
+  }, [listReviews]);
+
+  useEffect(() => { void loadReviewStates(); }, [loadReviewStates]);
+
+  const reviewStateFor = useCallback((pr: PullRequestPayload): { status: 'running' | 'done' | 'error'; findingCount: number } | null => {
+    const r = reviewStates.get(`${pr.host}:${pr.repoKey}:${pr.number}`);
+    if (!r) return null;
+    return { status: r.status, findingCount: r.findings.length };
+  }, [reviewStates]);
+
+  // Any push about a review's lifecycle can affect a row this list is showing (even
+  // one not open in the drawer), so refresh the whole map rather than trying to
+  // resolve which PR a bare reviewId push belongs to.
+  useEffect(() => {
+    const offDone = window.watchtower.on('prReviewDone', () => { void loadReviewStates(); });
+    const offProgress = window.watchtower.on('prReviewProgress', () => { void loadReviewStates(); });
+    return () => { offDone(); offProgress(); };
+  }, [loadReviewStates]);
+
   // Load (or reload) the review shown for a PR — call when the Report tab / drawer opens.
   const openReviewFor = useCallback(async (pr: PullRequestPayload): Promise<void> => {
     // Clear immediately so switching PRs never flashes the previous PR's review
@@ -149,5 +190,6 @@ export function useReviews() {
   return {
     pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
     review, reviewRunning, openReviewFor, runReview, startReview, getReview, listReviews, latestReviewFor,
+    reviewStateFor,
   };
 }

@@ -63,7 +63,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
               <>
                 {error && <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>}
                 {loading && <Box sx={{ p: 2 }}><CircularProgress size={20} /></Box>}
-                {!loading && !error && <DiffView files={files} threads={threads} />}
+                {!loading && !error && <DiffView files={files} threads={threads} findings={review?.status === 'done' ? review.findings : []} />}
               </>
             )}
             {tab === 1 && (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupPrsByHost, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings } from '../../apps/desktop/src/state/useReviews.js';
+import { groupPrsByHost, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity } from '../../apps/desktop/src/state/useReviews.js';
 import type { PrFindingPayload } from '../../packages/shared/src/ipcContract.js';
 
 const pr = (o: Partial<any> = {}) => ({ host: 'github', repoKey: 'gh:o/r', repoLabel: 'r', number: 1,
@@ -40,5 +40,13 @@ describe('useReviews helpers', () => {
     const sorted = sortFindings(findings);
     expect(sorted.map((f) => f.file)).toEqual(['w1.ts', 'w2.ts']);
     expect(sorted).not.toBe(findings);
+  });
+  it('worstSeverity picks error over warn/info regardless of order', () => {
+    expect(worstSeverity([finding({ severity: 'info' }), finding({ severity: 'error' }), finding({ severity: 'warn' })])).toBe('error');
+    expect(worstSeverity([finding({ severity: 'info' }), finding({ severity: 'warn' })])).toBe('warn');
+    expect(worstSeverity([finding({ severity: 'info' })])).toBe('info');
+  });
+  it('worstSeverity returns null for an empty list', () => {
+    expect(worstSeverity([])).toBeNull();
   });
 });

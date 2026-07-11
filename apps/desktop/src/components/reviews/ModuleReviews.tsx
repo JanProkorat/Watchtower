@@ -7,7 +7,7 @@ import { PrInspectorDrawer } from './PrInspectorDrawer.js';
 
 export function ModuleReviews(): JSX.Element {
   const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
-    review, reviewRunning, openReviewFor, runReview } = useReviews();
+    review, reviewRunning, openReviewFor, runReview, reviewStateFor } = useReviews();
   const [host, setHost] = useState<HostFilter>('all');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<PullRequestPayload | null>(null);
@@ -44,7 +44,9 @@ export function ModuleReviews(): JSX.Element {
       {groups.map((g) => (
         <Box key={g.host} sx={{ mb: 2 }}>
           <Typography sx={{ fontSize: 10, letterSpacing: '.07em', textTransform: 'uppercase', color: 'text.secondary', mb: 0.5 }}>{g.label}</Typography>
-          <Stack spacing={0.25}>{g.prs.map((pr) => <PrRow key={`${pr.repoKey}-${pr.number}`} pr={pr} nowMs={nowMs} onOpen={setOpen} />)}</Stack>
+          <Stack spacing={0.25}>{g.prs.map((pr) => (
+            <PrRow key={`${pr.repoKey}-${pr.number}`} pr={pr} nowMs={nowMs} onOpen={setOpen} reviewState={reviewStateFor(pr)} />
+          ))}</Stack>
         </Box>
       ))}
 

@@ -16,8 +16,27 @@ export function avatarColor(author: string): string {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]!;
 }
 
-export function PrRow({ pr, nowMs, onOpen }: { pr: PullRequestPayload; nowMs: number; onOpen(pr: PullRequestPayload): void }): JSX.Element {
+export type ReviewState = { status: 'running' | 'done' | 'error'; findingCount: number } | null;
+
+const REVIEW_STATE_DISPLAY: Record<'running' | 'done' | 'error' | 'none', { color: string; label(findingCount: number): string }> = {
+  running: { color: 'warning.main', label: () => 'reviewing…' },
+  done: { color: 'success.main', label: (n) => (n > 0 ? `${n} finding${n === 1 ? '' : 's'}` : 'no findings') },
+  error: { color: 'error.main', label: () => 'review failed' },
+  none: { color: 'text.disabled', label: () => 'not reviewed' },
+};
+
+// Pure mapping from a PR's review state to the dot color + label the row shows —
+// extracted so the running/done/error/none mapping is unit-testable without rendering.
+export function reviewStateDisplay(reviewState: ReviewState): { color: string; label: string } {
+  const d = REVIEW_STATE_DISPLAY[reviewState?.status ?? 'none'];
+  return { color: d.color, label: d.label(reviewState?.findingCount ?? 0) };
+}
+
+export function PrRow({ pr, nowMs, onOpen, reviewState = null }: {
+  pr: PullRequestPayload; nowMs: number; onOpen(pr: PullRequestPayload): void; reviewState?: ReviewState;
+}): JSX.Element {
   const num = pr.host === 'github' ? `#${pr.number}` : `!${pr.number}`;
+  const display = reviewStateDisplay(reviewState);
   return (
     <Box onClick={() => onOpen(pr)}
       sx={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1fr) auto auto', gap: 1.5, alignItems: 'center',
@@ -49,8 +68,8 @@ export function PrRow({ pr, nowMs, onOpen }: { pr: PullRequestPayload; nowMs: nu
         </Box>
       </Box>
       <Box sx={{ width: 116, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.6, fontSize: 10 }}>
-        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'text.disabled' }} />
-        <Box component="span" sx={{ color: 'text.secondary' }}>not reviewed</Box>
+        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: display.color }} />
+        <Box component="span" sx={{ color: 'text.secondary' }}>{display.label}</Box>
       </Box>
       <Button size="small" variant="text" onClick={() => onOpen(pr)} sx={{ minWidth: 0, fontSize: 11 }}>
         Open ▸
