@@ -11,3 +11,6 @@ export * from './useWorklogMutations.js';
 export * from './useTaskMutations.js';
 export * from './useContractMutations.js';
 export * from './useDaysOffMutations.js';
+export { useAttentionThreads } from './useAttentionThreads.js';
+export { mapAttentionRow, groupThreads } from './attentionCache.js';
+export type { AttentionMessage, AttentionThread } from './attentionCache.js';
