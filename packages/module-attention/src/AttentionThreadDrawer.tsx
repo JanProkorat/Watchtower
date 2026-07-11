@@ -8,7 +8,7 @@
 // styles + glass tokens (no MUI); ENGLISH user-facing strings.
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
-import { BottomSheet, dataPanelFill, text, accent, glassCard, ctaGradient, ctaGlow, type SheetAnchor } from '@watchtower/ui-core';
+import { BottomSheet, dataPanelFill, text, glassCard, ctaGradient, ctaGlow, type SheetAnchor } from '@watchtower/ui-core';
 import { useAttentionReply, type AttentionThread, type AttentionMessage } from '@watchtower/data-supabase';
 
 interface Props {
@@ -30,16 +30,7 @@ const chip: CSSProperties = {
   cursor: 'pointer', fontFamily: 'inherit', border: '1px solid rgba(255,255,255,0.14)',
 };
 
-/** Find the syncId of the last `role==='claude'` message, or null when the thread has no claude row yet. */
-function findLatestClaudeSyncId(messages: AttentionMessage[]): string | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m && m.role === 'claude') return m.syncId;
-  }
-  return null;
-}
-
-/** Find the last `role==='claude'` message itself (for its options), or null. */
+/** Find the last `role==='claude'` message itself (for its syncId + options), or null. */
 function findLatestClaudeMessage(messages: AttentionMessage[]): AttentionMessage | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
@@ -52,8 +43,8 @@ export function AttentionThreadDrawer({ thread, onClose, openInTerminal, anchor 
   const { sendReply, pending, error } = useAttentionReply();
   const [draft, setDraft] = useState('');
 
-  const latestClaudeSyncId = findLatestClaudeSyncId(thread.messages);
   const latestClaudeMessage = findLatestClaudeMessage(thread.messages);
+  const latestClaudeSyncId = latestClaudeMessage?.syncId ?? null;
   const latestOptions = latestClaudeMessage?.options ?? [];
 
   const canSend = !pending && !thread.closed && latestClaudeSyncId != null;
@@ -85,7 +76,13 @@ export function AttentionThreadDrawer({ thread, onClose, openInTerminal, anchor 
             // buttons live in the composer below (tied to the LATEST claude
             // row only) rather than per-row here: a reply always targets
             // latestClaudeSyncId, so buttons on a historical (already-answered
-            // or superseded) row would be misleading dead controls.
+            // or superseded) row would be misleading dead controls. Historical
+            // (non-latest) claude rows instead show their options as INERT,
+            // muted text so the thread scrollback stays informationally
+            // complete without offering a control that would answer the wrong
+            // (newer) question. Each option is prefixed with its number
+            // ("N. label") so it never collides with the composer's bare-label
+            // option button in getByText lookups.
             <div
               key={m.syncId}
               style={{
@@ -95,6 +92,15 @@ export function AttentionThreadDrawer({ thread, onClose, openInTerminal, anchor 
               }}
             >
               <div style={{ fontWeight: 700, color: text.primary }}>{m.body}</div>
+              {m.syncId !== latestClaudeSyncId && m.options.length > 0 && (
+                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {m.options.map((o) => (
+                    <div key={o.number} style={{ color: text.muted, fontSize: 12.5 }}>
+                      {o.number}. {o.label}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div key={m.syncId} style={{ display: 'flex', justifyContent: 'flex-end' }}>
