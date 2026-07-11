@@ -67,9 +67,15 @@ describe('parseReviewOutput', () => {
 
 describe('buildReviewPrompt', () => {
   it('mentions the base ref and the JSON schema requirement', () => {
-    const prompt = buildReviewPrompt({ title: 'Fix the thing', sourceBranch: 'feature/x', targetBranch: 'main' });
+    const prompt = buildReviewPrompt({ title: 'Fix the thing', sourceBranch: 'feature/x', targetBranch: 'main' }, 'refs/wt-review/tgt');
     expect(prompt).toContain('main');
     expect(prompt).toMatch(/JSON schema/i);
+  });
+
+  it('uses baseRef in the git diff command', () => {
+    const prompt = buildReviewPrompt({ title: 'Fix the thing', sourceBranch: 'feature/x', targetBranch: 'main' }, 'refs/wt-review/tgt');
+    expect(prompt).toContain('git diff refs/wt-review/tgt...HEAD');
+    expect(prompt).not.toMatch(/git diff main/);
   });
 });
 

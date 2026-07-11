@@ -36,10 +36,10 @@ const REVIEW_SCHEMA = {
   required: ['summary', 'findings'],
 };
 
-export function buildReviewPrompt(pr: { title: string; sourceBranch: string; targetBranch: string }): string {
+export function buildReviewPrompt(pr: { title: string; sourceBranch: string; targetBranch: string }, baseRef: string): string {
   return `You are reviewing a pull request titled "${pr.title}" (branch \`${pr.sourceBranch}\` into \`${pr.targetBranch}\`). ` +
-    `Its changes are on this checked-out branch relative to the base ref \`${pr.targetBranch}\`. ` +
-    `Run \`git diff ${pr.targetBranch}...HEAD\` to see the diff, and read surrounding code as needed. ` +
+    `Its changes are on this checked-out branch relative to the base ref \`${baseRef}\`. ` +
+    `Run \`git diff ${baseRef}...HEAD\` to see the diff, and read surrounding code as needed. ` +
     'Report correctness/logic/security **bugs** AND reuse/simplification/efficiency **quality** issues. ' +
     'For each finding give the repo-relative file, the 1-based line on the new side, a severity (error|warn|info), ' +
     'a short category (e.g. correctness, efficiency, simplification), a one-line summary, and optional detail. ' +
@@ -103,7 +103,7 @@ export async function runReview(
   await exec('git', ['-C', clonePath, 'worktree', 'add', '--detach', worktree, headSha]);
 
   try {
-    const prompt = buildReviewPrompt(pr);
+    const prompt = buildReviewPrompt(pr, baseRef);
     const stdout = await exec(claudeBin, [
       '-p', prompt,
       '--model', 'opus',
