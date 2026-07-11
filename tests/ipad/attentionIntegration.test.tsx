@@ -79,7 +79,7 @@ describe('iPad attention integration', () => {
     render(<Shell connection={connection} onConnectionChange={() => {}} />);
 
     // Bell badge reflects the merged count (one thread, no live items).
-    const bell = await screen.findByTitle('Upozornění');
+    const bell = await screen.findByTitle('Notifications');
     fireEvent.click(bell);
 
     // Hub lists the merged item; tapping it opens the drawer for the thread.

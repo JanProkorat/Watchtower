@@ -510,8 +510,11 @@ export function Shell({ connection, onConnectionChange }: ShellProps) {
             items={bellItems}
             onClose={() => setHubOpen(false)}
             onSelect={(id) => {
-              const t = threads.find((x) => x.instanceId === id);
-              if (t) setOpenThreadId(id);
+              // Route on the MERGED item's hasThread (what the bell rendered),
+              // not a bare threads.find — a live instance that also has a
+              // CLOSED/answered thread must open the terminal, not the drawer.
+              const hasThread = bellItems.find((b) => b.instanceId === id)?.hasThread;
+              if (hasThread) setOpenThreadId(id);
               else openInTerminal(id);
               setHubOpen(false);
             }}

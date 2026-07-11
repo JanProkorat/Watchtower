@@ -382,7 +382,7 @@ export function Rail({
         {/* Notification bell as a labeled nav row (same .nav style as prototype) */}
         <button
           onClick={() => onOpenNotifications?.()}
-          title="Upozornění"
+          title="Notifications"
           style={{
             flex: expanded ? 1 : '0 0 auto',
             width: expanded ? undefined : 40,
@@ -416,7 +416,7 @@ export function Rail({
                 color: 'inherit',
               }}
             >
-              Upozornění
+              Notifications
             </span>
           )}
           {notificationCount ? (
