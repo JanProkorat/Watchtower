@@ -19,7 +19,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff }: {
   }, [pr, loadDiff]);
 
   return (
-    <Drawer anchor="right" open={pr != null} onClose={onClose} PaperProps={{ sx: { width: 620, display: 'flex', flexDirection: 'column' } }}>
+    <Drawer anchor="right" open={pr != null} onClose={onClose} PaperProps={{ sx: { width: 'min(1200px, 92vw)', maxWidth: '92vw', display: 'flex', flexDirection: 'column' } }}>
       {pr && (
         <>
           <Box sx={{ p: 2, pb: 1, borderBottom: 1, borderColor: 'divider' }}>
