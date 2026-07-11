@@ -227,6 +227,10 @@ function prReviewsRepo(): PrReviewsRepo {
 // `prReview:cancel` can abort the underlying claude process. Entries are
 // removed once the review's runReview() promise settles (success or failure).
 const runningReviews = new Map<number, AbortController>();
+// Reviews currently mid-postComments — guards against a double-click (or two
+// interleaved IPC requests) posting the same findings twice even if the
+// renderer's own re-entrancy guard is bypassed.
+const postingReviews = new Set<number>();
 
 function reviewPayloadOf(row: PrReviewRow): PrReviewPayload {
   let findings: PrFindingPayload[] = [];
@@ -1233,51 +1237,60 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'prReview:postComments': {
       const p = req.payload;
-      const reviews = prReviewsRepo();
-      const row = reviews.get(p.reviewId);
-      if (!row) throw new Error(`Review not found: ${p.reviewId}`);
-      let findings: PrFindingPayload[];
+      const reviewId = p.reviewId;
+      if (postingReviews.has(reviewId)) {
+        return { posted: 0, skipped: p.findingIndexes.length, errors: ['already posting'] };
+      }
+      postingReviews.add(reviewId);
       try {
-        findings = JSON.parse(row.findings_json ?? '[]') as PrFindingPayload[];
-      } catch {
-        throw new Error(`Review ${p.reviewId} has malformed findings JSON`);
-      }
-      const { github, azdo } = await reviewsSvc().resolveRepos();
-      const githubRepo = row.host === 'github' ? github.find((r) => r.repoKey === row.repo_key) : undefined;
-      const azdoRepo = row.host === 'azdo' ? azdo.find((r) => r.repoKey === row.repo_key) : undefined;
-      if (!githubRepo && !azdoRepo) throw new Error(`Cannot resolve repo for review: ${row.host}:${row.repo_key}`);
-
-      let posted = 0;
-      let skipped = 0;
-      const errors: string[] = [];
-      for (const i of [...new Set(p.findingIndexes)]) {
-        const f = findings[i];
-        if (i < 0 || !f) { skipped++; continue; }
-        if (f.posted === true) { skipped++; continue; }
-        // Findings carry repo-relative paths; strip any accidental leading
-        // slash before handing them to either host's poster.
-        const file = f.file.replace(/^\/+/, '');
+        const reviews = prReviewsRepo();
+        const row = reviews.get(reviewId);
+        if (!row) throw new Error(`Review not found: ${reviewId}`);
+        let findings: PrFindingPayload[];
         try {
-          if (githubRepo) {
-            await postGithubComment(githubRepo.nwo, row.pr_number, row.head_sha, { ...f, file });
-          } else if (azdoRepo) {
-            const pat = p.devopsPats?.[azdoRepo.devopsHost];
-            if (!pat) {
-              errors.push(`${f.file}:${f.line}: chybí PAT`);
-              continue;
-            }
-            await postAzdoComment(azdoRepo.apiBase, azdoRepo.repo, row.pr_number, { ...f, file }, pat);
-          }
-          f.posted = true;
-          posted++;
-        } catch (e) {
-          errors.push(`${f.file}:${f.line}: ${e instanceof Error ? e.message : String(e)}`);
+          findings = JSON.parse(row.findings_json ?? '[]') as PrFindingPayload[];
+        } catch {
+          throw new Error(`Review ${reviewId} has malformed findings JSON`);
         }
-      }
+        const { github, azdo } = await reviewsSvc().resolveRepos();
+        const githubRepo = row.host === 'github' ? github.find((r) => r.repoKey === row.repo_key) : undefined;
+        const azdoRepo = row.host === 'azdo' ? azdo.find((r) => r.repoKey === row.repo_key) : undefined;
+        if (!githubRepo && !azdoRepo) throw new Error(`Cannot resolve repo for review: ${row.host}:${row.repo_key}`);
 
-      reviews.updateFindings(p.reviewId, JSON.stringify(findings));
-      emitPush({ kind: 'prReviewDone', payload: { reviewId: p.reviewId } });
-      return { posted, skipped, errors };
+        let posted = 0;
+        let skipped = 0;
+        const errors: string[] = [];
+        for (const i of [...new Set(p.findingIndexes)]) {
+          const f = findings[i];
+          if (i < 0 || !f) { skipped++; continue; }
+          if (f.posted === true) { skipped++; continue; }
+          // Findings carry repo-relative paths; strip any accidental leading
+          // slash before handing them to either host's poster.
+          const file = f.file.replace(/^\/+/, '');
+          try {
+            if (githubRepo) {
+              await postGithubComment(githubRepo.nwo, row.pr_number, row.head_sha, { ...f, file });
+            } else if (azdoRepo) {
+              const pat = p.devopsPats?.[azdoRepo.devopsHost];
+              if (!pat) {
+                errors.push(`${f.file}:${f.line}: chybí PAT`);
+                continue;
+              }
+              await postAzdoComment(azdoRepo.apiBase, azdoRepo.repo, row.pr_number, { ...f, file }, pat);
+            }
+            f.posted = true;
+            posted++;
+          } catch (e) {
+            errors.push(`${f.file}:${f.line}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        reviews.updateFindings(reviewId, JSON.stringify(findings));
+        emitPush({ kind: 'prReviewDone', payload: { reviewId } });
+        return { posted, skipped, errors };
+      } finally {
+        postingReviews.delete(reviewId);
+      }
     }
 
   }

@@ -66,13 +66,14 @@ export function ReviewReport({ pr, review, running, onRun, onCancel, postComment
   };
 
   const handlePost = (): void => {
+    if (posting) return;
     if (!review) return;
     setConfirmOpen(false);
     const indexes = [...selected];
     setPosting(true);
     postComments(review.id, indexes)
       .then((res) => {
-        setSelected(new Set());
+        if (res.errors.length === 0) setSelected(new Set());
         if (res.errors.length > 0) {
           showError(`Posted ${res.posted}${res.skipped ? `, ${res.skipped} skipped` : ''}, ${res.errors.length} failed: ${res.errors.join('; ')}`);
         } else {
@@ -122,7 +123,7 @@ export function ReviewReport({ pr, review, running, onRun, onCancel, postComment
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handlePost}>Post</Button>
+          <Button variant="contained" disabled={posting} onClick={handlePost}>Post</Button>
         </DialogActions>
       </Dialog>
     </Box>
