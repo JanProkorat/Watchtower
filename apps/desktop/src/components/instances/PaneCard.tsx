@@ -57,7 +57,27 @@ export function PaneCard({
         setCtxAnchor({ x: e.clientX, y: e.clientY });
       }}
     >
-      <ColumnSlot instanceId={instanceId} focused={focused} accent={accent} onFocus={onFocus} />
+      <ColumnSlot instanceId={instanceId} onFocus={onFocus} />
+
+      {/* Focus indicator — accent line along the card's top edge, drawn as an
+          overlay ABOVE the terminal (an inset shadow on the slot would be
+          hidden behind the xterm host). iPad PaneTerminal language. */}
+      {focused && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '3px',
+            backgroundColor: accent ?? '#818cf8',
+            borderTopLeftRadius: '12px',
+            borderTopRightRadius: '12px',
+            zIndex: 7,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
 
       {/* Fading top-right chrome — brighter when the pane is focused. */}
       <Box

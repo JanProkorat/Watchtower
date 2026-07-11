@@ -79,7 +79,9 @@ const SETTINGS_SUB_TABS: Array<SubTabMeta<SettingsTab>> = [
   { id: 'hub', label: 'Messaging hub', icon: <PhoneIphoneIcon fontSize="inherit" /> },
 ];
 
-const COLLAPSED_WIDTH = 52;
+// Wide enough to clear the macOS traffic lights (which the OS pins to the
+// rail's top-left at x12), so the collapsed rail still fully contains them.
+const COLLAPSED_WIDTH = 78;
 const EXPANDED_WIDTH = 232;
 const STORAGE_KEY = 'watchtower.moduleRail.expanded';
 const BILLING_STORAGE_KEY = 'watchtower.moduleRail.billingExpanded';
