@@ -40,11 +40,11 @@ interface RailItem {
 }
 
 const ITEMS: RailItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <SpaceDashboardIcon fontSize="small" />, enabled: true },
-  { id: 'instances', label: 'Instances', icon: <TerminalIcon fontSize="small" />, enabled: true },
-  { id: 'billing', label: 'Billing', icon: <RequestQuoteIcon fontSize="small" />, enabled: true },
-  { id: 'reviews', label: 'Reviews', icon: <RateReviewIcon fontSize="small" />, enabled: true },
-  { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="small" />, enabled: true },
+  { id: 'dashboard', label: 'Dashboard', icon: <SpaceDashboardIcon fontSize="inherit" />, enabled: true },
+  { id: 'instances', label: 'Instances', icon: <TerminalIcon fontSize="inherit" />, enabled: true },
+  { id: 'billing', label: 'Billing', icon: <RequestQuoteIcon fontSize="inherit" />, enabled: true },
+  { id: 'reviews', label: 'Reviews', icon: <RateReviewIcon fontSize="inherit" />, enabled: true },
+  { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="inherit" />, enabled: true },
 ];
 
 /** Sub-tab metadata for a module that exposes children under its rail entry. */
@@ -315,10 +315,10 @@ export function ModuleRail({
             disabled={!item.enabled}
             onClick={() => item.enabled && handleParentClick(item.id)}
             sx={{
-              width: expanded ? '100%' : 40,
-              height: 40,
+              width: expanded ? '100%' : 56,
+              height: expanded ? 40 : 48,
               alignSelf: expanded ? 'stretch' : 'center',
-              borderRadius: 1,
+              borderRadius: expanded ? 1 : '14px',
               px: expanded ? 1 : 0,
               justifyContent: expanded ? 'flex-start' : 'center',
               gap: expanded ? 1.25 : 0,
@@ -345,7 +345,9 @@ export function ModuleRail({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: 24,
+                width: expanded ? 24 : 'auto',
+                // Larger glyphs when collapsed so they fill the wider icon rail.
+                fontSize: expanded ? 20 : 26,
                 color: isActive ? accentColor : 'inherit',
               }}
             >
