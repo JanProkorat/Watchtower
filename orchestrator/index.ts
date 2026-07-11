@@ -50,6 +50,8 @@ import { TerminalSnapshots } from './terminalSnapshots.js';
 import { buildTerminalAttachResponse } from './terminalAttach.js';
 import { readHubConfig, writeHubConfig } from './services/hubConfig.js';
 import { createHubSender } from './hubSender.js';
+import { createAttentionRelay, type AttentionRelay } from './attentionRelay.js';
+import { readPgPushTokens } from './db/repositories/pgPushDevices.js';
 import { sendApns } from './services/apns.js';
 import {
   previewHookInstall,
@@ -129,6 +131,7 @@ export function handleClientGone(clientId: string): void {
 let notifier: Notifier | null = null;
 let quietTimers: QuietTimers | null = null;
 let escalationGate: EscalationGate | null = null;
+let attentionRelay: AttentionRelay | null = null;
 
 const DEFAULT_QUIET_MS = 90_000;
 
@@ -390,6 +393,19 @@ function applyTransition(instanceId: string, event: StateEvent): void {
   }
 }
 
+/**
+ * Inject a remote reply into a live pty as if the user typed it, then advance
+ * the state machine via `userPromptSubmit`. Returns false if the instance has
+ * no live pty session (the caller still stamps the message as handled).
+ */
+function deliverReply(instanceId: string, text: string): boolean {
+  const session = pty.get(instanceId);
+  if (!session) return false;
+  session.write(text + '\r');
+  applyTransition(instanceId, { kind: 'userPromptSubmit' });
+  return true;
+}
+
 function mapHookEventToStateEvent(name: string, body: unknown): StateEvent | null {
   const b = body as { session_id?: string } | undefined;
   switch (name) {
@@ -419,6 +435,7 @@ function disposeInstanceRow(id: string): void {
   new NotificationsRepo(handle!.db).deleteForInstance(id);
   repo().delete(id);
   escalationGate?.clear(id);
+  void attentionRelay?.closeThread(id);
   terminalSnapshots.dispose(id);
   ptySizeOwnership.disposeInstance(id);
 }
@@ -1261,7 +1278,13 @@ function respawnIncompleteRowsOnBoot(): void {
     });
     const hubSender = createHubSender({
       getConfig: () => readHubConfig(new SettingsRepo(handle!.db)),
-      listTokens: () => new PushDevicesRepo(handle!.db).listTokens(),
+      listTokens: async () =>
+        Array.from(
+          new Set([
+            ...new PushDevicesRepo(handle!.db).listTokens(),
+            ...(await readPgPushTokens(handle!.pg)),
+          ]),
+        ),
       removeToken: (token) => new PushDevicesRepo(handle!.db).remove(token),
       sendApns,
       buildContext: (instanceId, cwd, kind) => {
@@ -1277,7 +1300,24 @@ function respawnIncompleteRowsOnBoot(): void {
         return { title, body };
       },
     });
+    attentionRelay = createAttentionRelay({
+      pg: handle!.pg,
+      getSnapshot: async (id) => {
+        await terminalSnapshots.flush(id);
+        return terminalSnapshots.snapshot(id);
+      },
+      deliverReply: (id, text) => {
+        const ok = deliverReply(id, text);
+        if (ok) escalationGate?.markRemotelyEngaged(id);
+        return ok;
+      },
+      resolveLabel: (cwd) => cwd.split('/').pop() ?? 'instance',
+      newId: () => randomUUID(),
+      now: () => new Date().toISOString(),
+    });
+    attentionRelay.start();
     const onEscalate = (instanceId: string, cwd: string, kind: EscalationKind) => {
+      void attentionRelay?.writeClaudeMessage(instanceId, cwd, kind);
       void hubSender.fire(instanceId, cwd, kind);
     };
     escalationGate = new EscalationGate(() => {
