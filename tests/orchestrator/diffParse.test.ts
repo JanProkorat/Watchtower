@@ -13,7 +13,25 @@ index 1111111..2222222 100644
  export { a };
 `;
 
+const DELETED = `diff --git a/src/gone.ts b/src/gone.ts
+deleted file mode 100644
+index 1234567..0000000
+--- a/src/gone.ts
++++ /dev/null
+@@ -1,2 +0,0 @@
+-const x = 1;
+-export { x };
+`;
+
 describe('parseUnifiedDiff', () => {
+  it('includes a deleted file (+++ /dev/null) with its deletions', () => {
+    const files = parseUnifiedDiff(DELETED);
+    expect(files).toHaveLength(1);
+    expect(files[0].path).toBe('src/gone.ts');
+    expect(files[0].deletions).toBe(2);
+    expect(files[0].additions).toBe(0);
+  });
+
   it('parses one file with add/del/ctx lines and counts', () => {
     const files = parseUnifiedDiff(SAMPLE);
     expect(files).toHaveLength(1);

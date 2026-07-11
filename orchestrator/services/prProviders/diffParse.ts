@@ -8,6 +8,7 @@ export function parseUnifiedDiff(raw: string): DiffFilePayload[] {
   if (!raw.trim()) return [];
   const files: DiffFilePayload[] = [];
   let cur: DiffFilePayload | null = null;
+  let lastOldPath: string | null = null;
   let oldNo = 0;
   let newNo = 0;
 
@@ -23,14 +24,29 @@ export function parseUnifiedDiff(raw: string): DiffFilePayload[] {
 
     if (line.startsWith('diff --git')) {
       cur = null;
+      lastOldPath = null;
       continue;
     }
     const mOld = OLD_FILE_RE.exec(line);
-    if (mOld) continue; // path taken from +++ line
+    if (mOld) {
+      // Remember the old path so deleted files (whose `+++` is `/dev/null`)
+      // can still be recorded — modified/added files take their path from `+++ b/`.
+      lastOldPath = mOld[1]!;
+      continue;
+    }
     const mNew = FILE_RE.exec(line);
     if (mNew) {
       cur = { path: mNew[1]!, additions: 0, deletions: 0, lines: [] };
       files.push(cur);
+      continue;
+    }
+    if (line.startsWith('+++ /dev/null')) {
+      // Deleted file: no `+++ b/<path>`, so use the captured `--- a/<path>`.
+      if (lastOldPath) {
+        cur = { path: lastOldPath, additions: 0, deletions: 0, lines: [] };
+        files.push(cur);
+        lastOldPath = null;
+      }
       continue;
     }
     if (!cur) continue;
