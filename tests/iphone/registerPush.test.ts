@@ -12,6 +12,9 @@ import { registerPush } from '../../apps/iphone/src/registerPush';
 describe('registerPush', () => {
   it('writes the APNs token to pg push_devices', async () => {
     await registerPush();
-    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ apns_token: 'tok-123', platform: 'ios' }), expect.anything());
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ apns_token: 'tok-123', platform: 'ios' }),
+      expect.objectContaining({ onConflict: 'apns_token', ignoreDuplicates: true }),
+    );
   });
 });

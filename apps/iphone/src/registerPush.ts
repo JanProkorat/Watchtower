@@ -13,7 +13,10 @@ export async function registerPush(): Promise<void> {
   PushNotifications.addListener('registration', async (t: { value: string }) => {
     await getSupabase()
       .from('push_devices')
-      .upsert({ apns_token: t.value, platform: 'ios' }, { onConflict: 'apns_token' });
+      .upsert(
+        { apns_token: t.value, platform: 'ios' },
+        { onConflict: 'apns_token', ignoreDuplicates: true },
+      );
   });
   await PushNotifications.register();
 }
