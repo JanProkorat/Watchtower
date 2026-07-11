@@ -77,7 +77,7 @@ export type OrchRequest =
   | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } }
   | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } }
   | { id: string; kind: 'prs:list'; payload: Record<string, never> }
-  | { id: string; kind: 'prs:refresh'; payload: { devopsPat?: string } }
+  | { id: string; kind: 'prs:refresh'; payload: { devopsPats?: Record<string, string> } }
   | {
       id: string;
       kind: 'prs:diff';
@@ -85,15 +85,10 @@ export type OrchRequest =
         host: import('./ipcContract.js').PrHost;
         repoKey: string;
         prNumber: number;
-        devopsPat?: string;
+        devopsPats?: Record<string, string>;
       };
     }
-  | { id: string; kind: 'reviews:getDevopsConfig'; payload: Record<string, never> }
-  | {
-      id: string;
-      kind: 'reviews:setDevopsConfig';
-      payload: { orgBaseUrl: string; repos: import('./ipcContract.js').DevopsRepoConfigPayload[] };
-    };
+  | { id: string; kind: 'reviews:projectRepo'; payload: { projectId: number } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -572,14 +567,9 @@ export type OrchResponse =
     }
   | { kind: 'prs:diff'; payload: { files: import('./ipcContract.js').DiffFilePayload[] } }
   | {
-      kind: 'reviews:getDevopsConfig';
-      payload: {
-        orgBaseUrl: string;
-        repos: import('./ipcContract.js').DevopsRepoConfigPayload[];
-        hasPat: boolean;
-      };
-    }
-  | { kind: 'reviews:setDevopsConfig'; payload: { ok: true } };
+      kind: 'reviews:projectRepo';
+      payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null };
+    };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

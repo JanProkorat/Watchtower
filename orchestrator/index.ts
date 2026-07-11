@@ -67,7 +67,7 @@ import { ReviewsService } from './services/reviews.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
-import type { PrHost, DevopsRepoConfigPayload } from '@watchtower/shared/ipcContract.js';
+import type { PrHost } from '@watchtower/shared/ipcContract.js';
 import { buildPtySpawnConfig, planBootAction } from './shellPolicy.js';
 import type { InstanceKind } from './shellPolicy.js';
 import { PtySizeOwnership } from './ptySizeOwnership.js';
@@ -1139,22 +1139,13 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'prs:list':
       return reviewsSvc().list();
     case 'prs:refresh':
-      return reviewsSvc().refresh(req.payload.devopsPat);
+      return reviewsSvc().refresh((req.payload as { devopsPats?: Record<string, string> }).devopsPats);
     case 'prs:diff': {
-      const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPat?: string };
-      return { files: await reviewsSvc().diff(p.host, p.repoKey, p.prNumber, p.devopsPat) };
+      const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> };
+      return { files: await reviewsSvc().diff(p.host, p.repoKey, p.prNumber, p.devopsPats) };
     }
-    case 'reviews:getDevopsConfig': {
-      // hasPat truth lives in electron-main (it owns safeStorage); main
-      // overrides this field before returning to the renderer. `false` is
-      // a safe orchestrator-side default.
-      return { ...reviewsSvc().getDevopsConfig(), hasPat: false };
-    }
-    case 'reviews:setDevopsConfig': {
-      const p = req.payload as { orgBaseUrl: string; repos: DevopsRepoConfigPayload[] };
-      reviewsSvc().setDevopsConfig(p);
-      return { ok: true };
-    }
+    case 'reviews:projectRepo':
+      return reviewsSvc().projectRepo((req.payload as { projectId: number }).projectId);
 
   }
 }

@@ -12,9 +12,9 @@ export interface AzdoRepoConfig {
   host: 'azdo';
   repoKey: string;
   repoLabel: string;
-  orgBaseUrl: string;
-  project: string;
-  repo: string;
+  devopsHost: string;   // PAT scope key, e.g. devops.skoda.vwgroup.com
+  apiBase: string;      // everything before /_git/
+  repo: string;         // repo name after /_git/
   localClonePath: string | null;
 }
 

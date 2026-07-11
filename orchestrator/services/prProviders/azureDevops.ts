@@ -5,6 +5,21 @@ import { parseUnifiedDiff } from './diffParse.js';
 const API = 'api-version=7.1';
 const stripRef = (r: string) => r.replace(/^refs\/heads\//, '');
 
+export interface AzureRemote { devopsHost: string; apiBase: string; repo: string; }
+
+export function parseAzureRemote(remoteUrl: string): AzureRemote | null {
+  const u = remoteUrl.trim().replace(/\.git$/, '');
+  const marker = '/_git/';
+  const idx = u.indexOf(marker);
+  if (idx < 0) return null;
+  const apiBase = u.slice(0, idx);
+  const repo = u.slice(idx + marker.length).replace(/\/.*$/, '');
+  if (!repo) return null;
+  let devopsHost: string;
+  try { devopsHost = new URL(apiBase).host; } catch { return null; }
+  return { devopsHost, apiBase, repo };
+}
+
 export function parseAzdoPrList(json: unknown, repo: AzdoRepoConfig): PullRequestPayload[] {
   const rows = (json as { value?: Array<Record<string, unknown>> }).value ?? [];
   return rows.map((r) => {
@@ -13,7 +28,7 @@ export function parseAzdoPrList(json: unknown, repo: AzdoRepoConfig): PullReques
       host: 'azdo', repoKey: repo.repoKey, repoLabel: repo.repoLabel, number: id,
       title: (r.title as string) ?? '', author: ((r.createdBy as { uniqueName?: string })?.uniqueName) ?? 'unknown',
       sourceBranch: stripRef((r.sourceRefName as string) ?? ''), targetBranch: stripRef((r.targetRefName as string) ?? ''),
-      url: `${repo.orgBaseUrl}/${repo.project}/_git/${repo.repo}/pullrequest/${id}`,
+      url: `${repo.apiBase}/_git/${repo.repo}/pullrequest/${id}`,
       updatedAt: (r.creationDate as string) ?? '', reviewable: repo.localClonePath != null,
     };
   });
@@ -27,7 +42,7 @@ const defaultGet: HttpGet = async (url, pat) => {
 };
 
 export async function listAzdoPrs(repo: AzdoRepoConfig, pat: string, get: HttpGet = defaultGet): Promise<PullRequestPayload[]> {
-  const url = `${repo.orgBaseUrl}/${repo.project}/_apis/git/repositories/${repo.repo}/pullrequests?searchCriteria.status=active&$top=100&${API}`;
+  const url = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullrequests?searchCriteria.status=active&$top=100&${API}`;
   return parseAzdoPrList(await get(url, pat), repo);
 }
 
@@ -35,10 +50,10 @@ export async function fetchAzdoDiff(repo: AzdoRepoConfig, prNumber: number, pat:
   // DevOps has no single unified-diff endpoint; SP1 uses the commit-level diff text
   // via the "diffs/commits" API and reconstructs unified hunks. For the first slice
   // we fetch the PR's iteration changes and render file-level diffs.
-  const itUrl = `${repo.orgBaseUrl}/${repo.project}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}/iterations?${API}`;
+  const itUrl = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}/iterations?${API}`;
   const iterations = (await get(itUrl, pat)) as { value: Array<{ id: number }> };
   const last = iterations.value.at(-1)?.id ?? 1;
-  const chUrl = `${repo.orgBaseUrl}/${repo.project}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}/iterations/${last}/changes?${API}`;
+  const chUrl = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}/iterations/${last}/changes?${API}`;
   const changes = (await get(chUrl, pat)) as { changeEntries?: Array<{ item?: { path?: string } }> };
   // Minimal SP1 rendering: one pseudo-file entry per changed path, no line bodies yet.
   // (Full DevOps hunk bodies are a follow-up; GitHub diffs are full-fidelity in SP1.)

@@ -1,14 +1,10 @@
 import { execFile } from 'node:child_process';
 import type { SqliteLike } from '../db/migrations.js';
 import { SettingsRepo } from '../db/repositories/settings.js';
-import type { PrHost, PullRequestPayload, DiffFilePayload, DevopsRepoConfigPayload } from '@watchtower/shared/ipcContract.js';
+import type { PrHost, PullRequestPayload, DiffFilePayload } from '@watchtower/shared/ipcContract.js';
 import type { GithubRepoConfig, AzdoRepoConfig } from './prProviders/types.js';
 import { listGithubPrs, fetchGithubDiff, parseGitRemoteNwo } from './prProviders/github.js';
-import { listAzdoPrs, fetchAzdoDiff } from './prProviders/azureDevops.js';
-
-const CONFIG_KEY = 'reviews.devops';
-
-interface DevopsStored { orgBaseUrl: string; repos: DevopsRepoConfigPayload[]; }
+import { listAzdoPrs, fetchAzdoDiff, parseAzureRemote } from './prProviders/azureDevops.js';
 
 export interface ReviewsDeps {
   db: SqliteLike;
@@ -39,52 +35,49 @@ export class ReviewsService {
     this.projectsFn = deps.projects ?? (() => []);
   }
 
-  private readConfig(): DevopsStored {
-    const raw = this.settings.getString(CONFIG_KEY, '');
-    if (!raw) return { orgBaseUrl: '', repos: [] };
-    try { return JSON.parse(raw) as DevopsStored; } catch { return { orgBaseUrl: '', repos: [] }; }
-  }
-
-  getDevopsConfig() {
-    const c = this.readConfig();
-    return { orgBaseUrl: c.orgBaseUrl, repos: c.repos };
-  }
-  setDevopsConfig(cfg: DevopsStored): void {
-    this.settings.set(CONFIG_KEY, JSON.stringify({ orgBaseUrl: cfg.orgBaseUrl, repos: cfg.repos }));
-  }
-
-  private async githubRepos(): Promise<GithubRepoConfig[]> {
-    const out: GithubRepoConfig[] = [];
+  private async resolveRepos(): Promise<{ github: GithubRepoConfig[]; azdo: AzdoRepoConfig[] }> {
+    const github: GithubRepoConfig[] = [];
+    const azdo: AzdoRepoConfig[] = [];
     for (const p of this.projectsFn()) {
       if (!p.folder_path) continue;
       const remote = await this.gitRemote(p.folder_path);
-      const nwo = remote ? parseGitRemoteNwo(remote) : null;
-      if (!nwo) continue;
-      out.push({ host: 'github', repoKey: `gh:${nwo}`, repoLabel: p.name, nwo, localClonePath: p.folder_path });
+      if (!remote) continue;
+      const nwo = parseGitRemoteNwo(remote);
+      if (nwo) {
+        github.push({ host: 'github', repoKey: `gh:${nwo}`, repoLabel: p.name, nwo, localClonePath: p.folder_path });
+        continue;
+      }
+      const azure = parseAzureRemote(remote);
+      if (azure) {
+        azdo.push({
+          host: 'azdo',
+          repoKey: `azdo:${azure.devopsHost}/${azure.repo}`,
+          repoLabel: p.name,
+          devopsHost: azure.devopsHost,
+          apiBase: azure.apiBase,
+          repo: azure.repo,
+          localClonePath: p.folder_path,
+        });
+      }
     }
-    return out;
-  }
-  private azdoRepos(): AzdoRepoConfig[] {
-    const c = this.readConfig();
-    return c.repos.map((r) => ({ host: 'azdo', repoKey: `azdo:${r.project}/${r.repo}`,
-      repoLabel: `${r.project} / ${r.repo}`, orgBaseUrl: r.orgBaseUrl || c.orgBaseUrl,
-      project: r.project, repo: r.repo, localClonePath: null }));
+    return { github, azdo };
   }
 
   list() { return { pullRequests: this.cache, syncedAt: this.syncedAt }; }
 
-  async refresh(devopsPat: string | undefined) {
+  async refresh(devopsPats: Record<string, string> | undefined) {
     const results: PullRequestPayload[] = [];
     const errors: string[] = [];
-    for (const r of await this.githubRepos()) {
+    const { github, azdo } = await this.resolveRepos();
+    for (const r of github) {
       try { results.push(...(await this.listGithub(r))); }
       catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
     }
-    if (devopsPat) {
-      for (const r of this.azdoRepos()) {
-        try { results.push(...(await this.listAzdo(r, devopsPat))); }
-        catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
-      }
+    for (const r of azdo) {
+      const pat = devopsPats?.[r.devopsHost];
+      if (!pat) { errors.push(`${r.repoLabel}: chybí PAT`); continue; }
+      try { results.push(...(await this.listAzdo(r, pat))); }
+      catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
     }
     this.cache = results;
     this.syncedAt = isoNow();
@@ -94,15 +87,29 @@ export class ReviewsService {
     return this.list();
   }
 
-  async diff(host: PrHost, repoKey: string, prNumber: number, devopsPat: string | undefined): Promise<DiffFilePayload[]> {
+  async diff(host: PrHost, repoKey: string, prNumber: number, devopsPats: Record<string, string> | undefined): Promise<DiffFilePayload[]> {
+    const { github, azdo } = await this.resolveRepos();
     if (host === 'github') {
-      const repo = (await this.githubRepos()).find((r) => r.repoKey === repoKey);
+      const repo = github.find((r) => r.repoKey === repoKey);
       if (!repo) return [];
       return fetchGithubDiff(repo, prNumber);
     }
-    const repo = this.azdoRepos().find((r) => r.repoKey === repoKey);
-    if (!repo || !devopsPat) return [];
-    return fetchAzdoDiff(repo, prNumber, devopsPat);
+    const repo = azdo.find((r) => r.repoKey === repoKey);
+    const pat = repo ? devopsPats?.[repo.devopsHost] : undefined;
+    if (!repo || !pat) return [];
+    return fetchAzdoDiff(repo, prNumber, pat);
+  }
+
+  async projectRepo(projectId: number): Promise<{ host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null }> {
+    const p = this.projectsFn().find((proj) => proj.id === projectId);
+    if (!p || !p.folder_path) return { host: null, devopsHost: null, repoLabel: null };
+    const remote = await this.gitRemote(p.folder_path);
+    if (!remote) return { host: null, devopsHost: null, repoLabel: null };
+    const nwo = parseGitRemoteNwo(remote);
+    if (nwo) return { host: 'github', devopsHost: null, repoLabel: nwo };
+    const azure = parseAzureRemote(remote);
+    if (azure) return { host: 'azdo', devopsHost: azure.devopsHost, repoLabel: `${p.name} (${azure.repo})` };
+    return { host: null, devopsHost: null, repoLabel: null };
   }
 }
 

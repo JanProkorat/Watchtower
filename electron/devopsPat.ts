@@ -1,37 +1,44 @@
 import { safeStorage } from 'electron';
 import { getOrchestrator } from './orchestratorHost.js';
 
-// Azure DevOps PAT, encrypted at rest via Electron's OS-keychain-backed
+// Azure DevOps PATs, encrypted at rest via Electron's OS-keychain-backed
 // safeStorage and persisted through the orchestrator's generic settings
-// store (same `settings` table other config lives in). Decrypted value is
-// cached in memory for the life of the process so we don't hit safeStorage
-// on every prs:refresh/prs:diff call.
-const SETTINGS_KEY = 'reviews.devops.patEnc';
+// store (same `settings` table other config lives in), keyed by DevOps
+// host — one PAT per server, since a server can host multiple projects.
+// Decrypted values are cached in memory for the life of the process so we
+// don't hit safeStorage on every prs:refresh/prs:diff call.
+const SETTINGS_KEY = 'reviews.devops.pats';
 
-let cache: string | null = null;
+let cache: Record<string, string> | null = null; // host -> plaintext
 
-export async function setPat(plain: string): Promise<void> {
+async function readMap(): Promise<Record<string, string>> { // host -> base64enc
+  const { value } = await getOrchestrator().invoke('getSetting', { key: SETTINGS_KEY });
+  if (!value) return {};
+  try { return JSON.parse(value) as Record<string, string>; } catch { return {}; }
+}
+
+export async function setPat(host: string, plain: string): Promise<void> {
   // safeStorage.isEncryptionAvailable() can be false very early in app
   // startup (before the OS keychain is unlocked) — call lazily, on use,
   // rather than caching a decision made at import time.
-  const enc = safeStorage.encryptString(plain).toString('base64');
-  await getOrchestrator().invoke('setSetting', { key: SETTINGS_KEY, value: enc });
-  cache = plain;
+  const map = await readMap();
+  map[host] = safeStorage.encryptString(plain).toString('base64');
+  await getOrchestrator().invoke('setSetting', { key: SETTINGS_KEY, value: JSON.stringify(map) });
+  cache = { ...(cache ?? {}), [host]: plain };
 }
 
-export async function getPat(): Promise<string | null> {
+export async function getPats(): Promise<Record<string, string>> {
   if (cache) return cache;
-  const { value } = await getOrchestrator().invoke('getSetting', { key: SETTINGS_KEY });
-  if (!value) return null;
-  try {
-    cache = safeStorage.decryptString(Buffer.from(value, 'base64'));
-    return cache;
-  } catch (err) {
-    console.error('[devopsPat] failed to decrypt stored PAT:', err);
-    return null;
+  const map = await readMap();
+  const out: Record<string, string> = {};
+  for (const [host, enc] of Object.entries(map)) {
+    try { out[host] = safeStorage.decryptString(Buffer.from(enc, 'base64')); }
+    catch (err) { console.error('[devopsPat] decrypt failed for', host, err); }
   }
+  cache = out;
+  return out;
 }
 
-export async function hasPat(): Promise<boolean> {
-  return (await getPat()) != null;
+export async function hasPat(host: string): Promise<boolean> {
+  return (await getPats())[host] != null;
 }

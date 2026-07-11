@@ -34,16 +34,31 @@ describe('ReviewsService', () => {
     expect(res.syncedAt).not.toBeNull();
     expect(svc.list().pullRequests).toHaveLength(1); // cached
   });
-  it('devops config round-trips through settings', () => {
-    const svc = new ReviewsService(deps());
-    svc.setDevopsConfig({ orgBaseUrl: 'https://x/tfs', repos: [{ orgBaseUrl: 'https://x/tfs', project: 'PPS', repo: 'technology' }] });
-    const got = svc.getDevopsConfig();
-    expect(got.orgBaseUrl).toBe('https://x/tfs');
-    expect(got.repos[0].repo).toBe('technology');
+  it('refresh() lists a DevOps project when its host has a matching PAT', async () => {
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+      listGithub: async () => [],
+      listAzdo: async (repo) => [{ host: 'azdo', repoKey: repo.repoKey, repoLabel: repo.repoLabel,
+        number: 7, title: 'y', author: 'jan', sourceBranch: 'b', targetBranch: 'main',
+        url: 'u', updatedAt: '2026-07-10T00:00:00Z', reviewable: true }],
+    });
+    const res = await svc.refresh({ 'devops.skoda.vwgroup.com': 'pat-value' });
+    expect(res.pullRequests).toHaveLength(1);
+    expect(res.pullRequests[0]!.host).toBe('azdo');
   });
-  it('refresh() skips DevOps when no PAT and reports only github', async () => {
-    const svc = new ReviewsService(deps());
-    svc.setDevopsConfig({ orgBaseUrl: 'https://x/tfs', repos: [{ orgBaseUrl: 'https://x/tfs', project: 'PPS', repo: 'technology' }] });
+  it('refresh() skips DevOps when no PAT for its host and reports only github', async () => {
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [
+        { id: 1, name: 'Watchtower', folder_path: '/tmp/wt' },
+        { id: 2, name: 'PPSToolshop', folder_path: '/tmp/pps' },
+      ],
+      gitRemote: async (cwd) => (cwd === '/tmp/pps'
+        ? 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology'
+        : 'git@github.com:jan/watchtower.git'),
+    });
     const res = await svc.refresh(undefined);
     expect(res.pullRequests.every((p) => p.host === 'github')).toBe(true);
   });

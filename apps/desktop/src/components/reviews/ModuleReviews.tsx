@@ -4,14 +4,12 @@ import { useReviews, applyPrFilter, groupPrsByHost, type HostFilter } from '../.
 import type { PullRequestPayload } from '@watchtower/shared/ipcContract.js';
 import { PrRow } from './PrRow.js';
 import { PrInspectorDrawer } from './PrInspectorDrawer.js';
-import { ConnectDevopsDrawer } from './ConnectDevopsDrawer.js';
 
 export function ModuleReviews(): JSX.Element {
   const { pullRequests, syncedAt, loading, error, refresh, loadDiff } = useReviews();
   const [host, setHost] = useState<HostFilter>('all');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<PullRequestPayload | null>(null);
-  const [cfgOpen, setCfgOpen] = useState(false);
   const nowMs = Date.now();
   const groups = useMemo(() => groupPrsByHost(applyPrFilter(pullRequests, host, query)), [pullRequests, host, query]);
 
@@ -23,7 +21,6 @@ export function ModuleReviews(): JSX.Element {
           {pullRequests.length} open{syncedAt ? ` · synced ${new Date(syncedAt).toLocaleTimeString('cs-CZ')}` : ''}
         </Typography>
         <Box sx={{ flex: 1 }} />
-        <Button size="small" onClick={() => setCfgOpen(true)}>Azure DevOps…</Button>
         <Button size="small" variant="outlined" disabled={loading} onClick={() => void refresh()}>↻ Obnovit</Button>
       </Stack>
 
@@ -51,7 +48,6 @@ export function ModuleReviews(): JSX.Element {
       ))}
 
       <PrInspectorDrawer pr={open} onClose={() => setOpen(null)} loadDiff={loadDiff} />
-      <ConnectDevopsDrawer open={cfgOpen} onClose={() => setCfgOpen(false)} onSaved={() => void refresh()} />
     </Box>
   );
 }

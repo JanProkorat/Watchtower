@@ -81,12 +81,11 @@ export type IpcRequest =
   | { kind: 'terminalFocus'; payload: { instanceId: string } }
   | { kind: 'push:registerDevice'; payload: { token: string; platform: string } }
   | { kind: 'prs:list'; payload: Record<string, never> }
-  | { kind: 'prs:refresh'; payload: { devopsPat?: string } }
-  | { kind: 'prs:diff'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPat?: string } }
-  | { kind: 'reviews:getDevopsConfig'; payload: Record<string, never> }
-  | { kind: 'reviews:setDevopsConfig'; payload: { orgBaseUrl: string; repos: DevopsRepoConfigPayload[] } }
-  | { kind: 'devops:setPat'; payload: { pat: string } }
-  | { kind: 'devops:hasPat'; payload: Record<string, never> };
+  | { kind: 'prs:refresh'; payload: { devopsPats?: Record<string, string> } }
+  | { kind: 'prs:diff'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
+  | { kind: 'reviews:projectRepo'; payload: { projectId: number } }
+  | { kind: 'devops:setPat'; payload: { host: string; pat: string } }
+  | { kind: 'devops:hasPat'; payload: { host: string } };
 
 export interface RunningInstancePayload {
   id: string;
@@ -538,12 +537,6 @@ export interface DiffFilePayload {
   lines: DiffLinePayload[];
 }
 
-export interface DevopsRepoConfigPayload {
-  orgBaseUrl: string;
-  project: string;
-  repo: string;
-}
-
 export type IpcResponse =
   | { kind: 'ping'; payload: { now: number; main: number; orch: number } }
   | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
@@ -648,8 +641,7 @@ export type IpcResponse =
   | { kind: 'prs:list'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
   | { kind: 'prs:refresh'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
   | { kind: 'prs:diff'; payload: { files: DiffFilePayload[] } }
-  | { kind: 'reviews:getDevopsConfig'; payload: { orgBaseUrl: string; repos: DevopsRepoConfigPayload[]; hasPat: boolean } }
-  | { kind: 'reviews:setDevopsConfig'; payload: { ok: true } }
+  | { kind: 'reviews:projectRepo'; payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null } }
   | { kind: 'devops:setPat'; payload: { ok: true } }
   | { kind: 'devops:hasPat'; payload: { hasPat: boolean } };
 
