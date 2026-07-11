@@ -68,14 +68,24 @@ const REVIEW_SCHEMA = {
   required: ['summary', 'findings'],
 };
 
-export function buildReviewPrompt(pr: { title: string; sourceBranch: string; targetBranch: string }, baseRef: string): string {
-  return `You are reviewing a pull request titled "${pr.title}" (branch \`${pr.sourceBranch}\` into \`${pr.targetBranch}\`). ` +
+export function buildReviewPrompt(
+  pr: { title: string; sourceBranch: string; targetBranch: string },
+  baseRef: string,
+  language: 'en' | 'cs' = 'en',
+): string {
+  const base = `You are reviewing a pull request titled "${pr.title}" (branch \`${pr.sourceBranch}\` into \`${pr.targetBranch}\`). ` +
     `Its changes are on this checked-out branch relative to the base ref \`${baseRef}\`. ` +
     `Run \`git diff ${baseRef}...HEAD\` to see the diff, and read surrounding code as needed. ` +
     'Report correctness/logic/security **bugs** AND reuse/simplification/efficiency **quality** issues. ' +
     'For each finding give the repo-relative file, the 1-based line on the new side, a severity (error|warn|info), ' +
     'a short category (e.g. correctness, efficiency, simplification), a one-line summary, and optional detail. ' +
     'Also give a 2-3 sentence overall summary. Output must match the provided JSON schema.';
+  if (language === 'cs') {
+    return base +
+      " Write all human-readable text — the overall summary and every finding's summary and detail — in Czech (čeština). " +
+      'Keep the JSON structure, field names, and the severity enum values (error|warn|info) in English.';
+  }
+  return base;
 }
 
 export function parseReviewOutput(stdout: string): { summary: string; findings: PrFindingPayload[] } {
@@ -129,6 +139,7 @@ export async function runReview(
   pr: { title: string; sourceBranch: string; targetBranch: string },
   deps: ReviewRunnerDeps = {},
   signal?: AbortSignal,
+  language: 'en' | 'cs' = 'en',
 ): Promise<{ summary: string; findings: PrFindingPayload[] }> {
   const exec = deps.exec ?? defaultExec;
   const claudeBin = deps.claudeBin ?? 'claude';
@@ -142,7 +153,7 @@ export async function runReview(
   await exec('git', ['-C', clonePath, 'worktree', 'add', '--detach', worktree, headSha]);
 
   try {
-    const prompt = buildReviewPrompt(pr, baseRef);
+    const prompt = buildReviewPrompt(pr, baseRef, language);
     const args = [
       '-p', prompt,
       '--model', 'opus',

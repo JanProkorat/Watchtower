@@ -83,6 +83,18 @@ describe('buildReviewPrompt', () => {
     expect(prompt).toContain('git diff refs/wt-review/tgt...HEAD');
     expect(prompt).not.toMatch(/git diff main/);
   });
+
+  it("defaults to English and doesn't request Czech", () => {
+    const prompt = buildReviewPrompt({ title: 'Fix the thing', sourceBranch: 'feature/x', targetBranch: 'main' }, 'refs/wt-review/tgt');
+    expect(prompt).not.toMatch(/Czech|čeština/i);
+  });
+
+  it('requests Czech output when language is cs', () => {
+    const prompt = buildReviewPrompt({ title: 'Fix the thing', sourceBranch: 'feature/x', targetBranch: 'main' }, 'refs/wt-review/tgt', 'cs');
+    expect(prompt).toMatch(/Czech/i);
+    // structure/severity must stay English
+    expect(prompt).toMatch(/severity enum values/i);
+  });
 });
 
 describe('runReview', () => {

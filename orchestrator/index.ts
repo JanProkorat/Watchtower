@@ -1197,7 +1197,9 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       runningReviews.set(id, ac);
       // Fire-and-forget: the caller gets `reviewId` immediately and follows
       // progress via the prReviewProgress/prReviewDone pushes.
-      runReview(target.clonePath, target.baseRef, target.headSha, target.pr, {}, ac.signal)
+      // Azure DevOps PRs are Škoda work read by a Czech-speaking team, so their
+      // review findings are written in Czech; GitHub PRs stay English.
+      runReview(target.clonePath, target.baseRef, target.headSha, target.pr, {}, ac.signal, p.host === 'azdo' ? 'cs' : 'en')
         .then(({ summary, findings }) => {
           reviews.finish(id, summary, JSON.stringify(findings));
           emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'done', message: summary } });
