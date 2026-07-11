@@ -436,33 +436,10 @@ export function App() {
                 onToggleMode={toggleThemeMode}
               />
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                {activeModule === 'dashboard' && (
-                  <ModuleDashboard
-                    instances={instances}
-                    onActivateInstance={switchToInstance}
-                    onKillInstance={(id) => kill(id)}
-                    onStartNewInstance={() => setNewOpen(true)}
-                    onOpenProject={switchToTimeTrackerProject}
-                  />
-                )}
-                {activeModule === 'settings' && <ModuleSettings view={settingsView.view} />}
-                {activeModule === 'reviews' && <ModuleReviews />}
-                {activeModule === 'billing' && (
-                  <ModuleTimeTracker
-                    view={billingView.view}
-                    onSelectProject={billingView.selectProject}
-                    onOpenInstanceForCwd={spawnClaudeForCwd}
-                    onOpenTerminalForCwd={spawnTerminalForCwd}
-                  />
-                )}
-                <Box
-                  sx={{
-                    display: activeModule === 'instances' ? 'flex' : 'none',
-                    flex: 1,
-                    flexDirection: 'column',
-                    minHeight: 0,
-                  }}
-                >
+                {/* Instance tab bar — visible on every module so you can jump back
+                    to a session from anywhere. Hidden on the dashboard, which
+                    already lists sessions in its own card. */}
+                {activeModule !== 'dashboard' && (
                   <TabStrip
                     tabs={tabs}
                     mountedTabIds={mountedTabIds}
@@ -522,6 +499,34 @@ export function App() {
                     }}
                     onNew={() => setNewOpen(true)}
                   />
+                )}
+                {activeModule === 'dashboard' && (
+                  <ModuleDashboard
+                    instances={instances}
+                    onActivateInstance={switchToInstance}
+                    onKillInstance={(id) => kill(id)}
+                    onStartNewInstance={() => setNewOpen(true)}
+                    onOpenProject={switchToTimeTrackerProject}
+                  />
+                )}
+                {activeModule === 'settings' && <ModuleSettings view={settingsView.view} />}
+                {activeModule === 'reviews' && <ModuleReviews />}
+                {activeModule === 'billing' && (
+                  <ModuleTimeTracker
+                    view={billingView.view}
+                    onSelectProject={billingView.selectProject}
+                    onOpenInstanceForCwd={spawnClaudeForCwd}
+                    onOpenTerminalForCwd={spawnTerminalForCwd}
+                  />
+                )}
+                <Box
+                  sx={{
+                    display: activeModule === 'instances' ? 'flex' : 'none',
+                    flex: 1,
+                    flexDirection: 'column',
+                    minHeight: 0,
+                  }}
+                >
                   <SlotRegistryProvider>
                       {layoutLoaded && (
                         <WorkspaceRoot
