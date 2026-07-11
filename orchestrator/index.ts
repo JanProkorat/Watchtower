@@ -1223,6 +1223,10 @@ function respawnIncompleteRowsOnBoot(): void {
       portRange: [7421, 7430],
       handleRequest,
       onClientGone: handleClientGone,
+      // attentionRelay is created below (after this bootstrap() call resolves,
+      // once handle!.pg exists), so this closure reads the module-scoped
+      // variable at call time — by the first daily purge tick it is set.
+      onPurgeDue: () => { void attentionRelay?.pruneClosedThreads(14); },
       onHookEvent: async (eventName, body, instanceId) => {
         // Drop hook events fired by a NESTED `claude` (memory summarizer, skills,
         // sub-agents) that inherited this instance's WATCHTOWER_INSTANCE_ID but

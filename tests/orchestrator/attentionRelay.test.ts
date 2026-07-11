@@ -4,11 +4,16 @@ import { createAttentionRelay } from '../../orchestrator/attentionRelay';
 function fakePg() {
   const inserts: any[] = [];
   const updates: any[] = [];
+  const deletes: [string, unknown[] | undefined][] = [];
   let pending: any[] = [];
+  let deleteRows: any[] = [];
   return {
-    inserts, updates, setPending: (r: any[]) => { pending = r; },
+    inserts, updates, deletes,
+    setPending: (r: any[]) => { pending = r; },
+    setDeleteRows: (r: any[]) => { deleteRows = r; },
     query: vi.fn(async (sql: string, params?: unknown[]) => {
       if (/INSERT INTO attention_messages/.test(sql)) { inserts.push(params); return { rows: [] }; }
+      if (/DELETE FROM attention_messages/.test(sql)) { deletes.push([sql, params]); return { rows: deleteRows }; }
       if (/SELECT[\s\S]*role = 'user' AND injected_at IS NULL/.test(sql)) return { rows: pending };
       if (/UPDATE attention_messages SET injected_at/.test(sql)) { updates.push(params); pending = []; return { rows: [] }; }
       if (/SELECT 1 FROM attention_messages[\s\S]*role = 'claude'/.test(sql)) return { rows: [] };
@@ -74,5 +79,43 @@ describe('AttentionRelay', () => {
     });
     await relay.writeClaudeMessage('i', '/c', 'crashed');
     expect(await relay.pollOnce()).toBe(0);
+  });
+
+  it('pruneClosedThreads deletes closed threads older than the cutoff and returns the count', async () => {
+    const pg = fakePg();
+    pg.setDeleteRows([{ sync_id: 'a' }, { sync_id: 'b' }]);
+    const relay = createAttentionRelay({
+      pg, getSnapshot: async () => '', deliverReply: () => true,
+      resolveLabel: () => 'x', newId: () => 'id', now: () => '2026-07-11T00:00:00.000Z',
+    });
+    const n = await relay.pruneClosedThreads();
+    expect(n).toBe(2);
+    expect(pg.deletes.length).toBe(1);
+    const [sql, params] = pg.deletes[0];
+    expect(sql).toMatch(/DELETE FROM attention_messages/);
+    expect(sql).toMatch(/closed_at IS NOT NULL/);
+    expect(sql).toMatch(/closed_at < \$1/);
+    // default 14-day cutoff computed from deps.now(), not Date.now()
+    expect(params?.[0]).toBe('2026-06-27T00:00:00.000Z');
+  });
+
+  it('pruneClosedThreads honors an explicit olderThanDays argument', async () => {
+    const pg = fakePg();
+    pg.setDeleteRows([{ sync_id: 'a' }]);
+    const relay = createAttentionRelay({
+      pg, getSnapshot: async () => '', deliverReply: () => true,
+      resolveLabel: () => 'x', newId: () => 'id', now: () => '2026-07-11T00:00:00.000Z',
+    });
+    const n = await relay.pruneClosedThreads(1);
+    expect(n).toBe(1);
+    expect(pg.deletes[0][1]?.[0]).toBe('2026-07-10T00:00:00.000Z');
+  });
+
+  it('pruneClosedThreads is a no-op (no query, returns 0) when pg is null', async () => {
+    const relay = createAttentionRelay({
+      pg: null, getSnapshot: async () => '', deliverReply: () => true,
+      resolveLabel: () => 'x', newId: () => 'id', now: () => 'now',
+    });
+    expect(await relay.pruneClosedThreads()).toBe(0);
   });
 });

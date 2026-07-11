@@ -55,6 +55,14 @@ export interface BootstrapOptions {
   wsHost?: string;
   /** Port for the WS bridge server. 0 = ephemeral (good for tests). Defaults to 0. */
   wsPort?: number;
+  /**
+   * Called on the same daily cadence as the tombstone purge (i.e. whenever a
+   * sync cycle actually ran it — see SyncCycleResult.purge). index.ts wires
+   * this to attentionRelay.pruneClosedThreads(14); attentionRelay is created
+   * after bootstrap() resolves, so this fires via closure over that
+   * module-scoped variable, never called synchronously during bootstrap.
+   */
+  onPurgeDue?: () => void;
 }
 
 export interface BootstrapHandle {
@@ -145,6 +153,10 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
       } else if (syncDebug && (r.push || r.pull)) {
         console.debug('[sync] cycle ok:', { push: r.push, pull: r.pull });
       }
+      // r.purge is only populated when purgeDue() actually let the tombstone
+      // sweep run this cycle (throttled to once/day) — piggyback the
+      // attention-thread retention prune on that exact same cadence.
+      if (r.purge) opts.onPurgeDue?.();
     },
   });
   sync.start();

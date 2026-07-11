@@ -14,10 +14,12 @@ export interface AttentionRelay {
   hasOutstanding(): Promise<boolean>;
   start(): void; stop(): void;
   closeThread(instanceId: string): Promise<void>;
+  pruneClosedThreads(olderThanDays?: number): Promise<number>;
 }
 
 const FAST_MS = 3_000;
 const SLOW_MS = 30_000;
+const DEFAULT_PRUNE_DAYS = 14;
 
 export function createAttentionRelay(deps: AttentionRelayDeps): AttentionRelay {
   let timer: NodeJS.Timeout | null = null;
@@ -73,6 +75,21 @@ export function createAttentionRelay(deps: AttentionRelayDeps): AttentionRelay {
     );
   }
 
+  // Retention: drop closed threads once they're old enough that nobody will
+  // scroll back to them. Cutoff is derived from deps.now() (not Date.now())
+  // so it stays testable/deterministic with the injected clock, matching the
+  // rest of this module's convention.
+  async function pruneClosedThreads(olderThanDays: number = DEFAULT_PRUNE_DAYS): Promise<number> {
+    if (!deps.pg) return 0;
+    const cutoffMs = new Date(deps.now()).getTime() - olderThanDays * 24 * 60 * 60 * 1000;
+    const cutoff = new Date(cutoffMs).toISOString();
+    const { rows } = await deps.pg.query(
+      `DELETE FROM attention_messages WHERE closed_at IS NOT NULL AND closed_at < $1 RETURNING sync_id`,
+      [cutoff],
+    );
+    return rows.length;
+  }
+
   function schedule() {
     if (!deps.pg) return;
     const tick = async () => {
@@ -87,7 +104,7 @@ export function createAttentionRelay(deps: AttentionRelayDeps): AttentionRelay {
   }
 
   return {
-    writeClaudeMessage, pollOnce, hasOutstanding, closeThread,
+    writeClaudeMessage, pollOnce, hasOutstanding, closeThread, pruneClosedThreads,
     start: () => { if (!timer) schedule(); },
     stop: () => { if (timer) { clearTimeout(timer); timer = null; } },
   };
