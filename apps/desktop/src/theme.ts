@@ -34,6 +34,14 @@ const shared: ThemeOptions = {
         '.tt-num': { fontVariantNumeric: 'tabular-nums' },
         'html, body, #root': { height: '100%' },
         body: { fontFeatureSettings: '"cv11", "ss01"' },
+        // Instance tab "stretch-in": a new pill expands the centered tab bar open.
+        '@keyframes wt-tab-in': {
+          from: { maxWidth: 0, opacity: 0 },
+          to: { maxWidth: '280px', opacity: 1 },
+        },
+        '@media (prefers-reduced-motion: reduce)': {
+          '*': { animation: 'none !important' },
+        },
       },
     },
     MuiChip: {

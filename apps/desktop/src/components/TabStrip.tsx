@@ -82,6 +82,11 @@ function TabButton({
         fontWeight: active ? 600 : 500,
         whiteSpace: 'nowrap',
         flexShrink: 0,
+        // Stretch-in on mount — a newly added tab expands the (content-width,
+        // centered) bar open. overflow:hidden clips the content while max-width
+        // animates from 0. Runs once per tab (keyed elements aren't remounted).
+        overflow: 'hidden',
+        animation: 'wt-tab-in 240ms cubic-bezier(0.2,0.8,0.2,1)',
         transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
       }}
     >
@@ -241,10 +246,13 @@ export function TabStrip({
         display: 'flex',
         alignItems: 'center',
         minHeight: 44,
-        // Floating frosted pill bar for the instance/project tabs (iPad tab
-        // strip). Sits at the top of the Instances content, gutter all around.
+        // Floating frosted pill bar — sized to its content and centered at the
+        // top of the Instances content (alignSelf stops the flex-column stretch).
         ...glassFloating(theme, { radius: 14, elevation: 1 }),
-        m: '8px',
+        alignSelf: 'center',
+        maxWidth: 'calc(100% - 16px)',
+        mt: '8px',
+        mb: '4px',
         px: 0.75,
         flexShrink: 0,
         overflowX: 'auto',
@@ -277,12 +285,11 @@ export function TabStrip({
           ))}
         </Box>
       </SortableContext>
-      <Box sx={{ flex: 1, minWidth: 0 }} />
-      <Tooltip title="New instance" placement="left">
+      <Tooltip title="New instance" placement="bottom">
         <IconButton
           onClick={onNew}
           size="small"
-          sx={{ mr: 0.5, color: 'text.secondary', ':hover': { color: 'primary.main' } }}
+          sx={{ ml: 0.25, color: 'text.secondary', ':hover': { color: 'primary.main' } }}
         >
           <AddIcon fontSize="small" />
         </IconButton>
