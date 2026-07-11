@@ -6,7 +6,7 @@ function deps(over = {}) {
   const sent: Array<{ token: string; data: Record<string, unknown> }> = []; const removed: string[] = [];
   const base = {
     getConfig: () => ({ ...DEFAULT_HUB_CONFIG, enabled: true, apnsKey: 'k', apnsKeyId: 'i', apnsTeamId: 't' }),
-    listTokens: () => ['tokA', 'tokB'],
+    listTokens: async () => ['tokA', 'tokB'],
     removeToken: (t: string) => removed.push(t),
     sendApns: async (_c: any, token: string, msg: any) => { sent.push({ token, data: msg.data }); return token === 'tokB' ? { ok: false, status: 410, reason: 'Unregistered' } : { ok: true, status: 200 }; },
     buildContext: () => ({ title: 'api', body: 'čeká na povolení' }),
@@ -20,7 +20,7 @@ describe('hubSender.fire', () => {
     const { base, sent, removed } = deps();
     await createHubSender(base).fire('i1', '/x', 'waiting-permission');
     expect(sent.map(s => s.token).sort()).toEqual(['tokA', 'tokB']);
-    expect(sent[0].data).toEqual({ instanceId: 'i1' });
+    expect(sent[0].data).toEqual({ instanceId: 'i1', kind: 'waiting-permission' });
     expect(removed).toEqual(['tokB']); // 410 → pruned
   });
 
