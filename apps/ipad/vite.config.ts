@@ -16,6 +16,7 @@ export default defineConfig({
       '@watchtower/ui-core': path.resolve(__dirname, '../../packages/ui-core/src'),
       '@watchtower/data-supabase': path.resolve(__dirname, '../../packages/data-supabase/src'),
       '@watchtower/module-timetracker': path.resolve(__dirname, '../../packages/module-timetracker/src'),
+      '@watchtower/module-attention': path.resolve(__dirname, '../../packages/module-attention/src'),
     },
   },
   build: {
