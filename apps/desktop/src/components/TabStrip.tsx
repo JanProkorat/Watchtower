@@ -86,8 +86,11 @@ function TabButton({
         // centered) bar open. overflow:hidden clips the content while max-width
         // animates from 0. Runs once per tab (keyed elements aren't remounted).
         overflow: 'hidden',
-        animation: 'wt-tab-in 500ms cubic-bezier(0.22,1,0.36,1)',
-        transition: 'background-color 500ms ease, color 500ms ease, box-shadow 500ms ease',
+        // easeInOutCubic — motion is spread evenly across the 500ms so it reads
+        // as a real animation (an ease-out front-loads and looks instant).
+        animation: 'wt-tab-in 500ms cubic-bezier(0.65,0,0.35,1)',
+        transition:
+          'background-color 500ms cubic-bezier(0.65,0,0.35,1), color 500ms cubic-bezier(0.65,0,0.35,1), box-shadow 500ms cubic-bezier(0.65,0,0.35,1)',
       }}
     >
       {attention ? (
