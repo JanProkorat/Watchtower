@@ -15,6 +15,8 @@ public struct AppFeature {
         }
     }
 
+    @CasePathable
+    @dynamicMemberLookup
     public enum Phase: Equatable {
         case loading
         case signedOut(AuthFeature.State)
