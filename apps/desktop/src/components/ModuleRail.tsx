@@ -28,7 +28,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import type { ThemeMode } from '../theme.js';
 import type { ListTab } from '../util/timetrackerUrl.js';
 import type { SettingsTab } from '../util/settingsUrl.js';
-import { glassSurface } from '../theme/glass.js';
+import { glassFloating } from '../theme/glass.js';
 
 export type ModuleId = 'dashboard' | 'instances' | 'billing' | 'reviews' | 'settings';
 
@@ -149,8 +149,6 @@ export function ModuleRail({
   onToggleMode,
 }: Props) {
   const theme = useTheme();
-  // glassSurface is the single source of truth for frosted sidebar fill + blur.
-  const glass = glassSurface(theme);
   // Active nav item: purple wash background + 1px ring matching the prototype
   // (#s-rail: --chip background + 0 0 0 1px rgba(154,135,245,.30) ring).
   // Dark: chip = rgba(154,135,245,.24); light: chip = rgba(109,95,224,.16).
@@ -232,11 +230,10 @@ export function ModuleRail({
     <Box
       sx={{
         width: expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH,
-        // Glass frosted sidebar — glassSurface provides fill, backdropFilter, border.
-        // Border is overridden: sidebar only needs a right-edge hairline.
-        ...glass,
-        border: 'none',
-        borderRight: `1px solid ${theme.palette.divider}`,
+        // Floating frosted panel — lifts off the OS vibrancy backdrop; the gutter
+        // margin lets the ambient background show around it (iPad rail language).
+        ...glassFloating(theme, { radius: 20, elevation: 1 }),
+        m: '10px 8px 10px 10px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'stretch',

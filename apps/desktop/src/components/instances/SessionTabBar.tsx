@@ -1,6 +1,7 @@
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import { accentWash, accentActiveText } from '../../theme/glass.js';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -115,15 +116,18 @@ export function SessionTabBar({
               minHeight: 32,
               cursor: 'pointer',
               userSelect: 'none',
-              color: active ? 'text.primary' : 'text.secondary',
-              backgroundColor: active ? 'background.default' : 'transparent',
+              // iPad active treatment: purple wash + accent text, keeping the
+              // accent underline as the "this column" indicator (tabs stay
+              // column-aligned with the panes below, so they aren't free pills).
+              color: active ? accentActiveText(theme) : 'text.secondary',
+              backgroundColor: active ? accentWash(theme) : 'transparent',
               borderRight: idx < sessions.length - 1 ? 1 : 0,
               borderColor: 'divider',
               borderBottom: 2,
               borderBottomColor: active ? accent : 'transparent',
-              transition: 'background-color 120ms',
+              transition: 'background-color 120ms ease, color 120ms ease',
               ':hover': {
-                backgroundColor: active ? 'background.default' : 'action.hover',
+                backgroundColor: active ? accentWash(theme) : 'action.hover',
               },
               fontSize: 12,
             }}
@@ -141,6 +145,8 @@ export function SessionTabBar({
                   height: 8,
                   borderRadius: '50%',
                   backgroundColor: attentionColor ?? MUTED_DOT,
+                  // Attention statuses glow (iPad status-dot language); idle stays flat.
+                  boxShadow: attentionColor ? `0 0 8px ${attentionColor}` : 'none',
                   flexShrink: 0,
                 }}
               />

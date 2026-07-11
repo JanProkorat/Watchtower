@@ -115,3 +115,86 @@ export function glassFill(theme: Theme, opts?: GlassSurfaceOptions): GlassFillSt
     border: `1px solid ${borderColor}`,
   };
 }
+
+// ---------------------------------------------------------------------------
+// iPad "frosted-floating" chrome language (Instances rail + tab bars).
+//
+// These mirror the iPad app's Liquid Glass tokens (packages/ui-core/glass.ts /
+// apps/ipad theme) but are THEME-AWARE — derived from theme.palette.primary and
+// the mode — so the same look reads correctly in both light and dark mode.
+// ---------------------------------------------------------------------------
+
+/**
+ * A floating rounded glass panel — the chrome material for the module rail and
+ * floating bars. Same fill + blur as {@link glassSurface}, but with rounded
+ * corners and a deeper soft drop shadow so the panel reads as lifted off the
+ * OS vibrancy backdrop (matches the iPad rail's `glassPanel`).
+ */
+export function glassFloating(
+  theme: Theme,
+  opts?: { radius?: number; elevation?: number },
+): GlassSurfaceStyle & { borderRadius: number } {
+  const radius = opts?.radius ?? 18;
+  const base = glassSurface(theme, { elevation: opts?.elevation ?? 1 });
+  const isDark = theme.palette.mode === 'dark';
+  const drop = isDark ? '0 18px 44px rgba(0,0,0,0.50)' : '0 12px 32px rgba(15,18,24,0.14)';
+  const highlight = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.70)';
+  return {
+    ...base,
+    borderRadius: radius,
+    boxShadow: `inset 0 1px 0 ${highlight}, ${drop}`,
+  };
+}
+
+// The purple wash + ring below mirror the tuned values the ModuleRail already
+// uses inline (its active nav item), so the rail, instance TabStrip, and
+// SessionTabBar all read as one consistent active-state language.
+
+/** Translucent accent wash behind an active nav item / tab (iPad `accentWash`). */
+export function accentWash(theme: Theme): string {
+  return theme.palette.mode === 'dark' ? 'rgba(154,135,245,0.24)' : 'rgba(109,95,224,0.16)';
+}
+
+/** Ring highlight around an active nav item — inset top highlight + accent frame. */
+export function accentRing(theme: Theme): string {
+  const ring = theme.palette.mode === 'dark' ? 'rgba(154,135,245,0.30)' : 'rgba(109,95,224,0.25)';
+  return `inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 1px ${ring}`;
+}
+
+/** Icon tint for an active nav item (iPad `accentIcon` → theme primary). */
+export function accentIconColor(theme: Theme): string {
+  return theme.palette.primary.main;
+}
+
+/** Text color for an active nav item / tab (white in dark, saturated primary in light). */
+export function accentActiveText(theme: Theme): string {
+  return theme.palette.mode === 'dark' ? '#ffffff' : theme.palette.primary.main;
+}
+
+/** Amber used for the attention (needs-input) status dot, matching the iPad. */
+export const ATTENTION_AMBER = '#f5a524';
+
+export type DotState = 'active' | 'attention' | 'idle';
+
+/**
+ * Glowing status dot for the instance / session tabs. `active` glows with the
+ * project accent (falling back to the theme primary), `attention` glows amber,
+ * and `idle` is a muted (or project-tinted) dot with no glow. Returned as an
+ * sx-spreadable style object.
+ */
+export function statusDot(
+  state: DotState,
+  accent: string | undefined,
+  theme: Theme,
+): Record<string, string | number> {
+  const base = { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 };
+  if (state === 'attention') {
+    return { ...base, backgroundColor: ATTENTION_AMBER, boxShadow: `0 0 8px ${ATTENTION_AMBER}` };
+  }
+  if (state === 'active') {
+    const c = accent ?? theme.palette.primary.main;
+    return { ...base, backgroundColor: c, boxShadow: `0 0 8px ${c}` };
+  }
+  const muted = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.28)' : 'rgba(15,18,24,0.28)';
+  return { ...base, backgroundColor: accent ?? muted, boxShadow: 'none' };
+}

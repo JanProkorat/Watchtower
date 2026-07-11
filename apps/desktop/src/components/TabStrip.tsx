@@ -4,13 +4,12 @@ import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { TabId, TabRecord } from '@watchtower/shared/layout.js';
 import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 import { tabAccent } from '../util/tabAccent.js';
-import { glassSurface } from '../theme/glass.js';
+import { glassSurface, accentWash, accentRing, accentActiveText, statusDot } from '../theme/glass.js';
 
 // Outer tab dot is locked to the project's accent color (or a hash-based
 // palette pick for ad-hoc cwd tabs). Per-session attention status is
@@ -62,6 +61,7 @@ function TabButton({
   onHide,
   onClose,
 }: TabButtonProps) {
+  const theme = useTheme();
   return (
     <Box
       ref={dragRef}
@@ -73,48 +73,40 @@ function TabButton({
       sx={{
         display: 'flex',
         alignItems: 'center',
-        gap: 1,
-        minHeight: 40,
-        px: 1.5,
+        gap: 0.75,
+        height: 30,
+        px: 1.25,
+        borderRadius: '10px',
         cursor: draggable ? 'grab' : 'pointer',
         userSelect: 'none',
-        color: active ? 'text.primary' : 'text.secondary',
-        backgroundColor: active ? 'background.default' : 'transparent',
-        borderBottom: 2,
-        borderBottomColor: active
-          ? accent ?? 'primary.main'
-          : mounted
-          ? accent ?? 'rgba(255,255,255,0.18)'
-          : 'transparent',
-        ':hover': { backgroundColor: active ? 'background.default' : 'action.hover' },
+        // iPad pill: active = purple wash + ring + accent text; no underline.
+        color: active ? accentActiveText(theme) : 'text.secondary',
+        backgroundColor: active ? accentWash(theme) : 'transparent',
+        boxShadow: active ? accentRing(theme) : 'none',
+        ':hover': {
+          backgroundColor: active ? accentWash(theme) : 'action.hover',
+          color: active ? accentActiveText(theme) : 'text.primary',
+        },
         ':active': { cursor: draggable ? 'grabbing' : 'pointer' },
-        fontSize: 13,
+        fontSize: 12.5,
+        fontWeight: active ? 600 : 500,
         whiteSpace: 'nowrap',
         flexShrink: 0,
+        transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
       }}
     >
       {attention ? (
         <Tooltip title="A session here needs your attention" placement="bottom">
-          <WarningRoundedIcon
+          <Box
             aria-label={`${label} needs your attention`}
-            sx={{
-              fontSize: 20,
-              // Explicit yellow (theme `warning.main` is amber); a touch
-              // deeper in light mode so it stays legible on the white strip.
-              color: (theme) => (theme.palette.mode === 'dark' ? '#facc15' : '#eab308'),
-              flexShrink: 0,
-            }}
+            sx={statusDot('attention', accent, theme)}
           />
         </Tooltip>
       ) : (
         <Box
-          sx={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            backgroundColor: dotColor(id, accent),
-            flexShrink: 0,
-          }}
+          // Active → project-accent dot with glow; otherwise the project dot when
+          // the tab is mounted, a muted dot when it's only a collapsed tab.
+          sx={statusDot(active ? 'active' : 'idle', mounted ? dotColor(id, accent) : undefined, theme)}
         />
       )}
       <span>{label}</span>
@@ -257,7 +249,7 @@ export function TabStrip({
       style={DRAG_REGION}
       sx={{
         display: 'flex',
-        alignItems: 'stretch',
+        alignItems: 'center',
         minHeight: 40,
         pl: TRAFFIC_LIGHT_INSET,
         // Glass frosted bar — glassSurface provides fill, backdropFilter, border, boxShadow.
@@ -272,7 +264,7 @@ export function TabStrip({
     >
       {/* No DndContext here — App provides one so a tab drag can also drop on workspace leaves. */}
       <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
-        <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, pl: 0.5 }}>
           {visibleTabs.map((t) => (
             <Box
               key={t.id}
