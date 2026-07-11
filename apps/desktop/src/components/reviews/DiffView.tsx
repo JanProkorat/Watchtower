@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Box, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import type { DiffFilePayload, PrCommentThreadPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
 import { CommentThread } from './CommentThread.js';
 import { FindingCard } from './FindingCard.js';
+import { glassSurface } from '../../theme/glass.js';
 import { worstSeverity } from '../../state/useReviews.js';
 
 const SEVERITY_DOT_COLOR: Record<PrFindingPayload['severity'], string> = {
@@ -13,6 +15,7 @@ const SEVERITY_DOT_COLOR: Record<PrFindingPayload['severity'], string> = {
 export function DiffView({ files, threads = [], findings = [] }: {
   files: DiffFilePayload[]; threads?: PrCommentThreadPayload[]; findings?: PrFindingPayload[];
 }): JSX.Element {
+  const theme = useTheme();
   const [active, setActive] = useState(0);
   const commentsByFile = useMemo(() => {
     const m = new Map<string, number>();
@@ -89,10 +92,12 @@ export function DiffView({ files, threads = [], findings = [] }: {
           })}
         </Box>
       </Panel>
-      <PanelResizeHandle style={{ width: 6, background: 'rgba(255,255,255,0.08)', cursor: 'col-resize' }} />
+      <PanelResizeHandle style={{ width: 6, background: theme.palette.divider, cursor: 'col-resize' }} />
       <Panel minSize={30}>
         <Box sx={{ height: '100%', overflow: 'auto', fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11 }}>
-          <Typography sx={{ position: 'sticky', top: 0, px: 1.5, py: 1, bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider', fontFamily: 'inherit', fontSize: 11 }}>{file.path}</Typography>
+          {/* Sticky file header — glassSurface (blurred) so code scrolling under it
+              frosts instead of showing through the now-translucent paper fill. */}
+          <Typography sx={{ position: 'sticky', top: 0, zIndex: 1, px: 1.5, py: 1, ...glassSurface(theme), border: 'none', borderBottom: 1, borderColor: 'divider', fontFamily: 'inherit', fontSize: 11 }}>{file.path}</Typography>
           {file.lines.map((l, i) => {
             const lineThreads = l.newNo != null ? threadsByLine.get(l.newNo) : undefined;
             const lineFindings = l.newNo != null ? findingsByLine.get(l.newNo) : undefined;

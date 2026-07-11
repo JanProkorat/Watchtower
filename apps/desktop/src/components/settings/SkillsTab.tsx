@@ -13,12 +13,15 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useSkills } from '../../state/useSkills.js';
 import type { SkillRowPayload } from '@watchtower/shared/ipcContract.js';
+import { glassSurface } from '../../theme/glass.js';
 
 export function SkillsTab() {
+  const theme = useTheme();
   const state = useSkills();
   const [search, setSearch] = useState('');
   const [activeSource, setActiveSource] = useState<string | 'all'>('all');
@@ -105,8 +108,8 @@ export function SkillsTab() {
 
       {/* Body: split list + preview */}
       <Box sx={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-        {/* List */}
-        <Box sx={{ width: 340, borderRight: 1, borderColor: 'divider', overflow: 'auto' }}>
+        {/* List panel — glassSurface: singleton container, one blur per pane */}
+        <Box sx={{ width: 340, borderRight: 1, borderColor: 'divider', overflow: 'auto', ...glassSurface(theme, { elevation: 1 }) }}>
           {state.loading && (
             <Stack spacing={1} sx={{ p: 1.5 }}>
               <Skeleton variant="rounded" height={48} />
@@ -177,8 +180,8 @@ export function SkillsTab() {
           </List>
         </Box>
 
-        {/* Preview */}
-        <Box sx={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
+        {/* Preview panel — glassSurface: singleton detail pane */}
+        <Box sx={{ flex: 1, overflow: 'auto', minWidth: 0, ...glassSurface(theme, { elevation: 1 }) }}>
           {selected ? (
             <Box sx={{ p: 2 }}>
               <Stack spacing={0.5} sx={{ mb: 2 }}>

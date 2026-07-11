@@ -3,9 +3,11 @@ import {
   Box, Typography, Button, Alert, CircularProgress, Stack,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import type { PullRequestPayload, PrReviewPayload } from '@watchtower/shared/ipcContract.js';
 import { sortFindingsWithIndex } from '../../state/useReviews.js';
 import { FindingCard } from './FindingCard.js';
+import { glassFill } from '../../theme/glass.js';
 import { useToast } from '../../state/useToast.js';
 
 export function ReviewReport({ pr, review, running, onRun, onCancel, postComments }: {
@@ -16,6 +18,7 @@ export function ReviewReport({ pr, review, running, onRun, onCancel, postComment
   onCancel(): void;
   postComments(reviewId: number, findingIndexes: number[]): Promise<{ posted: number; skipped: number; errors: string[] }>;
 }): JSX.Element {
+  const theme = useTheme();
   const isRunning = running || review?.status === 'running';
   const { showError, showSuccess } = useToast();
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -87,8 +90,8 @@ export function ReviewReport({ pr, review, running, onRun, onCancel, postComment
   return (
     <Box sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-        <Box sx={{ bgcolor: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.09)',
-          borderRadius: 2, p: 1.25, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)', mb: 1.5 }}>
+        {/* Review summary — theme-aware glassFill (drawer backdrop is already frosted). */}
+        <Box sx={{ ...glassFill(theme, { elevation: 3 }), borderRadius: 2, p: 1.25, mb: 1.5 }}>
           <Typography sx={{ fontSize: 12.5 }}>{review?.summary}</Typography>
         </Box>
         <Typography sx={{ fontSize: 11, color: 'text.secondary', mb: 1 }}>

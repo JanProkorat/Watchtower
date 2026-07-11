@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTheme } from '@mui/material/styles';
+import { glassSurface } from '../../theme/glass.js';
 import { BoardTaskDetailDrawer } from './BoardTaskDetailDrawer.js';
 import {
   Alert,
@@ -95,6 +97,8 @@ export function BoardTab({ active }: Props) {
   );
 
   const { showError } = useToast();
+  const theme = useTheme();
+  const columnGlass = glassSurface(theme, { elevation: 1 });
 
   // Load the set of active projects that have a Jira board URL configured. We
   // do this every time the tab becomes active so a project edit in another
@@ -325,9 +329,7 @@ export function BoardTab({ active }: Props) {
             sx={{
               display: 'flex',
               flexDirection: 'column',
-              bgcolor: 'background.paper',
-              border: 1,
-              borderColor: 'divider',
+              ...columnGlass,
               borderRadius: 2,
               overflow: 'hidden',
               minHeight: 0,
@@ -347,7 +349,6 @@ export function BoardTab({ active }: Props) {
                 color: 'text.secondary',
                 borderBottom: 1,
                 borderColor: 'divider',
-                bgcolor: 'background.default',
               }}
             >
               <span>{col.label}</span>

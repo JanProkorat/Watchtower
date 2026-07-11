@@ -1,5 +1,7 @@
 import { Box, Typography, Chip, Checkbox } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import type { PrFindingPayload } from '@watchtower/shared/ipcContract.js';
+import { glassFill } from '../../theme/glass.js';
 
 const SEVERITY_COLOR: Record<PrFindingPayload['severity'], 'error' | 'warning' | 'info'> = {
   error: 'error',
@@ -12,6 +14,7 @@ export function FindingCard({ finding, selected, onToggle }: {
   selected?: boolean;
   onToggle?: () => void;
 }): JSX.Element {
+  const theme = useTheme();
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.25 }}>
       {onToggle && (
@@ -23,8 +26,10 @@ export function FindingCard({ finding, selected, onToggle }: {
           sx={{ mt: 0.25, p: 0.5 }}
         />
       )}
-      <Box sx={{ flex: 1, bgcolor: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.09)',
-        borderRadius: 2, p: 1.25, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+      {/* Dense card in a findings list — glassFill (no per-card backdropFilter);
+          the drawer paper already frosts the backdrop. Theme-aware so it reads
+          correctly in both light and dark mode. */}
+      <Box sx={{ flex: 1, ...glassFill(theme, { elevation: 2 }), borderRadius: 2, p: 1.25 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
           <Chip label={finding.severity} size="small" color={SEVERITY_COLOR[finding.severity]}
             sx={{ height: 16, fontSize: 9.5, textTransform: 'uppercase' }} />

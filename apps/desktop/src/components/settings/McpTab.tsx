@@ -13,6 +13,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditIcon from '@mui/icons-material/Edit';
@@ -22,6 +23,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import RestoreIcon from '@mui/icons-material/Restore';
 import { useClaudeSettings, type SettingsScope } from '../../state/useClaudeSettings.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
+import { glassFill, glassSurface } from '../../theme/glass.js';
 
 const PROJECT_PATH_STORAGE_KEY = 'watchtower.settings.json.projectPath';
 
@@ -223,6 +225,7 @@ function serverFromDraft(draft: EditDraft): Server | string {
 }
 
 export function McpTab() {
+  const theme = useTheme();
   const [scope, setScope] = useState<SettingsScope>('global');
   const [projectPath, setProjectPath] = useState<string>(() => {
     try {
@@ -361,8 +364,8 @@ export function McpTab() {
         </Button>
       </Stack>
 
-      {/* Body */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+      {/* Body — glassSurface: singleton scroll panel for the MCP server list */}
+      <Box sx={{ flex: 1, overflow: 'auto', p: 2, ...glassSurface(theme, { elevation: 1 }) }}>
         {showProjectRequired && (
           <Alert severity="info" sx={{ mb: 2 }}>
             Choose a project folder to read its <code>.claude/settings.json</code>.
@@ -425,15 +428,13 @@ export function McpTab() {
               </Stack>
             )}
 
-            {/* Edit/add form */}
+            {/* Edit/add form — glassFill: inline singleton form (provides its own border) */}
             {draft && (
               <Box
                 sx={{
                   p: 2,
                   borderRadius: 1,
-                  bgcolor: 'background.default',
-                  border: 1,
-                  borderColor: 'divider',
+                  ...glassFill(theme),
                 }}
               >
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -535,6 +536,7 @@ export function McpTab() {
               </Box>
             )}
 
+            {/* Server list — glassFill: repeating items sit over parent's glass, no per-row blur */}
             {Object.entries(servers).map(([name, server]) => (
               <Box
                 key={name}
@@ -544,8 +546,7 @@ export function McpTab() {
                   gap: 1,
                   p: 1.5,
                   borderRadius: 1,
-                  border: 1,
-                  borderColor: 'divider',
+                  ...glassFill(theme),
                 }}
               >
                 <Box sx={{ flex: 1, minWidth: 0 }}>

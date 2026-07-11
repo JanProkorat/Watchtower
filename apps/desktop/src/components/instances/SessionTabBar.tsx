@@ -1,11 +1,14 @@
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import { accentWash, accentActiveText } from '../../theme/glass.js';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { tabFlex } from '../../util/tabFlex.js';
+import { glassSurface } from '../../theme/glass.js';
 import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
 
 const ATTENTION_DOT: Record<string, string> = {
@@ -56,6 +59,11 @@ export function SessionTabBar({
   onAddSession,
   onSetTask,
 }: Props) {
+  const theme = useTheme();
+  // glassSurface provides frosted fill + backdropFilter + border for this singleton container.
+  // Individual tab chips inside do NOT get their own backdropFilter — that would stack GPU
+  // blur cost without visual benefit (glassFill rule: repeating elements omit the blur).
+  const glass = glassSurface(theme);
   const [hiddenAnchor, setHiddenAnchor] = useState<HTMLElement | null>(null);
 
   // Context menu (right-click on a session tab).
@@ -78,9 +86,12 @@ export function SessionTabBar({
       sx={{
         display: 'flex',
         flexShrink: 0,
-        borderBottom: 1,
-        borderColor: 'divider',
-        backgroundColor: 'background.paper',
+        // Glass frosted bar — matches TabStrip language from Phase B.
+        // glassSurface provides fill, backdropFilter, border, boxShadow.
+        // Border overridden to draw only the bottom edge (top is the TabStrip chrome above).
+        ...glass,
+        border: 'none',
+        borderBottom: `1px solid ${theme.palette.divider}`,
         overflowX: 'auto',
         overflowY: 'hidden',
       }}
@@ -105,15 +116,18 @@ export function SessionTabBar({
               minHeight: 32,
               cursor: 'pointer',
               userSelect: 'none',
-              color: active ? 'text.primary' : 'text.secondary',
-              backgroundColor: active ? 'background.default' : 'transparent',
+              // iPad active treatment: purple wash + accent text, keeping the
+              // accent underline as the "this column" indicator (tabs stay
+              // column-aligned with the panes below, so they aren't free pills).
+              color: active ? accentActiveText(theme) : 'text.secondary',
+              backgroundColor: active ? accentWash(theme) : 'transparent',
               borderRight: idx < sessions.length - 1 ? 1 : 0,
               borderColor: 'divider',
               borderBottom: 2,
               borderBottomColor: active ? accent : 'transparent',
-              transition: 'background-color 120ms',
+              transition: 'background-color 120ms ease, color 120ms ease',
               ':hover': {
-                backgroundColor: active ? 'background.default' : 'action.hover',
+                backgroundColor: active ? accentWash(theme) : 'action.hover',
               },
               fontSize: 12,
             }}
@@ -131,6 +145,8 @@ export function SessionTabBar({
                   height: 8,
                   borderRadius: '50%',
                   backgroundColor: attentionColor ?? MUTED_DOT,
+                  // Attention statuses glow (iPad status-dot language); idle stays flat.
+                  boxShadow: attentionColor ? `0 0 8px ${attentionColor}` : 'none',
                   flexShrink: 0,
                 }}
               />

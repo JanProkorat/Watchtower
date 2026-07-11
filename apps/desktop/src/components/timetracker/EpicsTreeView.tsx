@@ -1,5 +1,7 @@
 import type React from 'react';
 import { useState } from 'react';
+import { useTheme } from '@mui/material/styles';
+import { glassFill } from '../../theme/glass.js';
 import {
   Alert,
   Box,
@@ -348,6 +350,7 @@ function EpicCard({
   taskUrlTemplate,
   onOpenExternal,
 }: EpicCardProps) {
+  const theme = useTheme();
   const totalPages = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
   const safePage = Math.min(Math.max(0, page), totalPages - 1);
   const sliceStart = safePage * PAGE_SIZE;
@@ -373,11 +376,10 @@ function EpicCard({
   return (
     <Box
       sx={{
-        border: 1,
-        borderColor: 'divider',
+        // glassFill: per-epic cards repeat many times — no per-card backdropFilter.
+        ...glassFill(theme, { elevation: 1 }),
         borderRadius: 1.5,
         overflow: 'hidden',
-        backgroundColor: 'background.paper',
       }}
     >
       {/* Header */}

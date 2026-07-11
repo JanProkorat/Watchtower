@@ -1,4 +1,4 @@
-import { ipcMain, dialog, shell } from 'electron';
+import { ipcMain, dialog, shell, nativeTheme } from 'electron';
 import { exec } from 'node:child_process';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -81,6 +81,12 @@ export function registerIpc(): void {
 
       if (kind === 'board:signIn') {
         return await runBoardSignIn();
+      }
+
+      if (kind === 'appearance:set') {
+        const { mode } = payload as { mode: 'dark' | 'light' };
+        nativeTheme.themeSource = mode;
+        return { ok: true };
       }
 
       if (kind === 'openExternalUrl') {

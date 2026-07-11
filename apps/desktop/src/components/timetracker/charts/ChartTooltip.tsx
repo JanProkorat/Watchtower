@@ -16,6 +16,10 @@ export default function ChartTooltip({ title, rows }: Props) {
         p: 1.25,
         minWidth: 140,
         border: `1px solid ${colors.tooltipBorder}`,
+        backgroundColor: colors.tooltipBg,
+        backgroundImage: 'none',
+        backdropFilter: 'none',
+        WebkitBackdropFilter: 'none',
       }}
     >
       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>

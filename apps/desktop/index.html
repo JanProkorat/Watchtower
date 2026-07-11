@@ -10,7 +10,9 @@
          div below until then. */
       :root { --wt-splash-bg: #0a0b0f; --wt-splash-fg: #9aa3b2; --wt-splash-spinner: #2e333d; --wt-splash-accent: #7c5cff; }
       html[data-theme='light'] { --wt-splash-bg: #f7f8fa; --wt-splash-fg: #5b6370; --wt-splash-spinner: #d9dde3; --wt-splash-accent: #6e54e0; }
-      body { background: var(--wt-splash-bg); }
+      /* Transparent body so vibrancy shows through during load; the inline
+         splash div uses a semi-opaque scrim instead of the solid var. */
+      body { background: transparent; }
     </style>
     <script>
       // Read saved theme so the pre-React paint matches what App.tsx will render.
@@ -39,7 +41,7 @@
           align-items: center;
           justify-content: center;
           gap: 14px;
-          background: var(--wt-splash-bg);
+          background: rgba(10,11,15,0.55);
           color: var(--wt-splash-fg);
           font-family: Inter, system-ui, -apple-system, sans-serif;
           font-size: 13px;

@@ -91,7 +91,8 @@ export type IpcRequest =
   | { kind: 'prReview:cancel'; payload: { reviewId: number } }
   | { kind: 'prReview:postComments'; payload: { reviewId: number; findingIndexes: number[]; devopsPats?: Record<string, string> } }
   | { kind: 'devops:setPat'; payload: { host: string; pat: string } }
-  | { kind: 'devops:hasPat'; payload: { host: string } };
+  | { kind: 'devops:hasPat'; payload: { host: string } }
+  | { kind: 'appearance:set'; payload: { mode: 'dark' | 'light' } };
 
 export interface RunningInstancePayload {
   id: string;
@@ -688,7 +689,8 @@ export type IpcResponse =
   | { kind: 'prReview:get'; payload: { review: PrReviewPayload | null } }
   | { kind: 'prReview:list'; payload: { reviews: PrReviewPayload[] } }
   | { kind: 'prReview:cancel'; payload: { ok: true } }
-  | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } };
+  | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } }
+  | { kind: 'appearance:set'; payload: { ok: true } };
 
 export interface AgentRowPayload {
   name: string;
@@ -862,6 +864,7 @@ export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'openInVSCode',
   'openExternalUrl',
   'board:signIn',
+  'appearance:set',
   'devops:setPat',
   'devops:hasPat',
 ]);

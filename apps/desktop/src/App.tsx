@@ -27,6 +27,7 @@ import {
 import { arrayMove } from '@dnd-kit/sortable';
 import 'dayjs/locale/cs';
 import { darkTheme, lightTheme } from './theme.js';
+import { ambientBackground } from './theme/glass.js';
 import { useThemeMode } from './state/useThemeMode.js';
 import { useActiveModule } from './state/useActiveModule.js';
 import { ToastProvider } from './state/useToast.js';
@@ -95,7 +96,7 @@ function LoadingScreen() {
 export function App() {
   const { mode, toggle: toggleThemeMode } = useThemeMode();
   const theme = useMemo(() => (mode === 'dark' ? darkTheme : lightTheme), [mode]);
-  const { instances, activeId, loaded, setActive, spawn, kill, remove, setTask } = useInstances();
+  const { instances, activeId, loaded, setActive, spawn, kill, remove, setTask, reorder } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
   const [confirmTabClose, setConfirmTabClose] = useState<{
@@ -299,7 +300,11 @@ export function App() {
     if (leafId) layoutActions.unmountLeafAt(leafId);
   };
 
-  const doSpawn = async (cwd: string, kind: 'claude' | 'shell' = 'claude') => {
+  const doSpawn = async (
+    cwd: string,
+    kind: 'claude' | 'shell' = 'claude',
+    afterInstanceId?: string,
+  ) => {
     setSpawnInFlight((n) => n + 1);
     try {
       const tabId = routeSpawnToTab(cwd, projects);
@@ -308,6 +313,20 @@ export function App() {
       setActiveModule('instances');
       const res = await spawn(cwd, undefined, kind);
       if (res.instanceId) {
+        // Positional insert: place the new column immediately to the right of
+        // the pane the "+" was clicked in (reorder writes display_order, which
+        // is what deriveTabs sorts columns by). The DB row already exists, so
+        // the order sticks even though the new instance isn't in local state yet.
+        if (afterInstanceId) {
+          const newId = res.instanceId;
+          const currentIds = instances.map((i) => i.id).filter((id) => id !== newId);
+          const idx = currentIds.indexOf(afterInstanceId);
+          const ordered =
+            idx >= 0
+              ? [...currentIds.slice(0, idx + 1), newId, ...currentIds.slice(idx + 1)]
+              : [...currentIds, newId];
+          await reorder(ordered);
+        }
         layoutActions.focusColumnInTab(tabId, res.instanceId);
         setActive(res.instanceId);
       } else {
@@ -368,78 +387,12 @@ export function App() {
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="cs">
         <ToastProvider>
-          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', background: (t) => ambientBackground(t) }}>
             <DndContext
               sensors={dndSensors}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
-              <TabStrip
-                tabs={tabs}
-                mountedTabIds={mountedTabIds}
-                attentionTabIds={attentionTabIds}
-                workspaceActive={activeModule === 'instances'}
-                // Only highlight the focused tab while the Instances module is
-                // showing — on other pages the workspace isn't visible, so no
-                // tab should read as selected.
-                focusedTabId={activeModule === 'instances' ? focusedTab : null}
-                onSelect={(id) => {
-                  // A tab collapsed by hiding all its sessions still shows in
-                  // the strip. Clicking it should bring the window back with
-                  // content, so un-hide its sessions before mounting — but only
-                  // when the tab is actually collapsed (not currently mounted),
-                  // so the sole-pane "N hidden" tray keeps working untouched.
-                  const clicked = tabs.find((tab) => tab.id === id);
-                  if (
-                    clicked &&
-                    clicked.columnOrder.length === 0 &&
-                    clicked.hiddenInstanceIds.length > 0 &&
-                    !findLeafByTabId(layout.root, id)
-                  ) {
-                    for (const hid of clicked.hiddenInstanceIds) unhideInstance(hid);
-                  }
-                  selectGlobalTab(id, {
-                    setActiveModule,
-                    ensureMounted: (tid) =>
-                      ensureTabMountedAndFocused({ layout, actions: layoutActions }, tid),
-                    setActive,
-                    focusedInstanceIdForTab: (tid) =>
-                      tabs.find((t) => t.id === tid)?.focusedInstanceId ?? null,
-                  });
-                }}
-                onContextSplit={(id, dir) => {
-                  // Splitting only makes sense inside the workspace, so a split
-                  // triggered from the global bar (possibly while another module
-                  // is showing) first brings the Instances module forward.
-                  setActiveModule('instances');
-                  if (!layout.focusedLeafId) return;
-                  // Don't duplicate a tab into a second leaf — the xterm host can
-                  // only attach to one slot, so the second leaf steals the
-                  // terminal and the first goes blank. If the tab is already
-                  // mounted, focus it instead.
-                  const existing = findLeafByTabId(layout.root, id);
-                  if (existing) {
-                    layoutActions.focusLeaf(existing.id);
-                    return;
-                  }
-                  layoutActions.splitLeafAt(layout.focusedLeafId, dir, 'after', id);
-                }}
-                onContextNewInstance={(id) => {
-                  const cwd = cwdForTab(id);
-                  if (cwd) switchToNewInstanceForCwd(cwd);
-                }}
-                canSpawnInTab={(id) => cwdForTab(id) !== null}
-                onCloseTab={handleCloseTab}
-                onCloseInWorkspace={(id) => {
-                  const node = findLeafByTabId(layout.root, id);
-                  if (node) layoutActions.unmountLeafAt(node.id);
-                }}
-                onHideTab={(id) => {
-                  const node = findLeafByTabId(layout.root, id);
-                  if (node) layoutActions.unmountLeafAt(node.id);
-                }}
-                onNew={() => setNewOpen(true)}
-              />
             {orchDown && (
               <Box
                 sx={{
@@ -483,6 +436,70 @@ export function App() {
                 onToggleMode={toggleThemeMode}
               />
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                {/* Instance tab bar — visible on every module so you can jump back
+                    to a session from anywhere. Hidden on the dashboard, which
+                    already lists sessions in its own card. */}
+                {activeModule !== 'dashboard' && (
+                  <TabStrip
+                    tabs={tabs}
+                    mountedTabIds={mountedTabIds}
+                    attentionTabIds={attentionTabIds}
+                    workspaceActive={activeModule === 'instances'}
+                    focusedTabId={activeModule === 'instances' ? focusedTab : null}
+                    onSelect={(id) => {
+                      // A tab collapsed by hiding all its sessions still shows in
+                      // the strip. Clicking it should bring the window back with
+                      // content, so un-hide its sessions before mounting — but only
+                      // when the tab is actually collapsed (not currently mounted),
+                      // so the sole-pane "N hidden" tray keeps working untouched.
+                      const clicked = tabs.find((tab) => tab.id === id);
+                      if (
+                        clicked &&
+                        clicked.columnOrder.length === 0 &&
+                        clicked.hiddenInstanceIds.length > 0 &&
+                        !findLeafByTabId(layout.root, id)
+                      ) {
+                        for (const hid of clicked.hiddenInstanceIds) unhideInstance(hid);
+                      }
+                      selectGlobalTab(id, {
+                        setActiveModule,
+                        ensureMounted: (tid) =>
+                          ensureTabMountedAndFocused({ layout, actions: layoutActions }, tid),
+                        setActive,
+                        focusedInstanceIdForTab: (tid) =>
+                          tabs.find((t) => t.id === tid)?.focusedInstanceId ?? null,
+                      });
+                    }}
+                    onContextSplit={(id, dir) => {
+                      setActiveModule('instances');
+                      if (!layout.focusedLeafId) return;
+                      // Don't duplicate a tab into a second leaf — the xterm host can
+                      // only attach to one slot, so the second leaf steals the
+                      // terminal and the first goes blank. If already mounted, focus it.
+                      const existing = findLeafByTabId(layout.root, id);
+                      if (existing) {
+                        layoutActions.focusLeaf(existing.id);
+                        return;
+                      }
+                      layoutActions.splitLeafAt(layout.focusedLeafId, dir, 'after', id);
+                    }}
+                    onContextNewInstance={(id) => {
+                      const cwd = cwdForTab(id);
+                      if (cwd) switchToNewInstanceForCwd(cwd);
+                    }}
+                    canSpawnInTab={(id) => cwdForTab(id) !== null}
+                    onCloseTab={handleCloseTab}
+                    onCloseInWorkspace={(id) => {
+                      const node = findLeafByTabId(layout.root, id);
+                      if (node) layoutActions.unmountLeafAt(node.id);
+                    }}
+                    onHideTab={(id) => {
+                      const node = findLeafByTabId(layout.root, id);
+                      if (node) layoutActions.unmountLeafAt(node.id);
+                    }}
+                    onNew={() => setNewOpen(true)}
+                  />
+                )}
                 {activeModule === 'dashboard' && (
                   <ModuleDashboard
                     instances={instances}
@@ -533,6 +550,9 @@ export function App() {
                             const cwd = cwdForTab(tabId as TabId);
                             if (cwd) void doSpawn(cwd);
                           }}
+                          onAddSessionAfter={(afterInstanceId, cwd, kind) =>
+                            void doSpawn(cwd, kind, afterInstanceId)
+                          }
                           dashboardOnNew={() => setNewOpen(true)}
                         />
                       )}
