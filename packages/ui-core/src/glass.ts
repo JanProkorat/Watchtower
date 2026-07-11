@@ -17,31 +17,31 @@ import type { CSSProperties } from 'react';
 // ── Base / ambient ────────────────────────────────────────────────────────
 
 /** Near-black app base. Body stays this colour to avoid a white flash on load. */
-export const baseBg = '#0b0c11';
+export const baseBg = '#0a0d13';
 
 /**
- * The ambient lit background — a faint brand-coloured glow (purple TL, cyan TR,
- * teal BR) over near-black, applied once behind everything (index.css `#root`).
- * Keep `index.css` in sync with this string.
+ * The ambient lit background — a faint brand-coloured glow (ocean-blue TL,
+ * cyan TR, deep-sky BR) over near-black, applied once behind everything
+ * (index.css `#root`). Keep `index.css` in sync with this string.
  */
 export const ambientBackground =
-  'radial-gradient(60% 55% at 4% 0%, rgba(124,109,240,0.34), transparent 60%), ' +
-  'radial-gradient(70% 65% at 100% 8%, rgba(77,208,225,0.22), transparent 55%), ' +
-  'radial-gradient(85% 85% at 88% 100%, rgba(26,188,156,0.26), transparent 55%), ' +
+  'radial-gradient(60% 55% at 4% 0%, rgba(56,189,248,0.30), transparent 60%), ' +
+  'radial-gradient(70% 65% at 100% 8%, rgba(34,211,238,0.20), transparent 55%), ' +
+  'radial-gradient(85% 85% at 88% 100%, rgba(2,132,199,0.24), transparent 55%), ' +
   baseBg;
 
 // ── Accents ────────────────────────────────────────────────────────────────
 
-export const accent = '#7c6df0';
-export const accentHover = '#a89cf0';
+export const accent = '#38bdf8';
+export const accentHover = '#7dd3fc';
 /** Icon colour for an active nav item. */
-export const accentIcon = '#c9bdff';
-/** Translucent purple wash behind an active nav item / tab. */
-export const accentWash = 'rgba(168,156,240,0.22)';
+export const accentIcon = '#bae6fd';
+/** Translucent ocean-blue wash behind an active nav item / tab. */
+export const accentWash = 'rgba(56,189,248,0.20)';
 
-/** Primary CTA — purple gradient + soft glow. */
-export const ctaGradient = 'linear-gradient(135deg, #8b7cf2, #6d5fe0)';
-export const ctaGlow = '0 8px 22px rgba(124,109,240,0.45), inset 0 1px 0 rgba(255,255,255,0.35)';
+/** Primary CTA — ocean-blue gradient + soft glow. */
+export const ctaGradient = 'linear-gradient(135deg, #38bdf8, #0284c7)';
+export const ctaGlow = '0 8px 22px rgba(56,189,248,0.45), inset 0 1px 0 rgba(255,255,255,0.35)';
 
 // ── Text ────────────────────────────────────────────────────────────────────
 
@@ -54,10 +54,10 @@ export const text = {
 
 // ── Glass fill + builders ────────────────────────────────────────────────────
 
-/** Default frosted-panel fill (rail, tab strip). */
-export const glassFill = 'rgba(48,52,76,0.34)';
+/** Default frosted-panel fill (rail, tab strip) — cool blue-slate (ocean). */
+export const glassFill = 'rgba(44,54,74,0.34)';
 /** Stronger fill for modals / drawers that float over a scrim. */
-export const glassFillStrong = 'rgba(56,60,86,0.55)';
+export const glassFillStrong = 'rgba(52,62,84,0.55)';
 
 const hairline = '1px solid rgba(255,255,255,0.15)';
 const highlight = 'inset 0 1px 0 rgba(255,255,255,0.30)';

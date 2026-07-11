@@ -116,7 +116,7 @@ const BILLING_TABS: { id: BillingSection; label: string; d: string }[] = [
 ];
 
 // Active item ring — translucent purple outline
-const ACTIVE_RING = 'inset 0 1px 0 rgba(255,255,255,0.20), 0 0 0 1px rgba(168,156,240,0.30)';
+const ACTIVE_RING = 'inset 0 1px 0 rgba(255,255,255,0.20), 0 0 0 1px rgba(56,189,248,0.30)';
 
 export function Rail({
   active,

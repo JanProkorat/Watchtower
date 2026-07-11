@@ -25,7 +25,7 @@ type Sheet =
 function dayTint(meta: DayMeta): string | undefined {
   if (meta.kind === 'vacation') return 'rgba(34,211,238,0.16)';
   if (meta.kind === 'sick') return 'rgba(248,113,113,0.16)';
-  if (meta.kind === 'holiday') return 'rgba(168,156,240,0.20)';
+  if (meta.kind === 'holiday') return 'rgba(56,189,248,0.20)';
   if (meta.isWeekend) return 'rgba(150,160,190,0.13)';
   return undefined;
 }
@@ -117,7 +117,7 @@ export function TaskGridView(): JSX.Element {
   const hrsVal = (min: number): string => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 }).format(min / 60);
   const czkVal = (czk: number): string => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(czk);
 
-  const stepBtn: React.CSSProperties = { width: 34, height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c9bdff', fontSize: 18, lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
+  const stepBtn: React.CSSProperties = { width: 34, height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#bae6fd', fontSize: 18, lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
   const flatBtn: React.CSSProperties = { height: 34, padding: '0 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#c2c9d8', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
   // Column widths — slimmer on phone width so the two frozen columns don't eat
   // the whole viewport. Σ sits right after the task name, frozen left alongside it.
@@ -197,10 +197,10 @@ export function TaskGridView(): JSX.Element {
       {/* legend — matches the prototype's non-working-day key */}
       <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 11, color: C.muted, padding: '10px 16px 0' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(150,160,190,0.45)', display: 'inline-block' }} />víkend</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#a89cf0', display: 'inline-block' }} />svátek</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#7dd3fc', display: 'inline-block' }} />svátek</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#22D3EE', display: 'inline-block' }} />dovolená</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#f87171', display: 'inline-block' }} />nemoc</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, boxShadow: 'inset 0 0 0 1.5px #a89cf0', display: 'inline-block' }} />dnes</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, boxShadow: 'inset 0 0 0 1.5px #7dd3fc', display: 'inline-block' }} />dnes</span>
       </div>
 
       {!editable && (
@@ -223,8 +223,8 @@ export function TaskGridView(): JSX.Element {
                   {dayHeaders.map((d, i) => {
                     const meta = dayMeta[i]!;
                     const bg = dayTint(meta);
-                    const todayStyle: React.CSSProperties = meta.isToday ? { boxShadow: 'inset 0 0 0 1.5px rgba(168,156,240,0.7)' } : {};
-                    const weColor = meta.isWeekend ? '#c9bdff' : undefined;
+                    const todayStyle: React.CSSProperties = meta.isToday ? { boxShadow: 'inset 0 0 0 1.5px rgba(56,189,248,0.7)' } : {};
+                    const weColor = meta.isWeekend ? '#bae6fd' : undefined;
                     return (
                       <th key={d} style={{ ...cellBase, position: 'sticky', top: 0, zIndex: 3, background: overTint(bg, HEAD_BG), ...todayStyle, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
                         <div style={{ fontSize: 10, color: weColor ?? '#c2c9d8', lineHeight: 1.15 }}>{d}</div>
@@ -255,7 +255,7 @@ export function TaskGridView(): JSX.Element {
                       {t.perDay.map((min, i) => {
                         const meta = dayMeta[i]!;
                         const bg = dayTint(meta);
-                        const todayStyle: React.CSSProperties = meta.isToday ? { boxShadow: 'inset 0 0 0 1.5px rgba(168,156,240,0.7)' } : {};
+                        const todayStyle: React.CSSProperties = meta.isToday ? { boxShadow: 'inset 0 0 0 1.5px rgba(56,189,248,0.7)' } : {};
                         return (
                           <td key={i} style={{ ...cellBase, padding: 0, background: bg, color: min ? '#c2c9d8' : '#5a6072', ...todayStyle }}>
                             <button
@@ -264,7 +264,7 @@ export function TaskGridView(): JSX.Element {
                               // Narrow (iPhone): taller tap target — day columns can't widen past
                               // ~30px without losing the month, so we buy touch comfort vertically.
                               // The tap highlight flags which cell was hit on a dense grid.
-                              style={{ width: '100%', minHeight: isNarrow ? 40 : 26, background: 'transparent', border: 'none', color: 'inherit', font: 'inherit', cursor: editable ? 'pointer' : 'default', padding: '5px 0', WebkitTapHighlightColor: 'rgba(168,156,240,0.35)' }}
+                              style={{ width: '100%', minHeight: isNarrow ? 40 : 26, background: 'transparent', border: 'none', color: 'inherit', font: 'inherit', cursor: editable ? 'pointer' : 'default', padding: '5px 0', WebkitTapHighlightColor: 'rgba(56,189,248,0.35)' }}
                             >
                               {hrs(min)}
                             </button>

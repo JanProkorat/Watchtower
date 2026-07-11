@@ -99,7 +99,7 @@ export function BillingLogin({ signIn }: Props): JSX.Element {
             padding: '10px 0',
             borderRadius: 8,
             border: 'none',
-            background: busy ? 'rgba(124,109,240,0.35)' : ctaGradient,
+            background: busy ? 'rgba(56,189,248,0.35)' : ctaGradient,
             boxShadow: busy ? 'none' : ctaGlow,
             color: busy ? text.muted : '#fff',
             fontSize: 15,

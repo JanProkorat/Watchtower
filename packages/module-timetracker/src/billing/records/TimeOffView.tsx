@@ -8,7 +8,7 @@ import { useDaysOffMutations } from '@watchtower/data-supabase';
 import { canEdit } from '@watchtower/data-supabase';
 import { glassCard, BottomSheet } from '@watchtower/ui-core';
 
-const KIND_COLOR: Record<TimeOffKind, string> = { vacation: '#22D3EE', sick: '#f87171', other: '#fbbf24', holiday: '#6d5fbb' };
+const KIND_COLOR: Record<TimeOffKind, string> = { vacation: '#22D3EE', sick: '#f87171', other: '#fbbf24', holiday: '#3d7fb0' };
 const KIND_LABEL: Record<TimeOffKind, string> = { vacation: 'Dovolená', sick: 'Nemoc', other: 'Jiné', holiday: 'Svátek' };
 const DOW = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 
@@ -40,7 +40,7 @@ export function TimeOffView(): JSX.Element {
         {(['vacation', 'sick', 'other', 'holiday'] as TimeOffKind[]).map((k) => (
           <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: C.muted }}>
             {k === 'holiday'
-              ? <span style={{ width: 10, height: 10, borderRadius: 2, background: 'transparent', border: '1px dashed rgba(168,156,240,0.7)', display: 'inline-block' }} />
+              ? <span style={{ width: 10, height: 10, borderRadius: 2, background: 'transparent', border: '1px dashed rgba(56,189,248,0.7)', display: 'inline-block' }} />
               : <span style={{ width: 10, height: 10, borderRadius: 2, background: KIND_COLOR[k], display: 'inline-block' }} />}
             {KIND_LABEL[k]}
           </span>
@@ -67,7 +67,7 @@ export function TimeOffView(): JSX.Element {
                     // user days-off and stay visible when a vacation/sick day shadows the same date.
                     color: c.date
                       ? c.kind === 'holiday'
-                        ? '#c9bdff'
+                        ? '#bae6fd'
                         : c.kind
                           ? '#0F0F17'
                           : c.isWeekend
@@ -75,9 +75,9 @@ export function TimeOffView(): JSX.Element {
                             : '#c2c9d8'
                       : 'transparent',
                     background: c.kind && c.kind !== 'holiday' ? KIND_COLOR[c.kind] : c.date ? 'rgba(255,255,255,0.04)' : 'transparent',
-                    border: c.kind === 'holiday' ? '1px dashed rgba(168,156,240,0.6)' : 'none',
+                    border: c.kind === 'holiday' ? '1px dashed rgba(56,189,248,0.6)' : 'none',
                     fontWeight: c.kind ? 700 : 400,
-                    ...(c.date && c.date === picker?.date ? { boxShadow: 'inset 0 0 0 2px #a89cf0' } : {}),
+                    ...(c.date && c.date === picker?.date ? { boxShadow: 'inset 0 0 0 2px #7dd3fc' } : {}),
                   }}>
                   {c.date ? Number(c.date.slice(8, 10)) : ''}
                 </div>

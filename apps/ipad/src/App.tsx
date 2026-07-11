@@ -613,7 +613,7 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
         justifyContent: 'center',
       }}
     >
-      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 18, color: '#c9bdff', letterSpacing: 0.2 }}>
+      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 18, color: '#bae6fd', letterSpacing: 0.2 }}>
         Watchtower
       </h1>
       <div style={{ ...glassPanel({ radius: 18 }), display: 'grid', gap: 10, width: '100%', maxWidth: 380, padding: 20 }}>
@@ -625,7 +625,7 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
             padding: '10px 0',
             borderRadius: 12,
             border: 'none',
-            background: connecting ? 'rgba(124,109,240,0.35)' : ctaGradient,
+            background: connecting ? 'rgba(56,189,248,0.35)' : ctaGradient,
             boxShadow: connecting ? 'none' : ctaGlow,
             color: connecting ? text.muted : '#fff',
             fontSize: 15,

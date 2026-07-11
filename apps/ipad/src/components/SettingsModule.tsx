@@ -119,7 +119,7 @@ export function SettingsModule({ connection, onConnectionChange }: {
           {saved && <div style={{ fontSize: 12, color: '#9be7c0' }}>Uloženo, připojuji…</div>}
           <button onClick={() => void handleSave()} disabled={saving} style={{
             alignSelf: 'flex-start', padding: '9px 16px', borderRadius: 11, border: 'none',
-            background: saving ? 'rgba(124,109,240,0.35)' : ctaGradient, boxShadow: saving ? 'none' : ctaGlow,
+            background: saving ? 'rgba(56,189,248,0.35)' : ctaGradient, boxShadow: saving ? 'none' : ctaGlow,
             color: saving ? text.muted : '#fff', fontSize: 13, fontWeight: 600,
             cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', WebkitTapHighlightColor: 'transparent',
           }}>{saving ? 'Ukládám…' : 'Uložit a připojit'}</button>

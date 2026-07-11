@@ -66,7 +66,7 @@ export function WakeButton({ connection }: { connection: Connection }) {
         ...glassPanel({ radius: 20, blur: 24 }),
         border: disabled
           ? '1px solid rgba(255,255,255,0.06)'
-          : `1px solid rgba(124,109,240,0.35)`,
+          : `1px solid rgba(56,189,248,0.35)`,
         background: disabled ? 'rgba(48,52,76,0.20)' : accentWash,
         fontSize: 14, fontWeight: 600,
         color: disabled ? text.dim : (status === 'error' ? '#f87171' : accent),
