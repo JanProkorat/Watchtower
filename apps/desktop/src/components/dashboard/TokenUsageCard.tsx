@@ -27,7 +27,7 @@ function severityColor(status: string | null, pct: number | null): string {
 function Title() {
   return (
     <Typography sx={{ fontSize: 15, fontWeight: 600, mb: 1.5 }}>
-      Spotřeba tokenů · 5h blok
+      Token usage · 5h block
     </Typography>
   );
 }
@@ -47,7 +47,7 @@ export function TokenUsageCard({ usage }: TokenUsageCardProps) {
     return (
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Title />
-        <Alert severity="error">Nepodařilo se načíst spotřebu tokenů: {error}</Alert>
+        <Alert severity="error">Failed to load token usage: {error}</Alert>
       </Paper>
     );
   }
@@ -57,7 +57,7 @@ export function TokenUsageCard({ usage }: TokenUsageCardProps) {
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Title />
         <Typography variant="body2" color="text.secondary">
-          Načítám…
+          Loading…
         </Typography>
       </Paper>
     );
@@ -68,7 +68,7 @@ export function TokenUsageCard({ usage }: TokenUsageCardProps) {
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Title />
         <Typography variant="body2" color="text.secondary">
-          {data.error ?? 'Spotřeba tokenů není dostupná.'}
+          {data.error ?? 'Token usage is not available.'}
         </Typography>
       </Paper>
     );
@@ -80,7 +80,7 @@ export function TokenUsageCard({ usage }: TokenUsageCardProps) {
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Title />
         <Typography variant="body2" color="text.secondary">
-          Žádný aktivní 5h blok — spusť relaci Claude Code.
+          No active 5h block — start a Claude Code session.
         </Typography>
       </Paper>
     );
@@ -98,10 +98,10 @@ export function TokenUsageCard({ usage }: TokenUsageCardProps) {
 
       <Stack direction="row" alignItems="baseline" justifyContent="space-between" sx={{ mb: 0.5 }}>
         <Typography sx={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-          {remaining != null ? `reset za ${remaining}` : 'reset —'}
+          {remaining != null ? `resets in ${remaining}` : 'reset —'}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          v {resetTime}
+          at {resetTime}
         </Typography>
       </Stack>
 
@@ -115,7 +115,7 @@ export function TokenUsageCard({ usage }: TokenUsageCardProps) {
               sx={{ fontSize: 13, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
             >
               {formatTokenCount(block.totalTokens)}
-              {block.limit != null ? ` / ${formatTokenCount(block.limit)}` : ''} tokenů
+              {block.limit != null ? ` / ${formatTokenCount(block.limit)}` : ''} tokens
             </Typography>
           </Stack>
           <LinearProgress
@@ -135,26 +135,26 @@ export function TokenUsageCard({ usage }: TokenUsageCardProps) {
         <Typography
           sx={{ fontSize: 13, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
         >
-          {formatTokenCount(block.totalTokens)} tokenů
+          {formatTokenCount(block.totalTokens)} tokens
         </Typography>
       )}
 
       <Stack direction="row" spacing={2} sx={{ mt: 1.25 }} flexWrap="wrap">
         {block.burnRateTokensPerMinute != null && (
-          <Tooltip title="Aktuální tempo spotřeby">
+          <Tooltip title="Current consumption rate">
             <Typography
               sx={{ fontSize: 12.5, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
             >
-              tempo {formatTokenCount(block.burnRateTokensPerMinute)}/min
+              rate {formatTokenCount(block.burnRateTokensPerMinute)}/min
             </Typography>
           </Tooltip>
         )}
         {block.projectedPercentUsed != null && (
-          <Tooltip title="Odhadovaná spotřeba na konci bloku při aktuálním tempu">
+          <Tooltip title="Estimated usage at end of block at the current rate">
             <Typography
               sx={{ fontSize: 12.5, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
             >
-              odhad konce bloku {formatPercent(block.projectedPercentUsed)}
+              projected end-of-block {formatPercent(block.projectedPercentUsed)}
             </Typography>
           </Tooltip>
         )}

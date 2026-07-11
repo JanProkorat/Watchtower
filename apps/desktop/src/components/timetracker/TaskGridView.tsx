@@ -254,9 +254,9 @@ export function TaskGridView({ projectId }: Props) {
     try {
       await navigator.clipboard.writeText(command);
       setSyncMeetingsAnchor(null);
-      showSuccess('Příkaz zkopírován do schránky. Vložte ho do Claude Code chatu pro spuštění.');
+      showSuccess('Command copied to clipboard. Paste it into the Claude Code chat to run it.');
     } catch (err) {
-      showError(`Nepodařilo se zkopírovat příkaz: ${toastMessage(err)}`);
+      showError(`Failed to copy command: ${toastMessage(err)}`);
     }
   };
 
@@ -648,9 +648,9 @@ export function TaskGridView({ projectId }: Props) {
             {formatDateLongCz(monthEnd.format('YYYY-MM-DD'))}).
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-            Klik vám zkopíruje <code>/sync-meetings</code> příkaz do schránky.
-            Vložte ho do svého Claude Code chatu a stiskněte Enter — Watchtower
-            si nové worklogy vyzvedne přímo z DB.
+            Clicking copies the <code>/sync-meetings</code> command to your clipboard.
+            Paste it into your Claude Code chat and press Enter — Watchtower
+            will pick up the new worklogs directly from the DB.
           </Typography>
           <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
             <DatePicker

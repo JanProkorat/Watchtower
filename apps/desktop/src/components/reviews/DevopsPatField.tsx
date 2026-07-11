@@ -63,7 +63,7 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
         <Typography sx={{ fontSize: 13, fontFamily: 'Menlo, monospace' }}>{repoLabel}</Typography>
-        {hasPat && <Chip size="small" color="success" label="uloženo" />}
+        {hasPat && <Chip size="small" color="success" label="saved" />}
       </Box>
       <Box sx={{ display: 'flex', gap: 1 }}>
         <TextField
@@ -71,16 +71,16 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
           type="password"
           value={pat}
           onChange={(e) => setPat(e.target.value)}
-          placeholder={hasPat ? '•••••• (uloženo, ponechat beze změny)' : 'vložit PAT'}
+          placeholder={hasPat ? '•••••• (saved, leave unchanged)' : 'enter PAT'}
           fullWidth
           sx={{ '& input': { fontFamily: 'Menlo, monospace', fontSize: 12 } }}
         />
         <Button variant="outlined" size="small" disabled={saving || !pat.trim()} onClick={() => void save()}>
-          Uložit PAT
+          Save PAT
         </Button>
       </Box>
       <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
-        Jeden PAT platí pro celý server (všechny projekty na tomto hostu).
+        One PAT applies to the whole server (all projects on this host).
       </Typography>
     </Box>
   );

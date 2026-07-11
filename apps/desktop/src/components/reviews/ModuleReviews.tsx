@@ -21,23 +21,23 @@ export function ModuleReviews(): JSX.Element {
           {pullRequests.length} open{syncedAt ? ` · synced ${new Date(syncedAt).toLocaleTimeString('cs-CZ')}` : ''}
         </Typography>
         <Box sx={{ flex: 1 }} />
-        <Button size="small" variant="outlined" disabled={loading} onClick={() => void refresh()}>↻ Obnovit</Button>
+        <Button size="small" variant="outlined" disabled={loading} onClick={() => void refresh()}>↻ Refresh</Button>
       </Stack>
 
       <Stack direction="row" spacing={1} sx={{ mb: 1.5 }} alignItems="center">
         {(['all', 'github', 'azdo'] as HostFilter[]).map((h) => (
-          <Chip key={h} size="small" label={h === 'all' ? 'Vše' : h === 'github' ? 'GitHub' : 'Azure DevOps'}
+          <Chip key={h} size="small" label={h === 'all' ? 'All' : h === 'github' ? 'GitHub' : 'Azure DevOps'}
             color={host === h ? 'primary' : 'default'} variant={host === h ? 'filled' : 'outlined'}
             onClick={() => setHost(h)} />
         ))}
         <Box sx={{ flex: 1 }} />
-        <TextField size="small" placeholder="Hledat PR…" value={query} onChange={(e) => setQuery(e.target.value)} sx={{ width: 220 }} />
+        <TextField size="small" placeholder="Search PRs…" value={query} onChange={(e) => setQuery(e.target.value)} sx={{ width: 220 }} />
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
       {loading && pullRequests.length === 0 && <CircularProgress size={20} />}
       {!loading && pullRequests.length === 0 && !error && (
-        <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Žádné otevřené PR. Zkuste Obnovit. Pro Azure DevOps nastavte PAT v úpravě projektu.</Typography>
+        <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>No open PRs. Try Refresh. For Azure DevOps, set a PAT in the project editor.</Typography>
       )}
 
       {groups.map((g) => (

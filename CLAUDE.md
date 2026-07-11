@@ -116,10 +116,14 @@ When adding a new kind:
 
 ## Locale
 
-Czech. **Don't add i18n.**
+**UI text is English.** (Switched from Czech app-wide, 2026-07.) Still a
+single-language app — **don't add i18n**. Date / number / currency
+**formatting** stays Czech (`cs-CZ`, CZK `Kč`) — the app bills in CZK, so the
+`formatDate*` helpers, `dayjs/locale/cs`, and `adapterLocale="cs"` are
+unchanged. New user-facing strings: write them in English.
 
-- Dates: `D. M. YYYY` (cs-CZ), via `formatDate*` helpers in
-  `client/src/util/format.ts`.
+- Dates: `D. M. YYYY` (cs-CZ) numeric formatting, via `formatDate*` helpers in
+  `apps/desktop/src/util/format.ts`.
 - Numbers: NBSP thousand separator (`1 234,56 Kč`), via the same helpers.
 - dayjs imports must `import 'dayjs/locale/cs'`.
 - MUI X DatePicker mounts `<LocalizationProvider … adapterLocale="cs">`

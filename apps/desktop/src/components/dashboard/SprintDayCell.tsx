@@ -17,10 +17,10 @@ function shortDate(iso: string): string {
 }
 
 function czechWeekdayShort(iso: string): string {
-  // Returns e.g. "PO", "ÚT" via UTC day index to avoid TZ shifts
-  const CZECH_DOW = ['NE', 'PO', 'ÚT', 'ST', 'ČT', 'PÁ', 'SO'] as const;
+  // Returns e.g. "MO", "TU" via UTC day index to avoid TZ shifts
+  const DOW = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
   const dow = new Date(iso + 'T00:00:00Z').getUTCDay();
-  return CZECH_DOW[dow] ?? '';
+  return DOW[dow] ?? '';
 }
 
 function isWeekend(iso: string): boolean {

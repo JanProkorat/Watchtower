@@ -39,9 +39,9 @@ function formatBucketAxis(bucket: string, granularity: 'day' | 'week' | 'month')
     return d.isValid() ? d.format('D. M.') : bucket;
   }
   if (granularity === 'week') {
-    // Server format: "YYYY-Www" — display as "týden ww".
+    // Server format: "YYYY-Www" — display as "Week ww".
     const m = bucket.match(/^\d{4}-W(\d{1,2})$/);
-    return m ? `${parseInt(m[1]!, 10)}. týden` : bucket;
+    return m ? `Week ${parseInt(m[1]!, 10)}` : bucket;
   }
   // month: "YYYY-MM"
   const d = dayjs(bucket + '-01');
@@ -52,7 +52,7 @@ function formatBucketTooltip(bucket: string, granularity: 'day' | 'week' | 'mont
   if (granularity === 'day') return formatDateCz(bucket);
   if (granularity === 'week') {
     const m = bucket.match(/^(\d{4})-W(\d{1,2})$/);
-    return m ? `${parseInt(m[2]!, 10)}. týden ${m[1]}` : bucket;
+    return m ? `Week ${parseInt(m[2]!, 10)}, ${m[1]}` : bucket;
   }
   return formatMonthCz(bucket + '-01');
 }

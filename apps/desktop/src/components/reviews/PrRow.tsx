@@ -50,10 +50,10 @@ export function PrRow({ pr, nowMs, onOpen }: { pr: PullRequestPayload; nowMs: nu
       </Box>
       <Box sx={{ width: 116, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.6, fontSize: 10 }}>
         <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'text.disabled' }} />
-        <Box component="span" sx={{ color: 'text.secondary' }}>nerecenzováno</Box>
+        <Box component="span" sx={{ color: 'text.secondary' }}>not reviewed</Box>
       </Box>
       <Button size="small" variant="text" onClick={() => onOpen(pr)} sx={{ minWidth: 0, fontSize: 11 }}>
-        Otevřít ▸
+        Open ▸
       </Button>
     </Box>
   );

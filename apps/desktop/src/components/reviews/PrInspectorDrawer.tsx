@@ -39,7 +39,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments }: {
           </Box>
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 1, minHeight: 40 }}>
             <Tab label={`Diff${files.length ? ` (${files.length})` : ''}`} sx={{ minHeight: 40 }} />
-            <Tab label={`Komentáře (${threads.length})`} sx={{ minHeight: 40 }} />
+            <Tab label={`Comments (${threads.length})`} sx={{ minHeight: 40 }} />
             <Tab label="Report" sx={{ minHeight: 40 }} />
           </Tabs>
           <Box sx={{ flex: 1, minHeight: 0 }}>
@@ -54,7 +54,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments }: {
               <Box sx={{ p: 2, height: '100%', overflow: 'auto' }}>
                 {loading && <CircularProgress size={20} />}
                 {!loading && threads.length === 0 && (
-                  <Typography color="text.secondary">Žádné komentáře.</Typography>
+                  <Typography color="text.secondary">No comments.</Typography>
                 )}
                 {!loading && threads.length > 0 && (() => {
                   const general = threads.filter((t) => t.file == null);
@@ -64,7 +64,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments }: {
                       {general.length > 0 && (
                         <>
                           <Typography sx={{ fontSize: 10, letterSpacing: '.07em', textTransform: 'uppercase', color: 'text.secondary' }}>
-                            Obecné
+                            General
                           </Typography>
                           {general.map((t) => <CommentThread key={t.id} thread={t} />)}
                         </>
@@ -77,7 +77,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments }: {
             )}
             {tab === 2 && (
               <Typography sx={{ p: 2, color: 'text.secondary', fontSize: 13 }}>
-                Zatím bez recenze. Spuštění review agenta přijde v dalším kroku (SP2).
+                No review yet. Running the review agent comes in the next step (SP2).
               </Typography>
             )}
           </Box>
