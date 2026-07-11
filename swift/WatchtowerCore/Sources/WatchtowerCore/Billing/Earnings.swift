@@ -32,8 +32,14 @@ public func aggregateMonthEarnings(_ rows: [WorklogRow], _ month: String) -> (to
         byProject[r.projectId] = cur
     }
 
+    var position: [Int: Int] = [:]
+    for (i, pid) in order.enumerated() { position[pid] = i }
     let perProject = order.compactMap { byProject[$0] }
-        .sorted { $0.earnedCzk > $1.earnedCzk }
+        .sorted {
+            $0.earnedCzk != $1.earnedCzk
+                ? $0.earnedCzk > $1.earnedCzk
+                : (position[$0.projectId] ?? 0) < (position[$1.projectId] ?? 0)
+        }
     return (totalCzk, perProject)
 }
 
@@ -75,9 +81,15 @@ public func topProjects(_ rows: [WorklogRow], _ month: String, _ limit: Int) -> 
         byProject[r.projectId] = cur
     }
 
+    var position: [Int: Int] = [:]
+    for (i, pid) in order.enumerated() { position[pid] = i }
     return order.compactMap { byProject[$0] }
         .filter { $0.minutes > 0 }
-        .sorted { $0.minutes != $1.minutes ? $0.minutes > $1.minutes : $0.name < $1.name }
+        .sorted {
+            if $0.minutes != $1.minutes { return $0.minutes > $1.minutes }
+            if $0.name != $1.name { return $0.name < $1.name }
+            return (position[$0.projectId] ?? 0) < (position[$1.projectId] ?? 0)
+        }
         .prefix(limit)
         .map { $0 }
 }

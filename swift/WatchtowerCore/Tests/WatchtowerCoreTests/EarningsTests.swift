@@ -36,4 +36,14 @@ final class EarningsTests: XCTestCase {
         let top = topProjects(rows, "2026-06", 8)
         XCTAssertEqual(top.map(\.projectId), [3, 1, 2])
     }
+    func testPerProjectStableOnEarningsTie() {
+        // Project 5 appears before project 3 in the rows; both earn equally.
+        let rows = [
+            wl("2026-06-01", 5, "Zeta", 60, 1000),
+            wl("2026-06-01", 3, "Gamma", 60, 1000),
+        ]
+        let r = aggregateMonthEarnings(rows, "2026-06")
+        let tied = r.perProject.filter { $0.projectId == 5 || $0.projectId == 3 }.map(\.projectId)
+        XCTAssertEqual(tied, [5, 3]) // first-seen order preserved on earnedCzk tie
+    }
 }
