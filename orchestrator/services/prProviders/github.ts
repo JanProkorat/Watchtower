@@ -1,7 +1,7 @@
-import { execFile } from 'node:child_process';
 import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
 import type { Exec, GithubRepoConfig } from './types.js';
 import { parseUnifiedDiff } from './diffParse.js';
+import { defaultExec } from './exec.js';
 
 const GH_FIELDS = 'number,title,author,headRefName,baseRefName,updatedAt,url';
 
@@ -25,16 +25,6 @@ export function parseGithubPrList(json: string, repo: GithubRepoConfig): PullReq
     url: r.url, updatedAt: r.updatedAt, reviewable: repo.localClonePath != null,
   }));
 }
-
-const defaultExec: Exec = (cmd, args, opts) =>
-  new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout: 20_000, maxBuffer: 16 * 1024 * 1024, cwd: opts?.cwd,
-      env: { ...process.env, PATH: `${process.env.PATH ?? ''}:/opt/homebrew/bin:/usr/local/bin` } },
-      (err, stdout, stderr) => {
-        if (err) { (err as Error).message += stderr ? `: ${stderr.trim()}` : ''; reject(err); }
-        else resolve(stdout);
-      });
-  });
 
 export async function listGithubPrs(repo: GithubRepoConfig, exec: Exec = defaultExec): Promise<PullRequestPayload[]> {
   const out = await exec('gh', ['pr', 'list', '--repo', repo.nwo, '--state', 'open', '--limit', '100', '--json', GH_FIELDS]);

@@ -1,6 +1,7 @@
 import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
-import type { AzdoRepoConfig, HttpGet } from './types.js';
+import type { AzdoRepoConfig, HttpGet, Exec } from './types.js';
 import { parseUnifiedDiff } from './diffParse.js';
+import { defaultExec } from './exec.js';
 
 const API = 'api-version=7.1';
 const stripRef = (r: string) => r.replace(/^refs\/heads\//, '');
@@ -46,20 +47,17 @@ export async function listAzdoPrs(repo: AzdoRepoConfig, pat: string, get: HttpGe
   return parseAzdoPrList(await get(url, pat), repo);
 }
 
-export async function fetchAzdoDiff(repo: AzdoRepoConfig, prNumber: number, pat: string, get: HttpGet = defaultGet): Promise<DiffFilePayload[]> {
-  // DevOps has no single unified-diff endpoint; SP1 uses the commit-level diff text
-  // via the "diffs/commits" API and reconstructs unified hunks. For the first slice
-  // we fetch the PR's iteration changes and render file-level diffs.
-  const itUrl = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}/iterations?${API}`;
-  const iterations = (await get(itUrl, pat)) as { value: Array<{ id: number }> };
-  const last = iterations.value.at(-1)?.id ?? 1;
-  const chUrl = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}/iterations/${last}/changes?${API}`;
-  const changes = (await get(chUrl, pat)) as { changeEntries?: Array<{ item?: { path?: string } }> };
-  // Minimal SP1 rendering: one pseudo-file entry per changed path, no line bodies yet.
-  // (Full DevOps hunk bodies are a follow-up; GitHub diffs are full-fidelity in SP1.)
-  const paths = (changes.changeEntries ?? []).map((c) => c.item?.path).filter(Boolean) as string[];
-  const raw = paths.map((p) => `diff --git a${p} b${p}\n--- a${p}\n+++ b${p}\n`).join('');
-  return parseUnifiedDiff(raw);
+export async function fetchAzdoDiff(
+  repo: AzdoRepoConfig, sourceBranch: string, targetBranch: string, exec: Exec = defaultExec,
+): Promise<DiffFilePayload[]> {
+  const clone = repo.localClonePath;
+  if (!clone || !sourceBranch || !targetBranch) return [];
+  // Fetch both PR branches into a private ref namespace (force, no tags), then three-dot diff.
+  // Uses the clone's own git auth (SSH key / credential helper already configured for `origin`) — no PAT needed.
+  await exec('git', ['-C', clone, 'fetch', '--no-tags', '--force', 'origin',
+    `+${sourceBranch}:refs/wt-review/src`, `+${targetBranch}:refs/wt-review/tgt`]);
+  const out = await exec('git', ['-C', clone, 'diff', 'refs/wt-review/tgt...refs/wt-review/src']);
+  return parseUnifiedDiff(out);
 }
 
 export async function fetchAzdoComments(repo: AzdoRepoConfig, prNumber: number, pat: string, get: HttpGet = defaultGet): Promise<PrCommentThreadPayload[]> {

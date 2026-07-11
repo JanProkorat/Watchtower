@@ -84,17 +84,17 @@ export class ReviewsService {
     return this.list();
   }
 
-  async diff(host: PrHost, repoKey: string, prNumber: number, devopsPats: Record<string, string> | undefined): Promise<DiffFilePayload[]> {
+  async diff(host: PrHost, repoKey: string, prNumber: number, _devopsPats: Record<string, string> | undefined): Promise<DiffFilePayload[]> {
     const { github, azdo } = await this.resolveRepos();
     if (host === 'github') {
       const repo = github.find((r) => r.repoKey === repoKey);
-      if (!repo) return [];
-      return fetchGithubDiff(repo, prNumber);
+      return repo ? fetchGithubDiff(repo, prNumber) : [];
     }
     const repo = azdo.find((r) => r.repoKey === repoKey);
-    const pat = repo ? devopsPats?.[repo.devopsHost] : undefined;
-    if (!repo || !pat) return [];
-    return fetchAzdoDiff(repo, prNumber, pat);
+    if (!repo) return [];
+    const pr = this.cache.find((p) => p.host === 'azdo' && p.repoKey === repoKey && p.number === prNumber);
+    if (!pr) return [];
+    return fetchAzdoDiff(repo, pr.sourceBranch, pr.targetBranch);
   }
 
   async comments(host: PrHost, repoKey: string, prNumber: number, devopsPats: Record<string, string> | undefined): Promise<PrCommentThreadPayload[]> {
