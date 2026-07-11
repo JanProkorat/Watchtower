@@ -65,6 +65,7 @@ import { fetchTokenUsage } from './services/tokenUsage.js';
 import { AutoTimeLogger } from './services/autoTimeLogger.js';
 import { ReviewsService } from './services/reviews.js';
 import { runReview } from './services/prReview.js';
+import { postGithubComment, postAzdoComment } from './services/prProviders/postComment.js';
 import { PrReviewsRepo, type PrReviewRow } from './db/repositories/prReviews.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
@@ -1228,6 +1229,54 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       // Do NOT fail() the row here — aborting makes runReview() throw 'Cancelled',
       // which the .catch above already routes through the normal fail()+push path.
       return { ok: true };
+    }
+
+    case 'prReview:postComments': {
+      const p = req.payload;
+      const reviews = prReviewsRepo();
+      const row = reviews.get(p.reviewId);
+      if (!row) throw new Error(`Review not found: ${p.reviewId}`);
+      let findings: PrFindingPayload[];
+      try {
+        findings = JSON.parse(row.findings_json ?? '[]') as PrFindingPayload[];
+      } catch {
+        throw new Error(`Review ${p.reviewId} has malformed findings JSON`);
+      }
+      const { github, azdo } = await reviewsSvc().resolveRepos();
+      const githubRepo = row.host === 'github' ? github.find((r) => r.repoKey === row.repo_key) : undefined;
+      const azdoRepo = row.host === 'azdo' ? azdo.find((r) => r.repoKey === row.repo_key) : undefined;
+      if (!githubRepo && !azdoRepo) throw new Error(`Cannot resolve repo for review: ${row.host}:${row.repo_key}`);
+
+      let posted = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+      for (const i of p.findingIndexes) {
+        const f = findings[i];
+        if (i < 0 || !f) { skipped++; continue; }
+        // Findings carry repo-relative paths; strip any accidental leading
+        // slash before handing them to either host's poster.
+        const file = f.file.replace(/^\/+/, '');
+        try {
+          if (githubRepo) {
+            await postGithubComment(githubRepo.nwo, row.pr_number, row.head_sha, { ...f, file });
+          } else if (azdoRepo) {
+            const pat = p.devopsPats?.[azdoRepo.devopsHost];
+            if (!pat) {
+              errors.push(`${f.file}:${f.line}: chybí PAT`);
+              continue;
+            }
+            await postAzdoComment(azdoRepo.apiBase, azdoRepo.repo, row.pr_number, { ...f, file }, pat);
+          }
+          f.posted = true;
+          posted++;
+        } catch (e) {
+          errors.push(`${f.file}:${f.line}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      reviews.updateFindings(p.reviewId, JSON.stringify(findings));
+      emitPush({ kind: 'prReviewDone', payload: { reviewId: p.reviewId } });
+      return { posted, skipped, errors };
     }
 
   }

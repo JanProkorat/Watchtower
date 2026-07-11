@@ -44,7 +44,7 @@ export class ReviewsService {
     this.exec = deps.exec ?? defaultExec;
   }
 
-  private async resolveRepos(): Promise<{ github: GithubRepoConfig[]; azdo: AzdoRepoConfig[] }> {
+  async resolveRepos(): Promise<{ github: GithubRepoConfig[]; azdo: AzdoRepoConfig[] }> {
     const github: GithubRepoConfig[] = [];
     const azdo: AzdoRepoConfig[] = [];
     for (const p of this.projectsFn()) {
