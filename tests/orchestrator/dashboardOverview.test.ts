@@ -84,6 +84,73 @@ describe('DashboardOverviewService', () => {
     expect(res.today.minutes).toBe(60);
   });
 
+  it('today.minutes filters to the union of projectIds', () => {
+    const a = seedTask('A', '#aaa', 'A-1');
+    const b = seedTask('B', '#bbb', 'B-1');
+    const c = seedTask('C', '#ccc', 'C-1');
+    seedWorklog(a.task.id, '2026-05-25', 60);
+    seedWorklog(b.task.id, '2026-05-25', 30);
+    seedWorklog(c.task.id, '2026-05-25', 15);
+
+    const both = service.run({
+      projectIds: [a.project.id, b.project.id],
+      sprintAnchor: '2026-05-25',
+      todayDate: '2026-05-25',
+    });
+    const onlyA = service.run({
+      projectIds: [a.project.id],
+      sprintAnchor: '2026-05-25',
+      todayDate: '2026-05-25',
+    });
+    const all = service.run({
+      sprintAnchor: '2026-05-25',
+      todayDate: '2026-05-25',
+    });
+
+    expect(both.today.minutes).toBe(90);
+    expect(onlyA.today.minutes).toBe(60);
+    expect(both.today.minutes).toBe(onlyA.today.minutes + 30);
+    expect(all.today.minutes).toBe(105);
+    expect(all.today.minutes).toBeGreaterThanOrEqual(both.today.minutes);
+  });
+
+  it('honours the legacy single projectId', () => {
+    const a = seedTask('A', '#aaa', 'A-1');
+    const b = seedTask('B', '#bbb', 'B-1');
+    seedWorklog(a.task.id, '2026-05-25', 60);
+    seedWorklog(b.task.id, '2026-05-25', 30);
+
+    const legacy = service.run({
+      projectId: a.project.id,
+      sprintAnchor: '2026-05-25',
+      todayDate: '2026-05-25',
+    });
+    const viaArray = service.run({
+      projectIds: [a.project.id],
+      sprintAnchor: '2026-05-25',
+      todayDate: '2026-05-25',
+    });
+
+    expect(legacy.today.minutes).toBe(viaArray.today.minutes);
+    expect(legacy.today.minutes).toBe(60);
+  });
+
+  it('empty projectIds array falls back to legacy projectId, not "all"', () => {
+    const a = seedTask('A', '#aaa', 'A-1');
+    const b = seedTask('B', '#bbb', 'B-1');
+    seedWorklog(a.task.id, '2026-05-25', 60);
+    seedWorklog(b.task.id, '2026-05-25', 30);
+
+    const res = service.run({
+      projectId: a.project.id,
+      projectIds: [],
+      sprintAnchor: '2026-05-25',
+      todayDate: '2026-05-25',
+    });
+
+    expect(res.today.minutes).toBe(60);
+  });
+
   it('month.minutes sums all worklogs in the YYYY-MM derived from todayDate', () => {
     const { task } = seedTask('P', '#7aa7ff', 'T-1');
     seedWorklog(task.id, '2026-05-01', 60);
@@ -522,6 +589,40 @@ describe('DashboardOverviewService', () => {
       expect(res.activeContracts).toHaveLength(1);
       expect(res.activeContracts[0].contract.mdsUsed).toBe(1.5);
       expect(res.activeContracts[0].contract.mdsRemaining).toBe(98.5);
+    });
+
+    it('surfaces a shared contract once, not once per member project', () => {
+      const a = projects.create({ name: 'Alpha', color: '#aaa', kind: 'work' });
+      const b = projects.create({ name: 'Bravo', color: '#bbb', kind: 'work' });
+      const solo = projects.create({ name: 'Solo', color: '#ccc', kind: 'work' });
+      rates.createGroup(
+        {
+          effectiveFrom: '2026-01-01',
+          rateType: 'daily',
+          rateAmount: 10000,
+          endDate: '2026-12-31',
+          mdLimit: 100,
+        },
+        [a.id, b.id],
+      );
+      rates.create({
+        projectId: solo.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 10000,
+        endDate: '2026-12-31',
+        mdLimit: 50,
+      });
+
+      const res = service.run({
+        projectId: null,
+        sprintAnchor: '2026-05-27',
+        todayDate: '2026-05-27',
+      });
+      // Alpha represents the group once; Bravo is deduped away. The solo
+      // contract on a third project still appears. (Solo's smaller mdLimit
+      // gives it a higher overshoot score at zero usage, so it sorts first.)
+      expect(res.activeContracts.map((c) => c.projectName)).toEqual(['Solo', 'Alpha']);
     });
   });
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   resolvePreset, defaultGranularity, clampGranularity,
-} from '../../apps/ipad/src/state/useReportsFilters.js';
+} from '@watchtower/module-timetracker';
 
 describe('resolvePreset', () => {
   const today = '2026-06-15';

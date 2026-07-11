@@ -5,9 +5,9 @@ import type { ProjectSummary } from './useProjects.js';
 export interface AttentionItem { instanceId: string; label: string; reason: string }
 
 const REASON: Record<string, string> = {
-  'waiting-permission': 'čeká na povolení',
-  'waiting-input': 'dokončeno, čeká na vstup',
-  'crashed': 'spadlo',
+  'waiting-permission': 'waiting for permission',
+  'waiting-input': 'waiting for input',
+  'crashed': 'crashed',
 };
 
 export function buildAttentionList(instances: InstanceView[], projects: ProjectSummary[]): AttentionItem[] {
@@ -16,6 +16,6 @@ export function buildAttentionList(instances: InstanceView[], projects: ProjectS
     .map((i) => {
       const label = projects.find((p) => p.folderPath === i.cwd)?.name
         ?? i.cwd.split('/').filter(Boolean).pop() ?? i.id;
-      return { instanceId: i.id, label, reason: REASON[i.status] ?? 'vyžaduje pozornost' };
+      return { instanceId: i.id, label, reason: REASON[i.status] ?? 'needs attention' };
     });
 }

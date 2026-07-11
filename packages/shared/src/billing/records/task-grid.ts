@@ -7,6 +7,12 @@ export interface TaskGridRow {
   taskTitle: string | null;
   projectColor: string | null;
   perDay: number[];
+  /**
+   * Expected time for the task, in minutes. Manual estimate wins; falls back
+   * to the estimate pulled from Jira (see `estimatesByKey`). Null when neither
+   * is known. Mirrors the desktop grid's `estimatedMinutes`.
+   */
+  estimatedMinutes: number | null;
 }
 
 export interface TaskGridResult {
@@ -20,9 +26,35 @@ export interface TaskGridResult {
 
 export function buildTaskGrid(
   rows: WorklogRow[],
-  opts: { month: string; projectId?: number },
+  opts: {
+    month: string;
+    /**
+     * Single-project filter. Kept for back-compat; when `projectIds` is also
+     * supplied and non-empty, `projectIds` wins.
+     */
+    projectId?: number;
+    /**
+     * Multi-project filter. Empty/undefined = all projects; otherwise only
+     * rows whose `projectId` is in the list are kept.
+     */
+    projectIds?: number[];
+    /**
+     * Expected-time lookup keyed by `${projectId}:${taskNumber ?? ''}` (the
+     * same key this builder buckets tasks under). Value is the already-resolved
+     * estimate in minutes (manual estimate with the Jira fallback applied by
+     * the caller). Absent key → row.estimatedMinutes stays null.
+     */
+    estimatesByKey?: Map<string, number | null>;
+  },
 ): TaskGridResult {
-  const { month, projectId } = opts;
+  const { month, projectId, projectIds, estimatesByKey } = opts;
+  // projectIds (when non-empty) takes precedence over the legacy single filter.
+  const projectFilter: Set<number> | null =
+    projectIds && projectIds.length > 0
+      ? new Set(projectIds)
+      : projectId !== undefined
+        ? new Set([projectId])
+        : null;
   const parts = month.split('-').map(Number);
   const y = parts[0]!;
   const m = parts[1]!;
@@ -36,7 +68,7 @@ export function buildTaskGrid(
 
   for (const r of rows) {
     if (r.workDate.slice(0, 7) !== month) continue;
-    if (projectId !== undefined && r.projectId !== projectId) continue;
+    if (projectFilter !== null && !projectFilter.has(r.projectId)) continue;
     const dayIdx = Number(r.workDate.slice(8, 10)) - 1;
     const key = `${r.projectId}:${r.taskNumber ?? ''}`;
     let row = byTask.get(key);
@@ -52,6 +84,7 @@ export function buildTaskGrid(
         taskTitle: r.taskTitle,
         projectColor: r.projectColor,
         perDay,
+        estimatedMinutes: estimatesByKey?.get(key) ?? null,
       };
       byTask.set(key, row);
     }

@@ -45,6 +45,7 @@ import { FirstRunWizard } from './components/FirstRunWizard.js';
 import { ModuleSettings } from './components/settings/ModuleSettings.js';
 import { ModuleTimeTracker } from './components/timetracker/ModuleTimeTracker.js';
 import { ModuleDashboard } from './components/dashboard/ModuleDashboard.js';
+import { ModuleReviews } from './components/reviews/ModuleReviews.js';
 import { SlotRegistryProvider } from './components/instances/SlotRegistry.js';
 import { TerminalPool } from './components/instances/TerminalPool.js';
 import { WorkspaceRoot } from './components/instances/WorkspaceRoot.js';
@@ -53,7 +54,7 @@ import {
   collectTabIds,
   findLeafById,
   findLeafByTabId,
-} from './layout/workspaceTreeOps.js';
+} from '@watchtower/shared/workspaceTreeOps.js';
 import { parseTabId } from './layout/tabId.js';
 import { pruneLayout } from './layout/pruneLayout.js';
 import { leafToCollapseOnHide } from './layout/hiddenPaneCollapse.js';
@@ -206,6 +207,10 @@ export function App() {
   const spawnTerminalForCwd = (cwd: string) => {
     setActiveModule('instances');
     void doSpawn(cwd, 'shell');
+  };
+  const spawnClaudeForCwd = (cwd: string) => {
+    setActiveModule('instances');
+    void doSpawn(cwd, 'claude');
   };
   const cwdForTab = (id: TabId): string | null => {
     const parsed = parseTabId(id);
@@ -488,12 +493,12 @@ export function App() {
                   />
                 )}
                 {activeModule === 'settings' && <ModuleSettings view={settingsView.view} />}
+                {activeModule === 'reviews' && <ModuleReviews />}
                 {activeModule === 'billing' && (
                   <ModuleTimeTracker
                     view={billingView.view}
                     onSelectProject={billingView.selectProject}
-                    onActivateInstance={switchToInstance}
-                    onOpenNewInstanceForCwd={switchToNewInstanceForCwd}
+                    onOpenInstanceForCwd={spawnClaudeForCwd}
                     onOpenTerminalForCwd={spawnTerminalForCwd}
                   />
                 )}
@@ -527,12 +532,6 @@ export function App() {
                           onAddSession={(tabId) => {
                             const cwd = cwdForTab(tabId as TabId);
                             if (cwd) void doSpawn(cwd);
-                          }}
-                          dashboardOnOpen={(id) => switchToInstance(id)}
-                          dashboardOnKill={(id) => void kill(id)}
-                          dashboardOnRemove={(id) => {
-                            const inst = instances.find((i) => i.id === id);
-                            handleRemove(id, inst ? !['finished', 'crashed', 'suspended'].includes(inst.status) : false);
                           }}
                           dashboardOnNew={() => setNewOpen(true)}
                         />

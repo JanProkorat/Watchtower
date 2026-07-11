@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useSlotForInstance } from './instances/SlotRegistry.js';
+import { signalTerminalInteraction } from './instances/terminalInteraction.js';
 
 interface Props {
   instanceId: string;
@@ -25,6 +26,14 @@ export function Terminal({ instanceId, status }: Props) {
   const [fallbackElapsed, setFallbackElapsed] = useState(false);
   const slot = useSlotForInstance(instanceId);
   const isStarting = STARTING_STATUSES.has(status) && !fallbackElapsed;
+
+  const statusRef = useRef(status);
+  statusRef.current = status;
+
+  const clearAttentionOnInteraction = () =>
+    signalTerminalInteraction(instanceId, statusRef.current, (id) =>
+      void window.watchtower.invoke('focusChanged', { instanceId: id }),
+    );
 
   useEffect(() => {
     if (!STARTING_STATUSES.has(status)) return;
@@ -71,6 +80,7 @@ export function Terminal({ instanceId, status }: Props) {
     });
     const inputDisp = term.onData((data) => {
       void window.watchtower.invoke('ptyWrite', { instanceId, data });
+      clearAttentionOnInteraction();
     });
     void window.watchtower.invoke('ptyResize', {
       instanceId,
@@ -79,9 +89,14 @@ export function Terminal({ instanceId, status }: Props) {
     });
     void window.watchtower.invoke('terminalFocus', { instanceId });
 
+    const host = hostRef.current;
+    const onHostMouseDown = () => clearAttentionOnInteraction();
+    host.addEventListener('mousedown', onHostMouseDown, true);
+
     return () => {
       offData();
       inputDisp.dispose();
+      host.removeEventListener('mousedown', onHostMouseDown, true);
       term.dispose();
       termRef.current = null;
       fitRef.current = null;

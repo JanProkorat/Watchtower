@@ -3,7 +3,7 @@ import { Box, Typography, useTheme } from '@mui/material';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ColumnSlot } from './ColumnSlot.js';
 import { SessionTabBar } from './SessionTabBar.js';
-import { DashboardTab } from '../DashboardTab.js';
+import { EmptyWorkspace } from './EmptyWorkspace.js';
 import type { TabRecord } from '@watchtower/shared/layout.js';
 import type { InstanceView } from '../../state/useInstances.js';
 import { tabAccent } from '../../util/tabAccent.js';
@@ -19,9 +19,6 @@ interface Props {
   onUnhideSession(instanceId: string): void;
   onAddSession(): void;
   onSetTask?(instanceId: string, taskId: number | null): void;
-  dashboardOnOpen?(id: string): void;
-  dashboardOnKill?(id: string): void;
-  dashboardOnRemove?(id: string): void;
   dashboardOnNew?(): void;
 }
 
@@ -36,9 +33,6 @@ export function LeafView({
   onUnhideSession,
   onAddSession,
   onSetTask,
-  dashboardOnOpen,
-  dashboardOnKill,
-  dashboardOnRemove,
   dashboardOnNew,
 }: Props) {
   // Live pane percentages from the column PanelGroup, so the session tabs above
@@ -58,13 +52,7 @@ export function LeafView({
           outlineOffset: -2,
         }}
       >
-        <DashboardTab
-          instances={instances}
-          onOpen={dashboardOnOpen ?? (() => {})}
-          onKill={dashboardOnKill ?? (() => {})}
-          onRemove={dashboardOnRemove ?? (() => {})}
-          onNew={dashboardOnNew ?? (() => {})}
-        />
+        <EmptyWorkspace onNew={dashboardOnNew ?? (() => {})} />
       </Box>
     );
   }

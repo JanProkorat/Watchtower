@@ -48,7 +48,7 @@ export type OrchRequest =
   | { id: string; kind: 'contracts:create'; payload: OrchContractInput }
   | { id: string; kind: 'contracts:update'; payload: { id: number; input: Partial<OrchContractInput> } }
   | { id: string; kind: 'contracts:delete'; payload: { id: number } }
-  | { id: string; kind: 'taskGrid:get'; payload: { year: number; month: number; projectId?: number } }
+  | { id: string; kind: 'taskGrid:get'; payload: { year: number; month: number; projectIds?: number[] } }
   | { id: string; kind: 'daysOff:list'; payload: Record<string, never> }
   | { id: string; kind: 'daysOff:listInRange'; payload: { from: string; to: string } }
   | { id: string; kind: 'daysOff:upsert'; payload: OrchDayOffInput }
@@ -75,7 +75,47 @@ export type OrchRequest =
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
   | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } }
-  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } };
+  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } }
+  | { id: string; kind: 'prs:list'; payload: Record<string, never> }
+  | { id: string; kind: 'prs:refresh'; payload: { devopsPats?: Record<string, string> } }
+  | {
+      id: string;
+      kind: 'prs:diff';
+      payload: {
+        host: import('./ipcContract.js').PrHost;
+        repoKey: string;
+        prNumber: number;
+        devopsPats?: Record<string, string>;
+      };
+    }
+  | {
+      id: string;
+      kind: 'prs:comments';
+      payload: {
+        host: import('./ipcContract.js').PrHost;
+        repoKey: string;
+        prNumber: number;
+        devopsPats?: Record<string, string>;
+      };
+    }
+  | { id: string; kind: 'reviews:projectRepo'; payload: { projectId: number } }
+  | {
+      id: string;
+      kind: 'prReview:start';
+      payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number };
+    }
+  | { id: string; kind: 'prReview:get'; payload: { reviewId: number } }
+  | { id: string; kind: 'prReview:list'; payload: { repoKey?: string } }
+  | { id: string; kind: 'prReview:cancel'; payload: { reviewId: number } }
+  | {
+      id: string;
+      kind: 'prReview:postComments';
+      payload: {
+        reviewId: number;
+        findingIndexes: number[];
+        devopsPats?: Record<string, string>;
+      };
+    };
 
 export interface OrchRunningInstance {
   id: string;
@@ -215,6 +255,8 @@ export interface OrchTaskGridResponse {
 
 export interface OrchContractInput {
   projectId: number;
+  /** Shared-contract member project ids. Omitted/length<=1 behaves as a solo contract. */
+  projectIds?: number[];
   effectiveFrom: string;
   rateType: 'hourly' | 'daily';
   rateAmount: number;
@@ -242,6 +284,10 @@ export interface OrchContractView {
   projectedTotalMds: number | null;
   isActive: boolean;
   isCompleted: boolean;
+  /** Shared-contract group id, or null for a solo (single-project) contract. */
+  groupId: string | null;
+  /** Member project ids — `[projectId]` for a solo contract. */
+  projectIds: number[];
 }
 
 export interface OrchOverlapError {
@@ -249,6 +295,8 @@ export interface OrchOverlapError {
   conflictingId: number;
   conflictingFrom: string;
   conflictingTo: string | null;
+  conflictingProjectId: number;
+  conflictingProjectName: string;
 }
 
 export interface OrchWorklogListFilter {
@@ -409,7 +457,7 @@ export interface OrchProjectInput {
   name: string;
   color?: string;
   kind?: 'work' | 'time_off';
-  isDefault?: boolean;
+  isPinned?: boolean;
   folderPath?: string | null;
   jiraGlobs?: string[];
   description?: string | null;
@@ -421,7 +469,7 @@ export interface OrchProjectView {
   color: string;
   archived: boolean;
   kind: 'work' | 'time_off';
-  isDefault: boolean;
+  isPinned: boolean;
   folderPath: string | null;
   jiraGlobs: string[];
   description: string | null;
@@ -535,7 +583,26 @@ export type OrchResponse =
     }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'terminalFocus'; payload: { ok: true } }
-  | { kind: 'push:registerDevice'; payload: { ok: true } };
+  | { kind: 'push:registerDevice'; payload: { ok: true } }
+  | {
+      kind: 'prs:list';
+      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null };
+    }
+  | {
+      kind: 'prs:refresh';
+      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null };
+    }
+  | { kind: 'prs:diff'; payload: { files: import('./ipcContract.js').DiffFilePayload[] } }
+  | { kind: 'prs:comments'; payload: { threads: import('./ipcContract.js').PrCommentThreadPayload[] } }
+  | {
+      kind: 'reviews:projectRepo';
+      payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null };
+    }
+  | { kind: 'prReview:start'; payload: { reviewId: number } }
+  | { kind: 'prReview:get'; payload: { review: import('./ipcContract.js').PrReviewPayload | null } }
+  | { kind: 'prReview:list'; payload: { reviews: import('./ipcContract.js').PrReviewPayload[] } }
+  | { kind: 'prReview:cancel'; payload: { ok: true } }
+  | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
@@ -548,7 +615,9 @@ export type OrchPush =
   | { kind: 'clearAttention'; payload: { instanceId: string } }
   | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
   | { kind: 'badge'; payload: { count: number } }
-  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload };
+  | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
+  | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
+  | { kind: 'prReviewDone'; payload: { reviewId: number } };
 
 type AnyPort = {
   postMessage(data: unknown): void;

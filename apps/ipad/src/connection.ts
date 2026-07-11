@@ -52,9 +52,6 @@ export function connectionToWsUrl(c: Connection): string {
   return `ws://${c.host}:${c.port}/ws`;
 }
 
-export function connectionToVncWsUrl(c: Connection): string {
-  return `ws://${c.host}:${c.port}/vnc`;
-}
 
 export async function saveConnection(store: ConnStore, c: Connection): Promise<void> {
   await store.set(KEY, JSON.stringify(c));
@@ -68,4 +65,35 @@ export async function loadConnection(store: ConnStore): Promise<Connection | nul
   } catch {
     return null;
   }
+}
+
+export type ConnectionFormState = {
+  host: string; port: string; token: string;
+  mac: string; lanIp: string; wanHost: string; wanPort: string;
+};
+
+export function emptyConnectionFormState(): ConnectionFormState {
+  return { host: '', port: '7445', token: '', mac: '', lanIp: '', wanHost: '', wanPort: '' };
+}
+
+export function connectionToFormState(c: Connection): ConnectionFormState {
+  return {
+    host: c.host, port: String(c.port), token: c.token,
+    mac: c.mac ?? '', lanIp: c.lanIp ?? '',
+    wanHost: c.wanHost ?? '', wanPort: c.wanPort ? String(c.wanPort) : '',
+  };
+}
+
+export async function commitConnectionEdit(
+  store: ConnStore,
+  form: ConnectionFormState,
+): Promise<{ ok: true; value: Connection } | { ok: false; error: string }> {
+  const parsed = parseConnection(form);
+  if (!parsed.ok) return parsed;
+  try {
+    await saveConnection(store, parsed.value);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  return parsed;
 }

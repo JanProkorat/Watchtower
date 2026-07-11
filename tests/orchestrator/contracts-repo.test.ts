@@ -69,6 +69,17 @@ describe('ProjectRatesRepo', () => {
       expect(c.endDate).toBe('2026-06-30');
       expect(c.mdLimit).toBe(50);
     });
+
+    it('round-trips contractGroupId on a created contract', () => {
+      const c = rates.create({ projectId, effectiveFrom: '2026-01-01', contractGroupId: 'grp-1', ...STANDARD_INPUT });
+      expect(c.contractGroupId).toBe('grp-1');
+      expect(rates.get(c.id)?.contractGroupId).toBe('grp-1');
+    });
+
+    it('defaults contractGroupId to null for a solo contract', () => {
+      const c = rates.create({ projectId, effectiveFrom: '2026-02-01', ...STANDARD_INPUT });
+      expect(c.contractGroupId).toBeNull();
+    });
   });
 
   describe('auto-close behaviour', () => {
@@ -176,6 +187,55 @@ describe('ProjectRatesRepo', () => {
         }),
       ).not.toThrow();
     });
+
+    it('overlap error carries the conflicting project id', () => {
+      rates.create({ projectId, effectiveFrom: '2026-01-01', endDate: '2026-06-30', ...STANDARD_INPUT });
+      try {
+        rates.create({ projectId, effectiveFrom: '2026-03-01', endDate: '2026-09-30', ...STANDARD_INPUT });
+        throw new Error('expected overlap');
+      } catch (e) {
+        expect(e).toBeInstanceOf(RateOverlapError);
+        expect((e as RateOverlapError).conflictingProjectId).toBe(projectId);
+      }
+    });
+  });
+
+  describe('delete then recreate', () => {
+    it('allows recreating a contract with the same effective_from after the original is deleted', () => {
+      const first = rates.create({
+        projectId,
+        effectiveFrom: '2026-01-01',
+        ...STANDARD_INPUT,
+      });
+      rates.delete(first.id);
+      // The soft-deleted row must not block a fresh contract on the same start
+      // date (the DB-level UNIQUE(project_id, effective_from) still holds the
+      // tombstone's slot; the repo has to work around it).
+      const second = rates.create({
+        projectId,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 12000,
+        hoursPerDay: 8,
+      });
+      expect(second.effectiveFrom).toBe('2026-01-01');
+      expect(second.rateType).toBe('daily');
+      expect(second.rateAmount).toBe(12000);
+      // Only the live contract shows up.
+      const live = rates.listForProject(projectId);
+      expect(live).toHaveLength(1);
+      expect(live[0]!.id).toBe(second.id);
+      expect(live[0]!.rateAmount).toBe(12000);
+    });
+
+    it('still rejects a duplicate effective_from when the original is live', () => {
+      rates.create({ projectId, effectiveFrom: '2026-01-01', endDate: '2026-06-30', ...STANDARD_INPUT });
+      // A second live contract sharing the exact start date overlaps — must be
+      // reported as an overlap, not a raw constraint failure.
+      expect(() =>
+        rates.create({ projectId, effectiveFrom: '2026-01-01', endDate: '2026-12-31', ...STANDARD_INPUT }),
+      ).toThrowError(RateOverlapError);
+    });
   });
 
   describe('activeForProject', () => {
@@ -206,6 +266,67 @@ describe('ProjectRatesRepo', () => {
       });
       expect(rates.activeForProject(projectId, '2025-12-31')?.id).toBe(b.id);
       expect(rates.activeForProject(projectId, '2025-06-30')?.id).toBe(a.id);
+    });
+  });
+
+  describe('shared contract groups', () => {
+    let pA: number, pB: number, pC: number;
+    beforeEach(() => {
+      pA = projectId;
+      pB = projects.create({ name: 'B', kind: 'work' }).id;
+      pC = projects.create({ name: 'C', kind: 'work' }).id;
+    });
+
+    const TERMS = { effectiveFrom: '2026-01-01', rateType: 'hourly' as const, rateAmount: 1600, hoursPerDay: 8, endDate: null, mdLimit: 30 };
+
+    it('createGroup writes one row per project sharing a group id + identical terms', () => {
+      const { groupId, rows } = rates.createGroup(TERMS, [pA, pB, pC]);
+      expect(rows).toHaveLength(3);
+      for (const p of [pA, pB, pC]) {
+        const [row] = rates.listForProject(p);
+        expect(row!.contractGroupId).toBe(groupId);
+        expect(row!.rateAmount).toBe(1600);
+        expect(row!.mdLimit).toBe(30);
+      }
+      expect(rates.listGroupMembers(groupId).sort()).toEqual([pA, pB, pC].sort());
+    });
+
+    it('createGroup rejects and rolls back when a member project overlaps, naming the project', () => {
+      rates.create({ projectId: pB, effectiveFrom: '2026-03-01', ...STANDARD_INPUT }); // pB busy
+      try {
+        rates.createGroup(TERMS, [pA, pB, pC]);
+        throw new Error('expected overlap');
+      } catch (e) {
+        expect((e as RateOverlapError).conflictingProjectId).toBe(pB);
+      }
+      // rollback: pA and pC got nothing
+      expect(rates.listForProject(pA)).toHaveLength(0);
+      expect(rates.listForProject(pC)).toHaveLength(0);
+    });
+
+    it('updateGroup propagates term changes to all members', () => {
+      const { groupId } = rates.createGroup(TERMS, [pA, pB]);
+      rates.updateGroup(groupId, { ...TERMS, rateAmount: 2000, mdLimit: 50 }, [pA, pB]);
+      for (const p of [pA, pB]) {
+        const [row] = rates.listForProject(p);
+        expect(row!.rateAmount).toBe(2000);
+        expect(row!.mdLimit).toBe(50);
+      }
+    });
+
+    it('updateGroup adds a newly-listed project and removes an unlisted one', () => {
+      const { groupId } = rates.createGroup(TERMS, [pA, pB]);
+      rates.updateGroup(groupId, TERMS, [pA, pC]); // drop B, add C
+      expect(rates.listForProject(pB)).toHaveLength(0);
+      expect(rates.listForProject(pC)[0]!.contractGroupId).toBe(groupId);
+      expect(rates.listGroupMembers(groupId).sort()).toEqual([pA, pC].sort());
+    });
+
+    it('deleteGroup soft-deletes every member', () => {
+      const { groupId } = rates.createGroup(TERMS, [pA, pB, pC]);
+      rates.deleteGroup(groupId);
+      for (const p of [pA, pB, pC]) expect(rates.listForProject(p)).toHaveLength(0);
+      expect(rates.listGroupMembers(groupId)).toEqual([]);
     });
   });
 });
@@ -353,6 +474,35 @@ describe('ContractStatusService', () => {
     expect(status?.totalWorkdays).toBeNull();
     expect(status?.workdaysRemaining).toBeNull();
     expect(status?.projectedTotalMds).toBeNull();
+  });
+
+  it('pools MD usage across all projects in a shared contract group', () => {
+    // pA and pB share a group with mdLimit 30; log 8h on each → 2 MD total.
+    const pA = projects.create({ name: 'A', kind: 'work' }).id;
+    const pB = projects.create({ name: 'B', kind: 'work' }).id;
+    const seed = (p: number, mins: number) => {
+      const e = epics.create({ projectId: p, name: 'E' });
+      const t = tasks.create({ epicId: e.id, number: 'X', title: 'X' });
+      worklogs.create({ taskId: t.id, workDate: '2026-01-05', minutes: mins });
+    };
+    seed(pA, 8 * 60);
+    seed(pB, 8 * 60);
+    rates.createGroup(
+      {
+        effectiveFrom: '2026-01-01',
+        endDate: '2026-12-31',
+        mdLimit: 30,
+        ...STANDARD_INPUT,
+      },
+      [pA, pB],
+    );
+    const statusA = service.forProject(pA, '2026-06-30');
+    expect(statusA?.minutesLogged).toBe(2 * 8 * 60); // pooled, not just pA
+    expect(statusA?.mdsUsed).toBe(2);
+    expect(statusA?.mdsRemaining).toBe(28); // 30 - 2, same number on either project
+    const statusB = service.forProject(pB, '2026-06-30');
+    expect(statusB?.minutesLogged).toBe(statusA?.minutesLogged);
+    expect(statusB?.mdsRemaining).toBe(statusA?.mdsRemaining);
   });
 });
 

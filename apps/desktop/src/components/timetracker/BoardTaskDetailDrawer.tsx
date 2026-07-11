@@ -208,7 +208,7 @@ export function BoardTaskDetailDrawer({
 
   const handleDeleteWorklog = async (w: WorklogViewPayload) => {
     if (
-      !window.confirm(`Smazat worklog z ${formatDateCz(w.workDate)} (${formatMinutes(w.minutes)})?`)
+      !window.confirm(`Delete worklog from ${formatDateCz(w.workDate)} (${formatMinutes(w.minutes)})?`)
     ) {
       return;
     }

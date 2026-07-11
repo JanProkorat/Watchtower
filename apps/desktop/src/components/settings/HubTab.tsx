@@ -44,18 +44,18 @@ export function HubTab() {
       <Stack spacing={2}>
         <Typography variant="h6">Messaging hub</Typography>
         <Typography variant="body2" color="text.secondary">
-          Konfigurace APNs pro odesílání push notifikací na iPad / iPhone přes messaging hub.
+          APNs configuration for sending push notifications to iPad / iPhone via the messaging hub.
         </Typography>
 
         {error && <Alert severity="error">{error}</Alert>}
 
         <FormControlLabel
           control={<Switch checked={value.enabled} onChange={(e) => patch({ enabled: e.target.checked })} />}
-          label="Povolit"
+          label="Enable"
         />
 
         <TextField
-          label="APNs klíč (.p8)"
+          label="APNs key (.p8)"
           multiline
           minRows={4}
           fullWidth
@@ -77,7 +77,7 @@ export function HubTab() {
         />
         <TextField
           select
-          label="Prostředí"
+          label="Environment"
           fullWidth
           value={value.apnsEnv}
           onChange={(e) => patch({ apnsEnv: e.target.value as HubConfig['apnsEnv'] })}
@@ -87,7 +87,7 @@ export function HubTab() {
         </TextField>
 
         <TextField
-          label="Prodleva (ms)"
+          label="Delay (ms)"
           type="number"
           fullWidth
           value={value.escalateMs}
@@ -97,7 +97,7 @@ export function HubTab() {
 
         <Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-            Spouštěče
+            Triggers
           </Typography>
           <FormControlLabel
             control={
@@ -108,7 +108,7 @@ export function HubTab() {
                 }
               />
             }
-            label="Povolení"
+            label="Permission"
           />
           <FormControlLabel
             control={
@@ -119,7 +119,7 @@ export function HubTab() {
                 }
               />
             }
-            label="Nečinnost"
+            label="Idle"
           />
           <FormControlLabel
             control={
@@ -130,13 +130,13 @@ export function HubTab() {
                 }
               />
             }
-            label="Pád"
+            label="Crash"
           />
         </Box>
 
         <Box>
           <Button variant="contained" onClick={onSave} disabled={saving || draft === null}>
-            Uložit
+            Save
           </Button>
         </Box>
       </Stack>

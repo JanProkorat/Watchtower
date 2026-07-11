@@ -15,7 +15,7 @@ import {
 } from './db/migrateTimetracker.js';
 import { startWsBridge, type WsBridgeHandle } from './wsBridge.js';
 import type { OrchRequest } from '@watchtower/shared/messagePort.js';
-import { createPgStore, type PgStore } from './db/pg/pool.js';
+import { createPgStore, evaluateHubGuard, type PgStore } from './db/pg/pool.js';
 import { runPgMigrations } from './db/pg/migrate.js';
 import { SyncService } from './sync/service.js';
 import { SettingsRepo } from './db/repositories/settings.js';
@@ -55,6 +55,14 @@ export interface BootstrapOptions {
   wsHost?: string;
   /** Port for the WS bridge server. 0 = ephemeral (good for tests). Defaults to 0. */
   wsPort?: number;
+  /**
+   * Called on the same daily cadence as the tombstone purge (i.e. whenever a
+   * sync cycle actually ran it — see SyncCycleResult.purge). index.ts wires
+   * this to attentionRelay.pruneClosedThreads(14); attentionRelay is created
+   * after bootstrap() resolves, so this fires via closure over that
+   * module-scoped variable, never called synchronously during bootstrap.
+   */
+  onPurgeDue?: () => void;
 }
 
 export interface BootstrapHandle {
@@ -93,7 +101,16 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
 
   // Optional Postgres hub. Construction never connects eagerly — a bad URL only
   // surfaces on first query, so an outage can't block startup.
-  const pg = createPgStore();
+  //
+  // Cross-environment guard: refuse the hub when the local data store and the
+  // resolved hub belong to different environments (the `WATCHTOWER_ENV=production
+  // npm run dev` footgun — dev SQLite would migrate/push into prod). A blocked
+  // hub stays null, so the desktop runs SQLite-only and never dials the wrong DB.
+  const hubGuard = evaluateHubGuard({ supportDir: opts.supportDir });
+  const pg = hubGuard.allow ? createPgStore() : null;
+  if (!hubGuard.allow) {
+    console.warn(`[orchestrator] Supabase hub disabled: ${hubGuard.reason}`);
+  }
   if (pg) {
     try { await runPgMigrations(pg); }
     catch (err) { console.error('[orchestrator] pg migrations failed (sync dormant):', err); }
@@ -136,6 +153,10 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
       } else if (syncDebug && (r.push || r.pull)) {
         console.debug('[sync] cycle ok:', { push: r.push, pull: r.pull });
       }
+      // r.purge is only populated when purgeDue() actually let the tombstone
+      // sweep run this cycle (throttled to once/day) — piggyback the
+      // attention-thread retention prune on that exact same cadence.
+      if (r.purge) opts.onPurgeDue?.();
     },
   });
   sync.start();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createPgStore, defaultPgUrl } from '../../../orchestrator/db/pg/pool.js';
+import { createPgStore, defaultPgUrl, evaluateHubGuard } from '../../../orchestrator/db/pg/pool.js';
 
 const PG_URL = process.env.WATCHTOWER_PG_URL ?? 'postgresql://watchtower:watchtower_dev_password@localhost:5432/watchtower';
 
@@ -36,6 +36,67 @@ describe('defaultPgUrl', () => {
       if (prev === undefined) delete process.env.WATCHTOWER_PG_URL;
       else process.env.WATCHTOWER_PG_URL = prev;
     }
+  });
+});
+
+describe('evaluateHubGuard', () => {
+  // A dev (unpackaged) session is signalled by WATCHTOWER_DEV_URL, which the
+  // `dev:electron` npm script always sets. The support-dir basename carries the
+  // data environment ('…-dev' → development); WATCHTOWER_ENV carries the hub the
+  // .env picker resolved. The guard refuses a cross-environment pairing.
+
+  it('blocks a dev support dir paired with a production hub', () => {
+    const r = evaluateHubGuard({
+      supportDir: '/Users/x/Library/Application Support/Watchtower-dev',
+      env: { WATCHTOWER_DEV_URL: 'http://localhost:5173', WATCHTOWER_ENV: 'production' },
+    });
+    expect(r.allow).toBe(false);
+    expect(r.reason).toMatch(/development/);
+    expect(r.reason).toMatch(/production/);
+  });
+
+  it('blocks a production support dir paired with a development hub', () => {
+    const r = evaluateHubGuard({
+      supportDir: '/Users/x/Library/Application Support/Watchtower',
+      env: { WATCHTOWER_DEV_URL: 'http://localhost:5173' /* WATCHTOWER_ENV unset → development */ },
+    });
+    expect(r.allow).toBe(false);
+  });
+
+  it('allows the normal dev-data → dev-hub pairing', () => {
+    const r = evaluateHubGuard({
+      supportDir: '/Users/x/Library/Application Support/Watchtower-dev',
+      env: { WATCHTOWER_DEV_URL: 'http://localhost:5173' /* WATCHTOWER_ENV unset → development */ },
+    });
+    expect(r.allow).toBe(true);
+  });
+
+  it('allows a deliberate prod-data → prod-hub pairing from a dev session', () => {
+    const r = evaluateHubGuard({
+      supportDir: '/Users/x/Library/Application Support/Watchtower',
+      env: { WATCHTOWER_DEV_URL: 'http://localhost:5173', WATCHTOWER_ENV: 'production' },
+    });
+    expect(r.allow).toBe(true);
+  });
+
+  it('allows a packaged run (no WATCHTOWER_DEV_URL) regardless of env pairing', () => {
+    const r = evaluateHubGuard({
+      supportDir: '/Users/x/Library/Application Support/Watchtower',
+      env: { WATCHTOWER_ENV: 'production' },
+    });
+    expect(r.allow).toBe(true);
+  });
+
+  it('honours the WATCHTOWER_ALLOW_ENV_MISMATCH override', () => {
+    const r = evaluateHubGuard({
+      supportDir: '/Users/x/Library/Application Support/Watchtower-dev',
+      env: {
+        WATCHTOWER_DEV_URL: 'http://localhost:5173',
+        WATCHTOWER_ENV: 'production',
+        WATCHTOWER_ALLOW_ENV_MISMATCH: '1',
+      },
+    });
+    expect(r.allow).toBe(true);
   });
 });
 

@@ -20,6 +20,14 @@ export interface ContractBurn {
   workdaysRemaining: number | null;
   totalWorkdays: number | null;
   endDate: string | null;
+  /**
+   * Shared-contract group id — null for a solo (non-pooled) contract.
+   * A pooled group returns one ContractBurn PER member project, all
+   * carrying the same pooled mdsUsed/mdLimit — consumers that render a
+   * card per entry (e.g. the iPad dashboard) must dedupe on this field,
+   * mirroring orchestrator/db/dashboardOverview.ts's seenGroups pattern.
+   */
+  contractGroupId: string | null;
 }
 
 function round2(n: number): number {
@@ -87,12 +95,20 @@ export function contractBurn(
     // periodEnd: for elapsed we cap at today when open-ended (source line 64).
     const periodEnd = rate.endDate ?? today;
 
-    // minutesLogged = sum effectiveMinutes for this project within [effectiveFrom, periodEnd]
+    // A shared contract's md_limit is one budget pooled across every project
+    // linked to the group — sum worklogs across all member ids, not just this
+    // rate's own project. Solo contracts (no group) fall back to the single
+    // project id (mirrors orchestrator/db/contractStatus.ts:forRate lines 67–73).
+    const memberIds = rate.contractGroupId
+      ? contracts.filter((c) => c.contractGroupId === rate.contractGroupId).map((c) => c.projectId)
+      : [rate.projectId];
+
+    // minutesLogged = sum effectiveMinutes across member projects within [effectiveFrom, periodEnd]
     // (source lines 72–87 — the SQL is replaced by an in-memory filter here).
     let minutesLogged = 0;
     for (const r of rows) {
       if (
-        r.projectId === rate.projectId &&
+        memberIds.includes(r.projectId) &&
         r.workDate >= rate.effectiveFrom &&
         r.workDate <= periodEnd &&
         r.projectKind === 'work'
@@ -148,6 +164,7 @@ export function contractBurn(
       workdaysRemaining,
       totalWorkdays,
       endDate: rate.endDate,
+      contractGroupId: rate.contractGroupId,
     });
   }
 

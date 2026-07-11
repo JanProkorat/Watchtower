@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useConnection } from '../state/connectionContext.js';
 import type { ProjectSummary } from '../state/useProjects.js';
+import { glassPanel, glassFillStrong, ctaGradient, ctaGlow, text, accent } from '@watchtower/ui-core';
 
 type InstanceKind = 'claude' | 'shell';
 
@@ -133,7 +134,9 @@ export function SpawnModal({
         style={{
           position: 'fixed',
           inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.6)',
+          background: 'rgba(6,7,11,0.45)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           zIndex: 100,
         }}
       />
@@ -149,16 +152,21 @@ export function SpawnModal({
           left: '50%',
           transform: 'translate(-50%,-50%)',
           zIndex: 101,
-          backgroundColor: '#1a1b1f',
-          border: '1px solid #2e3038',
-          borderRadius: 12,
+          ...glassPanel({
+            radius: 22,
+            fill: glassFillStrong,
+            blur: 40,
+            saturate: 1.9,
+            brightness: 1.1,
+            shadow: '0 30px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.32)',
+          }),
           width: 'min(480px, calc(100vw - 32px))',
           maxHeight: 'calc(100vh - 64px)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           fontFamily: 'system-ui, sans-serif',
-          color: '#e5e7eb',
+          color: text.primary,
         }}
       >
         {/* Header */}
@@ -168,11 +176,11 @@ export function SpawnModal({
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '14px 16px',
-            borderBottom: '1px solid #2e3038',
+            borderBottom: '1px solid rgba(255,255,255,0.10)',
             flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 15, fontWeight: 600 }}>Nová instance</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#f4f4f8' }}>Nová instance</span>
           <button
             onClick={onClose}
             disabled={spawning}
@@ -180,7 +188,7 @@ export function SpawnModal({
             style={{
               background: 'none',
               border: 'none',
-              color: '#9ca3af',
+              color: text.muted,
               fontSize: 20,
               cursor: 'pointer',
               lineHeight: 1,
@@ -197,12 +205,12 @@ export function SpawnModal({
           {/* Project picker */}
           <section>
             <label
-              style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}
+              style={{ display: 'block', fontSize: 10, color: text.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}
             >
               Projekt
             </label>
             {spawnableProjects.length === 0 ? (
-              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
+              <p style={{ fontSize: 13, color: text.dim, margin: 0 }}>
                 Žádné projekty s nastavenou složkou.
               </p>
             ) : (
@@ -216,12 +224,19 @@ export function SpawnModal({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 10,
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        border: `1px solid ${checked ? '#7c6df0' : '#2e3038'}`,
-                        backgroundColor: checked ? '#2d2857' : '#252730',
+                        padding: '8px 12px',
+                        borderRadius: 11,
+                        border: checked
+                          ? `1px solid rgba(124,109,240,0.55)`
+                          : '1px solid rgba(255,255,255,0.13)',
+                        background: checked
+                          ? 'rgba(168,156,240,0.18)'
+                          : 'rgba(255,255,255,0.07)',
                         cursor: 'pointer',
-                        transition: 'background-color 120ms ease, border-color 120ms ease',
+                        transition: 'background 120ms ease, border-color 120ms ease',
+                        boxShadow: checked
+                          ? `0 0 0 1px rgba(124,109,240,0.30), inset 0 1px 0 rgba(255,255,255,0.15)`
+                          : 'inset 0 1px 0 rgba(255,255,255,0.08)',
                       }}
                     >
                       <input
@@ -230,13 +245,13 @@ export function SpawnModal({
                         value={p.id}
                         checked={checked}
                         onChange={() => { setSelectedProjectId(p.id); setError(null); }}
-                        style={{ accentColor: '#7c6df0', flexShrink: 0 }}
+                        style={{ accentColor: accent, flexShrink: 0 }}
                       />
                       <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                        <span style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: checked ? '#c4b8ff' : '#d1d5db' }}>
+                        <span style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: checked ? '#c9bdff' : text.secondary }}>
                           {p.name}
                         </span>
-                        <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <span style={{ fontSize: 11, color: text.dim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {p.folderPath}
                         </span>
                       </div>
@@ -250,16 +265,18 @@ export function SpawnModal({
           {/* Kind toggle */}
           <section>
             <label
-              style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}
+              style={{ display: 'block', fontSize: 10, color: text.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}
             >
               Typ instance
             </label>
             <div
               style={{
                 display: 'inline-flex',
-                borderRadius: 8,
-                border: '1px solid #2e3038',
-                overflow: 'hidden',
+                gap: 4,
+                padding: 3,
+                borderRadius: 10,
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.13)',
               }}
             >
               {(['claude', 'shell'] as InstanceKind[]).map((k) => (
@@ -267,14 +284,20 @@ export function SpawnModal({
                   key={k}
                   onClick={() => setInstanceKind(k)}
                   style={{
-                    padding: '7px 20px',
+                    padding: '5px 18px',
+                    borderRadius: 7,
                     border: 'none',
-                    backgroundColor: instanceKind === k ? '#7c6df0' : '#252730',
-                    color: instanceKind === k ? '#fff' : '#9ca3af',
-                    fontSize: 13,
-                    fontWeight: instanceKind === k ? 600 : 400,
+                    background: instanceKind === k
+                      ? 'rgba(168,156,240,0.22)'
+                      : 'transparent',
+                    boxShadow: instanceKind === k
+                      ? 'inset 0 1px 0 rgba(255,255,255,0.20)'
+                      : 'none',
+                    color: instanceKind === k ? '#fff' : text.muted,
+                    fontSize: 12,
+                    fontWeight: instanceKind === k ? 600 : 500,
                     cursor: 'pointer',
-                    transition: 'background-color 120ms ease, color 120ms ease',
+                    transition: 'background 120ms ease, color 120ms ease',
                     fontFamily: 'system-ui, sans-serif',
                   }}
                 >
@@ -288,7 +311,7 @@ export function SpawnModal({
           {restartCandidates.length > 0 && (
             <section>
               <label
-                style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}
+                style={{ display: 'block', fontSize: 10, color: text.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}
               >
                 Restartovat existující
               </label>
@@ -301,28 +324,29 @@ export function SpawnModal({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: 8,
-                      padding: '7px 10px',
-                      borderRadius: 8,
-                      backgroundColor: '#252730',
-                      border: '1px solid #2e3038',
+                      padding: '7px 12px',
+                      borderRadius: 11,
+                      background: 'rgba(255,255,255,0.07)',
+                      border: '1px solid rgba(255,255,255,0.13)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
                     }}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                      <span style={{ fontSize: 12, color: '#d1d5db', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <span style={{ fontSize: 12, color: text.secondary, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {inst.id.slice(0, 12)}…
                       </span>
-                      <span style={{ fontSize: 11, color: '#ef4444' }}>{inst.status}</span>
+                      <span style={{ fontSize: 11, color: '#f87171' }}>{inst.status}</span>
                     </div>
                     <button
                       onClick={() => void handleRestart(inst.id)}
                       disabled={spawning}
                       style={{
                         padding: '5px 12px',
-                        borderRadius: 6,
-                        border: '1px solid #3a3c46',
-                        backgroundColor: '#2d2d38',
-                        color: spawning ? '#4b5563' : '#d1d5db',
-                        fontSize: 12,
+                        borderRadius: 8,
+                        border: '1px solid rgba(255,255,255,0.13)',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: spawning ? text.dim : text.secondary,
+                        fontSize: 11.5,
                         cursor: spawning ? 'not-allowed' : 'pointer',
                         fontFamily: 'system-ui, sans-serif',
                         flexShrink: 0,
@@ -342,9 +366,9 @@ export function SpawnModal({
               role="alert"
               style={{
                 padding: '8px 12px',
-                borderRadius: 8,
-                backgroundColor: '#2d1515',
-                border: '1px solid #7f1d1d',
+                borderRadius: 11,
+                background: 'rgba(110,24,24,0.32)',
+                border: '1px solid rgba(248,113,113,0.40)',
                 color: '#fca5a5',
                 fontSize: 13,
               }}
@@ -361,7 +385,7 @@ export function SpawnModal({
             justifyContent: 'flex-end',
             gap: 8,
             padding: '12px 16px',
-            borderTop: '1px solid #2e3038',
+            borderTop: '1px solid rgba(255,255,255,0.10)',
             flexShrink: 0,
           }}
         >
@@ -370,11 +394,11 @@ export function SpawnModal({
             disabled={spawning}
             style={{
               padding: '8px 18px',
-              borderRadius: 8,
-              border: '1px solid #3a3c46',
-              backgroundColor: '#252730',
-              color: '#d1d5db',
-              fontSize: 14,
+              borderRadius: 10,
+              border: '1px solid rgba(255,255,255,0.13)',
+              background: 'rgba(255,255,255,0.08)',
+              color: text.secondary,
+              fontSize: 12,
               cursor: spawning ? 'not-allowed' : 'pointer',
               fontFamily: 'system-ui, sans-serif',
             }}
@@ -386,15 +410,19 @@ export function SpawnModal({
             disabled={spawning || selectedProject === null}
             style={{
               padding: '8px 22px',
-              borderRadius: 8,
+              borderRadius: 12,
               border: 'none',
-              backgroundColor: spawning || selectedProject === null ? '#4b4a72' : '#7c6df0',
-              color: spawning || selectedProject === null ? '#9ca3af' : '#fff',
-              fontSize: 14,
+              background: spawning || selectedProject === null
+                ? 'rgba(124,109,240,0.35)'
+                : ctaGradient,
+              boxShadow: spawning || selectedProject === null
+                ? 'none'
+                : ctaGlow,
+              color: spawning || selectedProject === null ? 'rgba(255,255,255,0.40)' : '#fff',
+              fontSize: 12.5,
               fontWeight: 600,
               cursor: spawning || selectedProject === null ? 'not-allowed' : 'pointer',
               fontFamily: 'system-ui, sans-serif',
-              transition: 'background-color 120ms ease',
             }}
           >
             {spawning ? 'Spouštím…' : 'Spustit'}

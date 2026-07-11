@@ -9,13 +9,15 @@ export interface ProjectRow {
   color: string;
   archived: boolean;
   kind: ProjectKind;
-  isDefault: boolean;
+  isPinned: boolean;
   folderPath: string | null;
   jiraGlobs: string[];
   jiraBoardUrl: string | null;
   /** URL template for opening a task in its issue tracker. `{n}` → task number. */
   taskUrlTemplate: string | null;
   description: string | null;
+  /** Per-project opt-in: auto-log instance active time to this project. */
+  autoTrack: boolean;
   createdAt: string;
   /** epic_count joined at list time — 0 until Phase 15 lands epics CRUD. */
   epicCount: number;
@@ -27,12 +29,13 @@ export interface ProjectInput {
   name: string;
   color?: string;
   kind?: ProjectKind;
-  isDefault?: boolean;
+  isPinned?: boolean;
   folderPath?: string | null;
   jiraGlobs?: string[];
   jiraBoardUrl?: string | null;
   taskUrlTemplate?: string | null;
   description?: string | null;
+  autoTrack?: boolean;
 }
 
 export interface ProjectListFilter {
@@ -48,12 +51,13 @@ type DbRow = {
   color: string;
   archived: number;
   kind: ProjectKind;
-  is_default: number;
+  is_pinned: number;
   folder_path: string | null;
   jira_globs: string | null;
   jira_board_url: string | null;
   task_url_template: string | null;
   description: string | null;
+  auto_track: number;
   created_at: string;
   epic_count: number;
   total_minutes: number;
@@ -102,12 +106,13 @@ function toRow(r: DbRow): ProjectRow {
     color: r.color,
     archived: r.archived === 1,
     kind: r.kind,
-    isDefault: r.is_default === 1,
+    isPinned: r.is_pinned === 1,
     folderPath: r.folder_path,
     jiraGlobs: parseGlobs(r.jira_globs),
     jiraBoardUrl: r.jira_board_url,
     taskUrlTemplate: r.task_url_template,
     description: r.description,
+    autoTrack: r.auto_track === 1,
     createdAt: r.created_at,
     epicCount: r.epic_count,
     totalMinutes: r.total_minutes,
@@ -125,8 +130,8 @@ const DEFAULTS = {
 
 const LIST_SQL = `
   SELECT
-    p.id, p.name, p.color, p.archived, p.kind, p.is_default,
-    p.folder_path, p.jira_globs, p.jira_board_url, p.task_url_template, p.description, p.created_at,
+    p.id, p.name, p.color, p.archived, p.kind, p.is_pinned,
+    p.folder_path, p.jira_globs, p.jira_board_url, p.task_url_template, p.description, p.auto_track, p.created_at,
     (SELECT COUNT(*) FROM epics e WHERE e.project_id = p.id AND e.deleted_at IS NULL) AS epic_count,
     (SELECT COALESCE(SUM(w.minutes), 0)
        FROM worklogs w
@@ -159,9 +164,9 @@ export class ProjectsRepo {
     const sql =
       LIST_SQL +
       (where.length ? ` WHERE ${where.join(' AND ')}` : '') +
-      // Default project first, then alphabetical — matches the prototype's row
-      // ordering ("default" project pinned to the top).
-      ` ORDER BY p.is_default DESC, LOWER(p.name) ASC, p.id ASC`;
+      // Pinned projects first, then alphabetical — matches the prototype's row
+      // ordering (pinned projects pinned to the top).
+      ` ORDER BY p.is_pinned DESC, LOWER(p.name) ASC, p.id ASC`;
 
     return (this.db.prepare(sql).all(...params) as DbRow[]).map(toRow);
   }
@@ -174,35 +179,25 @@ export class ProjectsRepo {
   create(input: ProjectInput): ProjectRow {
     const color = input.color ?? DEFAULTS.color;
     const kind = input.kind ?? DEFAULTS.kind;
-    const isDefault = input.isDefault ? 1 : 0;
-    // work-kind projects are billable; time_off projects are not. The boolean
-    // column survives from TT and is used by repo/report queries that haven't
-    // been refactored yet — keeping it in sync with `kind` avoids drift.
+    const isPinned = input.isPinned ? 1 : 0;
     const isBillable = kind === 'work' ? 1 : 0;
     const globs = input.jiraGlobs ? JSON.stringify(input.jiraGlobs) : null;
     const boardUrl = normaliseBoardUrl(input.jiraBoardUrl);
     const taskUrl = normaliseTaskUrlTemplate(input.taskUrlTemplate);
 
-    this.db.exec('BEGIN IMMEDIATE');
-    try {
-      if (isDefault) this.clearDefault();
-      const info = this.db
-        .prepare(
-          `INSERT INTO projects (name, color, archived, is_billable, kind, is_default, folder_path, jira_globs, jira_board_url, task_url_template, description, sync_id, updated_at)
-           VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          input.name, color, isBillable, kind, isDefault,
-          input.folderPath ?? null, globs, boardUrl, taskUrl, input.description ?? null,
-          newSyncId(), nowIso(),
-        ) as { lastInsertRowid: number | bigint };
-      this.db.exec('COMMIT');
-      const id = Number(info.lastInsertRowid);
-      return this.get(id)!;
-    } catch (err) {
-      this.db.exec('ROLLBACK');
-      throw err;
-    }
+    const info = this.db
+      .prepare(
+        `INSERT INTO projects (name, color, archived, is_billable, kind, is_pinned, folder_path, jira_globs, jira_board_url, task_url_template, description, auto_track, sync_id, updated_at)
+         VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.name, color, isBillable, kind, isPinned,
+        input.folderPath ?? null, globs, boardUrl, taskUrl, input.description ?? null,
+        input.autoTrack ? 1 : 0,
+        newSyncId(), nowIso(),
+      ) as { lastInsertRowid: number | bigint };
+    const id = Number(info.lastInsertRowid);
+    return this.get(id)!;
   }
 
   update(id: number, input: Partial<ProjectInput>): ProjectRow {
@@ -230,30 +225,13 @@ export class ProjectsRepo {
       push('task_url_template', normaliseTaskUrlTemplate(input.taskUrlTemplate));
     }
     if (input.description !== undefined) push('description', input.description);
+    if (input.autoTrack !== undefined) push('auto_track', input.autoTrack ? 1 : 0);
 
-    if (input.isDefault !== undefined) {
-      // The is_default change has to happen inside the same transaction as the
-      // clearDefault() above so the partial unique index never sees two rows
-      // with is_default = 1 simultaneously.
-      this.db.exec('BEGIN IMMEDIATE');
-      try {
-        if (input.isDefault) this.clearDefault();
-        push('is_default', input.isDefault ? 1 : 0);
-        push('updated_at', nowIso());
-        params.push(id);
-        if (sets.length > 0) {
-          this.db.prepare(`UPDATE projects SET ${sets.join(', ')} WHERE id = ?`).run(...params);
-        }
-        this.db.exec('COMMIT');
-      } catch (err) {
-        this.db.exec('ROLLBACK');
-        throw err;
-      }
-    } else {
-      push('updated_at', nowIso());
-      params.push(id);
-      this.db.prepare(`UPDATE projects SET ${sets.join(', ')} WHERE id = ?`).run(...params);
-    }
+    if (input.isPinned !== undefined) push('is_pinned', input.isPinned ? 1 : 0);
+
+    push('updated_at', nowIso());
+    params.push(id);
+    this.db.prepare(`UPDATE projects SET ${sets.join(', ')} WHERE id = ?`).run(...params);
 
     const row = this.get(id);
     if (!row) throw new Error(`project ${id} not found after update`);
@@ -263,7 +241,7 @@ export class ProjectsRepo {
   archive(id: number, archived: boolean): void {
     const ts = nowIso();
     if (archived) {
-      this.db.prepare(`UPDATE projects SET archived = 1, is_default = 0, updated_at = ? WHERE id = ?`).run(ts, id);
+      this.db.prepare(`UPDATE projects SET archived = 1, is_pinned = 0, updated_at = ? WHERE id = ?`).run(ts, id);
     } else {
       this.db.prepare(`UPDATE projects SET archived = 0, updated_at = ? WHERE id = ?`).run(ts, id);
     }
@@ -298,10 +276,5 @@ export class ProjectsRepo {
       this.db.exec('ROLLBACK');
       throw err;
     }
-  }
-
-  /** Internal helper — must be called inside an explicit transaction. */
-  private clearDefault(): void {
-    this.db.prepare(`UPDATE projects SET is_default = 0, updated_at = ? WHERE is_default = 1`).run(nowIso());
   }
 }

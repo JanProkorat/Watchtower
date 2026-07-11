@@ -3,8 +3,8 @@ import {
   billingReducer,
   type BillingReducerState,
   type BillingAction,
-} from '../../apps/ipad/src/state/useBilling.js';
-import type { BillingDataset } from '../../apps/ipad/src/state/billingCache.js';
+} from '@watchtower/data-supabase';
+import type { BillingDataset } from '@watchtower/data-supabase';
 import type { WorklogRow, TaskRow, ContractRow } from '@watchtower/shared/billing/types.js';
 
 // ---------------------------------------------------------------------------

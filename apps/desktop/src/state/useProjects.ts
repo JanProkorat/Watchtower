@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ProjectInputPayload,
   ProjectListFilterPayload,
   ProjectViewPayload,
 } from '@watchtower/shared/ipcContract.js';
+import { broadcastProjectsChanged, subscribeProjects } from './projectsBus.js';
 
 export type ProjectKind = 'work' | 'time_off';
 export type ArchiveFilter = 'active' | 'archived';
@@ -79,10 +80,27 @@ export function useProjects(): ProjectsState {
     void refresh();
   }, [refresh]);
 
+  // Keep a stable listener whose body always calls the latest `refresh` (which
+  // closes over the current filter). Subscribe once on mount so a mutation in
+  // any other mounted useProjects() — e.g. creating a project in the
+  // TimeTracker module — refreshes this copy too, keeping the instances tab
+  // strip's project colors in sync without an app reload.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  const listenerRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const listener = () => {
+      void refreshRef.current();
+    };
+    listenerRef.current = listener;
+    return subscribeProjects(listener);
+  }, []);
+
   const create = useCallback(
     async (input: ProjectInputPayload) => {
       const res = await window.watchtower.invoke('projects:create', input);
       await refresh();
+      broadcastProjectsChanged(listenerRef.current);
       return res.project;
     },
     [refresh],
@@ -92,6 +110,7 @@ export function useProjects(): ProjectsState {
     async (id: number, input: Partial<ProjectInputPayload>) => {
       const res = await window.watchtower.invoke('projects:update', { id, input });
       await refresh();
+      broadcastProjectsChanged(listenerRef.current);
       return res.project;
     },
     [refresh],
@@ -101,6 +120,7 @@ export function useProjects(): ProjectsState {
     async (id: number, archived: boolean) => {
       await window.watchtower.invoke('projects:archive', { id, archived });
       await refresh();
+      broadcastProjectsChanged(listenerRef.current);
     },
     [refresh],
   );
@@ -109,6 +129,7 @@ export function useProjects(): ProjectsState {
     async (id: number) => {
       await window.watchtower.invoke('projects:delete', { id });
       await refresh();
+      broadcastProjectsChanged(listenerRef.current);
     },
     [refresh],
   );

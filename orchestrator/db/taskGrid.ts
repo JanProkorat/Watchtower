@@ -69,6 +69,7 @@ interface TaskMetaRow {
   task_title: string;
   status: 'open' | 'in_progress' | 'to_accept' | 'done';
   estimated_minutes: number | null;
+  jira_estimate_secs: number | null;
   epic_id: number;
   epic_name: string;
   project_id: number;
@@ -126,7 +127,7 @@ function monthBounds(year: number, month: number): { from: string; to: string; d
 export class TaskGridService {
   constructor(private db: SqliteLike) {}
 
-  get(year: number, month: number, projectId?: number): TaskGridResponse {
+  get(year: number, month: number, projectIds?: number[]): TaskGridResponse {
     const { from, to, daysInMonth } = monthBounds(year, month);
     const publicHolidays = holidaysInRange(from, to);
     const daysOff = new DaysOffRepo(this.db).listInRange(from, to);
@@ -134,9 +135,10 @@ export class TaskGridService {
     const workdays = workdayDates(from, to, daysOffSet);
     const monthCapacityMinutes = workdays.length * 8 * 60;
 
-    // 1. Fetch worklogs in the period scoped to the optional project.
-    //    Both tracked + reported come back so the client can flip between
-    //    them without re-fetching. Earnings always use reported (billing).
+    // 1. Fetch worklogs in the period scoped to the optional project set.
+    //    Empty/undefined projectIds = all projects. Both tracked + reported
+    //    come back so the client can flip between them without re-fetching.
+    //    Earnings always use reported (billing).
     const worklogParams: unknown[] = [from, to];
     let worklogSql =
       `SELECT w.task_id, p.id AS project_id, w.work_date,
@@ -148,9 +150,9 @@ export class TaskGridService {
          JOIN projects p ON p.id = e.project_id
         WHERE w.work_date >= ? AND w.work_date <= ?
           AND w.deleted_at IS NULL AND t.deleted_at IS NULL AND e.deleted_at IS NULL AND p.deleted_at IS NULL`;
-    if (projectId !== undefined) {
-      worklogSql += ' AND p.id = ?';
-      worklogParams.push(projectId);
+    if (projectIds !== undefined && projectIds.length > 0) {
+      worklogSql += ` AND p.id IN (${projectIds.map(() => '?').join(',')})`;
+      worklogParams.push(...projectIds);
     }
     const worklogs = this.db.prepare(worklogSql).all(...worklogParams) as WorklogPeriodRow[];
 
@@ -174,7 +176,7 @@ export class TaskGridService {
     const taskMetaSql = `
       SELECT
         t.id AS task_id, t.number AS task_number, t.title AS task_title,
-        t.status, t.estimated_minutes,
+        t.status, t.estimated_minutes, t.jira_estimate_secs,
         e.id AS epic_id, e.name AS epic_name, e.display_order AS epic_display_order,
         p.id AS project_id, p.name AS project_name, p.color AS project_color,
         p.task_url_template AS project_task_url_template,
@@ -239,7 +241,12 @@ export class TaskGridService {
           taskNumber: t.task_number,
           taskTitle: t.task_title,
           status: t.status,
-          estimatedMinutes: t.estimated_minutes,
+          // Manual estimate wins; fall back to the estimate pulled from Jira
+          // (`jira_estimate_secs`) so board-pulled tasks show an expected time
+          // in the grid without needing a hand-entered value.
+          estimatedMinutes:
+            t.estimated_minutes ??
+            (t.jira_estimate_secs != null ? Math.round(t.jira_estimate_secs / 60) : null),
           totalTracked: bucket.totalTracked,
           totalReported: bucket.totalReported,
           epicId: t.epic_id,

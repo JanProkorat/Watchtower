@@ -12,6 +12,7 @@ export interface ProjectRateRow {
   hoursPerDay: number;
   endDate: string | null;
   mdLimit: number | null;
+  contractGroupId: string | null;
   createdAt: string;
 }
 
@@ -23,7 +24,11 @@ export interface ProjectRateInput {
   hoursPerDay?: number;
   endDate?: string | null;
   mdLimit?: number | null;
+  contractGroupId?: string | null;
 }
+
+/** Terms shared by every member of a shared contract group (no project id, no group id). */
+export type GroupTerms = Omit<ProjectRateInput, 'projectId' | 'contractGroupId'>;
 
 type DbRow = {
   id: number;
@@ -34,6 +39,7 @@ type DbRow = {
   hours_per_day: number;
   end_date: string | null;
   md_limit: number | null;
+  contract_group_id: string | null;
   created_at: string;
 };
 
@@ -47,12 +53,18 @@ function toRow(r: DbRow): ProjectRateRow {
     hoursPerDay: r.hours_per_day,
     endDate: r.end_date,
     mdLimit: r.md_limit,
+    contractGroupId: r.contract_group_id,
     createdAt: r.created_at,
   };
 }
 
 export class RateOverlapError extends Error {
-  constructor(public conflictingId: number, public conflictingFrom: string, public conflictingTo: string | null) {
+  constructor(
+    public conflictingId: number,
+    public conflictingFrom: string,
+    public conflictingTo: string | null,
+    public conflictingProjectId: number,
+  ) {
     super(
       `Contract period overlaps with rate #${conflictingId} (${conflictingFrom} → ${
         conflictingTo ?? 'ongoing'
@@ -79,7 +91,7 @@ export class ProjectRatesRepo {
     const rows = this.db
       .prepare(
         `SELECT id, project_id, effective_from, rate_type, rate_amount,
-                hours_per_day, end_date, md_limit, created_at
+                hours_per_day, end_date, md_limit, contract_group_id, created_at
            FROM contracts
           WHERE project_id = ?
             AND deleted_at IS NULL
@@ -93,7 +105,7 @@ export class ProjectRatesRepo {
     const row = this.db
       .prepare(
         `SELECT id, project_id, effective_from, rate_type, rate_amount,
-                hours_per_day, end_date, md_limit, created_at
+                hours_per_day, end_date, md_limit, contract_group_id, created_at
            FROM contracts WHERE id = ? AND deleted_at IS NULL`,
       )
       .get(id) as DbRow | undefined;
@@ -106,7 +118,7 @@ export class ProjectRatesRepo {
     const row = this.db
       .prepare(
         `SELECT id, project_id, effective_from, rate_type, rate_amount,
-                hours_per_day, end_date, md_limit, created_at
+                hours_per_day, end_date, md_limit, contract_group_id, created_at
            FROM contracts
           WHERE project_id = ?
             AND effective_from <= ?
@@ -124,29 +136,73 @@ export class ProjectRatesRepo {
     try {
       this.autoClosePrevious(input.projectId, input.effectiveFrom);
       this.assertNoOverlap(input.projectId, input.effectiveFrom, input.endDate ?? null, null);
-      const info = this.db
+      const id = this.insertOrResurrect(input);
+      this.db.exec('COMMIT');
+      return this.get(id)!;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /**
+   * Insert one contract row (tombstone-resurrecting on the
+   * UNIQUE(project_id, effective_from) slot). Caller holds the transaction.
+   *
+   * The table keeps a DB-level UNIQUE(project_id, effective_from) that still
+   * counts soft-deleted rows, so a tombstone left by a prior delete on this
+   * exact start date would make the INSERT fail with a raw UNIQUE error even
+   * though the overlap check (which ignores tombstones) passed. Resurrect
+   * that tombstone in place instead — reusing its sync_id so the future
+   * Postgres LWW push cleanly un-deletes the same row rather than colliding.
+   */
+  private insertOrResurrect(input: ProjectRateInput): number {
+    const tombstone = this.db
+      .prepare(
+        `SELECT id FROM contracts
+          WHERE project_id = ? AND effective_from = ? AND deleted_at IS NOT NULL`,
+      )
+      .get(input.projectId, input.effectiveFrom) as { id: number } | undefined;
+    if (tombstone) {
+      this.db
         .prepare(
-          `INSERT INTO contracts
-             (project_id, effective_from, rate_type, rate_amount,
-              hours_per_day, end_date, md_limit, sync_id, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `UPDATE contracts
+              SET rate_type = ?, rate_amount = ?, hours_per_day = ?, end_date = ?, md_limit = ?,
+                  contract_group_id = ?, deleted_at = NULL, updated_at = ?
+            WHERE id = ?`,
         )
         .run(
-          input.projectId,
-          input.effectiveFrom,
           input.rateType,
           input.rateAmount,
           input.hoursPerDay ?? 8,
           input.endDate ?? null,
           input.mdLimit ?? null,
-          newSyncId(), nowIso(),
-        ) as { lastInsertRowid: number | bigint };
-      this.db.exec('COMMIT');
-      return this.get(Number(info.lastInsertRowid))!;
-    } catch (err) {
-      this.db.exec('ROLLBACK');
-      throw err;
+          input.contractGroupId ?? null,
+          nowIso(),
+          tombstone.id,
+        );
+      return tombstone.id;
     }
+    const info = this.db
+      .prepare(
+        `INSERT INTO contracts
+           (project_id, effective_from, rate_type, rate_amount, hours_per_day, end_date, md_limit,
+            contract_group_id, sync_id, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.projectId,
+        input.effectiveFrom,
+        input.rateType,
+        input.rateAmount,
+        input.hoursPerDay ?? 8,
+        input.endDate ?? null,
+        input.mdLimit ?? null,
+        input.contractGroupId ?? null,
+        newSyncId(),
+        nowIso(),
+      ) as { lastInsertRowid: number | bigint };
+    return Number(info.lastInsertRowid);
   }
 
   update(id: number, input: Partial<ProjectRateInput>): ProjectRateRow {
@@ -193,6 +249,161 @@ export class ProjectRatesRepo {
   }
 
   /**
+   * Creates a shared contract: one row per project in `projectIds`, all
+   * sharing a freshly-minted `contract_group_id` and identical terms.
+   * Wrapped in one transaction — if any member project overlaps an
+   * existing contract, the whole group is rolled back and RateOverlapError
+   * (naming the conflicting project) propagates to the caller.
+   */
+  createGroup(terms: GroupTerms, projectIds: number[]): { groupId: string; rows: ProjectRateRow[] } {
+    const groupId = newSyncId();
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const ids: number[] = [];
+      for (const projectId of projectIds) {
+        this.autoClosePrevious(projectId, terms.effectiveFrom);
+        this.assertNoOverlap(projectId, terms.effectiveFrom, terms.endDate ?? null, null);
+        ids.push(this.insertOrResurrect({ ...terms, projectId, contractGroupId: groupId }));
+      }
+      this.db.exec('COMMIT');
+      return { groupId, rows: ids.map((id) => this.get(id)!) };
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /**
+   * Promotes an existing SOLO contract into a shared group. The existing row
+   * becomes the group anchor — its `contract_group_id` is stamped and its terms
+   * propagated in place — and every other project in `projectIds` gets a row via
+   * `insertOrResurrect` (so a tombstone left on the same start date is reused
+   * rather than colliding with UNIQUE(project_id, effective_from)). One
+   * transaction, overlap-checked like `createGroup`; rolls back on conflict.
+   *
+   * `projectIds` is the full target membership and is expected to include the
+   * anchor row's own project (the drawer always sends it first).
+   */
+  promoteToGroup(existingId: number, terms: GroupTerms, projectIds: number[]): { groupId: string; rows: ProjectRateRow[] } {
+    const existing = this.get(existingId);
+    if (!existing) throw new Error(`project_rate ${existingId} not found`);
+    const groupId = newSyncId();
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const ids: number[] = [];
+      for (const projectId of projectIds) {
+        if (projectId === existing.projectId) {
+          // Anchor row: propagate terms + stamp the group id in place. Overlap
+          // check excludes this row (it may keep the same effective_from).
+          this.assertNoOverlap(projectId, terms.effectiveFrom, terms.endDate ?? null, existingId);
+          this.db
+            .prepare(
+              `UPDATE contracts SET effective_from = ?, end_date = ?, rate_type = ?, rate_amount = ?, hours_per_day = ?, md_limit = ?, contract_group_id = ?, updated_at = ? WHERE id = ?`,
+            )
+            .run(
+              terms.effectiveFrom,
+              terms.endDate ?? null,
+              terms.rateType,
+              terms.rateAmount,
+              terms.hoursPerDay ?? 8,
+              terms.mdLimit ?? null,
+              groupId,
+              nowIso(),
+              existingId,
+            );
+          ids.push(existingId);
+        } else {
+          // Newly added member — same path as create/createGroup.
+          this.autoClosePrevious(projectId, terms.effectiveFrom);
+          this.assertNoOverlap(projectId, terms.effectiveFrom, terms.endDate ?? null, null);
+          ids.push(this.insertOrResurrect({ ...terms, projectId, contractGroupId: groupId }));
+        }
+      }
+      this.db.exec('COMMIT');
+      return { groupId, rows: ids.map((id) => this.get(id)!) };
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /** Live (non-deleted) project ids currently sharing `groupId`. */
+  listGroupMembers(groupId: string): number[] {
+    return (
+      this.db
+        .prepare(`SELECT DISTINCT project_id FROM contracts WHERE contract_group_id = ? AND deleted_at IS NULL`)
+        .all(groupId) as Array<{ project_id: number }>
+    ).map((r) => r.project_id);
+  }
+
+  /**
+   * Propagates `terms` to every project in `projectIds`: existing members
+   * get their row updated in place (overlap-checked, excluding themselves),
+   * newly-listed projects get a fresh row inserted (auto-close + overlap
+   * checked like `create`), and previously-listed members not in the new
+   * `projectIds` are soft-deleted. All in one transaction.
+   */
+  updateGroup(groupId: string, terms: GroupTerms, projectIds: number[]): ProjectRateRow[] {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const current = this.listGroupMembers(groupId);
+      const target = new Set(projectIds);
+      // Remove unlisted members.
+      for (const p of current) {
+        if (!target.has(p)) {
+          const row = this.db
+            .prepare(`SELECT id FROM contracts WHERE contract_group_id = ? AND project_id = ? AND deleted_at IS NULL`)
+            .get(groupId, p) as { id: number } | undefined;
+          if (row) this.db.prepare(`UPDATE contracts SET deleted_at = ?, updated_at = ? WHERE id = ?`).run(nowIso(), nowIso(), row.id);
+        }
+      }
+      const ids: number[] = [];
+      for (const projectId of projectIds) {
+        const existing = this.db
+          .prepare(`SELECT id FROM contracts WHERE contract_group_id = ? AND project_id = ? AND deleted_at IS NULL`)
+          .get(groupId, projectId) as { id: number } | undefined;
+        if (existing) {
+          // Propagate terms; validate overlap excluding this row.
+          this.assertNoOverlap(projectId, terms.effectiveFrom, terms.endDate ?? null, existing.id);
+          this.db
+            .prepare(
+              `UPDATE contracts SET effective_from = ?, end_date = ?, rate_type = ?, rate_amount = ?, hours_per_day = ?, md_limit = ?, updated_at = ? WHERE id = ?`,
+            )
+            .run(
+              terms.effectiveFrom,
+              terms.endDate ?? null,
+              terms.rateType,
+              terms.rateAmount,
+              terms.hoursPerDay ?? 8,
+              terms.mdLimit ?? null,
+              nowIso(),
+              existing.id,
+            );
+          ids.push(existing.id);
+        } else {
+          // Newly added project.
+          this.autoClosePrevious(projectId, terms.effectiveFrom);
+          this.assertNoOverlap(projectId, terms.effectiveFrom, terms.endDate ?? null, null);
+          ids.push(this.insertOrResurrect({ ...terms, projectId, contractGroupId: groupId }));
+        }
+      }
+      this.db.exec('COMMIT');
+      return ids.map((id) => this.get(id)!);
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /** Soft-deletes every live row sharing `groupId`. */
+  deleteGroup(groupId: string): void {
+    const ts = nowIso();
+    this.db
+      .prepare(`UPDATE contracts SET deleted_at = ?, updated_at = ? WHERE contract_group_id = ? AND deleted_at IS NULL`)
+      .run(ts, ts, groupId);
+  }
+
+  /**
    * Closes any open-ended (end_date IS NULL) contract on this project whose
    * effective_from is strictly before the new contract's start date. The
    * closed contract gets end_date = new_from - 1 day. Must run inside a
@@ -226,7 +437,7 @@ export class ProjectRatesRepo {
     const SENTINEL_END = '9999-12-31';
     const row = this.db
       .prepare(
-        `SELECT id, effective_from, end_date FROM contracts
+        `SELECT id, project_id, effective_from, end_date FROM contracts
           WHERE project_id = ?
             AND (? IS NULL OR id != ?)
             AND effective_from <= ?
@@ -241,9 +452,9 @@ export class ProjectRatesRepo {
         to ?? SENTINEL_END,
         SENTINEL_END,
         from,
-      ) as { id: number; effective_from: string; end_date: string | null } | undefined;
+      ) as { id: number; project_id: number; effective_from: string; end_date: string | null } | undefined;
     if (row) {
-      throw new RateOverlapError(row.id, row.effective_from, row.end_date);
+      throw new RateOverlapError(row.id, row.effective_from, row.end_date, projectId);
     }
   }
 }

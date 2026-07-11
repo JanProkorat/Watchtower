@@ -74,7 +74,8 @@ const COLUMNS: Record<keyof TableCounts, readonly string[]> = {
     'rate_type',
     'rate_amount',
     'hours_per_day',
-    'is_default',
+    // (is_default is intentionally not copied: the target column is is_pinned
+    //  now; legacy imports land unpinned and the user re-pins as desired.)
     'created_at',
   ],
   project_rates: [

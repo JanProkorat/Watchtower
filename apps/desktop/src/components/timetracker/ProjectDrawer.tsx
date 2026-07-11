@@ -15,6 +15,7 @@ import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import RemoveIcon from '@mui/icons-material/Close';
 import type { ProjectInputPayload, ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
+import { DevopsPatField } from '../reviews/DevopsPatField.js';
 
 const COLOR_PALETTE = [
   '#7aa7ff',
@@ -26,6 +27,10 @@ const COLOR_PALETTE = [
   '#ffb74d',
   '#9e9e9e',
 ];
+
+function isPaletteColor(color: string): boolean {
+  return COLOR_PALETTE.some((c) => c.toLowerCase() === color.toLowerCase());
+}
 
 interface Props {
   open: boolean;
@@ -44,8 +49,9 @@ interface DraftState {
   name: string;
   color: string;
   kind: 'work' | 'time_off';
-  isDefault: boolean;
+  isPinned: boolean;
   folderPath: string;
+  autoTrack: boolean;
   jiraGlobs: string[];
   jiraBoardUrl: string;
   taskUrlTemplate: string;
@@ -57,8 +63,9 @@ function emptyDraft(): DraftState {
     name: '',
     color: COLOR_PALETTE[0]!,
     kind: 'work',
-    isDefault: false,
+    isPinned: false,
     folderPath: '',
+    autoTrack: false,
     jiraGlobs: [],
     jiraBoardUrl: '',
     taskUrlTemplate: '',
@@ -72,8 +79,9 @@ function draftOf(project: ProjectViewPayload | null): DraftState {
     name: project.name,
     color: project.color,
     kind: project.kind,
-    isDefault: project.isDefault,
+    isPinned: project.isPinned,
     folderPath: project.folderPath ?? '',
+    autoTrack: project.autoTrack,
     jiraGlobs: project.jiraGlobs.length > 0 ? project.jiraGlobs : [],
     jiraBoardUrl: project.jiraBoardUrl ?? '',
     taskUrlTemplate: project.taskUrlTemplate ?? '',
@@ -160,11 +168,22 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
           <FormControlLabel
             control={
               <Checkbox
-                checked={draft.isDefault}
-                onChange={(e) => setDraft({ ...draft, isDefault: e.target.checked })}
+                checked={draft.isPinned}
+                onChange={(e) => setDraft({ ...draft, isPinned: e.target.checked })}
               />
             }
-            label="Default project"
+            label="Pinned"
+            sx={{ mr: 0 }}
+          />
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={draft.autoTrack}
+                onChange={(e) => setDraft({ ...draft, autoTrack: e.target.checked })}
+              />
+            }
+            label="Auto-track time"
             sx={{ mr: 0 }}
           />
 
@@ -172,15 +191,20 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
               COLOR
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               {COLOR_PALETTE.map((c) => (
                 <SwatchButton
                   key={c}
                   color={c}
-                  selected={draft.color === c}
+                  selected={draft.color.toLowerCase() === c.toLowerCase()}
                   onClick={() => setDraft({ ...draft, color: c })}
                 />
               ))}
+              <CustomColorSwatch
+                color={draft.color}
+                selected={!isPaletteColor(draft.color)}
+                onChange={(c) => setDraft({ ...draft, color: c })}
+              />
             </Box>
           </Box>
 
@@ -262,6 +286,8 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
             minRows={3}
             fullWidth
           />
+
+          {project !== null && <DevopsPatField projectId={project.id} />}
         </Box>
 
         <Box
@@ -305,6 +331,59 @@ function SwatchButton({ color, selected, onClick }: { color: string; selected: b
         boxShadow: selected ? '0 0 0 2px rgba(255,255,255,0.06)' : 'none',
       }}
     />
+  );
+}
+
+// A ninth swatch that opens the OS color picker for a free-form choice. The
+// native <input type="color"> is overlaid transparently so the round swatch
+// stays visually consistent with the presets while still hosting the picker.
+// When a non-palette color is active the swatch fills with it (and shows the
+// selected ring); otherwise it renders a rainbow conic gradient to signal
+// "pick any color".
+function CustomColorSwatch({
+  color,
+  selected,
+  onChange,
+}: {
+  color: string;
+  selected: boolean;
+  onChange(color: string): void;
+}) {
+  return (
+    <Box
+      sx={{
+        position: 'relative',
+        width: 28,
+        height: 28,
+        borderRadius: '50%',
+        border: '2px solid',
+        borderColor: selected ? 'text.primary' : 'transparent',
+        boxShadow: selected ? '0 0 0 2px rgba(255,255,255,0.06)' : 'none',
+        overflow: 'hidden',
+        background: selected
+          ? color
+          : 'conic-gradient(#ef5350, #ffb74d, #66bb6a, #4fc3f7, #7aa7ff, #ce93d8, #ef5350)',
+      }}
+    >
+      <Box
+        component="input"
+        type="color"
+        aria-label="Custom color"
+        value={color}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          m: 0,
+          p: 0,
+          border: 0,
+          opacity: 0,
+          cursor: 'pointer',
+        }}
+      />
+    </Box>
   );
 }
 
@@ -367,8 +446,9 @@ function toInput(draft: DraftState): ProjectInputPayload {
     name: draft.name.trim(),
     color: draft.color,
     kind: draft.kind,
-    isDefault: draft.isDefault,
+    isPinned: draft.isPinned,
     folderPath: draft.folderPath.trim() ? draft.folderPath.trim() : null,
+    autoTrack: draft.autoTrack,
     jiraGlobs: draft.jiraGlobs.filter((g) => g.trim() !== ''),
     jiraBoardUrl: draft.jiraBoardUrl.trim() ? draft.jiraBoardUrl.trim() : null,
     taskUrlTemplate: draft.taskUrlTemplate.trim() ? draft.taskUrlTemplate.trim() : null,

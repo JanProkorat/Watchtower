@@ -161,7 +161,7 @@ function ProjectRow({
       >
         {project.name}
       </Typography>
-      {project.isDefault ? (
+      {project.isPinned ? (
         <StarIcon sx={{ fontSize: 14, color: 'warning.main' }} />
       ) : (
         <Box sx={{ width: 14 }} />

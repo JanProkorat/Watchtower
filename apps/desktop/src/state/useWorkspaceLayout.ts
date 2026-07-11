@@ -15,8 +15,8 @@ import {
   setSizes,
   firstLeafInPreOrder,
   findLeafById,
-} from '../layout/workspaceTreeOps.js';
-import { newNodeId } from '../layout/newNodeId.js';
+} from '@watchtower/shared/workspaceTreeOps.js';
+import { newNodeId } from '@watchtower/shared/newNodeId.js';
 
 const PERSIST_DEBOUNCE_MS = 500;
 

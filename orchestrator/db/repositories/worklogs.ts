@@ -204,6 +204,17 @@ export class WorklogsRepo {
     return row ? toRow(row) : null;
   }
 
+  /** Look up a single non-deleted worklog by its (source, external_id) pair. */
+  findByExternalId(source: string, externalId: string): WorklogRow | null {
+    const row = this.db
+      .prepare(
+        SELECT_JOINED +
+          ' WHERE w.source = ? AND w.external_id = ? AND w.deleted_at IS NULL LIMIT 1',
+      )
+      .get(source, externalId) as DbRow | undefined;
+    return row ? toRow(row) : null;
+  }
+
   create(input: WorklogInput): WorklogRow {
     this.throwIfLocked(input.workDate);
     // Treat undefined as "no preference, default to 'manual'", but preserve

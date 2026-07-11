@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- iOS variant of the Watchtower app icon: full-bleed square (no rounded
+       corners, no transparency) so iOS applies its own squircle mask. -->
+  <rect width="1024" height="1024" fill="#15171c"/>
+  <polygon points="512,152 664,240 664,416 512,504 360,416 360,240" fill="#4dd0e1"/>
+  <polygon points="320,496 472,584 472,760 320,848 168,760 168,584" fill="#1abc9c"/>
+  <polygon points="704,496 856,584 856,760 704,848 552,760 552,584" fill="#2980b9"/>
+</svg>

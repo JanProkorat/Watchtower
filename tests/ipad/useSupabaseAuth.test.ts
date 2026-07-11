@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { authErrorMessage } from '../../apps/ipad/src/state/useSupabaseAuth.js';
+import { authErrorMessage } from '@watchtower/data-supabase';
 
 // Tests cover the pure authErrorMessage helper only.
 // The useSupabaseAuth hook itself is thin and wraps supabase.auth directly;

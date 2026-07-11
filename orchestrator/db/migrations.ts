@@ -342,6 +342,65 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       }
     },
   },
+  {
+    version: 17,
+    up: (db) => {
+      // Per-project opt-in for automatic time logging from instance activity
+      // (see docs/superpowers/specs/2026-07-03-project-time-autolog-design.md).
+      // Constant default 0 — a non-constant ADD COLUMN default diverges between
+      // node:sqlite (tests) and better-sqlite3 (prod); see memory
+      // sqlite-add-column-engine-divergence.
+      addColumnIfMissing(db, 'projects', 'auto_track', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  },
+  {
+    version: 18,
+    up: (db) => {
+      // Shared contracts (#<issue>): a nullable group id ties per-project contract
+      // rows that belong to one client contract. NULL = solo contract (unchanged).
+      addColumnIfMissing(db, 'contracts', 'contract_group_id', 'TEXT');
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_contracts_group ON contracts(contract_group_id)`);
+    },
+  },
+  {
+    version: 19,
+    up: (db) => {
+      // "Pinned" projects: the former single-"default" flag becomes a
+      // multi-select preselection for the task-grid + dashboard filters.
+      // Drop the partial-unique index that enforced at-most-one default, then
+      // rename the column. RENAME COLUMN has no IF EXISTS, so guard on the old
+      // column still being present (replay-safe; a fresh install that already
+      // has is_pinned is a no-op). The column-level CHECK (is_default IN (0,1))
+      // travels with the rename and becomes CHECK (is_pinned IN (0,1)).
+      db.exec(`DROP INDEX IF EXISTS idx_projects_is_default`);
+      const cols = (db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>).map((c) => c.name);
+      if (cols.includes('is_default') && !cols.includes('is_pinned')) {
+        db.exec(`ALTER TABLE projects RENAME COLUMN is_default TO is_pinned`);
+      }
+    },
+  },
+  {
+    version: 20,
+    up: (db) => {
+      // Reviews SP2 Task 1: pr_reviews stores one row per review-agent run
+      // against a PR, keyed by (host, repo_key, pr_number). status transitions
+      // running -> done | error; finished_at is set on either terminal state.
+      db.exec(`CREATE TABLE IF NOT EXISTS pr_reviews (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        host          TEXT    NOT NULL,
+        repo_key      TEXT    NOT NULL,
+        pr_number     INTEGER NOT NULL,
+        head_sha      TEXT    NOT NULL,
+        status        TEXT    NOT NULL,
+        summary       TEXT,
+        findings_json TEXT,
+        error         TEXT,
+        created_at    TEXT    NOT NULL,
+        finished_at   TEXT
+      )`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_pr_reviews_pr ON pr_reviews(host, repo_key, pr_number)`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

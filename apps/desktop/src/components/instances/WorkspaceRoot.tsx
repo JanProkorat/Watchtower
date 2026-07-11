@@ -10,9 +10,6 @@ interface Props {
   instances: InstanceView[];
   actions: WorkspaceLayoutActions;
   dragInProgress: boolean;
-  dashboardOnOpen(id: string): void;
-  dashboardOnKill(id: string): void;
-  dashboardOnRemove(id: string): void;
   dashboardOnNew(): void;
   onCloseColumn(instanceId: string): void;
   onRestartColumn?(instanceId: string): void;
@@ -28,9 +25,6 @@ export function WorkspaceRoot({
   instances,
   actions,
   dragInProgress,
-  dashboardOnOpen,
-  dashboardOnKill,
-  dashboardOnRemove,
   dashboardOnNew,
   onCloseColumn,
   onRestartColumn,
@@ -56,9 +50,6 @@ export function WorkspaceRoot({
         onUnhideSession={onUnhideSession}
         onAddSession={onAddSession}
         onSetTask={onSetTask}
-        dashboardOnOpen={dashboardOnOpen}
-        dashboardOnKill={dashboardOnKill}
-        dashboardOnRemove={dashboardOnRemove}
         dashboardOnNew={dashboardOnNew}
       />
     </Box>

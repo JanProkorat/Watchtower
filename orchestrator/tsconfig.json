@@ -4,7 +4,11 @@
     "outDir": "../dist-orchestrator",
     "rootDir": "..",
     "composite": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@watchtower/shared/*": ["../packages/shared/src/*"]
+    }
   },
   "include": ["**/*.ts"],
   "references": [{ "path": "../packages/shared" }]

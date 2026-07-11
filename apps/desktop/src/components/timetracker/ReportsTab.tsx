@@ -104,7 +104,7 @@ export function ReportsTab() {
       setProjects(r.projects);
       if (!initialProjectSelectionDoneRef.current) {
         initialProjectSelectionDoneRef.current = true;
-        const def = r.projects.find((p) => p.isDefault);
+        const def = r.projects.find((p) => p.isPinned);
         if (def) setProjectFilter(def.id);
       }
     });
@@ -247,7 +247,7 @@ export function ReportsTab() {
             {projects.map((p) => (
               <MenuItem key={p.id} value={p.id}>
                 {p.name}
-                {p.isDefault ? ' (default)' : ''}
+                {p.isPinned ? ' (pinned)' : ''}
               </MenuItem>
             ))}
           </TextField>

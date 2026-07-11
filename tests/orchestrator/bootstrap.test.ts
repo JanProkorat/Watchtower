@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 // Under heavy parallel-suite CPU contention this can exceed vitest's default
 // 5s timeout; give it headroom so a transient slow boot isn't a false failure.
 vi.setConfig({ testTimeout: 30_000 });
-import { mkdtempSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { bootstrap, type BootstrapHandle, type DbHandle } from '../../orchestrator/bootstrap.js';
@@ -76,6 +76,36 @@ describe('bootstrap', () => {
     } finally {
       if (prevUrl === undefined) delete process.env.WATCHTOWER_PG_URL; else process.env.WATCHTOWER_PG_URL = prevUrl;
       if (prevDev === undefined) delete process.env.WATCHTOWER_DEV_URL; else process.env.WATCHTOWER_DEV_URL = prevDev;
+    }
+  });
+
+  it('keeps the hub dormant when dev data would sync to a prod hub', async () => {
+    // WATCHTOWER_ENV=production npm run dev: dev SQLite (support dir '…-dev')
+    // but a prod WATCHTOWER_PG_URL. The env guard must null the hub so the app
+    // never migrates/pushes the scrambled dev DB into production. A null hub
+    // never opens a connection, so this stays hermetic (bogus URL never dialed).
+    const prevUrl = process.env.WATCHTOWER_PG_URL;
+    const prevDev = process.env.WATCHTOWER_DEV_URL;
+    const prevEnv = process.env.WATCHTOWER_ENV;
+    process.env.WATCHTOWER_PG_URL = 'postgresql://u:p@127.0.0.1:1/prod';
+    process.env.WATCHTOWER_DEV_URL = 'http://localhost:5173';
+    process.env.WATCHTOWER_ENV = 'production';
+    const devDir = path.join(mkdtempSync(path.join(tmpdir(), 'wt-')), 'Watchtower-dev');
+    mkdirSync(devDir);
+    try {
+      handle = await bootstrap({
+        supportDir: devDir,
+        portRange: [0, 0],
+        dbFactory: nodeSqliteFactory,
+        timetrackerMigration: { skip: true },
+      });
+      expect(handle.pg).toBeNull();
+      const r = await handle.sync.syncNow();
+      expect(r.ok).toBe(true);
+    } finally {
+      if (prevUrl === undefined) delete process.env.WATCHTOWER_PG_URL; else process.env.WATCHTOWER_PG_URL = prevUrl;
+      if (prevDev === undefined) delete process.env.WATCHTOWER_DEV_URL; else process.env.WATCHTOWER_DEV_URL = prevDev;
+      if (prevEnv === undefined) delete process.env.WATCHTOWER_ENV; else process.env.WATCHTOWER_ENV = prevEnv;
     }
   });
 

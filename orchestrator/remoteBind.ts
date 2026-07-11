@@ -6,7 +6,7 @@ const DEFAULT_WS_PORT = 7445;
 /**
  * A Tailscale address is in the CGNAT range 100.64.0.0/10 (100.64.0.0–100.127.255.255).
  */
-function isTailscale(addr: string): boolean {
+export function isTailscale(addr: string): boolean {
   const m = /^(\d+)\.(\d+)\./.exec(addr);
   if (!m) return false;
   const a = Number(m[1]); const b = Number(m[2]);
@@ -14,17 +14,19 @@ function isTailscale(addr: string): boolean {
 }
 
 /**
- * Resolve the opt-in remote bind for the WS bridge. Returns null (→ caller keeps
- * the 127.0.0.1 default) unless WATCHTOWER_WS_HOST is set. "auto" prefers a Tailscale
- * (CGNAT) address for off-LAN reach; falls back to the first non-internal IPv4 address.
- * An explicit value is used verbatim. Never binds 0.0.0.0.
+ * Resolve the remote bind for the WS bridge so the iPad can reach the desktop by
+ * default. WATCHTOWER_WS_HOST defaults to "auto" when unset: prefer a Tailscale
+ * (CGNAT) address for off-LAN reach, then fall back to the first non-internal IPv4
+ * address. An explicit value is used verbatim — set WATCHTOWER_WS_HOST=127.0.0.1 to
+ * opt out and keep the bridge localhost-only. Returns null when "auto" finds no
+ * external interface (offline machine) so the caller keeps its 127.0.0.1 default.
+ * Never binds 0.0.0.0.
  */
 export function resolveWsRemoteBind(
   env: { WATCHTOWER_WS_HOST?: string; WATCHTOWER_WS_PORT?: string },
   interfaces: Interfaces,
 ): { host: string; port: number } | null {
-  const raw = env.WATCHTOWER_WS_HOST?.trim();
-  if (!raw) return null;
+  const raw = env.WATCHTOWER_WS_HOST?.trim() || 'auto';
   const port = env.WATCHTOWER_WS_PORT ? Number(env.WATCHTOWER_WS_PORT) : DEFAULT_WS_PORT;
   if (raw !== 'auto') return { host: raw, port };
   const v4 = (i: { family: string | number; internal: boolean }) =>
@@ -47,5 +49,6 @@ export function resolveWsRemoteBind(
 }
 
 export function formatIpadConnectionInfo(opts: { host: string; port: number; token: string }): string {
-  return `[orchestrator] iPad connect → ws://${opts.host}:${opts.port}/ws  token: ${opts.token}`;
+  const scope = isTailscale(opts.host) ? ' (Tailscale — reachable off-network)' : '';
+  return `[orchestrator] iPad connect${scope} → ws://${opts.host}:${opts.port}/ws  token: ${opts.token}`;
 }

@@ -179,7 +179,7 @@ export function TaskDetailDrawer({
   };
 
   const handleDeleteWorklog = async (w: WorklogViewPayload) => {
-    if (!window.confirm(`Smazat worklog z ${formatDateCz(w.workDate)} (${formatMinutes(w.minutes)})?`)) {
+    if (!window.confirm(`Delete worklog from ${formatDateCz(w.workDate)} (${formatMinutes(w.minutes)})?`)) {
       return;
     }
     setError(null);
@@ -216,7 +216,7 @@ export function TaskDetailDrawer({
   const handleDeleteTask = async () => {
     if (!onDelete) return;
     if (
-      !window.confirm(`Smazat úkol ${task.number} "${task.title}"? Worklogy budou také odstraněny.`)
+      !window.confirm(`Delete task ${task.number} "${task.title}"? Worklogs will also be removed.`)
     ) {
       return;
     }
@@ -524,7 +524,7 @@ export function TaskDetailDrawer({
                 startIcon={<DeleteOutlineIcon fontSize="small" />}
                 onClick={() => void handleDeleteTask()}
               >
-                Smazat úkol
+                Delete task
               </Button>
             </Stack>
           )}

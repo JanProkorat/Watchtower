@@ -4,7 +4,7 @@ import {
   rateLabel,
   rollupEarningsByContract,
   activeContract,
-} from '../../apps/ipad/src/lib/projectDetailHelpers.js';
+} from '@watchtower/ui-core';
 import type { ContractRow, WorklogRow } from '@watchtower/shared/billing/types.js';
 
 // ---------------------------------------------------------------------------

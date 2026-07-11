@@ -21,9 +21,6 @@ interface Props {
   onUnhideSession(instanceId: string): void;
   onAddSession(tabId: string): void;
   onSetTask?(instanceId: string, taskId: number | null): void;
-  dashboardOnOpen?(id: string): void;
-  dashboardOnKill?(id: string): void;
-  dashboardOnRemove?(id: string): void;
   dashboardOnNew?(): void;
 }
 
@@ -62,9 +59,6 @@ export function WorkspaceNodeView(props: Props) {
           onUnhideSession={props.onUnhideSession}
           onAddSession={() => props.onAddSession(tab.id)}
           onSetTask={props.onSetTask}
-          dashboardOnOpen={props.dashboardOnOpen}
-          dashboardOnKill={props.dashboardOnKill}
-          dashboardOnRemove={props.dashboardOnRemove}
           dashboardOnNew={props.dashboardOnNew}
         />
         <SplitDropZones leafId={node.id} visible={props.dragInProgress} />

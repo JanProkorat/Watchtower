@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { PortApi, type OrchRequest, type OrchResponse, type OrchPush } from '@watchtower/shared/messagePort.js';
+import { PortApi, type OrchRequest, type OrchResponse, type OrchPush, type OrchOverlapError } from '@watchtower/shared/messagePort.js';
 import { bootstrap, type BootstrapHandle } from './bootstrap.js';
 import { PtyManager } from './ptyManager.js';
 import { InstancesRepo } from './db/repositories/instances.js';
@@ -30,6 +30,7 @@ import {
   RateOverlapError,
   type ProjectRateInput,
   type ProjectRateRow,
+  type GroupTerms,
 } from './db/repositories/projectRates.js';
 import { ContractStatusService } from './db/contractStatus.js';
 import { markWorklogsForRebill } from './db/rebill.js';
@@ -49,6 +50,8 @@ import { TerminalSnapshots } from './terminalSnapshots.js';
 import { buildTerminalAttachResponse } from './terminalAttach.js';
 import { readHubConfig, writeHubConfig } from './services/hubConfig.js';
 import { createHubSender } from './hubSender.js';
+import { createAttentionRelay, type AttentionRelay } from './attentionRelay.js';
+import { readPgPushTokens } from './db/repositories/pgPushDevices.js';
 import { sendApns } from './services/apns.js';
 import {
   previewHookInstall,
@@ -61,9 +64,15 @@ import { listAgents } from './services/claudeAgents.js';
 import { JiraSyncService } from './services/jiraSync.js';
 import { JiraBoardService } from './services/jiraBoard.js';
 import { fetchTokenUsage } from './services/tokenUsage.js';
+import { AutoTimeLogger } from './services/autoTimeLogger.js';
+import { ReviewsService } from './services/reviews.js';
+import { runReview } from './services/prReview.js';
+import { postGithubComment, postAzdoComment } from './services/prProviders/postComment.js';
+import { PrReviewsRepo, type PrReviewRow } from './db/repositories/prReviews.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
+import type { PrHost, PrReviewPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
 import { buildPtySpawnConfig, planBootAction } from './shellPolicy.js';
 import type { InstanceKind } from './shellPolicy.js';
 import { PtySizeOwnership } from './ptySizeOwnership.js';
@@ -84,6 +93,16 @@ process.on('uncaughtException', (err) => {
 
 let api: PortApi | null = null;
 let handle: BootstrapHandle | null = null;
+
+/**
+ * Test-only: inject a bootstrap handle so `handleRequest`'s db-backed cases
+ * can be exercised directly, without the real parentPort/utilityProcess/ws
+ * wiring that normally populates `handle` (see the `parentPort.on('message', ...)`
+ * listener near the bottom of this file). Production code never calls this.
+ */
+export function __setHandleForTests(h: BootstrapHandle | null): void {
+  handle = h;
+}
 
 let pushSink: ((msg: OrchPush) => void) | null = null;
 
@@ -117,6 +136,7 @@ export function handleClientGone(clientId: string): void {
 let notifier: Notifier | null = null;
 let quietTimers: QuietTimers | null = null;
 let escalationGate: EscalationGate | null = null;
+let attentionRelay: AttentionRelay | null = null;
 
 const DEFAULT_QUIET_MS = 90_000;
 
@@ -186,6 +206,57 @@ function projectsRepo(): ProjectsRepo {
   return new ProjectsRepo(handle!.db);
 }
 
+let _reviews: ReviewsService | null = null;
+// Unlike the other repo/service accessors above (which are cheap to
+// re-construct per request), ReviewsService caches the last `refresh()`
+// result in-memory (`list()` just reads that cache) — it MUST be a true
+// singleton or every `prs:list` call after a `prs:refresh` would see an
+// empty cache from a freshly-constructed instance.
+function reviewsSvc(): ReviewsService {
+  if (!_reviews) {
+    _reviews = new ReviewsService({
+      db: handle!.db,
+      projects: () => projectsRepo().list({}).map((p) => ({ id: p.id, name: p.name, folder_path: p.folderPath ?? null })),
+    });
+  }
+  return _reviews;
+}
+
+function prReviewsRepo(): PrReviewsRepo {
+  return new PrReviewsRepo(handle!.db);
+}
+
+// Tracks the AbortController for each in-flight review by reviewId so
+// `prReview:cancel` can abort the underlying claude process. Entries are
+// removed once the review's runReview() promise settles (success or failure).
+const runningReviews = new Map<number, AbortController>();
+// Reviews currently mid-postComments — guards against a double-click (or two
+// interleaved IPC requests) posting the same findings twice even if the
+// renderer's own re-entrancy guard is bypassed.
+const postingReviews = new Set<number>();
+
+function reviewPayloadOf(row: PrReviewRow): PrReviewPayload {
+  let findings: PrFindingPayload[] = [];
+  try {
+    findings = row.findings_json ? (JSON.parse(row.findings_json) as PrFindingPayload[]) : [];
+  } catch {
+    findings = [];
+  }
+  return {
+    id: row.id,
+    host: row.host as PrHost,
+    repoKey: row.repo_key,
+    prNumber: row.pr_number,
+    headSha: row.head_sha,
+    status: row.status,
+    summary: row.summary,
+    findings,
+    error: row.error,
+    createdAt: row.created_at,
+    finishedAt: row.finished_at,
+  };
+}
+
 function epicsRepo(): EpicsRepo {
   return new EpicsRepo(handle!.db);
 }
@@ -222,6 +293,10 @@ function resolveTaskByNumberPayload(
 
 function worklogsRepo(): WorklogsRepo {
   return new WorklogsRepo(handle!.db);
+}
+
+function autoTimeLogger(): AutoTimeLogger {
+  return new AutoTimeLogger(handle!.db, notifySync);
 }
 
 /**
@@ -267,6 +342,8 @@ function contractViewOf(rate: ProjectRateRow): {
   projectedTotalMds: number | null;
   isActive: boolean;
   isCompleted: boolean;
+  groupId: string | null;
+  projectIds: number[];
 } {
   const status = contractStatusService().forRate(rate);
   return {
@@ -288,6 +365,50 @@ function contractViewOf(rate: ProjectRateRow): {
     projectedTotalMds: status.projectedTotalMds,
     isActive: status.isActive,
     isCompleted: status.isCompleted,
+    groupId: rate.contractGroupId,
+    projectIds: rate.contractGroupId
+      ? projectRatesRepo().listGroupMembers(rate.contractGroupId)
+      : [rate.projectId],
+  };
+}
+
+/**
+ * Builds the `GroupTerms` shared by every member of a contract (group or
+ * solo). `fallback` supplies defaults for fields missing from a partial
+ * update payload — mirrors the per-field fallback that `ProjectRatesRepo.update`
+ * already does at the SQL level, but `updateGroup` needs a complete term set
+ * up front since it applies identical terms to every member row.
+ */
+function termsOf(
+  payload: {
+    effectiveFrom?: string;
+    rateType?: 'hourly' | 'daily';
+    rateAmount?: number;
+    hoursPerDay?: number;
+    endDate?: string | null;
+    mdLimit?: number | null;
+  },
+  fallback?: ProjectRateRow,
+): GroupTerms {
+  return {
+    effectiveFrom: payload.effectiveFrom ?? fallback!.effectiveFrom,
+    rateType: payload.rateType ?? fallback!.rateType,
+    rateAmount: payload.rateAmount ?? fallback!.rateAmount,
+    hoursPerDay: payload.hoursPerDay ?? fallback?.hoursPerDay,
+    endDate: payload.endDate !== undefined ? payload.endDate : fallback?.endDate ?? null,
+    mdLimit: payload.mdLimit !== undefined ? payload.mdLimit : fallback?.mdLimit ?? null,
+  };
+}
+
+/** Shapes a caught `RateOverlapError` into the wire overlap-error payload, resolving the conflicting project's name. */
+function overlapResponse(err: RateOverlapError): OrchOverlapError {
+  return {
+    error: 'overlap',
+    conflictingId: err.conflictingId,
+    conflictingFrom: err.conflictingFrom,
+    conflictingTo: err.conflictingTo,
+    conflictingProjectId: err.conflictingProjectId,
+    conflictingProjectName: new ProjectsRepo(handle!.db).get(err.conflictingProjectId)?.name ?? '',
   };
 }
 
@@ -328,6 +449,19 @@ function applyTransition(instanceId: string, event: StateEvent): void {
   }
 }
 
+/**
+ * Inject a remote reply into a live pty as if the user typed it, then advance
+ * the state machine via `userPromptSubmit`. Returns false if the instance has
+ * no live pty session (the caller still stamps the message as handled).
+ */
+function deliverReply(instanceId: string, text: string): boolean {
+  const session = pty.get(instanceId);
+  if (!session) return false;
+  session.write(text + '\r');
+  applyTransition(instanceId, { kind: 'userPromptSubmit' });
+  return true;
+}
+
 function mapHookEventToStateEvent(name: string, body: unknown): StateEvent | null {
   const b = body as { session_id?: string } | undefined;
   switch (name) {
@@ -357,6 +491,7 @@ function disposeInstanceRow(id: string): void {
   new NotificationsRepo(handle!.db).deleteForInstance(id);
   repo().delete(id);
   escalationGate?.clear(id);
+  void attentionRelay?.closeThread(id);
   terminalSnapshots.dispose(id);
   ptySizeOwnership.disposeInstance(id);
 }
@@ -530,7 +665,13 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       return { ok: true };
 
     case 'removeInstance': {
-      disposeInstanceRow(req.payload.instanceId);
+      const removedId = req.payload.instanceId;
+      disposeInstanceRow(removedId);
+      // Notify all clients so they refetch and drop the removed instance.
+      // Clients refetch the instance list on any stateChanged; without this the
+      // removed instance lingers in stale lists (e.g. the iPad's project
+      // grouping and pane picker still offer it).
+      emitPush({ kind: 'stateChanged', payload: { instanceId: removedId, status: 'finished' } });
       return { ok: true };
     }
 
@@ -776,20 +917,23 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     }
 
     case 'contracts:create': {
+      const payload = req.payload;
+      const ids = payload.projectIds && payload.projectIds.length > 0 ? payload.projectIds : [payload.projectId];
       try {
-        const row = projectRatesRepo().create(req.payload as ProjectRateInput);
+        if (ids.length > 1) {
+          const { rows } = projectRatesRepo().createGroup(termsOf(payload), ids);
+          const first = rows[0];
+          if (!first) throw new Error('createGroup returned no rows');
+          for (const r of rows) markWorklogsForRebill(handle!.db, r.projectId, r.effectiveFrom, nowIso());
+          notifySync();
+          return { contract: contractViewOf(first) };
+        }
+        const row = projectRatesRepo().create({ ...termsOf(payload), projectId: ids[0] ?? payload.projectId });
         markWorklogsForRebill(handle!.db, row.projectId, row.effectiveFrom, nowIso());
         notifySync();
         return { contract: contractViewOf(row) };
       } catch (err) {
-        if (err instanceof RateOverlapError) {
-          return {
-            error: 'overlap' as const,
-            conflictingId: err.conflictingId,
-            conflictingFrom: err.conflictingFrom,
-            conflictingTo: err.conflictingTo,
-          };
-        }
+        if (err instanceof RateOverlapError) return overlapResponse(err);
         throw err;
       }
     }
@@ -798,13 +942,57 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       try {
         const repo = projectRatesRepo();
         const oldRow = repo.get(req.payload.id);
-        const row = repo.update(
-          req.payload.id,
-          req.payload.input as Partial<ProjectRateInput>,
-        );
+        const input = req.payload.input;
+        if (oldRow?.contractGroupId) {
+          const groupId = oldRow.contractGroupId;
+          // Capture the OLD membership before updateGroup soft-deletes any
+          // dropped project's row — needed below to rebill projects that get
+          // unchecked from the group (updateGroup only returns kept+added rows).
+          const oldMembers = repo.listGroupMembers(groupId);
+          const ids = input.projectIds && input.projectIds.length > 0 ? input.projectIds : oldMembers;
+          const rows = repo.updateGroup(groupId, termsOf(input, oldRow), ids);
+          const first = rows[0];
+          if (!first) throw new Error('updateGroup returned no rows');
+          // All group members shared `oldRow.effectiveFrom` prior to this edit
+          // (createGroup/updateGroup keep terms uniform across members), so it's
+          // the correct "old" anchor for every member's rebill window.
+          for (const r of rows) {
+            const fromDate = r.effectiveFrom < oldRow.effectiveFrom ? r.effectiveFrom : oldRow.effectiveFrom;
+            markWorklogsForRebill(handle!.db, r.projectId, fromDate, nowIso());
+          }
+          // A project unchecked from the group is soft-deleted by updateGroup
+          // but never appears in `rows` — without this it keeps stale
+          // earned_amount/resolved_rate from the old pooled terms. Rebill it
+          // too, anchored on the same old effectiveFrom every member shared.
+          const keptIds = new Set(rows.map((r) => r.projectId));
+          for (const projectId of oldMembers) {
+            if (!keptIds.has(projectId)) {
+              markWorklogsForRebill(handle!.db, projectId, oldRow.effectiveFrom, nowIso());
+            }
+          }
+          notifySync();
+          return { contract: contractViewOf(first) };
+        }
+        // Solo → shared-group promotion: the contract has no group yet, but the
+        // edit lists more than one project (the user added shared members via
+        // the drawer). Mint a group anchored on this row and attach the added
+        // projects. Without this, the plain update below silently drops
+        // `projectIds` and no link is created.
+        if (oldRow && input.projectIds && input.projectIds.length > 1) {
+          const rows = repo.promoteToGroup(req.payload.id, termsOf(input, oldRow), input.projectIds).rows;
+          const first = rows.find((r) => r.id === req.payload.id) ?? rows[0];
+          if (!first) throw new Error('promoteToGroup returned no rows');
+          for (const r of rows) {
+            const fromDate = r.effectiveFrom < oldRow.effectiveFrom ? r.effectiveFrom : oldRow.effectiveFrom;
+            markWorklogsForRebill(handle!.db, r.projectId, fromDate, nowIso());
+          }
+          notifySync();
+          return { contract: contractViewOf(first) };
+        }
+        const row = repo.update(req.payload.id, input as Partial<ProjectRateInput>);
         // Use the earliest effective_from so moving a contract earlier also
         // re-bills the newly-covered range.
-        const newFrom = (req.payload.input as Partial<ProjectRateInput>).effectiveFrom;
+        const newFrom = input.effectiveFrom;
         const fromDate =
           oldRow && newFrom && newFrom < oldRow.effectiveFrom
             ? newFrom
@@ -813,14 +1001,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
         notifySync();
         return { contract: contractViewOf(row) };
       } catch (err) {
-        if (err instanceof RateOverlapError) {
-          return {
-            error: 'overlap' as const,
-            conflictingId: err.conflictingId,
-            conflictingFrom: err.conflictingFrom,
-            conflictingTo: err.conflictingTo,
-          };
-        }
+        if (err instanceof RateOverlapError) return overlapResponse(err);
         throw err;
       }
     }
@@ -828,18 +1009,27 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'contracts:delete': {
       const delRepo = projectRatesRepo();
       const delRow = delRepo.get(req.payload.id);
-      delRepo.delete(req.payload.id);
-      if (delRow) {
-        markWorklogsForRebill(handle!.db, delRow.projectId, delRow.effectiveFrom, nowIso());
+      if (delRow?.contractGroupId) {
+        const groupId = delRow.contractGroupId;
+        const members = delRepo.listGroupMembers(groupId);
+        delRepo.deleteGroup(groupId);
+        for (const projectId of members) {
+          markWorklogsForRebill(handle!.db, projectId, delRow.effectiveFrom, nowIso());
+        }
+      } else {
+        delRepo.delete(req.payload.id);
+        if (delRow) {
+          markWorklogsForRebill(handle!.db, delRow.projectId, delRow.effectiveFrom, nowIso());
+        }
       }
       notifySync();
       return { ok: true };
     }
 
     case 'taskGrid:get': {
-      const { year, month, projectId } = req.payload;
+      const { year, month, projectIds } = req.payload;
       const service = new TaskGridService(handle!.db);
-      return service.get(year, month, projectId);
+      return service.get(year, month, projectIds);
     }
 
     case 'daysOff:list':
@@ -1001,6 +1191,125 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       new PushDevicesRepo(handle!.db).register(req.payload.token, req.payload.platform, Date.now());
       return { ok: true };
 
+    case 'prs:list':
+      return reviewsSvc().list();
+    case 'prs:refresh':
+      return reviewsSvc().refresh((req.payload as { devopsPats?: Record<string, string> }).devopsPats);
+    case 'prs:diff': {
+      const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> };
+      return { files: await reviewsSvc().diff(p.host, p.repoKey, p.prNumber, p.devopsPats) };
+    }
+    case 'prs:comments': {
+      const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> };
+      return { threads: await reviewsSvc().comments(p.host, p.repoKey, p.prNumber, p.devopsPats) };
+    }
+    case 'reviews:projectRepo':
+      return reviewsSvc().projectRepo((req.payload as { projectId: number }).projectId);
+
+    case 'prReview:start': {
+      const p = req.payload;
+      const target = await reviewsSvc().resolveRepoAndPr(p.host, p.repoKey, p.prNumber);
+      if (!target) {
+        throw new Error(`Cannot resolve repo/PR for review: ${p.host}:${p.repoKey}#${p.prNumber}`);
+      }
+      const reviews = prReviewsRepo();
+      const id = reviews.start(p.host, p.repoKey, p.prNumber, target.headSha);
+      emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'running', message: 'Reviewing...' } });
+      const ac = new AbortController();
+      runningReviews.set(id, ac);
+      // Fire-and-forget: the caller gets `reviewId` immediately and follows
+      // progress via the prReviewProgress/prReviewDone pushes.
+      // Azure DevOps PRs are Škoda work read by a Czech-speaking team, so their
+      // review findings are written in Czech; GitHub PRs stay English.
+      runReview(target.clonePath, target.baseRef, target.headSha, target.pr, {}, ac.signal, p.host === 'azdo' ? 'cs' : 'en')
+        .then(({ summary, findings }) => {
+          reviews.finish(id, summary, JSON.stringify(findings));
+          emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'done', message: summary } });
+          emitPush({ kind: 'prReviewDone', payload: { reviewId: id } });
+        })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          reviews.fail(id, msg);
+          emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'error', message: msg } });
+        })
+        .finally(() => { runningReviews.delete(id); });
+      return { reviewId: id };
+    }
+
+    case 'prReview:get': {
+      const row = prReviewsRepo().get(req.payload.reviewId);
+      return { review: row ? reviewPayloadOf(row) : null };
+    }
+
+    case 'prReview:list':
+      return { reviews: prReviewsRepo().list(req.payload.repoKey).map(reviewPayloadOf) };
+
+    case 'prReview:cancel': {
+      const ac = runningReviews.get(req.payload.reviewId);
+      if (ac) ac.abort();
+      // Do NOT fail() the row here — aborting makes runReview() throw 'Cancelled',
+      // which the .catch above already routes through the normal fail()+push path.
+      return { ok: true };
+    }
+
+    case 'prReview:postComments': {
+      const p = req.payload;
+      const reviewId = p.reviewId;
+      if (postingReviews.has(reviewId)) {
+        return { posted: 0, skipped: p.findingIndexes.length, errors: ['already posting'] };
+      }
+      postingReviews.add(reviewId);
+      try {
+        const reviews = prReviewsRepo();
+        const row = reviews.get(reviewId);
+        if (!row) throw new Error(`Review not found: ${reviewId}`);
+        let findings: PrFindingPayload[];
+        try {
+          findings = JSON.parse(row.findings_json ?? '[]') as PrFindingPayload[];
+        } catch {
+          throw new Error(`Review ${reviewId} has malformed findings JSON`);
+        }
+        const { github, azdo } = await reviewsSvc().resolveRepos();
+        const githubRepo = row.host === 'github' ? github.find((r) => r.repoKey === row.repo_key) : undefined;
+        const azdoRepo = row.host === 'azdo' ? azdo.find((r) => r.repoKey === row.repo_key) : undefined;
+        if (!githubRepo && !azdoRepo) throw new Error(`Cannot resolve repo for review: ${row.host}:${row.repo_key}`);
+
+        let posted = 0;
+        let skipped = 0;
+        const errors: string[] = [];
+        for (const i of [...new Set(p.findingIndexes)]) {
+          const f = findings[i];
+          if (i < 0 || !f) { skipped++; continue; }
+          if (f.posted === true) { skipped++; continue; }
+          // Findings carry repo-relative paths; strip any accidental leading
+          // slash before handing them to either host's poster.
+          const file = f.file.replace(/^\/+/, '');
+          try {
+            if (githubRepo) {
+              await postGithubComment(githubRepo.nwo, row.pr_number, row.head_sha, { ...f, file });
+            } else if (azdoRepo) {
+              const pat = p.devopsPats?.[azdoRepo.devopsHost];
+              if (!pat) {
+                errors.push(`${f.file}:${f.line}: chybí PAT`);
+                continue;
+              }
+              await postAzdoComment(azdoRepo.apiBase, azdoRepo.repo, row.pr_number, { ...f, file }, pat);
+            }
+            f.posted = true;
+            posted++;
+          } catch (e) {
+            errors.push(`${f.file}:${f.line}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        reviews.updateFindings(reviewId, JSON.stringify(findings));
+        emitPush({ kind: 'prReviewDone', payload: { reviewId } });
+        return { posted, skipped, errors };
+      } finally {
+        postingReviews.delete(reviewId);
+      }
+    }
+
   }
 }
 
@@ -1089,6 +1398,10 @@ function respawnIncompleteRowsOnBoot(): void {
       portRange: [7421, 7430],
       handleRequest,
       onClientGone: handleClientGone,
+      // attentionRelay is created below (after this bootstrap() call resolves,
+      // once handle!.pg exists), so this closure reads the module-scoped
+      // variable at call time — by the first daily purge tick it is set.
+      onPurgeDue: () => { void attentionRelay?.pruneClosedThreads(14); },
       onHookEvent: async (eventName, body, instanceId) => {
         // Drop hook events fired by a NESTED `claude` (memory summarizer, skills,
         // sub-agents) that inherited this instance's WATCHTOWER_INSTANCE_ID but
@@ -1103,6 +1416,11 @@ function respawnIncompleteRowsOnBoot(): void {
         authBlockDetector.onHookEvent(eventName, body, instanceId);
         const stateEvent = mapHookEventToStateEvent(eventName, body);
         if (stateEvent) applyTransition(instanceId, stateEvent);
+        // Auto-log this instance's active time to its project on session end
+        // (no-op unless the matched project has auto_track enabled). Best-effort:
+        // the service swallows its own errors so a logging failure can't break
+        // the state machine.
+        if (eventName === 'SessionEnd') autoTimeLogger().onSessionEnd(row);
       },
     });
     // Register the WS bridge's broadcast as the secondary push sink so every
@@ -1139,29 +1457,58 @@ function respawnIncompleteRowsOnBoot(): void {
     });
     const hubSender = createHubSender({
       getConfig: () => readHubConfig(new SettingsRepo(handle!.db)),
-      listTokens: () => new PushDevicesRepo(handle!.db).listTokens(),
+      listTokens: async () =>
+        Array.from(
+          new Set([
+            ...new PushDevicesRepo(handle!.db).listTokens(),
+            ...(await readPgPushTokens(handle!.pg)),
+          ]),
+        ),
       removeToken: (token) => new PushDevicesRepo(handle!.db).remove(token),
       sendApns,
       buildContext: (instanceId, cwd, kind) => {
         const name = cwd.split('/').filter(Boolean).pop() || instanceId;
         const title =
-          kind === 'waiting-permission' ? `${name} — čeká na povolení` :
-          kind === 'crashed' ? `${name} — pád procesu` :
-          `${name} — čeká na vstup`;
+          kind === 'waiting-permission' ? `${name} — permission needed` :
+          kind === 'crashed' ? `${name} — instance stopped` :
+          `${name} — waiting for you`;
         const body =
-          kind === 'waiting-permission' ? 'Claude potřebuje vaše rozhodnutí o povolení.' :
-          kind === 'crashed' ? 'Claude process neočekávaně skončil.' :
-          'Claude dokončil práci a čeká na váš vstup.';
+          kind === 'waiting-permission' ? 'Claude needs your permission to continue.' :
+          kind === 'crashed' ? 'A Claude instance has stopped.' :
+          'Claude is waiting for your input.';
         return { title, body };
       },
     });
+    attentionRelay = createAttentionRelay({
+      pg: handle!.pg,
+      getSnapshot: async (id) => {
+        await terminalSnapshots.flush(id);
+        return terminalSnapshots.snapshot(id);
+      },
+      deliverReply: (id, text) => {
+        const ok = deliverReply(id, text);
+        if (ok) escalationGate?.markRemotelyEngaged(id);
+        return ok;
+      },
+      resolveLabel: (cwd) => cwd.split('/').pop() ?? 'instance',
+      newId: () => randomUUID(),
+      now: () => new Date().toISOString(),
+    });
+    attentionRelay.start();
     const onEscalate = (instanceId: string, cwd: string, kind: EscalationKind) => {
+      void attentionRelay?.writeClaudeMessage(instanceId, cwd, kind);
       void hubSender.fire(instanceId, cwd, kind);
     };
     escalationGate = new EscalationGate(() => {
       const hub = readHubConfig(new SettingsRepo(handle!.db));
       return { escalateMs: hub.escalateMs, triggers: hub.triggers, armEnabled: hub.enabled };
     }, onEscalate);
+    // Any pr_reviews row still 'running' belonged to the previous orchestrator
+    // process and its in-memory runReview() promise is gone — sweep it to
+    // 'error' so it isn't a permanent dead-end (PR list stuck "reviewing…",
+    // Report drawer spinning with no Re-run button). Mirrors the instance
+    // recovery pass just below.
+    prReviewsRepo().failStuckRunning('Interrupted by restart');
     // Respawn after api is ready so the resumed pty's first output/exit can
     // push through to the renderer immediately.
     respawnIncompleteRowsOnBoot();
