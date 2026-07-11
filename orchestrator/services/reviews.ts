@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process';
 import type { SqliteLike } from '../db/migrations.js';
-import { SettingsRepo } from '../db/repositories/settings.js';
 import type { PrHost, PullRequestPayload, DiffFilePayload } from '@watchtower/shared/ipcContract.js';
 import type { GithubRepoConfig, AzdoRepoConfig } from './prProviders/types.js';
 import { listGithubPrs, fetchGithubDiff, parseGitRemoteNwo } from './prProviders/github.js';
@@ -19,7 +18,6 @@ const realGitRemote = (cwd: string) => new Promise<string | null>((resolve) => {
 });
 
 export class ReviewsService {
-  private settings: SettingsRepo;
   private cache: PullRequestPayload[] = [];
   private syncedAt: string | null = null;
   private listGithub: (r: GithubRepoConfig) => Promise<PullRequestPayload[]>;
@@ -28,7 +26,6 @@ export class ReviewsService {
   private projectsFn: () => Array<{ id: number; name: string; folder_path: string | null }>;
 
   constructor(deps: ReviewsDeps) {
-    this.settings = new SettingsRepo(deps.db);
     this.listGithub = deps.listGithub ?? ((r) => listGithubPrs(r));
     this.listAzdo = deps.listAzdo ?? ((r, pat) => listAzdoPrs(r, pat));
     this.gitRemote = deps.gitRemote ?? realGitRemote;

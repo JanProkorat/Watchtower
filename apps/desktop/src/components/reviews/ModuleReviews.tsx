@@ -37,7 +37,7 @@ export function ModuleReviews(): JSX.Element {
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
       {loading && pullRequests.length === 0 && <CircularProgress size={20} />}
       {!loading && pullRequests.length === 0 && !error && (
-        <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Žádné otevřené PR. Zkuste Obnovit nebo připojit Azure DevOps.</Typography>
+        <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Žádné otevřené PR. Zkuste Obnovit. Pro Azure DevOps nastavte PAT v úpravě projektu.</Typography>
       )}
 
       {groups.map((g) => (
