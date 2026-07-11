@@ -3,11 +3,12 @@ import type { PullRequestPayload, PrReviewPayload } from '@watchtower/shared/ipc
 import { sortFindings } from '../../state/useReviews.js';
 import { FindingCard } from './FindingCard.js';
 
-export function ReviewReport({ pr, review, running, onRun }: {
+export function ReviewReport({ pr, review, running, onRun, onCancel }: {
   pr: PullRequestPayload;
   review: PrReviewPayload | null;
   running: boolean;
   onRun(): void;
+  onCancel(): void;
 }): JSX.Element {
   const isRunning = running || review?.status === 'running';
 
@@ -25,6 +26,7 @@ export function ReviewReport({ pr, review, running, onRun }: {
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.25 }}>
         <CircularProgress size={20} />
         <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Reviewing… (Opus in a worktree)</Typography>
+        <Button size="small" color="error" onClick={onCancel}>Cancel</Button>
       </Box>
     );
   }

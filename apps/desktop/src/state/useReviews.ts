@@ -110,6 +110,14 @@ export function useReviews() {
     return reviews.find((r) => r.host === pr.host && r.prNumber === pr.number) ?? null;
   }, [listReviews]);
 
+  // Look up the latest review for this PR and, if it's still running, abort it via
+  // the orchestrator's runningReviews AbortController map (prReview:cancel).
+  const cancelReview = useCallback(async (pr: PullRequestPayload): Promise<void> => {
+    const found = await latestReviewFor(pr);
+    if (!found || found.status !== 'running') return;
+    await window.watchtower.invoke('prReview:cancel', { reviewId: found.id });
+  }, [latestReviewFor]);
+
   // ─── Review state for the PR list (grey/amber/green/red dot + finding count) ───
   const [reviewStates, setReviewStates] = useState<Map<string, PrReviewPayload>>(new Map());
 
@@ -196,7 +204,7 @@ export function useReviews() {
 
   return {
     pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
-    review, reviewRunning, openReviewFor, runReview, startReview, getReview, listReviews, latestReviewFor,
+    review, reviewRunning, openReviewFor, runReview, startReview, cancelReview, getReview, listReviews, latestReviewFor,
     reviewStateFor,
   };
 }

@@ -3,6 +3,7 @@ import {
   parseReviewOutput,
   buildReviewPrompt,
   runReview,
+  type RunClaudeResult,
 } from '../../orchestrator/services/prReview.js';
 import type { Exec } from '../../orchestrator/services/prProviders/types.js';
 
@@ -63,6 +64,11 @@ describe('parseReviewOutput', () => {
     const envelope = JSON.stringify({ is_error: false, result: 'null' });
     expect(() => parseReviewOutput(envelope)).toThrow(/could not parse review output/);
   });
+
+  it('surfaces the envelope detail when is_error is true, instead of a generic parse failure', () => {
+    const envelope = JSON.stringify({ is_error: true, result: 'rate limited' });
+    expect(() => parseReviewOutput(envelope)).toThrow(/rate limited/);
+  });
 });
 
 describe('buildReviewPrompt', () => {
@@ -88,13 +94,12 @@ describe('runReview', () => {
     }),
   });
 
-  function makeExec(claudeImpl: () => Promise<string>) {
+  function makeExec() {
     const calls: { cmd: string; args: string[]; opts?: unknown }[] = [];
     const exec: Exec = async (cmd, args, opts) => {
       calls.push({ cmd, args, opts });
       if (cmd === 'git' && args.includes('worktree') && args.includes('add')) return '';
       if (cmd === 'git' && args.includes('worktree') && args.includes('remove')) return '';
-      if (cmd === 'claude') return claudeImpl();
       throw new Error(`unexpected exec call: ${cmd} ${args.join(' ')}`);
     };
     return { exec, calls };
@@ -102,9 +107,14 @@ describe('runReview', () => {
 
   const PR = { title: 'Add feature', sourceBranch: 'feature/x', targetBranch: 'main' };
 
-  it('adds a worktree, runs claude, parses findings, and removes the worktree', async () => {
-    const { exec, calls } = makeExec(async () => CANNED_ENVELOPE);
-    const result = await runReview('/clone/path', 'main', 'abc1234deadbeef', PR, { exec, claudeBin: 'claude' });
+  it('adds a worktree, runs claude via deps.runClaude, parses findings, and removes the worktree', async () => {
+    const { exec, calls } = makeExec();
+    const runClaudeCalls: { claudeBin: string; args: string[]; cwd: string }[] = [];
+    const runClaude = vi.fn(async (claudeBin: string, args: string[], cwd: string): Promise<RunClaudeResult> => {
+      runClaudeCalls.push({ claudeBin, args, cwd });
+      return { stdout: CANNED_ENVELOPE, stderr: '', code: 0, signal: null, aborted: false };
+    });
+    const result = await runReview('/clone/path', 'main', 'abc1234deadbeef', PR, { exec, claudeBin: 'claude', runClaude });
 
     expect(result.summary).toBe('reviewed');
     expect(result.findings).toHaveLength(1);
@@ -119,16 +129,29 @@ describe('runReview', () => {
     expect(removeCall).toBeDefined();
     expect(removeCall!.args).toEqual(expect.arrayContaining(['-C', '/clone/path', 'worktree', 'remove', '--force']));
 
-    const claudeCall = calls.find((c) => c.cmd === 'claude');
-    expect(claudeCall).toBeDefined();
-    expect(claudeCall!.args).toEqual(expect.arrayContaining(['--model', 'opus', '--output-format', 'json', '--permission-mode', 'bypassPermissions']));
+    expect(runClaudeCalls).toHaveLength(1);
+    expect(runClaudeCalls[0]!.claudeBin).toBe('claude');
+    expect(runClaudeCalls[0]!.args).toEqual(expect.arrayContaining(['--model', 'opus', '--output-format', 'json', '--permission-mode', 'bypassPermissions']));
   });
 
-  it('still removes the worktree (finally) even when the claude call throws', async () => {
-    const { exec, calls } = makeExec(async () => { throw new Error('claude exploded'); });
+  it('still removes the worktree (finally) even when the injected runClaude throws', async () => {
+    const { exec, calls } = makeExec();
+    const runClaude = vi.fn(async (): Promise<RunClaudeResult> => { throw new Error('claude exploded'); });
 
-    await expect(runReview('/clone/path', 'main', 'abc1234deadbeef', PR, { exec, claudeBin: 'claude' }))
+    await expect(runReview('/clone/path', 'main', 'abc1234deadbeef', PR, { exec, claudeBin: 'claude', runClaude }))
       .rejects.toThrow('claude exploded');
+
+    const removeCall = calls.find((c) => c.args.includes('remove'));
+    expect(removeCall).toBeDefined();
+  });
+
+  it('still removes the worktree (finally) when the injected runClaude returns aborted:true, and throws Cancelled', async () => {
+    const { exec, calls } = makeExec();
+    const runClaude = vi.fn(async (): Promise<RunClaudeResult> =>
+      ({ stdout: '', stderr: '', code: null, signal: 'SIGKILL', aborted: true }));
+
+    await expect(runReview('/clone/path', 'main', 'abc1234deadbeef', PR, { exec, claudeBin: 'claude', runClaude }))
+      .rejects.toThrow('Cancelled');
 
     const removeCall = calls.find((c) => c.args.includes('remove'));
     expect(removeCall).toBeDefined();
@@ -138,10 +161,20 @@ describe('runReview', () => {
     const exec: Exec = vi.fn(async (cmd, args) => {
       if (cmd === 'git' && args.includes('add')) return '';
       if (cmd === 'git' && args.includes('remove')) throw new Error('remove failed');
-      if (cmd === 'claude') return CANNED_ENVELOPE;
       throw new Error(`unexpected exec call: ${cmd}`);
     });
-    const result = await runReview('/clone/path', 'main', 'abc1234deadbeef', PR, { exec, claudeBin: 'claude' });
+    const runClaude = vi.fn(async (): Promise<RunClaudeResult> =>
+      ({ stdout: CANNED_ENVELOPE, stderr: '', code: 0, signal: null, aborted: false }));
+    const result = await runReview('/clone/path', 'main', 'abc1234deadbeef', PR, { exec, claudeBin: 'claude', runClaude });
     expect(result.summary).toBe('reviewed');
+  });
+
+  it('surfaces the real stderr/exit-code when claude exits non-zero with empty stdout', async () => {
+    const { exec } = makeExec();
+    const runClaude = vi.fn(async (): Promise<RunClaudeResult> =>
+      ({ stdout: '', stderr: 'no stdin data received in 3s', code: 1, signal: null, aborted: false }));
+
+    await expect(runReview('/clone/path', 'main', 'abc1234deadbeef', PR, { exec, claudeBin: 'claude', runClaude }))
+      .rejects.toThrow(/claude exited 1.*no stdin data received/);
   });
 });

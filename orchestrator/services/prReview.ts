@@ -1,16 +1,48 @@
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import type { PrFindingPayload } from '@watchtower/shared/ipcContract.js';
 import type { Exec } from './prProviders/types.js';
 import { defaultExec } from './prProviders/exec.js';
 
 const CLAUDE_TIMEOUT_MS = 600_000;
 
+export interface RunClaudeResult { stdout: string; stderr: string; code: number | null; signal: NodeJS.Signals | null; aborted: boolean; }
+
+// Spawn-based claude invocation (replaces the old execFile call): (a) ignores stdin
+// (stdio: ['ignore', ...]) so claude never prints/waits on the "no stdin data
+// received" warning, (b) NEVER rejects on non-zero exit — it resolves with
+// {stdout, stderr, code, signal} so the caller can inspect claude's JSON envelope
+// (which carries the real is_error reason in stdout even on failure — execFile
+// discarded that), (c) supports cancellation via an AbortSignal, (d) enforces the
+// timeout by killing the child.
+export function runClaudeProcess(
+  claudeBin: string, args: string[], cwd: string,
+  opts: { timeoutMs: number; signal?: AbortSignal } = { timeoutMs: CLAUDE_TIMEOUT_MS },
+): Promise<RunClaudeResult> {
+  return new Promise((resolve) => {
+    const child = spawn(claudeBin, args, {
+      cwd, stdio: ['ignore', 'pipe', 'pipe'],           // stdin=/dev/null → no "no stdin data" warning
+      env: { ...process.env, PATH: `${process.env.PATH ?? ''}:/opt/homebrew/bin:/usr/local/bin` },
+    });
+    let stdout = '', stderr = '', aborted = false;
+    const cap = 128 * 1024 * 1024;
+    child.stdout.on('data', (d) => { if (stdout.length < cap) stdout += d; });
+    child.stderr.on('data', (d) => { if (stderr.length < 64 * 1024) stderr += d; });
+    const timer = setTimeout(() => { aborted = true; child.kill('SIGKILL'); }, opts.timeoutMs);
+    const onAbort = () => { aborted = true; child.kill('SIGKILL'); };
+    if (opts.signal) { if (opts.signal.aborted) onAbort(); else opts.signal.addEventListener('abort', onAbort, { once: true }); }
+    child.on('error', (err) => { clearTimeout(timer); resolve({ stdout, stderr: stderr + String(err), code: null, signal: null, aborted }); });
+    child.on('close', (code, signal) => { clearTimeout(timer); opts.signal?.removeEventListener('abort', onAbort); resolve({ stdout, stderr, code, signal, aborted }); });
+  });
+}
+
 export interface ReviewRunnerDeps {
   exec?: Exec;
   claudeBin?: string;
   workRoot?: string;
   now?: () => string;
+  runClaude?: typeof runClaudeProcess;
 }
 
 const REVIEW_SCHEMA = {
@@ -60,7 +92,12 @@ export function parseReviewOutput(stdout: string): { summary: string; findings: 
 
   if (envelope === null || typeof envelope !== 'object') return fail();
 
-  if (envelope.is_error) return fail();
+  if (envelope.is_error) {
+    const detail = typeof envelope.result === 'string'
+      ? envelope.result
+      : JSON.stringify(envelope.result ?? (envelope as { error?: unknown }).error ?? '');
+    throw new Error(`review failed: ${detail.slice(0, 800)}`);
+  }
 
   let parsed: { summary?: unknown; findings?: unknown };
   if (typeof envelope.result === 'string') {
@@ -91,11 +128,13 @@ export async function runReview(
   headSha: string,
   pr: { title: string; sourceBranch: string; targetBranch: string },
   deps: ReviewRunnerDeps = {},
+  signal?: AbortSignal,
 ): Promise<{ summary: string; findings: PrFindingPayload[] }> {
   const exec = deps.exec ?? defaultExec;
   const claudeBin = deps.claudeBin ?? 'claude';
   const workRoot = deps.workRoot ?? os.tmpdir();
   const now = deps.now ?? (() => Date.now().toString(36));
+  const runClaude = deps.runClaude ?? runClaudeProcess;
 
   const rand = `${now()}-${Math.random().toString(36).slice(2, 8)}`;
   const worktree = path.join(workRoot, `wt-review-${headSha.slice(0, 7)}-${rand}`);
@@ -104,14 +143,19 @@ export async function runReview(
 
   try {
     const prompt = buildReviewPrompt(pr, baseRef);
-    const stdout = await exec(claudeBin, [
+    const args = [
       '-p', prompt,
       '--model', 'opus',
       '--output-format', 'json',
       '--json-schema', JSON.stringify(REVIEW_SCHEMA),
       '--permission-mode', 'bypassPermissions',
-    ], { cwd: worktree, timeoutMs: CLAUDE_TIMEOUT_MS });
-    return parseReviewOutput(stdout);
+    ];
+    const res = await runClaude(claudeBin, args, worktree, { timeoutMs: CLAUDE_TIMEOUT_MS, signal });
+    if (res.aborted) throw new Error('Cancelled');
+    if (!res.stdout.trim()) {
+      throw new Error(`claude exited ${res.code ?? 'null'}${res.signal ? '/' + res.signal : ''}${res.stderr.trim() ? ': ' + res.stderr.trim().slice(0, 500) : ''}`);
+    }
+    return parseReviewOutput(res.stdout);
   } finally {
     try {
       await exec('git', ['-C', clonePath, 'worktree', 'remove', '--force', worktree]);

@@ -222,6 +222,11 @@ function prReviewsRepo(): PrReviewsRepo {
   return new PrReviewsRepo(handle!.db);
 }
 
+// Tracks the AbortController for each in-flight review by reviewId so
+// `prReview:cancel` can abort the underlying claude process. Entries are
+// removed once the review's runReview() promise settles (success or failure).
+const runningReviews = new Map<number, AbortController>();
+
 function reviewPayloadOf(row: PrReviewRow): PrReviewPayload {
   let findings: PrFindingPayload[] = [];
   try {
@@ -1188,9 +1193,11 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       const reviews = prReviewsRepo();
       const id = reviews.start(p.host, p.repoKey, p.prNumber, target.headSha);
       emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'running', message: 'Reviewing...' } });
+      const ac = new AbortController();
+      runningReviews.set(id, ac);
       // Fire-and-forget: the caller gets `reviewId` immediately and follows
       // progress via the prReviewProgress/prReviewDone pushes.
-      runReview(target.clonePath, target.baseRef, target.headSha, target.pr)
+      runReview(target.clonePath, target.baseRef, target.headSha, target.pr, {}, ac.signal)
         .then(({ summary, findings }) => {
           reviews.finish(id, summary, JSON.stringify(findings));
           emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'done', message: summary } });
@@ -1200,7 +1207,8 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           const msg = err instanceof Error ? err.message : String(err);
           reviews.fail(id, msg);
           emitPush({ kind: 'prReviewProgress', payload: { reviewId: id, status: 'error', message: msg } });
-        });
+        })
+        .finally(() => { runningReviews.delete(id); });
       return { reviewId: id };
     }
 
@@ -1211,6 +1219,14 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'prReview:list':
       return { reviews: prReviewsRepo().list(req.payload.repoKey).map(reviewPayloadOf) };
+
+    case 'prReview:cancel': {
+      const ac = runningReviews.get(req.payload.reviewId);
+      if (ac) ac.abort();
+      // Do NOT fail() the row here — aborting makes runReview() throw 'Cancelled',
+      // which the .catch above already routes through the normal fail()+push path.
+      return { ok: true };
+    }
 
   }
 }

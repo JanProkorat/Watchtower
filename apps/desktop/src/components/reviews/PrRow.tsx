@@ -32,8 +32,9 @@ export function reviewStateDisplay(reviewState: ReviewState): { color: string; l
   return { color: d.color, label: d.label(reviewState?.findingCount ?? 0) };
 }
 
-export function PrRow({ pr, nowMs, onOpen, reviewState = null }: {
+export function PrRow({ pr, nowMs, onOpen, reviewState = null, onReview, onCancel }: {
   pr: PullRequestPayload; nowMs: number; onOpen(pr: PullRequestPayload): void; reviewState?: ReviewState;
+  onReview?(pr: PullRequestPayload): void; onCancel?(pr: PullRequestPayload): void;
 }): JSX.Element {
   const num = pr.host === 'github' ? `#${pr.number}` : `!${pr.number}`;
   const display = reviewStateDisplay(reviewState);
@@ -71,9 +72,21 @@ export function PrRow({ pr, nowMs, onOpen, reviewState = null }: {
         <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: display.color }} />
         <Box component="span" sx={{ color: 'text.secondary' }}>{display.label}</Box>
       </Box>
-      <Button size="small" variant="text" onClick={() => onOpen(pr)} sx={{ minWidth: 0, fontSize: 11 }}>
-        Open ▸
-      </Button>
+      {reviewState?.status === 'running' ? (
+        <Button size="small" variant="text" color="error"
+          onClick={(e) => { e.stopPropagation(); onCancel?.(pr); }}
+          sx={{ minWidth: 0, fontSize: 11 }}>
+          Cancel
+        </Button>
+      ) : reviewState?.status === 'done' ? (
+        <Button size="small" variant="text" onClick={(e) => { e.stopPropagation(); onOpen(pr); }} sx={{ minWidth: 0, fontSize: 11 }}>
+          Open ▸
+        </Button>
+      ) : (
+        <Button size="small" variant="text" onClick={(e) => { e.stopPropagation(); onReview?.(pr); }} sx={{ minWidth: 0, fontSize: 11 }}>
+          Review ▸
+        </Button>
+      )}
     </Box>
   );
 }
