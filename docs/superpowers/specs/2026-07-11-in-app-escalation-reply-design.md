@@ -287,15 +287,16 @@ terminal streaming into the drawer (v1 relays only at pause points — turn-base
 a desktop reply UI (at the Mac you answer in the terminal); rich media / attachments;
 per-message read receipts.
 
-## 8. Open questions for spec review
+## 8. Resolved decisions (approved 2026-07-11)
 
-1. **iPhone token registration:** iPad registers its APNs token over the WS bridge
-   (`push:registerDevice`). iPhone has no bridge — is writing the token to a
-   Supabase-side `push_devices` table (read by the Mac) acceptable, or do we want a
-   minimal Supabase RPC? (Proposed: Supabase table + Mac reads it.)
-2. **Bell semantics on a connected iPad:** confirm the merge of live-bridge attention +
-   Supabase threads is desired (vs. threads-only). Proposed: merge, de-duped.
-3. **Fast-path follow-ups:** OK to escalate follow-ups immediately (skip `escalateMs`)
-   once a thread is remotely engaged and the window is still unfocused?
-4. **Retention window** for closed threads (proposed: prune with the daily purge, e.g.
-   14 days).
+1. **iPhone token registration:** iPhone writes its APNs token to a **pg-side
+   `push_devices` table** (RLS: `authenticated` insert); the Mac reads it alongside its
+   local SQLite tokens when fanning out APNs. (iPad keeps registering over the WS bridge.)
+2. **Bell semantics on a connected iPad:** **merge** live-bridge attention + Supabase
+   threads, de-duped by `instanceId`. A thread item shows the reply affordance; a bare
+   live item behaves as today (opens the terminal).
+3. **Fast-path follow-ups:** **yes** — once a thread is remotely engaged and the window
+   is still unfocused, the next attention state escalates immediately (skip `escalateMs`).
+   Cleared when the window regains focus.
+4. **Retention window:** closed threads are pruned with the existing daily purge after
+   **14 days**.
