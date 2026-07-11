@@ -39,6 +39,12 @@ const shared: ThemeOptions = {
           from: { maxWidth: 0, opacity: 0 },
           to: { maxWidth: '280px', opacity: 1 },
         },
+        // Instance pane fade+rise on mount — plays when switching to another
+        // tab (the leaf swaps and its PaneCards remount) and when a pane is added.
+        '@keyframes wt-pane-in': {
+          from: { opacity: 0, transform: 'translateY(8px)' },
+          to: { opacity: 1, transform: 'translateY(0)' },
+        },
         '@media (prefers-reduced-motion: reduce)': {
           '*': { animation: 'none !important' },
         },

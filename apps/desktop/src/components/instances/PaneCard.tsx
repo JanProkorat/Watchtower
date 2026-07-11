@@ -60,7 +60,7 @@ export function PaneCard({
 
   return (
     <Box
-      sx={{ position: 'relative', height: '100%' }}
+      sx={{ position: 'relative', height: '100%', animation: 'wt-pane-in 320ms cubic-bezier(0.22,1,0.36,1)' }}
       onContextMenu={(e: ReactMouseEvent<HTMLElement>) => {
         e.preventDefault();
         e.stopPropagation();
