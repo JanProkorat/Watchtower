@@ -133,7 +133,7 @@ export function glassFill(theme: Theme, opts?: GlassSurfaceOptions): GlassFillSt
 export function glassFloating(
   theme: Theme,
   opts?: { radius?: number; elevation?: number },
-): GlassSurfaceStyle & { borderRadius: number } {
+): GlassSurfaceStyle & { borderRadius: string } {
   const radius = opts?.radius ?? 18;
   const base = glassSurface(theme, { elevation: opts?.elevation ?? 1 });
   const isDark = theme.palette.mode === 'dark';
@@ -141,7 +141,9 @@ export function glassFloating(
   const highlight = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.70)';
   return {
     ...base,
-    borderRadius: radius,
+    // Explicit px — MUI's sx multiplies a NUMERIC borderRadius by
+    // theme.shape.borderRadius (×4), which would turn 20 into an 80px capsule.
+    borderRadius: `${radius}px`,
     boxShadow: `inset 0 1px 0 ${highlight}, ${drop}`,
   };
 }
