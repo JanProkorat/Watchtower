@@ -16,6 +16,7 @@ interface Props {
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(tabId: string): void;
+  onAddSessionAfter(afterInstanceId: string, cwd: string, kind: 'claude' | 'shell'): void;
   onSetTask?(instanceId: string, taskId: number | null): void;
 }
 
@@ -31,6 +32,7 @@ export function WorkspaceRoot({
   onHideSession,
   onUnhideSession,
   onAddSession,
+  onAddSessionAfter,
   onSetTask,
 }: Props) {
   return (
@@ -49,6 +51,7 @@ export function WorkspaceRoot({
         onHideSession={onHideSession}
         onUnhideSession={onUnhideSession}
         onAddSession={onAddSession}
+        onAddSessionAfter={onAddSessionAfter}
         onSetTask={onSetTask}
         dashboardOnNew={dashboardOnNew}
       />

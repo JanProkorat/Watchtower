@@ -95,7 +95,7 @@ function LoadingScreen() {
 export function App() {
   const { mode, toggle: toggleThemeMode } = useThemeMode();
   const theme = useMemo(() => (mode === 'dark' ? darkTheme : lightTheme), [mode]);
-  const { instances, activeId, loaded, setActive, spawn, kill, remove, setTask } = useInstances();
+  const { instances, activeId, loaded, setActive, spawn, kill, remove, setTask, reorder } = useInstances();
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ id: string; cwd: string } | null>(null);
   const [confirmTabClose, setConfirmTabClose] = useState<{
@@ -299,7 +299,11 @@ export function App() {
     if (leafId) layoutActions.unmountLeafAt(leafId);
   };
 
-  const doSpawn = async (cwd: string, kind: 'claude' | 'shell' = 'claude') => {
+  const doSpawn = async (
+    cwd: string,
+    kind: 'claude' | 'shell' = 'claude',
+    afterInstanceId?: string,
+  ) => {
     setSpawnInFlight((n) => n + 1);
     try {
       const tabId = routeSpawnToTab(cwd, projects);
@@ -308,6 +312,20 @@ export function App() {
       setActiveModule('instances');
       const res = await spawn(cwd, undefined, kind);
       if (res.instanceId) {
+        // Positional insert: place the new column immediately to the right of
+        // the pane the "+" was clicked in (reorder writes display_order, which
+        // is what deriveTabs sorts columns by). The DB row already exists, so
+        // the order sticks even though the new instance isn't in local state yet.
+        if (afterInstanceId) {
+          const newId = res.instanceId;
+          const currentIds = instances.map((i) => i.id).filter((id) => id !== newId);
+          const idx = currentIds.indexOf(afterInstanceId);
+          const ordered =
+            idx >= 0
+              ? [...currentIds.slice(0, idx + 1), newId, ...currentIds.slice(idx + 1)]
+              : [...currentIds, newId];
+          await reorder(ordered);
+        }
         layoutActions.focusColumnInTab(tabId, res.instanceId);
         setActive(res.instanceId);
       } else {
@@ -526,6 +544,9 @@ export function App() {
                             const cwd = cwdForTab(tabId as TabId);
                             if (cwd) void doSpawn(cwd);
                           }}
+                          onAddSessionAfter={(afterInstanceId, cwd, kind) =>
+                            void doSpawn(cwd, kind, afterInstanceId)
+                          }
                           dashboardOnNew={() => setNewOpen(true)}
                         />
                       )}

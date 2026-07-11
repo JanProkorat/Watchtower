@@ -3,6 +3,8 @@ import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import TerminalIcon from '@mui/icons-material/Terminal';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { ColumnSlot } from './ColumnSlot.js';
 import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
 
@@ -19,6 +21,8 @@ interface Props {
   onClose(): void;
   onRestart?(): void;
   onSetTask?(taskId: number | null): void;
+  /** Add a new instance of `kind` immediately to the right of this pane. */
+  onNewInstance(kind: 'claude' | 'shell'): void;
 }
 
 /**
@@ -42,6 +46,7 @@ export function PaneCard({
   onClose,
   onRestart,
   onSetTask,
+  onNewInstance,
 }: Props) {
   const [ctxAnchor, setCtxAnchor] = useState<{ x: number; y: number } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -92,6 +97,12 @@ export function PaneCard({
           zIndex: 6,
         }}
       >
+        <ChromeButton title="New terminal to the right" onClick={() => onNewInstance('shell')}>
+          <TerminalIcon sx={{ fontSize: 15 }} />
+        </ChromeButton>
+        <ChromeButton title="New Claude instance to the right" onClick={() => onNewInstance('claude')}>
+          <AutoAwesomeIcon sx={{ fontSize: 15 }} />
+        </ChromeButton>
         {kind === 'shell' && status === 'crashed' && onRestart && (
           <ChromeButton title="Restart terminal" onClick={onRestart}>
             <RefreshIcon sx={{ fontSize: 15 }} />

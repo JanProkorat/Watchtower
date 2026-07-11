@@ -19,6 +19,7 @@ interface Props {
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(): void;
+  onAddSessionAfter(afterInstanceId: string, cwd: string, kind: 'claude' | 'shell'): void;
   onSetTask?(instanceId: string, taskId: number | null): void;
   dashboardOnNew?(): void;
 }
@@ -41,6 +42,7 @@ export function LeafView({
   onHideSession,
   onUnhideSession,
   onAddSession,
+  onAddSessionAfter,
   onSetTask,
   dashboardOnNew,
 }: Props) {
@@ -90,16 +92,21 @@ export function LeafView({
         ':hover': { opacity: 1 },
       }}
     >
-      <Tooltip title="New session in this project" placement="bottom-start">
-        <IconButton
-          aria-label="new session"
-          size="small"
-          onClick={onAddSession}
-          sx={LEAF_BTN_SX}
-        >
-          <AddIcon sx={{ fontSize: 15 }} />
-        </IconButton>
-      </Tooltip>
+      {/* The "+" only seeds the FIRST instance of an empty leaf — once panes
+          exist, each pane's chrome carries the terminal/claude add buttons
+          (which insert positionally). */}
+      {tab.columnOrder.length === 0 && (
+        <Tooltip title="New session in this project" placement="bottom-start">
+          <IconButton
+            aria-label="new session"
+            size="small"
+            onClick={onAddSession}
+            sx={LEAF_BTN_SX}
+          >
+            <AddIcon sx={{ fontSize: 15 }} />
+          </IconButton>
+        </Tooltip>
+      )}
       {hiddenSessionInfos.length > 0 && (
         <Tooltip title={`${hiddenSessionInfos.length} hidden session${hiddenSessionInfos.length === 1 ? '' : 's'}`} placement="bottom-start">
           <IconButton
@@ -197,6 +204,7 @@ export function LeafView({
                   onClose={() => onCloseColumn(instanceId)}
                   onRestart={onRestartColumn ? () => onRestartColumn(instanceId) : undefined}
                   onSetTask={onSetTask ? (taskId) => onSetTask(instanceId, taskId) : undefined}
+                  onNewInstance={(kind) => onAddSessionAfter(instanceId, s.cwd, kind)}
                 />
               </Panel>
             </Fragment>
