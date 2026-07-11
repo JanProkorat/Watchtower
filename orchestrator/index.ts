@@ -1250,9 +1250,10 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       let posted = 0;
       let skipped = 0;
       const errors: string[] = [];
-      for (const i of p.findingIndexes) {
+      for (const i of [...new Set(p.findingIndexes)]) {
         const f = findings[i];
         if (i < 0 || !f) { skipped++; continue; }
+        if (f.posted === true) { skipped++; continue; }
         // Findings carry repo-relative paths; strip any accidental leading
         // slash before handing them to either host's poster.
         const file = f.file.replace(/^\/+/, '');
