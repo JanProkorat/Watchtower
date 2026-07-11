@@ -17,6 +17,7 @@
 - **Bundle identifier: `cz.greencode.watchtower.ios`** — deliberately distinct from the Capacitor app's `cz.greencode.watchtower.iphone` so both install side-by-side during the parity period.
 - **Secrets never committed.** `SUPABASE_URL` + `SUPABASE_ANON_KEY` come from a git-ignored `Secrets.xcconfig` surfaced through `Info.plist`; dev Supabase URL default is `https://xggihnrvsmbzbkhsnuky.supabase.co`.
 - **Palette (from `@watchtower/ui-core`):** `baseBg #0b0c11`, `textPrimary #e5e7eb`, `textMuted #9aa1ab`, `textDim #5a6072`, `accent #7c6df0`, `accentIcon #c9bdff`, cta gradient `#8b7cf2 → #6d5fe0`.
+- **Headless `xcodebuild` build/test commands MUST include `-skipMacroValidation -skipPackagePluginValidation`** — the TCA dependency vends Swift macros, and CLI builds have no GUI trust prompt; without these flags the build fails with a macro-fingerprint-trust error. (`swift test` on the package does not need them. `Package.swift` also declares `.macOS(.v13)` so host `swift test` matches the TCA/Supabase macOS floor.)
 - **Every reducer ships with `TestStore` tests.** A task with a reducer is not done until its reducer tests pass.
 
 ---
@@ -1003,8 +1004,8 @@ struct AppShellView: View {
 
 - [ ] **Step 3: Regenerate the project and build for the simulator**
 
-Run: `cd apps/iphone-native && xcodegen generate && xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination 'generic/platform=iOS Simulator' build`
-Expected: **BUILD SUCCEEDED**. (Regenerate because `Views/` added new files under the `Watchtower` source folder.)
+Run: `cd apps/iphone-native && xcodegen generate && xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination 'generic/platform=iOS Simulator' -skipMacroValidation -skipPackagePluginValidation build`
+Expected: **BUILD SUCCEEDED**. (Regenerate because `Views/` added new files under the `Watchtower` source folder. The `-skipMacroValidation -skipPackagePluginValidation` flags are required for headless `xcodebuild` of the TCA macro-vending package graph — see Global Constraints.)
 
 - [ ] **Step 4: Commit**
 
@@ -1078,7 +1079,7 @@ Run:
 cd apps/iphone-native
 xcodegen generate
 DEST='platform=iOS Simulator,name=iPhone 16e'
-xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination "$DEST" build
+xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination "$DEST" -skipMacroValidation -skipPackagePluginValidation build
 xcrun simctl boot "iPhone 16e" 2>/dev/null; open -a Simulator
 APP="$(xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -showBuildSettings -destination "$DEST" | awk '/ CODESIGNING_FOLDER_PATH/{ $1=""; print substr($0,2) }')"
 xcrun simctl install booted "$APP"
