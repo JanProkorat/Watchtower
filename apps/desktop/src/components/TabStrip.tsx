@@ -64,9 +64,9 @@ function TabButton({
         display: 'flex',
         alignItems: 'center',
         gap: 0.75,
-        height: 30,
+        height: 26,
         px: 1.25,
-        borderRadius: '10px',
+        borderRadius: '9px',
         cursor: draggable ? 'grab' : 'pointer',
         userSelect: 'none',
         // iPad pill: active = purple wash + ring + accent text; no underline.
@@ -245,7 +245,7 @@ export function TabStrip({
       sx={{
         display: 'flex',
         alignItems: 'center',
-        minHeight: 44,
+        minHeight: 34,
         // Floating frosted pill bar — sized to its content and centered at the
         // top of the Instances content (alignSelf stops the flex-column stretch).
         ...glassFloating(theme, { radius: 14, elevation: 1 }),
