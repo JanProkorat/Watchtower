@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Watchtower — In-app escalation reply (prototype)</title>
+<style>
+  :root{
+    --accent:#7c6df0; --accent-icon:#c9bdff; --amber:#f5a524; --red:#ff6b6b;
+    --glass-fill:rgba(48,52,76,0.34); --glass-strong:rgba(56,60,86,0.55);
+    --data-fill:rgba(14,15,23,0.62); --border:rgba(255,255,255,0.10);
+    --t-primary:#ECE9FF; --t-secondary:rgba(236,233,255,0.72);
+    --t-muted:rgba(236,233,255,0.48); --t-dim:rgba(236,233,255,0.30);
+    --mono:'SFMono-Regular',ui-monospace,Menlo,Consolas,monospace;
+    --ui:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:var(--ui); color:var(--t-primary);
+    background:
+      radial-gradient(1200px 800px at 15% -10%, rgba(124,109,240,0.22), transparent 60%),
+      radial-gradient(1000px 700px at 100% 0%, rgba(80,200,220,0.10), transparent 55%),
+      #0b0c14;
+    min-height:100vh; padding:32px 24px 64px;
+  }
+  h1{font-size:20px;font-weight:650;margin:0 0 4px}
+  .sub{color:var(--t-muted);font-size:13px;margin:0 0 28px;max-width:760px;line-height:1.5}
+  .stage{display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start}
+  .col{display:flex;flex-direction:column;gap:12px}
+  .caption{font-size:12px;color:var(--t-muted);letter-spacing:.02em}
+  .caption b{color:var(--t-secondary);font-weight:600}
+
+  /* frosted primitives (mirror ui-core glass helpers) */
+  .glass{background:var(--glass-fill);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid var(--border);}
+  .glass-strong{background:var(--glass-strong);backdrop-filter:blur(30px) saturate(1.5);-webkit-backdrop-filter:blur(30px) saturate(1.5);border:1px solid var(--border);}
+  .card{background:rgba(255,255,255,0.045);border:1px solid var(--border);border-radius:12px;}
+
+  /* ---------- iPad ---------- */
+  .ipad{width:840px;max-width:100%;height:560px;border-radius:26px;position:relative;overflow:hidden;
+    background:linear-gradient(160deg, rgba(30,32,52,0.6), rgba(12,13,22,0.7));
+    border:1px solid rgba(255,255,255,0.08);box-shadow:0 30px 80px rgba(0,0,0,.5);}
+  .rail{position:absolute;left:0;top:0;bottom:0;width:56px;display:flex;flex-direction:column;align-items:center;
+    padding:14px 0;gap:14px;background:rgba(10,11,18,0.5);border-right:1px solid var(--border)}
+  .rail .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,var(--accent),#5b8cff)}
+  .rail button{width:38px;height:38px;border-radius:11px;border:1px solid transparent;background:transparent;color:var(--t-muted);
+    display:grid;place-items:center;cursor:pointer;position:relative}
+  .rail button.active,.rail button:hover{background:rgba(124,109,240,0.16);color:var(--accent-icon);border-color:rgba(124,109,240,0.3)}
+  .rail .bell.on{color:var(--accent-icon);background:rgba(124,109,240,0.16)}
+  .badge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:var(--amber);
+    color:#241a00;font-size:10px;font-weight:700;display:grid;place-items:center;border:2px solid #0b0c14}
+  .canvas{position:absolute;left:56px;right:0;top:0;bottom:0;padding:22px}
+  .canvas .dim{color:var(--t-dim);font-size:13px}
+
+  /* popover list */
+  .popover{position:absolute;left:66px;top:56px;width:300px;border-radius:16px;padding:12px;z-index:5}
+  .popover h3{margin:2px 4px 10px;font-size:13px;color:var(--t-secondary);font-weight:600;letter-spacing:.02em}
+  .item{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:11px;cursor:pointer;text-align:left;width:100%;
+    background:rgba(255,255,255,0.04);border:1px solid var(--border);margin-bottom:8px}
+  .item:hover{background:rgba(124,109,240,0.12);border-color:rgba(124,109,240,0.28)}
+  .item.sel{background:rgba(124,109,240,0.16);border-color:rgba(124,109,240,0.4)}
+  .glyph{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;font-size:15px}
+  .glyph.perm{background:rgba(245,165,36,0.16);color:var(--amber)}
+  .glyph.ask{background:rgba(124,109,240,0.18);color:var(--accent-icon)}
+  .glyph.crash{background:rgba(255,107,107,0.16);color:var(--red)}
+  .item .txt{min-width:0}
+  .item .title{font-size:13px;font-weight:600;color:var(--t-primary);line-height:1.25}
+  .item .reason{font-size:11.5px;color:var(--t-muted);margin-top:2px}
+  .item .ago{font-size:10.5px;color:var(--t-dim);margin-top:3px}
+
+  /* thread drawer */
+  .drawer{position:absolute;right:22px;top:22px;bottom:22px;width:400px;border-radius:18px;display:flex;flex-direction:column;z-index:6;overflow:hidden}
+  .dhead{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+  .dhead .title{font-size:14px;font-weight:650}
+  .dhead .reason{font-size:11.5px;color:var(--t-muted)}
+  .dhead .x{margin-left:auto;color:var(--t-muted);cursor:pointer;background:none;border:none;font-size:18px}
+  .thread{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+  .msg{max-width:92%}
+  .msg .who{font-size:11px;color:var(--t-dim);margin:0 0 4px 2px}
+  .bubble-claude{background:var(--data-fill);border:1px solid var(--border);border-radius:4px 14px 14px 14px;padding:11px 12px}
+  .snap{font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--t-secondary);white-space:pre-wrap}
+  .snap .q{color:var(--t-primary);font-weight:600}
+  .opts{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .opt{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:9px;border:1px solid rgba(124,109,240,0.35);
+    background:rgba(124,109,240,0.10);color:var(--t-primary);font-size:12.5px;cursor:pointer;text-align:left}
+  .opt:hover{background:rgba(124,109,240,0.2)}
+  .opt .n{width:18px;height:18px;border-radius:6px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;flex:0 0 auto}
+  .msg.user{align-self:flex-end}
+  .bubble-user{background:linear-gradient(140deg,var(--accent),#5b8cff);color:#fff;border-radius:14px 4px 14px 14px;padding:10px 12px;font-size:13px}
+  .msg.user .who{text-align:right}
+  .composer{border-top:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:8px}
+  .quickrow{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{padding:6px 10px;border-radius:8px;border:1px solid rgba(124,109,240,0.35);background:rgba(124,109,240,0.10);
+    color:var(--t-primary);font-size:12px;cursor:pointer}
+  .chip:hover{background:rgba(124,109,240,0.2)}
+  .inputrow{display:flex;gap:8px;align-items:flex-end}
+  .field{flex:1;background:rgba(0,0,0,0.28);border:1px solid var(--border);border-radius:10px;padding:9px 11px;color:var(--t-primary);
+    font-size:13px;font-family:var(--ui);resize:none;min-height:38px}
+  .field::placeholder{color:var(--t-dim)}
+  .send{background:linear-gradient(140deg,var(--accent),#5b8cff);color:#fff;border:none;border-radius:10px;padding:0 14px;height:38px;
+    font-weight:600;font-size:13px;cursor:pointer;box-shadow:0 6px 18px rgba(124,109,240,0.4)}
+  .term-btn{background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--t-secondary);border-radius:10px;height:36px;
+    font-size:12.5px;cursor:pointer;display:flex;gap:8px;align-items:center;justify-content:center}
+  .term-btn:hover{background:rgba(255,255,255,0.1)}
+
+  /* ---------- iPhone ---------- */
+  .phone{width:290px;height:600px;border-radius:40px;padding:12px;background:#05060c;border:1px solid rgba(255,255,255,0.08);
+    box-shadow:0 30px 70px rgba(0,0,0,.55);position:relative}
+  .screen{position:absolute;inset:12px;border-radius:30px;overflow:hidden;background:
+      radial-gradient(600px 400px at 20% -10%, rgba(124,109,240,0.22), transparent 60%),#0b0c14;display:flex;flex-direction:column}
+  .notch{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:110px;height:24px;background:#05060c;border-radius:0 0 16px 16px;z-index:20}
+  .phead{padding:34px 16px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+  .phead .h{font-size:16px;font-weight:650}
+  .phead .bellp{margin-left:auto;position:relative;color:var(--accent-icon);width:34px;height:34px;border-radius:10px;background:rgba(124,109,240,0.16);display:grid;place-items:center}
+  .plist{flex:1;overflow:auto;padding:12px}
+  .pcompose{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  svg{display:block}
+</style>
+</head>
+<body>
+  <h1>Watchtower — odpovědi na upozornění přímo v aplikaci</h1>
+  <p class="sub">Prototyp: když instance potřebuje moji pozornost a nejsem u Macu, dorazí notifikace do iOS aplikace.
+  Zvonek → seznam (styl podle typu rozhodnutí) → vlákno s celým kontextem (snapshot terminálu + naparsované volby)
+  a polem pro odpověď. Odpověď se přes Supabase doručí na Mac a vloží do pty. Follow-up otázky se řadí do stejného vlákna.
+  Na připojeném iPadu je navíc „Otevřít v terminálu“; na iPhonu a odpojeném iPadu se odpovídá jen zde.</p>
+
+  <div class="stage">
+    <!-- iPad -->
+    <div class="col">
+      <div class="caption"><b>iPad</b> — zvonek + popover + vlákno (připojený k Macu → i „Otevřít v terminálu“)</div>
+      <div class="ipad">
+        <div class="rail">
+          <div class="logo"></div>
+          <button title="Dashboard"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg></button>
+          <button class="active" title="Instances"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
+          <button class="bell on" title="Upozornění">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="badge">2</span>
+          </button>
+        </div>
+        <div class="canvas">
+          <div class="dim">Terminál instance „watchtower“ …</div>
+        </div>
+
+        <!-- popover -->
+        <div class="popover glass-strong">
+          <h3>Upozornění</h3>
+          <button class="item sel">
+            <div class="glyph perm">$_</div>
+            <div class="txt">
+              <div class="title">watchtower chce spustit příkaz</div>
+              <div class="reason">Čeká na povolení · Bash</div>
+              <div class="ago">před 2 min</div>
+            </div>
+          </button>
+          <button class="item">
+            <div class="glyph ask">?</div>
+            <div class="txt">
+              <div class="title">pps-technology se ptá</div>
+              <div class="reason">Dokončeno, čeká na vstup</div>
+              <div class="ago">před 6 min</div>
+            </div>
+          </button>
+        </div>
+
+        <!-- thread drawer -->
+        <div class="drawer glass-strong">
+          <div class="dhead">
+            <div class="glyph perm">$_</div>
+            <div>
+              <div class="title">watchtower</div>
+              <div class="reason">Čeká na povolení</div>
+            </div>
+            <button class="x">✕</button>
+          </div>
+          <div class="thread">
+            <div class="msg">
+              <div class="who">Claude · před 8 min</div>
+              <div class="bubble-claude">
+                <div class="snap"> 3 failed, 12 passed
+ Cleaning build artifacts…
+<span class="q"> Allow Bash(rm -rf build)?</span></div>
+                <div class="opts">
+                  <button class="opt"><span class="n">1</span> Yes</button>
+                  <button class="opt"><span class="n">2</span> Yes, and don't ask again this session</button>
+                  <button class="opt"><span class="n">3</span> No, and tell Claude what to do differently</button>
+                </div>
+              </div>
+            </div>
+            <div class="msg user">
+              <div class="who">Já · před 7 min</div>
+              <div class="bubble-user">1</div>
+            </div>
+            <div class="msg">
+              <div class="who">Claude · právě teď</div>
+              <div class="bubble-claude">
+                <div class="snap"> build/ removed. Rebuilt in 4.1s.
+ 12 passed, 0 failed ✓
+<span class="q"> Ready to commit & push — proceed?</span></div>
+                <div class="opts">
+                  <button class="opt"><span class="n">1</span> Yes, commit and push</button>
+                  <button class="opt"><span class="n">2</span> Commit only</button>
+                  <button class="opt"><span class="n">3</span> No</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="composer">
+            <div class="quickrow">
+              <button class="chip">1</button><button class="chip">2</button><button class="chip">3</button>
+            </div>
+            <div class="inputrow">
+              <textarea class="field" placeholder="Napsat odpověď… (nebo číslo volby)"></textarea>
+              <button class="send">Odeslat</button>
+            </div>
+            <button class="term-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              Otevřít v terminálu
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- iPhone: list -->
+    <div class="col">
+      <div class="caption"><b>iPhone</b> — seznam</div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="phead">
+            <div class="h">Upozornění</div>
+            <div class="bellp">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+              <span class="badge">2</span>
+            </div>
+          </div>
+          <div class="plist">
+            <button class="item">
+              <div class="glyph perm">$_</div>
+              <div class="txt">
+                <div class="title">watchtower chce spustit příkaz</div>
+                <div class="reason">Čeká na povolení · Bash</div>
+                <div class="ago">před 2 min</div>
+              </div>
+            </button>
+            <button class="item">
+              <div class="glyph ask">?</div>
+              <div class="txt">
+                <div class="title">pps-technology se ptá</div>
+                <div class="reason">Dokončeno, čeká na vstup</div>
+                <div class="ago">před 6 min</div>
+              </div>
+            </button>
+            <button class="item">
+              <div class="glyph crash">!</div>
+              <div class="txt">
+                <div class="title">capacity-planning spadlo</div>
+                <div class="reason">Proces skončil</div>
+                <div class="ago">před 20 min</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- iPhone: thread compose -->
+    <div class="col">
+      <div class="caption"><b>iPhone</b> — vlákno (bez „Otevřít v terminálu“)</div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="phead">
+            <div class="glyph perm" style="width:28px;height:28px">$_</div>
+            <div class="h" style="font-size:14px">watchtower</div>
+            <div class="bellp" style="background:none;color:var(--t-muted)">✕</div>
+          </div>
+          <div class="pcompose">
+            <div class="thread" style="flex:1">
+              <div class="msg">
+                <div class="who">Claude · před 3 min</div>
+                <div class="bubble-claude">
+                  <div class="snap"><span class="q"> Allow Bash(rm -rf build)?</span></div>
+                  <div class="opts">
+                    <button class="opt"><span class="n">1</span> Yes</button>
+                    <button class="opt"><span class="n">2</span> Yes, don't ask again</button>
+                    <button class="opt"><span class="n">3</span> No, tell Claude</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="composer">
+              <div class="quickrow">
+                <button class="chip">1</button><button class="chip">2</button><button class="chip">3</button>
+              </div>
+              <div class="inputrow">
+                <textarea class="field" placeholder="Napsat odpověď…"></textarea>
+                <button class="send">Odeslat</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

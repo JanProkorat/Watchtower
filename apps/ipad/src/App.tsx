@@ -17,7 +17,8 @@ import { WorkspacePane } from './components/WorkspacePane.js';
 import { useWorkspaceLayout } from './state/useWorkspaceLayout.js';
 import { groupInstancesByProject } from '@watchtower/shared/groupInstances.js';
 import { SpawnModal } from './components/SpawnModal.js';
-import { NotificationHub } from './components/NotificationHub.js';
+import { NotificationHub, AttentionThreadDrawer, mergeAttention } from '@watchtower/module-attention';
+import { useAttentionThreads } from '@watchtower/data-supabase';
 import { WakeButton } from './components/WakeButton.js';
 import { ConnectionFields } from './components/ConnectionFields.js';
 import { ToastStack, type ToastItem } from './components/ToastStack.js';
@@ -292,14 +293,25 @@ interface ShellProps {
   onConnectionChange: (c: Connection) => void;
 }
 
-function Shell({ connection, onConnectionChange }: ShellProps) {
+export function Shell({ connection, onConnectionChange }: ShellProps) {
   const [activeModule, setActiveModule] = useState<RailModule>('dashboard');
   const [billingSection, setBillingSection] = useState<BillingSection>('earnings');
   const { activeId, setActiveId } = useActiveTerminal();
-  const { items: attention, ackedIds, acknowledge } = useAttention();
+  // Live per-instance attention (local orchestrator state), with the client-side
+  // acked overlay applied — `items` is the acked-filtered list, so focusing an
+  // instance still drops it from the bell. This is the "live" half of the merge.
+  const { items: liveItems, ackedIds, acknowledge } = useAttention();
   const [hubOpen, setHubOpen] = useState(false);
+  const [openThreadId, setOpenThreadId] = useState<string | null>(null);
   const { blockedIds } = useAuthBlock();
   const { bridge, status, reconnect } = useConnection();
+
+  // Escalation threads (Supabase-backed, cross-device) — the other half of the
+  // merge. Poll while the hub or a thread drawer is open so replies/answers show
+  // near-live without a push channel.
+  const { threads } = useAttentionThreads({ pollWhileOpen: hubOpen || openThreadId != null });
+  const bellItems = useMemo(() => mergeAttention(threads, liveItems), [threads, liveItems]);
+  const openThread = openThreadId != null ? (threads.find((t) => t.instanceId === openThreadId) ?? null) : null;
 
   // Once we've had a live connection, any later non-connected state is a
   // *reconnect* — keep the status toast steady (one message/colour) instead of
@@ -346,6 +358,14 @@ function Shell({ connection, onConnectionChange }: ShellProps) {
     setActiveId(id);
     if (id) acknowledge(id);
   }, [setActiveId, acknowledge]);
+
+  // Jump from a notification/thread to the live terminal for that instance:
+  // switch to the Instances module, focus it, and dismiss the thread drawer.
+  const openInTerminal = useCallback((id: string) => {
+    setActiveModule('instances');
+    selectInstance(id);
+    setOpenThreadId(null);
+  }, [selectInstance]);
 
   // Rail child tap: switch to billing and route to the chosen sub-section.
   const selectBilling = useCallback((tab: BillingSection) => {
@@ -456,7 +476,7 @@ function Shell({ connection, onConnectionChange }: ShellProps) {
           billingSection={billingSection}
           onSelect={setActiveModule}
           onSelectBillingTab={selectBilling}
-          notificationCount={attention.length}
+          notificationCount={bellItems.length}
           onOpenNotifications={() => setHubOpen(true)}
         />
 
@@ -482,12 +502,32 @@ function Shell({ connection, onConnectionChange }: ShellProps) {
           )}
         </Suspense>
 
-        {/* Notification hub popover */}
+        {/* Notification hub popover — bell feed is the merged source (threads +
+            live). A thread item opens the reply drawer; a bare live item falls
+            back to opening the instance's terminal. */}
         {hubOpen && (
           <NotificationHub
-            items={attention}
+            items={bellItems}
             onClose={() => setHubOpen(false)}
-            onSelect={(id) => { setActiveModule('instances'); selectInstance(id); setHubOpen(false); }}
+            onSelect={(id) => {
+              // Route on the MERGED item's hasThread (what the bell rendered),
+              // not a bare threads.find — a live instance that also has a
+              // CLOSED/answered thread must open the terminal, not the drawer.
+              const hasThread = bellItems.find((b) => b.instanceId === id)?.hasThread;
+              if (hasThread) setOpenThreadId(id);
+              else openInTerminal(id);
+              setHubOpen(false);
+            }}
+          />
+        )}
+
+        {/* Escalation reply drawer — shown when a thread notification is tapped.
+            "Open in terminal" is offered only when the Mac bridge is connected. */}
+        {openThread && (
+          <AttentionThreadDrawer
+            thread={openThread}
+            onClose={() => setOpenThreadId(null)}
+            openInTerminal={status === 'connected' ? openInTerminal : undefined}
           />
         )}
 

@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  // .tsx component tests use the automatic JSX runtime so React need not be
+  // imported into scope (matches the apps' react-jsx tsconfig setting).
+  esbuild: { jsx: 'automatic' },
   resolve: {
     alias: {
       '@watchtower/shared': path.resolve(__dirname, 'packages/shared/src'),
@@ -18,7 +21,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+    setupFiles: ['tests/setup.ts'],
     reporters: ['default'],
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } },

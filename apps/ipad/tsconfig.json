@@ -13,7 +13,8 @@
       "@watchtower/transport": ["../../packages/transport/src/index.ts"],
       "@watchtower/ui-core": ["../../packages/ui-core/src/index.ts"],
       "@watchtower/data-supabase": ["../../packages/data-supabase/src/index.ts"],
-      "@watchtower/module-timetracker": ["../../packages/module-timetracker/src/index.ts"]
+      "@watchtower/module-timetracker": ["../../packages/module-timetracker/src/index.ts"],
+      "@watchtower/module-attention": ["../../packages/module-attention/src/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"]

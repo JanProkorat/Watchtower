@@ -13,13 +13,20 @@ const ATTENTION: ReadonlyArray<InstanceStatus> = ['waiting-permission', 'idle-no
 export class EscalationGate {
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private windowFocused = true;
+  private engaged = new Set<string>();
 
   constructor(
     private getParams: () => EscalationParams,
     private onFire: (instanceId: string, cwd: string, kind: EscalationKind) => void,
   ) {}
 
-  setWindowFocused(focused: boolean): void { this.windowFocused = focused; }
+  setWindowFocused(focused: boolean): void {
+    this.windowFocused = focused;
+    if (focused) this.engaged.clear();
+  }
+
+  /** Mark an instance as having received a remote reply — its next attention entry fires immediately. */
+  markRemotelyEngaged(instanceId: string): void { this.engaged.add(instanceId); }
 
   apply(instanceId: string, cwd: string, prev: InstanceStatus, next: InstanceStatus): void {
     if (prev === next) return;
@@ -42,6 +49,12 @@ export class EscalationGate {
     if (kind === 'idle-notify' && !p.triggers.idle) return;
 
     this.clear(instanceId);
+
+    if (this.engaged.has(instanceId) && !this.windowFocused) {
+      this.onFire(instanceId, cwd, kind);
+      return;
+    }
+
     const timer = setTimeout(() => {
       this.timers.delete(instanceId);
       if (!this.windowFocused) this.onFire(instanceId, cwd, kind);

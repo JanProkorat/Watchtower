@@ -292,4 +292,58 @@ END $$;`,
        END $$;`,
     ],
   },
+  {
+    version: 12,
+    up: [
+      `CREATE TABLE IF NOT EXISTS attention_messages (
+         id            BIGSERIAL PRIMARY KEY,
+         sync_id       TEXT UNIQUE NOT NULL,
+         instance_id   TEXT NOT NULL,
+         project_label TEXT,
+         role          TEXT NOT NULL,
+         kind          TEXT,
+         body          TEXT,
+         options       JSONB,
+         reply_to      TEXT,
+         injected_at   TIMESTAMPTZ,
+         closed_at     TIMESTAMPTZ,
+         created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_attn_instance ON attention_messages(instance_id, created_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_attn_pending_user ON attention_messages(role, injected_at)
+         WHERE role = 'user' AND injected_at IS NULL`,
+      // RLS + authenticated policies/grants. Role-guarded (mirrors v4/v6-v9) so
+      // a plain Postgres (local dev / test harness) without the Supabase-built-in
+      // `authenticated` role still applies cleanly: RLS is enabled unconditionally,
+      // the policies and grants are skipped where the client role is absent.
+      // Idempotent: ENABLE RLS is re-run-safe; DROP POLICY IF EXISTS precedes each
+      // CREATE POLICY. The sequence GRANT lives inside the guard (also role-scoped).
+      `ALTER TABLE attention_messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS attn_read ON attention_messages;
+DROP POLICY IF EXISTS attn_write ON attention_messages;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE POLICY attn_read ON attention_messages FOR SELECT TO authenticated USING (true);
+    CREATE POLICY attn_write ON attention_messages FOR INSERT TO authenticated WITH CHECK (role = 'user');
+    GRANT SELECT, INSERT ON attention_messages TO authenticated;
+    GRANT USAGE, SELECT ON SEQUENCE attention_messages_id_seq TO authenticated;
+  END IF;
+END $$;`,
+      `CREATE TABLE IF NOT EXISTS push_devices (
+         id            BIGSERIAL PRIMARY KEY,
+         apns_token    TEXT UNIQUE NOT NULL,
+         platform      TEXT NOT NULL DEFAULT 'ios',
+         registered_at TIMESTAMPTZ NOT NULL DEFAULT now()
+       )`,
+      `ALTER TABLE push_devices ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS pushdev_write ON push_devices;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE POLICY pushdev_write ON push_devices FOR INSERT TO authenticated WITH CHECK (true);
+    GRANT INSERT ON push_devices TO authenticated;
+    GRANT USAGE, SELECT ON SEQUENCE push_devices_id_seq TO authenticated;
+  END IF;
+END $$;`,
+    ],
+  },
 ];

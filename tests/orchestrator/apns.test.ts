@@ -24,9 +24,9 @@ describe('apns', () => {
   });
 
   it('builds an aps payload with alert + custom data', () => {
-    const raw = buildApnsPayload({ title: 'watchtower-api', body: 'čeká na povolení', data: { instanceId: 'i1' } });
+    const raw = buildApnsPayload({ title: 'watchtower-api', body: 'permission needed', data: { instanceId: 'i1' } });
     expect(JSON.parse(raw)).toEqual({
-      aps: { alert: { title: 'watchtower-api', body: 'čeká na povolení' }, sound: 'default' },
+      aps: { alert: { title: 'watchtower-api', body: 'permission needed' }, sound: 'default' },
       instanceId: 'i1',
     });
   });

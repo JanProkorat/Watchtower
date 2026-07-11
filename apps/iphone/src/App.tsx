@@ -1,5 +1,5 @@
-import { useState, type CSSProperties } from 'react';
-import { useSupabaseAuth } from '@watchtower/data-supabase';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useSupabaseAuth, useAttentionThreads } from '@watchtower/data-supabase';
 import {
   BillingLogin,
   BoardView,
@@ -12,6 +12,8 @@ import {
   TaskListView,
   TimeOffView,
 } from '@watchtower/module-timetracker';
+import { NotificationHub, AttentionThreadDrawer, mergeAttention } from '@watchtower/module-attention';
+import { registerPush } from './registerPush.js';
 import { text, glassPanel, accentIcon } from '@watchtower/ui-core';
 
 // ---------------------------------------------------------------------------
@@ -38,6 +40,9 @@ const TIMEOFF_D = 'm21 19.57-1.427 1.428-6.442-6.442 1.43-1.428zM13.12 3c-2.58 0
 // column dividers — matches the icon used in the iPad Rail for the same tab.
 const BOARD_D = 'M22 3H2v18h20V3zM8 19H4V5h4v14zm6 0h-4V5h4v14zm6 0h-4V5h4v14z';
 const SIGNOUT_D = 'M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4z';
+// Bell glyph — lifted from the iPad Rail (same icon, same bell->hub->drawer
+// convention) so both remote-plane apps read as one attention feed.
+const BELL_D = 'M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2m6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1z';
 
 function Icon({ d, size = 22 }: { d: string; size?: number }): JSX.Element {
   return (
@@ -78,12 +83,31 @@ const TITLES: Record<Tab | RecordsSection, string> = {
 // Shell — rendered once the user is signed in.
 // ---------------------------------------------------------------------------
 
-function Shell({ signOut }: { signOut: () => Promise<void> }): JSX.Element {
+export function Shell({ signOut }: { signOut: () => Promise<void> }): JSX.Element {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [recordsSection, setRecordsSection] = useState<RecordsSection>('records-list');
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   // Month the caller was viewing when drilling in — detail opens on it, not today.
   const [selectedMonth, setSelectedMonth] = useState<string | undefined>(undefined);
+
+  // Attention bell — Supabase-backed escalation threads only; iPhone has no
+  // Mac bridge, so there are no "live" per-instance items to merge in (unlike
+  // the iPad's mergeAttention(threads, liveItems)).
+  const [hubOpen, setHubOpen] = useState(false);
+  const [openThreadId, setOpenThreadId] = useState<string | null>(null);
+  const { threads } = useAttentionThreads({ pollWhileOpen: hubOpen || openThreadId != null });
+  const bellItems = useMemo(() => mergeAttention(threads, []), [threads]);
+  const openThread = openThreadId != null ? (threads.find((t) => t.instanceId === openThreadId) ?? null) : null;
+
+  // registerPush() (F1) once per Shell mount — Shell is only mounted once the
+  // user is signed in (App renders it only when useSupabaseAuth's status is
+  // neither 'loading' nor 'out'), so an empty-deps effect here already fires
+  // exactly once per authenticated session, with no separate session check
+  // needed. Mirrors the iPad's registerForPush effect (also fire-and-forget,
+  // no toast — push registration failure is non-fatal to the app).
+  useEffect(() => {
+    void registerPush();
+  }, []);
 
   const openProject = (id: number, month?: string) => { setSelectedProject(id); setSelectedMonth(month); };
   const closeProject = () => setSelectedProject(null);
@@ -104,12 +128,18 @@ function Shell({ signOut }: { signOut: () => Promise<void> }): JSX.Element {
 
   return (
     <div style={shellRoot}>
-      {/* Compact top header — active section title + sign-out. */}
+      {/* Compact top header — active section title + bell + sign-out. */}
       <header style={headerBar}>
         <span style={headerTitle}>{title}</span>
-        <button onClick={() => void signOut()} style={signOutBtn} aria-label="Odhlásit se">
-          <Icon d={SIGNOUT_D} size={20} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => setHubOpen(true)} style={bellBtn} title="Notifications" aria-label="Notifications">
+            <Icon d={BELL_D} size={19} />
+            {bellItems.length > 0 && <span style={bellBadge}>{bellItems.length}</span>}
+          </button>
+          <button onClick={() => void signOut()} style={signOutBtn} aria-label="Odhlásit se">
+            <Icon d={SIGNOUT_D} size={20} />
+          </button>
+        </div>
       </header>
 
       {/* Records sub-nav — a top segmented control under the header (only on the
@@ -170,6 +200,27 @@ function Shell({ signOut }: { signOut: () => Promise<void> }): JSX.Element {
           );
         })}
       </nav>
+
+      {/* Notification hub popover — thread-only bell feed (no live items, no
+          Mac bridge on iPhone). Selecting an item always opens the reply
+          drawer since every iPhone bell item is backed by a thread. */}
+      {hubOpen && (
+        <NotificationHub
+          items={bellItems}
+          onClose={() => setHubOpen(false)}
+          onSelect={(id) => {
+            setOpenThreadId(id);
+            setHubOpen(false);
+          }}
+        />
+      )}
+
+      {/* Escalation reply drawer — no `openInTerminal` prop: iPhone has no
+          live terminal / Mac bridge, so the "Open in terminal" action never
+          renders (unlike the iPad's connected-only version of this button). */}
+      {openThread && (
+        <AttentionThreadDrawer thread={openThread} onClose={() => setOpenThreadId(null)} />
+      )}
     </div>
   );
 }
@@ -211,6 +262,9 @@ const shellRoot: CSSProperties = {
   backgroundColor: 'transparent',
   fontFamily: 'system-ui, sans-serif',
   color: text.primary,
+  // Positioned ancestor for the NotificationHub popover (position: absolute,
+  // anchored top-left of the Shell rather than the whole document).
+  position: 'relative',
 };
 
 const headerBar: CSSProperties = {
@@ -240,6 +294,40 @@ const signOutBtn: CSSProperties = {
   color: text.muted,
   cursor: 'pointer',
   WebkitTapHighlightColor: 'transparent',
+};
+
+// Bell button — same glass chip as sign-out, plus a relative anchor point for
+// the floating unread-count badge.
+const bellBtn: CSSProperties = {
+  position: 'relative',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 38,
+  height: 38,
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.12)',
+  background: 'rgba(255,255,255,0.06)',
+  color: text.muted,
+  cursor: 'pointer',
+  WebkitTapHighlightColor: 'transparent',
+};
+
+const bellBadge: CSSProperties = {
+  position: 'absolute',
+  top: 3,
+  right: 3,
+  minWidth: 15,
+  height: 15,
+  padding: '0 4px',
+  borderRadius: 8,
+  background: '#dc2626',
+  color: '#fff',
+  fontSize: 10,
+  fontWeight: 700,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 
 // Records secondary nav — a top segmented control (glass track + active pill),
