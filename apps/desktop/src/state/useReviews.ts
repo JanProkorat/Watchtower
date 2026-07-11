@@ -116,13 +116,20 @@ export function useReviews() {
   const loadReviewStates = useCallback(async (): Promise<void> => {
     // No repoKey → all repos, ordered id DESC (newest first), so the first row seen
     // per (host, repoKey, prNumber) key is that PR's latest review.
-    const reviews = await listReviews();
-    const map = new Map<string, PrReviewPayload>();
-    for (const r of reviews) {
-      const key = `${r.host}:${r.repoKey}:${r.prNumber}`;
-      if (!map.has(key)) map.set(key, r);
+    try {
+      const reviews = await listReviews();
+      const map = new Map<string, PrReviewPayload>();
+      for (const r of reviews) {
+        const key = `${r.host}:${r.repoKey}:${r.prNumber}`;
+        if (!map.has(key)) map.set(key, r);
+      }
+      setReviewStates(map);
+    } catch (err) {
+      // Surface via the hook's existing `error` state (rendered by ModuleReviews'
+      // Alert) — a rejected prReview:list must not silently fail the whole
+      // review-state map (grey/amber/green/red dots on the PR list).
+      setError(err instanceof Error ? err.message : String(err));
     }
-    setReviewStates(map);
   }, [listReviews]);
 
   useEffect(() => { void loadReviewStates(); }, [loadReviewStates]);

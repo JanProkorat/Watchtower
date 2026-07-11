@@ -104,4 +104,29 @@ describe('PrReviewsRepo', () => {
     const filtered = repo.list('acme/widgets');
     expect(filtered.map((r) => r.id)).toEqual([id1]);
   });
+
+  it('failStuckRunning() sweeps running rows to error and leaves done rows alone', () => {
+    const running1 = repo.start('github.com', 'acme/widgets', 42, 'sha1');
+    const running2 = repo.start('github.com', 'acme/other', 7, 'sha2');
+    const done = repo.start('github.com', 'acme/widgets', 43, 'sha3');
+    repo.finish(done, 'all good', '[]');
+
+    const changed = repo.failStuckRunning('x');
+    expect(changed).toBe(2);
+
+    const row1 = repo.get(running1)!;
+    expect(row1.status).toBe('error');
+    expect(row1.error).toBe('x');
+    expect(row1.finished_at).toBeTruthy();
+
+    const row2 = repo.get(running2)!;
+    expect(row2.status).toBe('error');
+    expect(row2.error).toBe('x');
+    expect(row2.finished_at).toBeTruthy();
+
+    const doneRow = repo.get(done)!;
+    expect(doneRow.status).toBe('done');
+    expect(doneRow.summary).toBe('all good');
+    expect(doneRow.error).toBeNull();
+  });
 });

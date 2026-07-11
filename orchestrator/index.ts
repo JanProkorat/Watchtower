@@ -223,6 +223,12 @@ function prReviewsRepo(): PrReviewsRepo {
 }
 
 function reviewPayloadOf(row: PrReviewRow): PrReviewPayload {
+  let findings: PrFindingPayload[] = [];
+  try {
+    findings = row.findings_json ? (JSON.parse(row.findings_json) as PrFindingPayload[]) : [];
+  } catch {
+    findings = [];
+  }
   return {
     id: row.id,
     host: row.host as PrHost,
@@ -231,7 +237,7 @@ function reviewPayloadOf(row: PrReviewRow): PrReviewPayload {
     headSha: row.head_sha,
     status: row.status,
     summary: row.summary,
-    findings: row.findings_json ? (JSON.parse(row.findings_json) as PrFindingPayload[]) : [],
+    findings,
     error: row.error,
     createdAt: row.created_at,
     finishedAt: row.finished_at,
@@ -1372,6 +1378,12 @@ function respawnIncompleteRowsOnBoot(): void {
       const hub = readHubConfig(new SettingsRepo(handle!.db));
       return { escalateMs: hub.escalateMs, triggers: hub.triggers, armEnabled: hub.enabled };
     }, onEscalate);
+    // Any pr_reviews row still 'running' belonged to the previous orchestrator
+    // process and its in-memory runReview() promise is gone — sweep it to
+    // 'error' so it isn't a permanent dead-end (PR list stuck "reviewing…",
+    // Report drawer spinning with no Re-run button). Mirrors the instance
+    // recovery pass just below.
+    prReviewsRepo().failStuckRunning('Interrupted by restart');
     // Respawn after api is ready so the resumed pty's first output/exit can
     // push through to the renderer immediately.
     respawnIncompleteRowsOnBoot();

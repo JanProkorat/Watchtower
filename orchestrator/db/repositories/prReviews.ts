@@ -48,6 +48,22 @@ export class PrReviewsRepo {
       .run(error, finishedAt, id);
   }
 
+  /**
+   * Sweep any row left `status='running'` (a review whose in-memory
+   * runReview() promise died with the previous orchestrator process) to
+   * `error` on boot. Mirrors the instance-recovery pass in
+   * `respawnIncompleteRowsOnBoot()` — without this, a restart leaves the row
+   * stuck 'running' forever: the PR list shows "reviewing…" and the Report
+   * drawer spins with no Re-run button. Returns the number of rows changed.
+   */
+  failStuckRunning(message: string): number {
+    const finishedAt = new Date().toISOString();
+    const info = this.db
+      .prepare(`UPDATE pr_reviews SET status = 'error', error = ?, finished_at = ? WHERE status = 'running'`)
+      .run(message, finishedAt) as { changes: number | bigint };
+    return Number(info.changes);
+  }
+
   get(id: number): PrReviewRow | undefined {
     return this.db.prepare(`SELECT * FROM pr_reviews WHERE id = ?`).get(id) as
       | PrReviewRow
