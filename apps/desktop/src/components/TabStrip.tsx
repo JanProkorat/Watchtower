@@ -4,12 +4,13 @@ import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { TabId, TabRecord } from '@watchtower/shared/layout.js';
 import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 import { tabAccent } from '../util/tabAccent.js';
-import { glassFloating, accentWash, accentRing, accentActiveText, statusDot } from '../theme/glass.js';
+import { glassFloating, accentWash, accentRing, accentActiveText, statusDot, ATTENTION_AMBER } from '../theme/glass.js';
 
 // Outer tab dot is locked to the project's accent color (or a hash-based
 // palette pick for ad-hoc cwd tabs). Per-session attention status is
@@ -86,9 +87,15 @@ function TabButton({
     >
       {attention ? (
         <Tooltip title="A session here needs your attention" placement="bottom">
-          <Box
+          <WarningRoundedIcon
             aria-label={`${label} needs your attention`}
-            sx={statusDot('attention', accent, theme)}
+            sx={{
+              fontSize: 17,
+              flexShrink: 0,
+              // Design amber + a soft glow so it reads as a live alert.
+              color: ATTENTION_AMBER,
+              filter: `drop-shadow(0 0 5px ${ATTENTION_AMBER}aa)`,
+            }}
           />
         </Tooltip>
       ) : (

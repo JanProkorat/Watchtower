@@ -6,6 +6,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { PaneCard } from './PaneCard.js';
 import { EmptyWorkspace } from './EmptyWorkspace.js';
 import type { TabRecord } from '@watchtower/shared/layout.js';
+import { ACTION_NEEDED_STATUSES } from '@watchtower/shared/tabAttention.js';
 import type { InstanceView } from '../../state/useInstances.js';
 import { tabAccent } from '../../util/tabAccent.js';
 
@@ -198,6 +199,7 @@ export function LeafView({
                   taskId={s.taskId}
                   cwd={s.cwd}
                   focused={focused && tab.focusedInstanceId === instanceId}
+                  attention={ACTION_NEEDED_STATUSES.has(s.status)}
                   accent={accent}
                   onFocus={() => onFocusColumn(instanceId)}
                   onHide={() => onHideSession(instanceId)}

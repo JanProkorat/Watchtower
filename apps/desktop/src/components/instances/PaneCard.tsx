@@ -5,8 +5,10 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import { ColumnSlot } from './ColumnSlot.js';
 import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
+import { ATTENTION_AMBER } from '../../theme/glass.js';
 
 interface Props {
   instanceId: string;
@@ -15,6 +17,8 @@ interface Props {
   taskId: number | null;
   cwd: string;
   focused: boolean;
+  /** This instance is blocked on the user (waiting-permission/input, crashed). */
+  attention: boolean;
   accent?: string;
   onFocus(): void;
   onHide(): void;
@@ -40,6 +44,7 @@ export function PaneCard({
   taskId,
   cwd,
   focused,
+  attention,
   accent,
   onFocus,
   onHide,
@@ -64,10 +69,11 @@ export function PaneCard({
     >
       <ColumnSlot instanceId={instanceId} onFocus={onFocus} />
 
-      {/* Focus indicator — accent line along the card's top edge, drawn as an
-          overlay ABOVE the terminal (an inset shadow on the slot would be
-          hidden behind the xterm host). iPad PaneTerminal language. */}
-      {focused && (
+      {/* Top-edge line, drawn as an overlay ABOVE the terminal (an inset shadow
+          on the slot would be hidden behind the xterm host). Amber + glowing
+          when the instance needs attention (shown even when unfocused so it's
+          easy to spot); otherwise the accent focus line. iPad language. */}
+      {(focused || attention) && (
         <Box
           sx={{
             position: 'absolute',
@@ -75,10 +81,29 @@ export function PaneCard({
             left: 0,
             right: 0,
             height: '3px',
-            backgroundColor: accent ?? '#818cf8',
+            backgroundColor: attention ? ATTENTION_AMBER : accent ?? '#818cf8',
+            boxShadow: attention ? `0 0 10px ${ATTENTION_AMBER}` : 'none',
             borderTopLeftRadius: '12px',
             borderTopRightRadius: '12px',
             zIndex: 7,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {/* Which instance needs attention — a glowing warning badge, matching the
+          project tab's ⚠ marker. */}
+      {attention && (
+        <WarningRoundedIcon
+          aria-label="needs your attention"
+          sx={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            zIndex: 7,
+            fontSize: 18,
+            color: ATTENTION_AMBER,
+            filter: `drop-shadow(0 0 5px ${ATTENTION_AMBER}aa)`,
             pointerEvents: 'none',
           }}
         />
