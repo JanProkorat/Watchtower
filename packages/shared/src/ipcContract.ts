@@ -89,6 +89,7 @@ export type IpcRequest =
   | { kind: 'prReview:get'; payload: { reviewId: number } }
   | { kind: 'prReview:list'; payload: { repoKey?: string } }
   | { kind: 'prReview:cancel'; payload: { reviewId: number } }
+  | { kind: 'prReview:postComments'; payload: { reviewId: number; findingIndexes: number[]; devopsPats?: Record<string, string> } }
   | { kind: 'devops:setPat'; payload: { host: string; pat: string } }
   | { kind: 'devops:hasPat'; payload: { host: string } };
 
@@ -558,6 +559,7 @@ export interface PrFindingPayload {
   category: string;
   summary: string;
   detail?: string;
+  posted?: boolean;
 }
 
 export interface PrReviewPayload {
@@ -685,7 +687,8 @@ export type IpcResponse =
   | { kind: 'prReview:start'; payload: { reviewId: number } }
   | { kind: 'prReview:get'; payload: { review: PrReviewPayload | null } }
   | { kind: 'prReview:list'; payload: { reviews: PrReviewPayload[] } }
-  | { kind: 'prReview:cancel'; payload: { ok: true } };
+  | { kind: 'prReview:cancel'; payload: { ok: true } }
+  | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } };
 
 export interface AgentRowPayload {
   name: string;

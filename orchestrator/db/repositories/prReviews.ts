@@ -40,6 +40,11 @@ export class PrReviewsRepo {
       .run(summary, findingsJson, finishedAt, id);
   }
 
+  /** Overwrite the findings JSON for a review (e.g. after marking findings posted). */
+  updateFindings(id: number, findingsJson: string): void {
+    this.db.prepare(`UPDATE pr_reviews SET findings_json = ? WHERE id = ?`).run(findingsJson, id);
+  }
+
   /** Mark a review errored with the error message. */
   fail(id: number, error: string): void {
     const finishedAt = new Date().toISOString();

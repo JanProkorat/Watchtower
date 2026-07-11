@@ -106,7 +106,16 @@ export type OrchRequest =
     }
   | { id: string; kind: 'prReview:get'; payload: { reviewId: number } }
   | { id: string; kind: 'prReview:list'; payload: { repoKey?: string } }
-  | { id: string; kind: 'prReview:cancel'; payload: { reviewId: number } };
+  | { id: string; kind: 'prReview:cancel'; payload: { reviewId: number } }
+  | {
+      id: string;
+      kind: 'prReview:postComments';
+      payload: {
+        reviewId: number;
+        findingIndexes: number[];
+        devopsPats?: Record<string, string>;
+      };
+    };
 
 export interface OrchRunningInstance {
   id: string;
@@ -592,7 +601,8 @@ export type OrchResponse =
   | { kind: 'prReview:start'; payload: { reviewId: number } }
   | { kind: 'prReview:get'; payload: { review: import('./ipcContract.js').PrReviewPayload | null } }
   | { kind: 'prReview:list'; payload: { reviews: import('./ipcContract.js').PrReviewPayload[] } }
-  | { kind: 'prReview:cancel'; payload: { ok: true } };
+  | { kind: 'prReview:cancel'; payload: { ok: true } }
+  | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
