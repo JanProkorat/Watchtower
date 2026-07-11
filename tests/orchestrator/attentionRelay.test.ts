@@ -45,6 +45,26 @@ describe('AttentionRelay', () => {
     expect(n).toBe(1);
     expect(deliver).toHaveBeenCalledWith('inst-1', '1');
     expect(pg.updates.length).toBe(1);
+    // UPDATE carried the right params: [now(), sync_id]
+    expect(pg.updates[0]).toContain('r1');
+    expect(pg.updates[0]).toContain('now');
+  });
+
+  it('stamps a dead reply (deliverReply false) exactly once — never retried', async () => {
+    const pg = fakePg();
+    pg.setPending([{ sync_id: 'r1', instance_id: 'inst-gone', body: '2' }]);
+    const deliver = vi.fn(() => false); // instance gone
+    const relay = createAttentionRelay({
+      pg, getSnapshot: async () => '', deliverReply: deliver,
+      resolveLabel: () => 'x', newId: () => 'id', now: () => 'now',
+    });
+    const n = await relay.pollOnce();
+    expect(n).toBe(1);
+    expect(deliver).toHaveBeenCalledWith('inst-gone', '2');
+    // injected_at UPDATE ran exactly once even though delivery failed:
+    // locks in that a dead reply is stamped and never retried forever.
+    expect(pg.updates.length).toBe(1);
+    expect(pg.updates[0]).toContain('r1');
   });
 
   it('is a no-op when pg is null', async () => {
