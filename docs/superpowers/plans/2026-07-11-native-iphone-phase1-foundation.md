@@ -1,0 +1,1072 @@
+# Native iPhone — Phase 1 (Foundation) Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Stand up the native Swift/SwiftUI foundation — a shared `WatchtowerCore` SPM package (TCA + supabase-swift), a working email/password auth gate, and a signed-in tab-shell scaffold — so later phases drop feature views into a proven architecture.
+
+**Architecture:** The Composable Architecture (TCA). Feature reducers, models, theme, and dependency clients live in the device-agnostic `WatchtowerCore` SPM package (reused by the future native iPad); the `apps/iphone-native` Xcode app target holds only SwiftUI views + the `@main` entry. Network is the official `supabase-swift` SDK wrapped behind a `SupabaseClient` `@Dependency`; auth session is persisted by the SDK in the Keychain. Data flow is unidirectional: views send actions to a `Store`, reducers run pure logic + effects that call dependency clients.
+
+**Tech Stack:** Swift 5.10+, SwiftUI, The Composable Architecture (`swift-composable-architecture`), `supabase-swift`, Swift Testing / XCTest via TCA `TestStore`, Xcode 16.
+
+## Global Constraints
+
+- **iOS deployment target: 17.0** (Observation-based TCA + Swift Charts baseline; Liquid Glass niceties applied progressively on newer OS).
+- **Architecture: TCA**, `@Reducer` + `@ObservableState`; every feature is a reducer in `WatchtowerCore/Features`; views live only in the app target.
+- **Dependencies via `@Dependency`** — reducers never call `supabase-swift` or disk directly; all I/O goes through a dependency client with `liveValue` + `testValue`.
+- **UI language: English.** All user-facing strings in English. (Formatting — dates `D. M. YYYY`, numbers `1 234,56`, currency `Kč` — stays cs-CZ, but no formatting is introduced in Phase 1.)
+- **Bundle identifier: `cz.greencode.watchtower.ios`** — deliberately distinct from the Capacitor app's `cz.greencode.watchtower.iphone` so both install side-by-side during the parity period.
+- **Secrets never committed.** `SUPABASE_URL` + `SUPABASE_ANON_KEY` come from a git-ignored `Secrets.xcconfig` surfaced through `Info.plist`; dev Supabase URL default is `https://xggihnrvsmbzbkhsnuky.supabase.co`.
+- **Palette (from `@watchtower/ui-core`):** `baseBg #0b0c11`, `textPrimary #e5e7eb`, `textMuted #9aa1ab`, `textDim #5a6072`, `accent #7c6df0`, `accentIcon #c9bdff`, cta gradient `#8b7cf2 → #6d5fe0`.
+- **Every reducer ships with `TestStore` tests.** A task with a reducer is not done until its reducer tests pass.
+
+---
+
+## File Structure
+
+```
+swift/WatchtowerCore/
+├─ Package.swift                              # SPM: TCA + supabase-swift deps, WatchtowerCore lib + test target
+├─ Sources/WatchtowerCore/
+│  ├─ Theme/Palette.swift                     # Color tokens + Color(hex:) initializer
+│  ├─ Config/SupabaseConfig.swift             # parse URL + anon key from a [String:Any] bag
+│  ├─ Dependencies/SupabaseClient.swift       # @DependencyClient: auth surface (session, signIn, signOut, authEvents)
+│  ├─ Features/AuthFeature.swift              # @Reducer — login state machine
+│  └─ Features/AppFeature.swift               # @Reducer — root auth gate + tab selection
+└─ Tests/WatchtowerCoreTests/
+   ├─ PaletteTests.swift
+   ├─ SupabaseConfigTests.swift
+   ├─ AuthFeatureTests.swift
+   └─ AppFeatureTests.swift
+
+apps/iphone-native/
+├─ Watchtower.xcodeproj
+├─ Watchtower/
+│  ├─ WatchtowerApp.swift                     # @main + UIApplicationDelegateAdaptor stub, builds root Store
+│  ├─ AppDelegate.swift                       # UIApplicationDelegate stub (APNs hook lands Phase 6)
+│  ├─ Views/AuthView.swift                    # SwiftUI login screen (renders AuthFeature)
+│  ├─ Views/AppShellView.swift                # signed-in TabView scaffold (4 placeholder tabs) + auth gate switch
+│  ├─ Info.plist                              # reads $(SUPABASE_URL)/$(SUPABASE_ANON_KEY) from xcconfig
+│  ├─ Secrets.xcconfig                        # GIT-IGNORED — real values
+│  └─ Secrets.sample.xcconfig                 # committed template
+└─ .gitignore
+```
+
+---
+
+### Task 1: Project + package scaffold
+
+Stand up the Xcode app, the `WatchtowerCore` SPM package with its two third-party dependencies, wire the package into the app target, and prove the whole thing builds and an (empty) test target runs. Scaffolding + config + `.gitignore` all fold into this task because nothing is independently testable until the build graph exists.
+
+**Files:**
+- Create: `swift/WatchtowerCore/Package.swift`
+- Create: `swift/WatchtowerCore/Sources/WatchtowerCore/WatchtowerCore.swift` (placeholder marker)
+- Create: `swift/WatchtowerCore/Tests/WatchtowerCoreTests/SmokeTests.swift`
+- Create: `apps/iphone-native/Watchtower.xcodeproj` (+ `Watchtower/WatchtowerApp.swift`, `Info.plist`, `Secrets.sample.xcconfig`)
+- Create: `apps/iphone-native/.gitignore`
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces: `import WatchtowerCore` resolves; the app target links `WatchtowerCore`, `ComposableArchitecture`, and `Supabase`.
+
+- [ ] **Step 1: Write `Package.swift`**
+
+```swift
+// swift-tools-version: 5.10
+import PackageDescription
+
+let package = Package(
+    name: "WatchtowerCore",
+    platforms: [.iOS(.v17)],
+    products: [
+        .library(name: "WatchtowerCore", targets: ["WatchtowerCore"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.15.0"),
+        .package(url: "https://github.com/supabase/supabase-swift", from: "2.0.0"),
+    ],
+    targets: [
+        .target(
+            name: "WatchtowerCore",
+            dependencies: [
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "Supabase", package: "supabase-swift"),
+            ]
+        ),
+        .testTarget(
+            name: "WatchtowerCoreTests",
+            dependencies: ["WatchtowerCore"]
+        ),
+    ]
+)
+```
+
+- [ ] **Step 2: Add a placeholder source + a smoke test**
+
+`Sources/WatchtowerCore/WatchtowerCore.swift`:
+```swift
+public enum WatchtowerCore {
+    public static let name = "WatchtowerCore"
+}
+```
+
+`Tests/WatchtowerCoreTests/SmokeTests.swift`:
+```swift
+import XCTest
+@testable import WatchtowerCore
+
+final class SmokeTests: XCTestCase {
+    func testPackageName() {
+        XCTAssertEqual(WatchtowerCore.name, "WatchtowerCore")
+    }
+}
+```
+
+- [ ] **Step 3: Resolve dependencies and run the package tests**
+
+Run: `cd swift/WatchtowerCore && swift test`
+Expected: dependencies resolve (TCA + Supabase), build succeeds, `testPackageName` PASSES.
+
+- [ ] **Step 4: Create the Xcode app target**
+
+Create `apps/iphone-native/Watchtower.xcodeproj` with a single iOS App target "Watchtower":
+- Deployment target **iOS 17.0**, bundle id **`cz.greencode.watchtower.ios`**, interface SwiftUI, life-cycle SwiftUI App.
+- Add a **local package reference** to `../../swift/WatchtowerCore` and link the `WatchtowerCore` library to the app target.
+- Minimal `WatchtowerApp.swift`:
+```swift
+import SwiftUI
+import WatchtowerCore
+
+@main
+struct WatchtowerApp: App {
+    var body: some Scene {
+        WindowGroup {
+            Text(WatchtowerCore.name)
+        }
+    }
+}
+```
+
+- [ ] **Step 5: Add `Secrets.sample.xcconfig` + `.gitignore`**
+
+`apps/iphone-native/Watchtower/Secrets.sample.xcconfig`:
+```
+// Copy to Secrets.xcconfig (git-ignored) and fill in real values.
+SUPABASE_URL = https:/$()/xggihnrvsmbzbkhsnuky.supabase.co
+SUPABASE_ANON_KEY =
+```
+> Note: the `/$()/` splices the `//` so Xcode's xcconfig parser does not treat it as a comment.
+
+`apps/iphone-native/.gitignore`:
+```
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+# Secrets (never commit)
+Watchtower/Secrets.xcconfig
+# SPM
+.swiftpm/
+.build/
+```
+
+- [ ] **Step 6: Build the app target**
+
+Run: `cd apps/iphone-native && xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination 'platform=iOS Simulator,name=iPhone 16' build`
+Expected: **BUILD SUCCEEDED**.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add swift/WatchtowerCore apps/iphone-native
+git commit -m "feat(ios): scaffold WatchtowerCore package + iPhone app target"
+```
+
+---
+
+### Task 2: Theme palette + hex color initializer
+
+The one piece of Phase-1 theme with real logic worth a test: a `Color(hex:)` initializer. Ships the shared `Palette` all later views read from.
+
+**Files:**
+- Create: `swift/WatchtowerCore/Sources/WatchtowerCore/Theme/Palette.swift`
+- Test: `swift/WatchtowerCore/Tests/WatchtowerCoreTests/PaletteTests.swift`
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces: `Color(hex: String)` initializer; `enum Palette` with static `Color`s: `baseBg`, `textPrimary`, `textMuted`, `textDim`, `accent`, `accentIcon`; `Palette.ctaGradient: LinearGradient`.
+
+- [ ] **Step 1: Write the failing test**
+
+`PaletteTests.swift`:
+```swift
+import XCTest
+import SwiftUI
+@testable import WatchtowerCore
+
+final class PaletteTests: XCTestCase {
+    func testHexParsesToComponents() {
+        let c = Color(hex: "#7c6df0")
+        let ui = UIColor(c)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        ui.getRed(&r, green: &g, blue: &b, alpha: &a)
+        XCTAssertEqual(r, 0x7c / 255, accuracy: 0.01)
+        XCTAssertEqual(g, 0x6d / 255, accuracy: 0.01)
+        XCTAssertEqual(b, 0xf0 / 255, accuracy: 0.01)
+        XCTAssertEqual(a, 1.0, accuracy: 0.01)
+    }
+
+    func testPaletteAccentMatchesToken() {
+        XCTAssertEqual(UIColor(Palette.accent), UIColor(Color(hex: "#7c6df0")))
+    }
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd swift/WatchtowerCore && swift test --filter PaletteTests`
+Expected: FAIL — `Color(hex:)` / `Palette` are undefined.
+
+- [ ] **Step 3: Implement `Palette.swift`**
+
+```swift
+import SwiftUI
+
+public extension Color {
+    /// Parse a `#RRGGBB` (or `RRGGBB`) hex string. Falls back to clear on bad input.
+    init(hex: String) {
+        let s = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        guard s.count == 6, let v = UInt32(s, radix: 16) else { self = .clear; return }
+        self.init(
+            .sRGB,
+            red: Double((v >> 16) & 0xff) / 255,
+            green: Double((v >> 8) & 0xff) / 255,
+            blue: Double(v & 0xff) / 255,
+            opacity: 1
+        )
+    }
+}
+
+public enum Palette {
+    public static let baseBg = Color(hex: "#0b0c11")
+    public static let textPrimary = Color(hex: "#e5e7eb")
+    public static let textMuted = Color(hex: "#9aa1ab")
+    public static let textDim = Color(hex: "#5a6072")
+    public static let accent = Color(hex: "#7c6df0")
+    public static let accentIcon = Color(hex: "#c9bdff")
+
+    public static let ctaGradient = LinearGradient(
+        colors: [Color(hex: "#8b7cf2"), Color(hex: "#6d5fe0")],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd swift/WatchtowerCore && swift test --filter PaletteTests`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add swift/WatchtowerCore/Sources/WatchtowerCore/Theme swift/WatchtowerCore/Tests/WatchtowerCoreTests/PaletteTests.swift
+git commit -m "feat(ios): shared Palette + Color(hex:) initializer"
+```
+
+---
+
+### Task 3: SupabaseConfig loader
+
+Parse `SUPABASE_URL` + `SUPABASE_ANON_KEY` out of a `[String: Any]` bag (in the app: `Bundle.main.infoDictionary`). Pure and fully testable; throws a clear error when the anon key is missing — mirroring the JS client's "anon key is not set" guard.
+
+**Files:**
+- Create: `swift/WatchtowerCore/Sources/WatchtowerCore/Config/SupabaseConfig.swift`
+- Test: `swift/WatchtowerCore/Tests/WatchtowerCoreTests/SupabaseConfigTests.swift`
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces: `struct SupabaseConfig { let url: URL; let anonKey: String }`; `enum SupabaseConfigError: Error, Equatable { case missingAnonKey, invalidURL }`; `static func SupabaseConfig.load(from: [String: Any]) throws -> SupabaseConfig`.
+
+- [ ] **Step 1: Write the failing tests**
+
+`SupabaseConfigTests.swift`:
+```swift
+import XCTest
+@testable import WatchtowerCore
+
+final class SupabaseConfigTests: XCTestCase {
+    func testLoadsUrlAndKey() throws {
+        let cfg = try SupabaseConfig.load(from: [
+            "SUPABASE_URL": "https://xggihnrvsmbzbkhsnuky.supabase.co",
+            "SUPABASE_ANON_KEY": "anon-123",
+        ])
+        XCTAssertEqual(cfg.url.absoluteString, "https://xggihnrvsmbzbkhsnuky.supabase.co")
+        XCTAssertEqual(cfg.anonKey, "anon-123")
+    }
+
+    func testMissingKeyThrows() {
+        XCTAssertThrowsError(try SupabaseConfig.load(from: ["SUPABASE_URL": "https://x.supabase.co"])) {
+            XCTAssertEqual($0 as? SupabaseConfigError, .missingAnonKey)
+        }
+    }
+
+    func testEmptyKeyThrows() {
+        XCTAssertThrowsError(try SupabaseConfig.load(from: [
+            "SUPABASE_URL": "https://x.supabase.co", "SUPABASE_ANON_KEY": "",
+        ])) {
+            XCTAssertEqual($0 as? SupabaseConfigError, .missingAnonKey)
+        }
+    }
+
+    func testInvalidUrlThrows() {
+        XCTAssertThrowsError(try SupabaseConfig.load(from: [
+            "SUPABASE_URL": "", "SUPABASE_ANON_KEY": "anon-123",
+        ])) {
+            XCTAssertEqual($0 as? SupabaseConfigError, .invalidURL)
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd swift/WatchtowerCore && swift test --filter SupabaseConfigTests`
+Expected: FAIL — `SupabaseConfig` undefined.
+
+- [ ] **Step 3: Implement `SupabaseConfig.swift`**
+
+```swift
+import Foundation
+
+public enum SupabaseConfigError: Error, Equatable {
+    case missingAnonKey
+    case invalidURL
+}
+
+public struct SupabaseConfig: Equatable, Sendable {
+    public let url: URL
+    public let anonKey: String
+
+    public init(url: URL, anonKey: String) {
+        self.url = url
+        self.anonKey = anonKey
+    }
+
+    public static func load(from bag: [String: Any]) throws -> SupabaseConfig {
+        let key = (bag["SUPABASE_ANON_KEY"] as? String) ?? ""
+        guard !key.isEmpty else { throw SupabaseConfigError.missingAnonKey }
+        let urlString = (bag["SUPABASE_URL"] as? String) ?? ""
+        guard let url = URL(string: urlString), url.scheme != nil, url.host != nil else {
+            throw SupabaseConfigError.invalidURL
+        }
+        return SupabaseConfig(url: url, anonKey: key)
+    }
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `cd swift/WatchtowerCore && swift test --filter SupabaseConfigTests`
+Expected: PASS (all 4).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add swift/WatchtowerCore/Sources/WatchtowerCore/Config swift/WatchtowerCore/Tests/WatchtowerCoreTests/SupabaseConfigTests.swift
+git commit -m "feat(ios): SupabaseConfig loader with missing-key/invalid-url guards"
+```
+
+---
+
+### Task 4: SupabaseClient dependency
+
+A TCA `@DependencyClient` exposing exactly the auth surface Phase 1 needs, wrapping `supabase-swift`. Keeping the SDK behind this seam is what lets `AuthFeature`/`AppFeature` be tested without a network.
+
+**Files:**
+- Create: `swift/WatchtowerCore/Sources/WatchtowerCore/Dependencies/SupabaseClient.swift`
+- Test: none of its own (exercised via `AuthFeature` tests in Task 5; the live value talks to the real SDK and isn't unit-tested).
+
+**Interfaces:**
+- Consumes: `SupabaseConfig` (Task 3).
+- Produces:
+  - `@DependencyClient struct SupabaseClient` with:
+    - `var currentSessionExists: @Sendable () async -> Bool`
+    - `var signIn: @Sendable (_ email: String, _ password: String) async throws -> Void`
+    - `var signOut: @Sendable () async -> Void`
+    - `var authEvents: @Sendable () -> AsyncStream<Bool>` (emits `true` when a session becomes present, `false` when it clears)
+  - `extension SupabaseClient: DependencyKey` with `liveValue` (built from `SupabaseConfig.load(from: Bundle.main.infoDictionary ?? [:])`) and `testValue` (unimplemented).
+  - `extension DependencyValues { var supabase: SupabaseClient { get set } }`
+
+- [ ] **Step 1: Implement `SupabaseClient.swift`**
+
+```swift
+import Foundation
+import ComposableArchitecture
+import Supabase
+
+@DependencyClient
+public struct SupabaseClient: Sendable {
+    public var currentSessionExists: @Sendable () async -> Bool = { false }
+    public var signIn: @Sendable (_ email: String, _ password: String) async throws -> Void
+    public var signOut: @Sendable () async -> Void
+    public var authEvents: @Sendable () -> AsyncStream<Bool> = { .finished }
+}
+
+extension SupabaseClient: DependencyKey {
+    public static var liveValue: SupabaseClient {
+        // Built lazily on first use so unit tests importing the package don't
+        // require Info.plist secrets (mirrors the JS getSupabase() lazy guard).
+        let client = LockIsolated<Supabase.SupabaseClient?>(nil)
+        @Sendable func c() throws -> Supabase.SupabaseClient {
+            if let existing = client.value { return existing }
+            let cfg = try SupabaseConfig.load(from: Bundle.main.infoDictionary ?? [:])
+            let made = Supabase.SupabaseClient(supabaseURL: cfg.url, supabaseKey: cfg.anonKey)
+            client.setValue(made)
+            return made
+        }
+        return SupabaseClient(
+            currentSessionExists: {
+                guard let client = try? c() else { return false }
+                return (try? await client.auth.session) != nil
+            },
+            signIn: { email, password in
+                try await c().auth.signIn(email: email, password: password)
+            },
+            signOut: {
+                try? await c().auth.signOut()
+            },
+            authEvents: {
+                AsyncStream { continuation in
+                    let task = Task {
+                        guard let client = try? c() else { continuation.finish(); return }
+                        for await (_, session) in client.auth.authStateChanges {
+                            continuation.yield(session != nil)
+                        }
+                        continuation.finish()
+                    }
+                    continuation.onTermination = { _ in task.cancel() }
+                }
+            }
+        )
+    }
+
+    public static let testValue = SupabaseClient()
+}
+
+public extension DependencyValues {
+    var supabase: SupabaseClient {
+        get { self[SupabaseClient.self] }
+        set { self[SupabaseClient.self] = newValue }
+    }
+}
+```
+
+- [ ] **Step 2: Build the package**
+
+Run: `cd swift/WatchtowerCore && swift build`
+Expected: **Compiling** succeeds (verifies the `supabase-swift` API surface — `auth.session`, `auth.signIn(email:password:)`, `auth.signOut()`, `auth.authStateChanges` — matches the resolved SDK version; if a signature differs, adjust to the resolved 2.x API and note it).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add swift/WatchtowerCore/Sources/WatchtowerCore/Dependencies/SupabaseClient.swift
+git commit -m "feat(ios): SupabaseClient dependency wrapping supabase-swift auth"
+```
+
+---
+
+### Task 5: AuthFeature reducer
+
+The login state machine, TDD'd end-to-end with `TestStore` against the stubbed `SupabaseClient`. This is the core deliverable of the phase.
+
+**Files:**
+- Create: `swift/WatchtowerCore/Sources/WatchtowerCore/Features/AuthFeature.swift`
+- Test: `swift/WatchtowerCore/Tests/WatchtowerCoreTests/AuthFeatureTests.swift`
+
+**Interfaces:**
+- Consumes: `SupabaseClient` dependency (Task 4).
+- Produces:
+  - `@Reducer struct AuthFeature`
+  - `@ObservableState struct State: Equatable { var email = ""; var password = ""; var isSubmitting = false; var errorMessage: String? }`
+  - `enum Action: BindableAction { case binding(BindingAction<State>); case signInTapped; case signInResponse(Result<Void, AuthError>) }`
+  - `enum AuthError: Error, Equatable { case invalidCredentials, other }` with `static func from(_ error: Error) -> AuthError`
+  - `static func message(for: AuthError) -> String` (English copy)
+
+- [ ] **Step 1: Write the failing tests**
+
+`AuthFeatureTests.swift`:
+```swift
+import XCTest
+import ComposableArchitecture
+@testable import WatchtowerCore
+
+@MainActor
+final class AuthFeatureTests: XCTestCase {
+    func testSuccessfulSignIn() async {
+        let store = TestStore(initialState: AuthFeature.State(email: "a@b.cz", password: "pw")) {
+            AuthFeature()
+        } withDependencies: {
+            $0.supabase.signIn = { _, _ in }
+        }
+        await store.send(.signInTapped) { $0.isSubmitting = true; $0.errorMessage = nil }
+        await store.receive(\.signInResponse.success) { $0.isSubmitting = false }
+    }
+
+    func testFailedSignInShowsEnglishError() async {
+        struct Boom: Error {}
+        let store = TestStore(initialState: AuthFeature.State(email: "a@b.cz", password: "bad")) {
+            AuthFeature()
+        } withDependencies: {
+            $0.supabase.signIn = { _, _ in throw Boom() }
+        }
+        await store.send(.signInTapped) { $0.isSubmitting = true; $0.errorMessage = nil }
+        await store.receive(\.signInResponse.failure) {
+            $0.isSubmitting = false
+            $0.errorMessage = "Sign-in failed. Please try again."
+        }
+    }
+
+    func testErrorMappingForInvalidCredentials() {
+        let mapped = AuthFeature.message(for: .invalidCredentials)
+        XCTAssertEqual(mapped, "Incorrect e-mail or password.")
+    }
+}
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd swift/WatchtowerCore && swift test --filter AuthFeatureTests`
+Expected: FAIL — `AuthFeature` undefined.
+
+- [ ] **Step 3: Implement `AuthFeature.swift`**
+
+```swift
+import Foundation
+import ComposableArchitecture
+
+@Reducer
+public struct AuthFeature {
+    @ObservableState
+    public struct State: Equatable {
+        public var email: String = ""
+        public var password: String = ""
+        public var isSubmitting: Bool = false
+        public var errorMessage: String?
+        public init(email: String = "", password: String = "") {
+            self.email = email
+            self.password = password
+        }
+    }
+
+    public enum AuthError: Error, Equatable {
+        case invalidCredentials
+        case other
+
+        static func from(_ error: Error) -> AuthError {
+            let msg = String(describing: error).lowercased()
+            if msg.contains("invalid") && msg.contains("credential") { return .invalidCredentials }
+            return .other
+        }
+    }
+
+    public enum Action: BindableAction {
+        case binding(BindingAction<State>)
+        case signInTapped
+        case signInResponse(Result<Void, AuthError>)
+    }
+
+    @Dependency(\.supabase) var supabase
+
+    public init() {}
+
+    public static func message(for error: AuthError) -> String {
+        switch error {
+        case .invalidCredentials: return "Incorrect e-mail or password."
+        case .other: return "Sign-in failed. Please try again."
+        }
+    }
+
+    public var body: some ReducerOf<Self> {
+        BindingReducer()
+        Reduce { state, action in
+            switch action {
+            case .binding:
+                return .none
+
+            case .signInTapped:
+                state.isSubmitting = true
+                state.errorMessage = nil
+                let email = state.email, password = state.password
+                return .run { send in
+                    do {
+                        try await supabase.signIn(email, password)
+                        await send(.signInResponse(.success(())))
+                    } catch {
+                        await send(.signInResponse(.failure(AuthError.from(error))))
+                    }
+                }
+
+            case .signInResponse(.success):
+                state.isSubmitting = false
+                // Session presence propagates to AppFeature via supabase.authEvents.
+                return .none
+
+            case let .signInResponse(.failure(err)):
+                state.isSubmitting = false
+                state.errorMessage = Self.message(for: err)
+                return .none
+            }
+        }
+    }
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `cd swift/WatchtowerCore && swift test --filter AuthFeatureTests`
+Expected: PASS (all 3).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add swift/WatchtowerCore/Sources/WatchtowerCore/Features/AuthFeature.swift swift/WatchtowerCore/Tests/WatchtowerCoreTests/AuthFeatureTests.swift
+git commit -m "feat(ios): AuthFeature login reducer with English error copy"
+```
+
+---
+
+### Task 6: AppFeature root reducer (auth gate + tab selection)
+
+The root state machine: `loading` → resolve session → `signedOut(AuthFeature)` or `signedIn`, listening to `supabase.authEvents` so a successful login flips the gate and a sign-out flips it back. Holds the selected tab for the shell scaffold.
+
+**Files:**
+- Create: `swift/WatchtowerCore/Sources/WatchtowerCore/Features/AppFeature.swift`
+- Test: `swift/WatchtowerCore/Tests/WatchtowerCoreTests/AppFeatureTests.swift`
+
+**Interfaces:**
+- Consumes: `SupabaseClient` (Task 4), `AuthFeature` (Task 5).
+- Produces:
+  - `@Reducer struct AppFeature`
+  - `enum Tab: String, CaseIterable, Equatable { case dashboard, earnings, reports, records }` with `var title: String` (English: "Dashboard"/"Earnings"/"Reports"/"Records")
+  - `@ObservableState struct State: Equatable { var phase: Phase = .loading; var selectedTab: Tab = .dashboard }`
+  - `enum Phase: Equatable { case loading; case signedOut(AuthFeature.State); case signedIn }`
+  - `enum Action { case onAppear; case authEvent(Bool); case tabSelected(Tab); case signOutTapped; case auth(AuthFeature.Action) }`
+
+- [ ] **Step 1: Write the failing tests**
+
+`AppFeatureTests.swift`:
+```swift
+import XCTest
+import ComposableArchitecture
+@testable import WatchtowerCore
+
+@MainActor
+final class AppFeatureTests: XCTestCase {
+    func testOnAppearWithNoSessionGoesSignedOut() async {
+        let events = AsyncStream<Bool>.makeStream()
+        let store = TestStore(initialState: AppFeature.State()) { AppFeature() } withDependencies: {
+            $0.supabase.currentSessionExists = { false }
+            $0.supabase.authEvents = { events.stream }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        await store.send(.onAppear)
+        await store.receive(\.authEvent) {
+            $0.phase = .signedOut(AuthFeature.State())
+        }
+        await store.send(.tabSelected(.reports)) // keep the long-living stream effect tidy
+        events.continuation.finish()
+    }
+
+    func testAuthEventTrueFlipsToSignedIn() async {
+        let store = TestStore(initialState: AppFeature.State(phase: .signedOut(AuthFeature.State()))) {
+            AppFeature()
+        }
+        await store.send(.authEvent(true)) { $0.phase = .signedIn }
+    }
+
+    func testAuthEventFalseFlipsToSignedOut() async {
+        let store = TestStore(initialState: AppFeature.State(phase: .signedIn)) { AppFeature() }
+        await store.send(.authEvent(false)) { $0.phase = .signedOut(AuthFeature.State()) }
+    }
+
+    func testTabSelection() async {
+        let store = TestStore(initialState: AppFeature.State(phase: .signedIn)) { AppFeature() }
+        await store.send(.tabSelected(.earnings)) { $0.selectedTab = .earnings }
+    }
+
+    func testSignOutCallsDependency() async {
+        let signedOut = LockIsolated(false)
+        let store = TestStore(initialState: AppFeature.State(phase: .signedIn)) { AppFeature() } withDependencies: {
+            $0.supabase.signOut = { signedOut.setValue(true) }
+        }
+        await store.send(.signOutTapped)
+        XCTAssertTrue(signedOut.value)
+    }
+}
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd swift/WatchtowerCore && swift test --filter AppFeatureTests`
+Expected: FAIL — `AppFeature` undefined.
+
+- [ ] **Step 3: Implement `AppFeature.swift`**
+
+```swift
+import Foundation
+import ComposableArchitecture
+
+@Reducer
+public struct AppFeature {
+    public enum Tab: String, CaseIterable, Equatable {
+        case dashboard, earnings, reports, records
+        public var title: String {
+            switch self {
+            case .dashboard: return "Dashboard"
+            case .earnings: return "Earnings"
+            case .reports: return "Reports"
+            case .records: return "Records"
+            }
+        }
+    }
+
+    public enum Phase: Equatable {
+        case loading
+        case signedOut(AuthFeature.State)
+        case signedIn
+    }
+
+    @ObservableState
+    public struct State: Equatable {
+        public var phase: Phase
+        public var selectedTab: Tab
+        public init(phase: Phase = .loading, selectedTab: Tab = .dashboard) {
+            self.phase = phase
+            self.selectedTab = selectedTab
+        }
+    }
+
+    public enum Action {
+        case onAppear
+        case authEvent(Bool)
+        case tabSelected(Tab)
+        case signOutTapped
+        case auth(AuthFeature.Action)
+    }
+
+    @Dependency(\.supabase) var supabase
+
+    public init() {}
+
+    public var body: some ReducerOf<Self> {
+        Reduce { state, action in
+            switch action {
+            case .onAppear:
+                return .run { send in
+                    await send(.authEvent(supabase.currentSessionExists()))
+                    for await present in supabase.authEvents() {
+                        await send(.authEvent(present))
+                    }
+                }
+
+            case let .authEvent(present):
+                switch state.phase {
+                case .signedIn where present, .signedOut where !present:
+                    return .none
+                default:
+                    state.phase = present ? .signedIn : .signedOut(AuthFeature.State())
+                    return .none
+                }
+
+            case let .tabSelected(tab):
+                state.selectedTab = tab
+                return .none
+
+            case .signOutTapped:
+                return .run { _ in await supabase.signOut() }
+
+            case .auth:
+                return .none
+            }
+        }
+        .ifLet(\.signedOutAuth, action: \.auth) {
+            AuthFeature()
+        }
+    }
+}
+
+private extension AppFeature.State {
+    var signedOutAuth: AuthFeature.State? {
+        get { if case let .signedOut(s) = phase { return s } else { return nil } }
+        set { if let newValue { phase = .signedOut(newValue) } }
+    }
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `cd swift/WatchtowerCore && swift test --filter AppFeatureTests`
+Expected: PASS (all 5).
+
+- [ ] **Step 5: Run the full package test suite**
+
+Run: `cd swift/WatchtowerCore && swift test`
+Expected: all tests PASS (Smoke, Palette, SupabaseConfig, AuthFeature, AppFeature).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add swift/WatchtowerCore/Sources/WatchtowerCore/Features/AppFeature.swift swift/WatchtowerCore/Tests/WatchtowerCoreTests/AppFeatureTests.swift
+git commit -m "feat(ios): AppFeature auth gate + tab selection reducer"
+```
+
+---
+
+### Task 7: AuthView + AppShellView (SwiftUI)
+
+The two Phase-1 screens: a glass-themed English login screen bound to `AuthFeature`, and the signed-in `TabView` scaffold with four placeholder tabs + a sign-out button. SwiftUI views aren't unit-tested; the deliverable is verified by a simulator build + a visual smoke run.
+
+**Files:**
+- Create: `apps/iphone-native/Watchtower/Views/AuthView.swift`
+- Create: `apps/iphone-native/Watchtower/Views/AppShellView.swift`
+
+**Interfaces:**
+- Consumes: `AuthFeature`, `AppFeature`, `Palette` from `WatchtowerCore`.
+- Produces: `struct AuthView: View { let store: StoreOf<AuthFeature> }`; `struct AppShellView: View { let store: StoreOf<AppFeature> }`.
+
+- [ ] **Step 1: Implement `AuthView.swift`**
+
+```swift
+import SwiftUI
+import ComposableArchitecture
+import WatchtowerCore
+
+struct AuthView: View {
+    @Bindable var store: StoreOf<AuthFeature>
+
+    var body: some View {
+        ZStack {
+            Palette.baseBg.ignoresSafeArea()
+            VStack(spacing: 18) {
+                Text("Watchtower")
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(Palette.accentIcon)
+                TextField("E-mail", text: $store.email)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(12)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                SecureField("Password", text: $store.password)
+                    .textContentType(.password)
+                    .padding(12)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                if let error = store.errorMessage {
+                    Text(error).font(.footnote).foregroundStyle(.red)
+                }
+                Button {
+                    store.send(.signInTapped)
+                } label: {
+                    Text(store.isSubmitting ? "Signing in…" : "Sign in")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Palette.ctaGradient, in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.white)
+                }
+                .disabled(store.isSubmitting)
+            }
+            .padding(24)
+            .foregroundStyle(Palette.textPrimary)
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Implement `AppShellView.swift`**
+
+```swift
+import SwiftUI
+import ComposableArchitecture
+import WatchtowerCore
+
+struct AppShellView: View {
+    @Bindable var store: StoreOf<AppFeature>
+
+    var body: some View {
+        switch store.phase {
+        case .loading:
+            ZStack { Palette.baseBg.ignoresSafeArea(); ProgressView().tint(Palette.accentIcon) }
+
+        case .signedOut:
+            if let authStore = store.scope(state: \.phase.signedOut, action: \.auth) {
+                AuthView(store: authStore)
+            }
+
+        case .signedIn:
+            TabView(selection: $store.selectedTab.sending(\.tabSelected)) {
+                ForEach(AppFeature.Tab.allCases, id: \.self) { tab in
+                    placeholder(tab)
+                        .tabItem { Label(tab.title, systemImage: icon(tab)) }
+                        .tag(tab)
+                }
+            }
+            .tint(Palette.accent)
+        }
+    }
+
+    private func placeholder(_ tab: AppFeature.Tab) -> some View {
+        ZStack {
+            Palette.baseBg.ignoresSafeArea()
+            VStack(spacing: 12) {
+                Text(tab.title).font(.title.bold()).foregroundStyle(Palette.textPrimary)
+                Text("Coming in a later phase").foregroundStyle(Palette.textMuted)
+                Button("Sign out") { store.send(.signOutTapped) }
+                    .foregroundStyle(Palette.accentIcon)
+            }
+        }
+    }
+
+    private func icon(_ tab: AppFeature.Tab) -> String {
+        switch tab {
+        case .dashboard: return "square.grid.2x2"
+        case .earnings: return "creditcard"
+        case .reports: return "chart.bar"
+        case .records: return "clock"
+        }
+    }
+}
+```
+
+> Note: `store.scope(state: \.phase.signedOut, action: \.auth)` relies on TCA's case-path scoping on the `Phase` enum; if the resolved TCA version requires a `@CasePathable` annotation on `Phase`, add `@CasePathable` above `enum Phase` in `AppFeature.swift`.
+
+- [ ] **Step 3: Build for the simulator**
+
+Run: `cd apps/iphone-native && xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination 'platform=iOS Simulator,name=iPhone 16' build`
+Expected: **BUILD SUCCEEDED**.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add apps/iphone-native/Watchtower/Views
+git commit -m "feat(ios): AuthView login screen + AppShellView tab scaffold"
+```
+
+---
+
+### Task 8: App entry wiring + AppDelegate stub + run verification
+
+Replace the placeholder `WatchtowerApp` with the real root: build the `AppFeature` store, render `AppShellView`, fire `.onAppear`, and register an empty `UIApplicationDelegate` (APNs registration lands in Phase 6). Then verify the app runs end-to-end in the simulator: login screen → sign in → tab shell → sign out → login screen.
+
+**Files:**
+- Modify: `apps/iphone-native/Watchtower/WatchtowerApp.swift`
+- Create: `apps/iphone-native/Watchtower/AppDelegate.swift`
+- Modify: `apps/iphone-native/Watchtower/Info.plist` (add `SUPABASE_URL`/`SUPABASE_ANON_KEY` keys reading `$(SUPABASE_URL)`/`$(SUPABASE_ANON_KEY)`) and set the build configs to use `Secrets.xcconfig`.
+
+**Interfaces:**
+- Consumes: `AppFeature` (Task 6), `AppShellView` (Task 7).
+- Produces: the runnable app.
+
+- [ ] **Step 1: Implement `AppDelegate.swift`**
+
+```swift
+import UIKit
+
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        // APNs registration is added in Phase 6 (Attention + push).
+        return true
+    }
+}
+```
+
+- [ ] **Step 2: Wire `WatchtowerApp.swift`**
+
+```swift
+import SwiftUI
+import ComposableArchitecture
+import WatchtowerCore
+
+@main
+struct WatchtowerApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    @MainActor
+    static let store = Store(initialState: AppFeature.State()) {
+        AppFeature()
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            AppShellView(store: Self.store)
+                .onAppear { Self.store.send(.onAppear) }
+                .preferredColorScheme(.dark)
+        }
+    }
+}
+```
+
+- [ ] **Step 3: Wire secrets into `Info.plist` + build configs**
+
+- In Xcode, set both Debug and Release configurations of the app target to base off `Watchtower/Secrets.xcconfig`.
+- Copy the template and fill in the real dev anon key:
+```bash
+cp apps/iphone-native/Watchtower/Secrets.sample.xcconfig apps/iphone-native/Watchtower/Secrets.xcconfig
+# then edit Secrets.xcconfig, pasting the dev anon key from apps/ipad/.env.development (VITE_SUPABASE_ANON_KEY)
+```
+- Add to `Info.plist`:
+```xml
+<key>SUPABASE_URL</key>
+<string>$(SUPABASE_URL)</string>
+<key>SUPABASE_ANON_KEY</key>
+<string>$(SUPABASE_ANON_KEY)</string>
+```
+
+- [ ] **Step 4: Build + launch in the simulator and verify the auth flow**
+
+Run:
+```bash
+cd apps/iphone-native
+xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcrun simctl boot "iPhone 16" 2>/dev/null; open -a Simulator
+xcrun simctl install booted "$(xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -showBuildSettings -destination 'platform=iOS Simulator,name=iPhone 16' | awk '/CODESIGNING_FOLDER_PATH/{ $1=""; print substr($0,2) }')"
+xcrun simctl launch booted cz.greencode.watchtower.ios
+```
+Expected, verified visually in the simulator:
+1. App launches to the **Watchtower** login screen (dark, purple title, glass fields).
+2. Signing in with valid Supabase dev credentials transitions to the **tab shell** (4 tabs: Dashboard/Earnings/Reports/Records).
+3. Tapping between tabs switches the placeholder pane.
+4. **Sign out** returns to the login screen.
+5. A bad password shows "Incorrect e-mail or password." (or the generic English fallback) and stays on the login screen.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/iphone-native/Watchtower/WatchtowerApp.swift apps/iphone-native/Watchtower/AppDelegate.swift apps/iphone-native/Watchtower/Info.plist apps/iphone-native/Watchtower.xcodeproj
+git commit -m "feat(ios): wire AppFeature store into @main + AppDelegate stub"
+```
+
+---
+
+## Self-Review
+
+**Spec coverage (Phase 1 scope = Foundation):**
+- `WatchtowerCore` package → Task 1. ✓
+- `SupabaseClient` dependency (supabase-swift) → Tasks 3–4. ✓
+- Auth (email/password, Keychain via SDK) → Tasks 4–5 (reducer) + 7 (view) + 8 (wiring). ✓
+- App shell + tab scaffold → Tasks 6–8. ✓
+- Theme → Task 2 + applied in Task 7. ✓
+- Config/secrets convention (git-ignored xcconfig) → Tasks 1, 3, 8. ✓
+- Reducer tests (TestStore) → Tasks 5, 6. ✓
+- Deferred to later phases (correctly absent here): read model/cache, charts, records, mutations, attention, APNs registration body. ✓
+
+**Placeholder scan:** No TBD/TODO; every code step shows complete code; the two "Note" callouts flag concrete SDK/TCA version-adaptation points, not omissions.
+
+**Type consistency:** `SupabaseClient` endpoints (`currentSessionExists`, `signIn`, `signOut`, `authEvents`) are used identically in Tasks 5–6 tests and reducers. `AuthFeature.State`/`Action` and `AppFeature.Phase`/`Tab`/`Action` names match across their reducer, tests, and the views. `Palette` members used in Task 7 all exist from Task 2.
+
+**Risk notes carried forward:** `supabase-swift` auth API surface is verified at build in Task 4 Step 2; TCA enum case-path scoping is flagged in Task 7. Wiring Swift tests into the npm CI is out of Phase 1 scope (design §11/§13) and intentionally not attempted here.
