@@ -34,6 +34,22 @@ final class AuthFeatureTests: XCTestCase {
         }
     }
 
+    func testFailedSignInWithInvalidCredentialsShowsSpecificError() async {
+        struct StubError: Error, CustomStringConvertible {
+            var description = "Invalid login credentials"
+        }
+        let store = TestStore(initialState: AuthFeature.State(email: "a@b.cz", password: "bad")) {
+            AuthFeature()
+        } withDependencies: {
+            $0.supabase.signIn = { _, _ in throw StubError() }
+        }
+        await store.send(.signInTapped) { $0.isSubmitting = true; $0.errorMessage = nil }
+        await store.receive(\.signInResponse) {
+            $0.isSubmitting = false
+            $0.errorMessage = "Incorrect e-mail or password."
+        }
+    }
+
     func testErrorMappingForInvalidCredentials() {
         let mapped = AuthFeature.message(for: .invalidCredentials)
         XCTAssertEqual(mapped, "Incorrect e-mail or password.")

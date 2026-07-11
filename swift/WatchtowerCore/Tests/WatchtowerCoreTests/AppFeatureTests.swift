@@ -59,6 +59,15 @@ final class AppFeatureTests: XCTestCase {
         await store.send(.authEvent(false))
     }
 
+    func testAuthActionRoutedToEmbeddedAuthFeature() async {
+        let store = TestStore(initialState: AppFeature.State(phase: .signedOut(AuthFeature.State()))) {
+            AppFeature()
+        }
+        await store.send(.auth(.binding(.set(\.email, "typed@x.cz")))) {
+            $0.phase = .signedOut(AuthFeature.State(email: "typed@x.cz"))
+        }
+    }
+
     func testOnAppearForwardsStreamEvents() async {
         let events = AsyncStream<Bool>.makeStream()
         let store = TestStore(initialState: AppFeature.State()) { AppFeature() } withDependencies: {
