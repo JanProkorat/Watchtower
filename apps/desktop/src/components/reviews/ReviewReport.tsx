@@ -1,16 +1,30 @@
-import { Box, Typography, Button, Alert, CircularProgress, Stack } from '@mui/material';
+import { useEffect, useState } from 'react';
+import {
+  Box, Typography, Button, Alert, CircularProgress, Stack,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
+} from '@mui/material';
 import type { PullRequestPayload, PrReviewPayload } from '@watchtower/shared/ipcContract.js';
-import { sortFindings } from '../../state/useReviews.js';
+import { sortFindingsWithIndex } from '../../state/useReviews.js';
 import { FindingCard } from './FindingCard.js';
+import { useToast } from '../../state/useToast.js';
 
-export function ReviewReport({ pr, review, running, onRun, onCancel }: {
+export function ReviewReport({ pr, review, running, onRun, onCancel, postComments }: {
   pr: PullRequestPayload;
   review: PrReviewPayload | null;
   running: boolean;
   onRun(): void;
   onCancel(): void;
+  postComments(reviewId: number, findingIndexes: number[]): Promise<{ posted: number; skipped: number; errors: string[] }>;
 }): JSX.Element {
   const isRunning = running || review?.status === 'running';
+  const { showError, showSuccess } = useToast();
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [posting, setPosting] = useState(false);
+
+  // Selection is per-review — switching PRs, or a re-run that mints a new review
+  // row with a new id, must not carry stale indices into the new findings array.
+  useEffect(() => { setSelected(new Set()); }, [review?.id]);
 
   if (!review && !isRunning) {
     return (
@@ -41,19 +55,76 @@ export function ReviewReport({ pr, review, running, onRun, onCancel }: {
   }
 
   // status === 'done'
-  const findings = sortFindings(review?.findings ?? []);
+  const indexed = sortFindingsWithIndex(review?.findings ?? []);
+
+  const toggle = (index: number): void => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index); else next.add(index);
+      return next;
+    });
+  };
+
+  const handlePost = (): void => {
+    if (!review) return;
+    setConfirmOpen(false);
+    const indexes = [...selected];
+    setPosting(true);
+    postComments(review.id, indexes)
+      .then((res) => {
+        setSelected(new Set());
+        if (res.errors.length > 0) {
+          showError(`Posted ${res.posted}${res.skipped ? `, ${res.skipped} skipped` : ''}, ${res.errors.length} failed: ${res.errors.join('; ')}`);
+        } else {
+          showSuccess(`Posted ${res.posted} comment${res.posted === 1 ? '' : 's'}${res.skipped ? ` (${res.skipped} skipped)` : ''}.`);
+        }
+      })
+      .catch((e) => showError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setPosting(false));
+  };
+
   return (
-    <Box sx={{ p: 2 }}>
-      <Box sx={{ bgcolor: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.09)',
-        borderRadius: 2, p: 1.25, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)', mb: 1.5 }}>
-        <Typography sx={{ fontSize: 12.5 }}>{review?.summary}</Typography>
+    <Box sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <Box sx={{ bgcolor: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.09)',
+          borderRadius: 2, p: 1.25, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)', mb: 1.5 }}>
+          <Typography sx={{ fontSize: 12.5 }}>{review?.summary}</Typography>
+        </Box>
+        <Typography sx={{ fontSize: 11, color: 'text.secondary', mb: 1 }}>
+          {indexed.length === 0 ? 'No findings' : `${indexed.length} finding${indexed.length === 1 ? '' : 's'}`}
+        </Typography>
+        <Stack spacing={1}>
+          {indexed.map(({ finding, index }) => (
+            <FindingCard
+              key={`${finding.file}:${finding.line}:${index}`}
+              finding={finding}
+              selected={selected.has(index)}
+              onToggle={() => toggle(index)}
+            />
+          ))}
+        </Stack>
       </Box>
-      <Typography sx={{ fontSize: 11, color: 'text.secondary', mb: 1 }}>
-        {findings.length === 0 ? 'No findings' : `${findings.length} finding${findings.length === 1 ? '' : 's'}`}
-      </Typography>
-      <Stack spacing={1}>
-        {findings.map((f, i) => <FindingCard key={`${f.file}:${f.line}:${i}`} finding={f} />)}
-      </Stack>
+
+      {indexed.length > 0 && (
+        <Box sx={{ pt: 1.5, mt: 1, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'flex-end' }}>
+          <Button variant="contained" disabled={selected.size === 0 || posting} onClick={() => setConfirmOpen(true)}>
+            Post {selected.size} comment{selected.size === 1 ? '' : 's'}
+          </Button>
+        </Box>
+      )}
+
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>Post {selected.size} comment{selected.size === 1 ? '' : 's'}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This posts the selected findings as comments on the pull request.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handlePost}>Post</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

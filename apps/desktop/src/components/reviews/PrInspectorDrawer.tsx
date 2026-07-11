@@ -6,7 +6,7 @@ import { CommentThread } from './CommentThread.js';
 import { ReviewReport } from './ReviewReport.js';
 import { useToast } from '../../state/useToast.js';
 
-export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview }: {
+export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments }: {
   pr: PullRequestPayload | null; onClose(): void;
   loadDiff(pr: PullRequestPayload): Promise<DiffFilePayload[]>;
   loadComments(pr: PullRequestPayload): Promise<PrCommentThreadPayload[]>;
@@ -15,6 +15,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   openReviewFor(pr: PullRequestPayload): Promise<void>;
   runReview(pr: PullRequestPayload): Promise<number>;
   cancelReview(pr: PullRequestPayload): Promise<void>;
+  postComments(reviewId: number, findingIndexes: number[]): Promise<{ posted: number; skipped: number; errors: string[] }>;
 }): JSX.Element {
   const [tab, setTab] = useState(0);
   const [files, setFiles] = useState<DiffFilePayload[]>([]);
@@ -99,7 +100,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
             )}
             {tab === 2 && (
               <Box sx={{ height: '100%', overflow: 'auto' }}>
-                <ReviewReport pr={pr} review={review} running={reviewRunning} onRun={handleRun} onCancel={handleCancel} />
+                <ReviewReport pr={pr} review={review} running={reviewRunning} onRun={handleRun} onCancel={handleCancel} postComments={postComments} />
               </Box>
             )}
           </Box>

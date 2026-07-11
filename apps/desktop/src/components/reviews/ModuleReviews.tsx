@@ -8,7 +8,7 @@ import { useToast, toastMessage } from '../../state/useToast.js';
 
 export function ModuleReviews(): JSX.Element {
   const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
-    review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor } = useReviews();
+    review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments } = useReviews();
   const { showError } = useToast();
   const [host, setHost] = useState<HostFilter>('all');
   const [query, setQuery] = useState('');
@@ -56,7 +56,7 @@ export function ModuleReviews(): JSX.Element {
 
       <PrInspectorDrawer pr={open} onClose={() => setOpen(null)} loadDiff={loadDiff} loadComments={loadComments}
         review={review} reviewRunning={reviewRunning} openReviewFor={openReviewFor} runReview={runReview}
-        cancelReview={cancelReview} />
+        cancelReview={cancelReview} postComments={postComments} />
     </Box>
   );
 }

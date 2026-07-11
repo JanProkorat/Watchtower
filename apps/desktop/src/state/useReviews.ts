@@ -10,6 +10,15 @@ export function sortFindings(findings: PrFindingPayload[]): PrFindingPayload[] {
   return [...findings].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
 }
 
+// Same ordering as sortFindings, but keeps each finding's index into the original
+// (unsorted, as-stored) array — that's the index prReview:postComments expects, so
+// the UI must track selection by original index, not sorted position.
+export function sortFindingsWithIndex(findings: PrFindingPayload[]): { finding: PrFindingPayload; index: number }[] {
+  return findings
+    .map((finding, index) => ({ finding, index }))
+    .sort((a, b) => SEVERITY_ORDER[a.finding.severity] - SEVERITY_ORDER[b.finding.severity]);
+}
+
 // The most severe (error > warn > info) severity present in a list of findings, or null if empty.
 export function worstSeverity(findings: PrFindingPayload[]): PrFindingPayload['severity'] | null {
   let worst: PrFindingPayload['severity'] | null = null;
@@ -118,6 +127,14 @@ export function useReviews() {
     await window.watchtower.invoke('prReview:cancel', { reviewId: found.id });
   }, [latestReviewFor]);
 
+  // Post the selected findings (by original index) as comments on the PR. The
+  // renderer never sends devopsPats — electron-main injects them for this kind.
+  // The reload of `review` (with `posted` flags flipped) happens via the already-
+  // subscribed prReviewDone push, not here.
+  const postComments = useCallback(async (reviewId: number, findingIndexes: number[]): Promise<{ posted: number; skipped: number; errors: string[] }> => {
+    return window.watchtower.invoke('prReview:postComments', { reviewId, findingIndexes });
+  }, []);
+
   // ─── Review state for the PR list (grey/amber/green/red dot + finding count) ───
   const [reviewStates, setReviewStates] = useState<Map<string, PrReviewPayload>>(new Map());
 
@@ -205,6 +222,6 @@ export function useReviews() {
   return {
     pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
     review, reviewRunning, openReviewFor, runReview, startReview, cancelReview, getReview, listReviews, latestReviewFor,
-    reviewStateFor,
+    reviewStateFor, postComments,
   };
 }

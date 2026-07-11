@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupPrsByHost, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity } from '../../apps/desktop/src/state/useReviews.js';
+import { groupPrsByHost, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex } from '../../apps/desktop/src/state/useReviews.js';
 import type { PrFindingPayload } from '../../packages/shared/src/ipcContract.js';
 
 const pr = (o: Partial<any> = {}) => ({ host: 'github', repoKey: 'gh:o/r', repoLabel: 'r', number: 1,
@@ -48,5 +48,19 @@ describe('useReviews helpers', () => {
   });
   it('worstSeverity returns null for an empty list', () => {
     expect(worstSeverity([])).toBeNull();
+  });
+  it('sortFindingsWithIndex orders by severity but keeps each finding\'s original array index', () => {
+    // prReview:postComments indexes into the as-stored (unsorted) findings array, so
+    // the UI must select by original index — not by position after sorting.
+    const findings = [finding({ severity: 'info', file: 'i.ts' }), finding({ severity: 'error', file: 'e.ts' }),
+      finding({ severity: 'warn', file: 'w.ts' })];
+    const result = sortFindingsWithIndex(findings);
+    expect(result.map((r) => r.finding.file)).toEqual(['e.ts', 'w.ts', 'i.ts']);
+    expect(result.map((r) => r.index)).toEqual([1, 2, 0]);
+  });
+  it('sortFindingsWithIndex does not mutate the input', () => {
+    const findings = [finding({ severity: 'info' }), finding({ severity: 'error' })];
+    sortFindingsWithIndex(findings);
+    expect(findings.map((f) => f.severity)).toEqual(['info', 'error']);
   });
 });
