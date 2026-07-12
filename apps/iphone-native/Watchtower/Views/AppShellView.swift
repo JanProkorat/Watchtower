@@ -50,19 +50,10 @@ struct AppShellView: View {
             )
 
         case .records:
-            placeholder(tab)
-        }
-    }
-
-    private func placeholder(_ tab: AppFeature.Tab) -> some View {
-        ZStack {
-            Palette.baseBg.ignoresSafeArea()
-            VStack(spacing: 12) {
-                Text(tab.title).font(.title.bold()).foregroundStyle(Palette.textPrimary)
-                Text("Coming in a later phase").foregroundStyle(Palette.textMuted)
-                Button("Sign out") { store.send(.signOutTapped) }
-                    .foregroundStyle(Palette.accentIcon)
-            }
+            RecordsView(
+                billing: store.scope(state: \.billing, action: \.billing),
+                records: store.scope(state: \.records, action: \.records)
+            )
         }
     }
 

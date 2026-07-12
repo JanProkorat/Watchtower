@@ -96,6 +96,27 @@ final class AppFeatureTests: XCTestCase {
         }
     }
 
+    func testAuthEventTrueFiresRecordsOnAppear() async {
+        // Records (like billing/earnings/reports) must load its month-cursor
+        // seed on the same signed-in transition — `records.onAppear` only
+        // touches `date.now`, no network dependency involved.
+        let store = TestStore(initialState: AppFeature.State(phase: .signedOut(AuthFeature.State()))) {
+            AppFeature()
+        } withDependencies: {
+            $0.billingCache.load = { nil }
+            $0.billingCache.save = { _ in }
+            $0.billingClient.fetchBillingDataset = { self.ds() }
+            $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        await store.send(.authEvent(true)) { $0.phase = .signedIn }
+        await store.receive(\.records.onAppear) {
+            $0.records.worklogMonth = "2026-05"
+            $0.records.gridMonth = "2026-05"
+            $0.records.timeOffFocus = "2026-05"
+        }
+    }
+
     func testFirstBillingDatasetReseedsReportsEarliest() async {
         // The sign-in transition fires `.reports(.onAppear(earliest: nil))`
         // before the billing dataset has loaded. Once a dataset first
