@@ -15,7 +15,7 @@ struct TrendChartPanel: View {
     @State private var selectedBucket: String?
 
     private var filled: [TrendBucket] {
-        let byBucket = Dictionary(uniqueKeysWithValues: series.map { ($0.bucket, $0) })
+        let byBucket = Dictionary(series.map { ($0.bucket, $0) }, uniquingKeysWith: { first, _ in first })
         return enumerateBuckets(from, to, granularity).map { key in
             byBucket[key] ?? TrendBucket(bucket: key, minutes: 0, earnedCzk: 0)
         }
@@ -101,7 +101,7 @@ struct TrendChartPanel: View {
                 Rectangle()
                     .fill(Color.clear)
                     .contentShape(Rectangle())
-                    .gesture(
+                    .simultaneousGesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in selectBucket(at: value.location, proxy: proxy, geo: geo) }
                     )
