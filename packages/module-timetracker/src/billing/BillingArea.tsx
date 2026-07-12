@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSupabaseAuth } from '@watchtower/data-supabase';
 import type { BillingSection } from './types.js';
-import { NotConnectedBar } from './NotConnectedBar.js';
+import { NotConnectedToast } from './NotConnectedToast.js';
 import { LoginDialog } from './LoginDialog.js';
 import { BoardView, type BoardActions } from './BoardView.js';
 import { DashboardView } from './DashboardView.js';
@@ -47,8 +47,10 @@ export function BillingArea({ module, section, boardActions }: Props): JSX.Eleme
   // returns cached/empty data with or without a session, and write-gating keys
   // off data freshness — so signed-out is automatically read-only.
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden', background: 'transparent' }}>
-      {status === 'out' && <NotConnectedBar onSignIn={() => setLoginOpen(true)} />}
+    // position:relative anchors the floating NotConnectedToast (an absolute
+    // top-right overlay) to this content area — it must not push content down.
+    <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden', background: 'transparent' }}>
+      {status === 'out' && <NotConnectedToast onSignIn={() => setLoginOpen(true)} />}
 
       {/* Keyed by session identity: signing in/out remounts the active view so
           useBilling refetches (fresh when authed, cached/offline otherwise). */}
