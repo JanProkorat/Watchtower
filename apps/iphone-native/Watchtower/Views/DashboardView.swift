@@ -103,7 +103,9 @@ struct DashboardView: View {
     private var workedSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "Worked")
-            HStack(alignment: .top) {
+            // 2+1 wrap layout — matches the React `flex: 1 1 40%` + wrap:
+            // two tiles on the first row, the third wraps to its own row.
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 KpiTile(label: "Today", minutes: kpis.today.minutes, earnedCzk: kpis.today.earnedCzk)
                 KpiTile(label: "Sprint", minutes: kpis.sprint.minutes, earnedCzk: kpis.sprint.earnedCzk)
                 KpiTile(label: "This month", minutes: kpis.month.minutes, earnedCzk: kpis.month.earnedCzk)
@@ -262,6 +264,20 @@ private struct KpiTile: View {
 private struct BurnCard: View {
     let burn: ContractBurn
 
+    /// Render an MD limit the way React prints the raw `limit` number: whole
+    /// numbers show without decimals ("20"), fractional values drop trailing
+    /// zeros ("20.5"). Only the limit denominator uses this — mdsUsed/projected
+    /// stay at 2dp to match the React `.toFixed(2)`.
+    private func rawMd(_ value: Double) -> String {
+        if value == value.rounded() {
+            return String(Int(value))
+        }
+        var s = String(format: "%.2f", value)
+        while s.hasSuffix("0") { s.removeLast() }
+        if s.hasSuffix(".") { s.removeLast() }
+        return s
+    }
+
     private var isOverrun: Bool {
         guard let limit = burn.mdLimit, let projected = burn.projectedMds else { return false }
         return projected > limit
@@ -295,7 +311,7 @@ private struct BurnCard: View {
         if let limit = burn.mdLimit {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("\(burn.mdsUsed, specifier: "%.2f") / \(limit, specifier: "%.2f") MD")
+                    Text("\(burn.mdsUsed, specifier: "%.2f") / \(rawMd(limit)) MD")
                         .font(.caption)
                         .foregroundStyle(Palette.textMuted)
                     Spacer()
