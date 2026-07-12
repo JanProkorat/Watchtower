@@ -143,6 +143,12 @@ final class BillingWriteMappingTests: XCTestCase {
         XCTAssertEqual(endDate.count, 2)
     }
 
+    func testContractInsertEmitsContractGroupIdWhenProvided() {
+        let input = ContractWriteInput(effectiveFrom: "2026-01-01", endDate: nil, rateType: "hourly", rateAmount: 100, hoursPerDay: 8, mdLimit: nil)
+        let insert = enc(buildContractInsert(input: input, projectId: 9, syncId: "c1", now: "2026-01-01T00:00:00Z", groupId: "group-123"))
+        XCTAssertEqual(insert["contract_group_id"] as? String, "group-123")
+    }
+
     func testDayOffUpsertColumns() {
         let j = enc(buildDayOffUpsert(date: "2026-03-05", kind: "vacation", syncId: "d1", now: "2026-03-01T00:00:00Z"))
         XCTAssertEqual(j["sync_id"] as? String, "d1")

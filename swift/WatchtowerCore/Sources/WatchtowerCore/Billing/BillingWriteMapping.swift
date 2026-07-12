@@ -23,13 +23,13 @@ public struct WorklogWriteInput: Equatable, Sendable {
 
 public struct TaskWriteInput: Equatable, Sendable {
     public var epicId: Int
-    public var number: String?
+    public var number: String
     public var title: String
     public var status: String
     public var estimatedMinutes: Double?
     public var description: String?
 
-    public init(epicId: Int, number: String?, title: String, status: String, estimatedMinutes: Double?, description: String?) {
+    public init(epicId: Int, number: String, title: String, status: String, estimatedMinutes: Double?, description: String?) {
         self.epicId = epicId
         self.number = number
         self.title = title
@@ -397,7 +397,7 @@ public func buildTaskInsert(input: TaskWriteInput, syncId: String, now: String) 
     TaskInsertPayload(
         syncId: syncId,
         epicId: input.epicId,
-        number: input.number ?? "",
+        number: input.number,
         title: input.title,
         status: input.status,
         estimatedMinutes: input.estimatedMinutes,
@@ -410,7 +410,7 @@ public func buildTaskInsert(input: TaskWriteInput, syncId: String, now: String) 
 public func buildTaskUpdate(input: TaskWriteInput, now: String) -> TaskUpdatePayload {
     TaskUpdatePayload(
         epicId: input.epicId,
-        number: input.number ?? "",
+        number: input.number,
         title: input.title,
         status: input.status,
         estimatedMinutes: input.estimatedMinutes,
