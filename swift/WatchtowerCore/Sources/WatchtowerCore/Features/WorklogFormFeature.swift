@@ -88,16 +88,6 @@ public struct WorklogFormFeature {
 
     private static let isoFormatter = ISO8601DateFormatter()
 
-    /// `BillingDataset.worklogs` is a `let` (the type is a plain immutable
-    /// value snapshot from the fetch layer), so patching it means rebuilding
-    /// the whole dataset value with every other field copied through.
-    private static func withWorklogs(_ dataset: BillingDataset, _ worklogs: [WorklogRow]) -> BillingDataset {
-        BillingDataset(
-            worklogs: worklogs, contracts: dataset.contracts, daysOff: dataset.daysOff,
-            projects: dataset.projects, tasks: dataset.tasks, epics: dataset.epics, fetchedAt: dataset.fetchedAt
-        )
-    }
-
     public var body: some ReducerOf<Self> {
         BindingReducer()
         Reduce { state, action in
@@ -169,7 +159,7 @@ public struct WorklogFormFeature {
 
             state.$dataset.withLock { current in
                 guard let value = current else { return }
-                current = Self.withWorklogs(value, value.worklogs + [optimisticRow])
+                current = value.replacing(worklogs: value.worklogs + [optimisticRow])
             }
             state.isSaving = true
             state.errorMessage = nil
@@ -206,7 +196,7 @@ public struct WorklogFormFeature {
                 let patched = value.worklogs.map { existing in
                     existing.syncId == row.syncId ? updatedRow : existing
                 }
-                current = Self.withWorklogs(value, patched)
+                current = value.replacing(worklogs: patched)
             }
             state.isSaving = true
             state.errorMessage = nil
@@ -242,7 +232,7 @@ public struct WorklogFormFeature {
         let previousDataset = state.dataset
         state.$dataset.withLock { current in
             guard let value = current else { return }
-            current = Self.withWorklogs(value, value.worklogs.filter { $0.syncId != row.syncId })
+            current = value.replacing(worklogs: value.worklogs.filter { $0.syncId != row.syncId })
         }
         state.isSaving = true
         state.errorMessage = nil

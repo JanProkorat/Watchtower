@@ -45,8 +45,8 @@ final class WorklogFormFeatureTests: XCTestCase {
 
     /// `BillingDataset.worklogs` is a `let`, so an expected-state closure
     /// that wants "the same dataset but with a different worklogs array"
-    /// must rebuild the whole value — mirrors `WorklogFormFeature`'s own
-    /// private `withWorklogs` helper.
+    /// must rebuild the whole value — mirrors what `WorklogFormFeature`
+    /// itself does via the shared `BillingDataset.replacing(worklogs:)`.
     private func datasetWith(_ worklogs: [WorklogRow]) -> BillingDataset {
         BillingDataset(
             worklogs: worklogs, contracts: [contract()], daysOff: [],
