@@ -39,19 +39,35 @@ private func addDaysYmd(_ y: Int, _ m: Int, _ d: Int, _ delta: Int) -> (Int, Int
     return (c.year!, c.month!, c.day!)
 }
 
-public func czechHolidays(_ year: Int) -> Set<String> {
-    var set = Set<String>()
-    let fixed: [(Int, Int)] = [
-        (1, 1), (5, 1), (5, 8), (7, 5), (7, 6),
-        (9, 28), (10, 28), (11, 17), (12, 24), (12, 25), (12, 26),
+/// Date → English holiday name (11 fixed dates per Act No. 245/2000 Sb. plus
+/// the two Easter-relative holidays). Ported from
+/// `packages/shared/src/billing/workdays.ts:69-91`.
+public func czechHolidayNames(_ year: Int) -> [String: String] {
+    var map: [String: String] = [:]
+    let fixed: [(Int, Int, String)] = [
+        (1, 1, "New Year / Restoration Day"),
+        (5, 1, "Labour Day"),
+        (5, 8, "Liberation Day"),
+        (7, 5, "Cyril & Methodius Day"),
+        (7, 6, "Jan Hus Day"),
+        (9, 28, "St. Wenceslas Day"),
+        (10, 28, "Statehood Day"),
+        (11, 17, "Freedom & Democracy Day"),
+        (12, 24, "Christmas Eve"),
+        (12, 25, "Christmas Day"),
+        (12, 26, "St. Stephen's Day"),
     ]
-    for (m, d) in fixed { set.insert(ymd(year, m, d)) }
+    for (m, d, name) in fixed { map[ymd(year, m, d)] = name }
     let e = easterSunday(year)
     let gf = addDaysYmd(year, e.month, e.day, -2)
     let em = addDaysYmd(year, e.month, e.day, +1)
-    set.insert(ymd(gf.0, gf.1, gf.2))
-    set.insert(ymd(em.0, em.1, em.2))
-    return set
+    map[ymd(gf.0, gf.1, gf.2)] = "Good Friday"
+    map[ymd(em.0, em.1, em.2)] = "Easter Monday"
+    return map
+}
+
+public func czechHolidays(_ year: Int) -> Set<String> {
+    Set(czechHolidayNames(year).keys)
 }
 
 /// Mon–Fri in [from, to] (inclusive) minus Czech holidays minus `extraNonWorking`.
@@ -78,4 +94,33 @@ public func countWorkdays(_ from: String, _ to: String, _ extraNonWorking: Set<S
         cur = utcCal.date(byAdding: .day, value: 1, to: cur)!
     }
     return count
+}
+
+/// Every workday (Mon–Fri minus Czech holidays minus `extraNonWorking`) in
+/// [from, to] (inclusive), ascending `YYYY-MM-DD`. Same predicate as
+/// `countWorkdays`; empty if `from > to`. Ported from
+/// `packages/shared/src/billing/workdays.ts:151`.
+public func workdayDates(_ from: String, _ to: String, _ extraNonWorking: Set<String>) -> [String] {
+    if from > to { return [] }
+    let fp = from.split(separator: "-").compactMap { Int($0) }
+    let tp = to.split(separator: "-").compactMap { Int($0) }
+    guard fp.count == 3, tp.count == 3 else { return [] }
+    var cur = date(fp[0], fp[1], fp[2])
+    let end = date(tp[0], tp[1], tp[2])
+    var holidaysByYear: [Int: Set<String>] = [:]
+    var out: [String] = []
+    while cur <= end {
+        let c = utcCal.dateComponents([.year, .month, .day, .weekday], from: cur)
+        // Gregorian weekday: 1=Sun ... 7=Sat. Skip weekend.
+        if c.weekday != 1 && c.weekday != 7 {
+            let y = c.year!
+            let hol = holidaysByYear[y] ?? {
+                let h = czechHolidays(y); holidaysByYear[y] = h; return h
+            }()
+            let key = ymd(y, c.month!, c.day!)
+            if !hol.contains(key) && !extraNonWorking.contains(key) { out.append(key) }
+        }
+        cur = utcCal.date(byAdding: .day, value: 1, to: cur)!
+    }
+    return out
 }

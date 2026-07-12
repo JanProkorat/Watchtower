@@ -31,6 +31,7 @@ public struct AppFeature {
         public var dashboard = DashboardFeature.State()
         public var earnings = EarningsFeature.State()
         public var reports = ReportsFeature.State()
+        public var records = RecordsFeature.State()
         public init(phase: Phase = .loading, selectedTab: Tab = .dashboard) {
             self.phase = phase
             self.selectedTab = selectedTab
@@ -47,6 +48,7 @@ public struct AppFeature {
         case dashboard(DashboardFeature.Action)
         case earnings(EarningsFeature.Action)
         case reports(ReportsFeature.Action)
+        case records(RecordsFeature.Action)
     }
 
     @Dependency(\.supabase) var supabase
@@ -83,7 +85,8 @@ public struct AppFeature {
                         ? .merge(
                             .send(.billing(.onAppear)),
                             .send(.earnings(.onAppear)),
-                            .send(.reports(.onAppear(earliest: nil)))
+                            .send(.reports(.onAppear(earliest: nil))),
+                            .send(.records(.onAppear))
                         )
                         : .none
                 }
@@ -129,6 +132,9 @@ public struct AppFeature {
 
             case .reports:
                 return .none
+
+            case .records:
+                return .none
             }
         }
         .ifLet(\.signedOutAuth, action: \.auth) {
@@ -145,6 +151,9 @@ public struct AppFeature {
         }
         Scope(state: \.reports, action: \.reports) {
             ReportsFeature()
+        }
+        Scope(state: \.records, action: \.records) {
+            RecordsFeature()
         }
     }
 }
