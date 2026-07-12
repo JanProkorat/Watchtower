@@ -16,6 +16,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -26,6 +27,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import RestoreIcon from '@mui/icons-material/Restore';
 import { useClaudeSettings, type SettingsScope } from '../../state/useClaudeSettings.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
+import { glassFill } from '../../theme/glass.js';
 
 const PROJECT_PATH_STORAGE_KEY = 'watchtower.settings.json.projectPath';
 
@@ -121,6 +123,7 @@ function withHooks(settingsObject: Record<string, unknown>, hooks: HooksMap): st
 }
 
 export function HooksTab() {
+  const theme = useTheme();
   const [scope, setScope] = useState<SettingsScope>('global');
   const [projectPath, setProjectPath] = useState<string>(() => {
     try {
@@ -266,6 +269,8 @@ export function HooksTab() {
       </Stack>
 
       {/* ── Body ─────────────────────────────────────────────────── */}
+      {/* No glassSurface here — content is MuiPaper Accordions, already frosted by Phase A.
+          Adding another backdropFilter would stack two GPU blurs with no benefit. */}
       <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
         {showProjectRequired && (
           <Alert severity="info" sx={{ mb: 2 }}>
@@ -376,9 +381,9 @@ export function HooksTab() {
                         }),
                       )}
 
-                      {/* In-place add form */}
+                      {/* In-place add form — glassFill: inline singleton form (no repeat blur stacking) */}
                       {draft ? (
-                        <Stack spacing={1} sx={{ mt: 1, p: 1.5, borderRadius: 1, bgcolor: 'background.default' }}>
+                        <Stack spacing={1} sx={{ mt: 1, p: 1.5, borderRadius: 1, ...glassFill(theme) }}>
                           <TextField
                             label="Matcher (optional, regex)"
                             size="small"

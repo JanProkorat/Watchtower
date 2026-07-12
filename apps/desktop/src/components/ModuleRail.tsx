@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Box, ButtonBase, IconButton, Tooltip, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
@@ -28,6 +29,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import type { ThemeMode } from '../theme.js';
 import type { ListTab } from '../util/timetrackerUrl.js';
 import type { SettingsTab } from '../util/settingsUrl.js';
+import { glassFloating, accentWash, accentRing, accentIconColor } from '../theme/glass.js';
 
 export type ModuleId = 'dashboard' | 'instances' | 'billing' | 'reviews' | 'settings';
 
@@ -39,11 +41,11 @@ interface RailItem {
 }
 
 const ITEMS: RailItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <SpaceDashboardIcon fontSize="small" />, enabled: true },
-  { id: 'instances', label: 'Instances', icon: <TerminalIcon fontSize="small" />, enabled: true },
-  { id: 'billing', label: 'Billing', icon: <RequestQuoteIcon fontSize="small" />, enabled: true },
-  { id: 'reviews', label: 'Reviews', icon: <RateReviewIcon fontSize="small" />, enabled: true },
-  { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="small" />, enabled: true },
+  { id: 'dashboard', label: 'Dashboard', icon: <SpaceDashboardIcon fontSize="inherit" />, enabled: true },
+  { id: 'instances', label: 'Instances', icon: <TerminalIcon fontSize="inherit" />, enabled: true },
+  { id: 'billing', label: 'Billing', icon: <RequestQuoteIcon fontSize="inherit" />, enabled: true },
+  { id: 'reviews', label: 'Reviews', icon: <RateReviewIcon fontSize="inherit" />, enabled: true },
+  { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="inherit" />, enabled: true },
 ];
 
 /** Sub-tab metadata for a module that exposes children under its rail entry. */
@@ -79,7 +81,9 @@ const SETTINGS_SUB_TABS: Array<SubTabMeta<SettingsTab>> = [
   { id: 'cloud-sync', label: 'Cloud Sync', icon: <CloudSyncIcon fontSize="inherit" /> },
 ];
 
-const COLLAPSED_WIDTH = 52;
+// Wide enough to clear the macOS traffic lights (which the OS pins to the
+// rail's top-left at x12), so the collapsed rail still fully contains them.
+const COLLAPSED_WIDTH = 78;
 const EXPANDED_WIDTH = 232;
 const STORAGE_KEY = 'watchtower.moduleRail.expanded';
 const BILLING_STORAGE_KEY = 'watchtower.moduleRail.billingExpanded';
@@ -148,6 +152,13 @@ export function ModuleRail({
   mode,
   onToggleMode,
 }: Props) {
+  const theme = useTheme();
+  // Active nav item styling — derived from the theme accent (see glass.ts), so
+  // the rail, TabStrip, and SessionTabBar share one active-state language.
+  const activeItemBg = accentWash(theme);
+  const activeItemRingShadow = accentRing(theme);
+  const accentColor = accentIconColor(theme);
+
   const [expanded, setExpanded] = useState<boolean>(() => readPersistedBool(STORAGE_KEY, true));
   const [billingExpanded, setBillingExpanded] = useState<boolean>(() =>
     readPersistedBool(BILLING_STORAGE_KEY, true),
@@ -220,9 +231,11 @@ export function ModuleRail({
     <Box
       sx={{
         width: expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH,
-        backgroundColor: 'background.paper',
-        borderRight: 1,
-        borderColor: 'divider',
+        // Full-height floating frosted panel. Hugs the window's top-left corner
+        // (margin 0 there) so the macOS traffic lights sit on a flat area of the
+        // rail, and floats on the right + bottom so the vibrancy shows around it.
+        ...glassFloating(theme, { radius: 12, elevation: 1 }),
+        m: '0 8px 8px 0',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'stretch',
@@ -234,6 +247,11 @@ export function ModuleRail({
         overflow: 'hidden',
       }}
     >
+      {/* Top drag strip — hosts the macOS traffic lights (drawn by the OS at
+          x12/y14) and keeps the window draggable now that the old title bar is
+          gone. Interactive rail rows below are outside this region, so they
+          stay clickable. */}
+      <Box style={{ WebkitAppRegion: 'drag' } as CSSProperties} sx={{ height: 30, flexShrink: 0 }} />
       <Box
         sx={{
           display: 'flex',
@@ -296,27 +314,42 @@ export function ModuleRail({
             disabled={!item.enabled}
             onClick={() => item.enabled && handleParentClick(item.id)}
             sx={{
-              width: expanded ? '100%' : 40,
-              height: 40,
+              width: expanded ? '100%' : 56,
+              height: expanded ? 40 : 48,
               alignSelf: expanded ? 'stretch' : 'center',
-              borderRadius: 1,
+              borderRadius: expanded ? 1 : '14px',
               px: expanded ? 1 : 0,
               justifyContent: expanded ? 'flex-start' : 'center',
               gap: expanded ? 1.25 : 0,
               color: isActive
-                ? 'primary.main'
+                ? 'text.primary'
                 : item.enabled
                   ? 'text.secondary'
                   : 'text.disabled',
-              backgroundColor: isActive ? 'action.selected' : 'transparent',
-              transition: 'background-color 120ms ease, color 120ms ease',
+              // Active: purple wash fill + 1px purple ring (prototype #s-rail .nav.on).
+              backgroundColor: isActive ? activeItemBg : 'transparent',
+              boxShadow: isActive
+                ? activeItemRingShadow
+                : 'none',
+              transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
               ':hover': {
-                backgroundColor: isActive ? 'action.selected' : 'action.hover',
+                backgroundColor: isActive ? activeItemBg : 'action.hover',
                 color: item.enabled ? 'text.primary' : 'text.disabled',
               },
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24 }}>
+            {/* Active item: icon tinted with theme accent color (prototype .nav.on svg). */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: expanded ? 24 : 'auto',
+                // Larger glyphs when collapsed so they fill the wider icon rail.
+                fontSize: expanded ? 20 : 26,
+                color: isActive ? accentColor : 'inherit',
+              }}
+            >
               {item.icon}
             </Box>
             {expanded && (
@@ -399,11 +432,15 @@ export function ModuleRail({
                     borderRadius: 1,
                     justifyContent: 'flex-start',
                     gap: 1,
-                    color: subActive ? 'primary.main' : 'text.secondary',
-                    backgroundColor: subActive ? 'action.selected' : 'transparent',
-                    transition: 'background-color 120ms ease, color 120ms ease',
+                    color: subActive ? 'text.primary' : 'text.secondary',
+                    // Active sub-item: same purple wash + ring as parent items.
+                    backgroundColor: subActive ? activeItemBg : 'transparent',
+                    boxShadow: subActive
+                      ? activeItemRingShadow
+                      : 'none',
+                    transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
                     ':hover': {
-                      backgroundColor: subActive ? 'action.selected' : 'action.hover',
+                      backgroundColor: subActive ? activeItemBg : 'action.hover',
                       color: 'text.primary',
                     },
                   }}
@@ -415,7 +452,8 @@ export function ModuleRail({
                       justifyContent: 'center',
                       width: 18,
                       fontSize: 16,
-                      color: 'inherit',
+                      // Active sub-item: icon tinted with theme accent color.
+                      color: subActive ? accentColor : 'inherit',
                     }}
                   >
                     {tab.icon}

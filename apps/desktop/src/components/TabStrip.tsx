@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -9,6 +10,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { TabId, TabRecord } from '@watchtower/shared/layout.js';
 import { DASHBOARD_TAB_ID } from '@watchtower/shared/layout.js';
 import { tabAccent } from '../util/tabAccent.js';
+import { glassFloating, accentWash, accentRing, accentActiveText, statusDot, ATTENTION_AMBER } from '../theme/glass.js';
 
 // Outer tab dot is locked to the project's accent color (or a hash-based
 // palette pick for ad-hoc cwd tabs). Per-session attention status is
@@ -16,17 +18,6 @@ import { tabAccent } from '../util/tabAccent.js';
 function dotColor(id: string, accent: string | undefined): string {
   return tabAccent(id, accent);
 }
-
-// The strip doubles as the frameless macOS title bar (window.ts sets
-// titleBarStyle: 'hiddenInset'), so the empty regions must drag the window
-// while the tabs and buttons stay clickable. -webkit-app-region inherits in
-// Electron: the container is `drag`, interactive children opt out via `no-drag`.
-// WebkitAppRegion isn't in React's CSSProperties typings, hence the cast.
-const DRAG_REGION = { WebkitAppRegion: 'drag' } as unknown as CSSProperties;
-const NO_DRAG_REGION = { WebkitAppRegion: 'no-drag' } as unknown as CSSProperties;
-
-// Clears the traffic-light buttons that hiddenInset keeps at the top-left.
-const TRAFFIC_LIGHT_INSET = '78px';
 
 interface TabButtonProps {
   id: string;
@@ -60,35 +51,46 @@ function TabButton({
   onHide,
   onClose,
 }: TabButtonProps) {
+  const theme = useTheme();
   return (
     <Box
       ref={dragRef}
       onClick={onClick}
-      style={{ ...(dragStyle ?? {}), ...NO_DRAG_REGION }}
+      style={dragStyle}
       {...(dragListeners ?? {})}
       role="tab"
       aria-selected={active}
       sx={{
         display: 'flex',
         alignItems: 'center',
-        gap: 1,
-        minHeight: 40,
-        px: 1.5,
+        gap: 0.75,
+        height: 26,
+        px: 1.25,
+        borderRadius: '9px',
         cursor: draggable ? 'grab' : 'pointer',
         userSelect: 'none',
-        color: active ? 'text.primary' : 'text.secondary',
-        backgroundColor: active ? 'background.default' : 'transparent',
-        borderBottom: 2,
-        borderBottomColor: active
-          ? accent ?? 'primary.main'
-          : mounted
-          ? accent ?? 'rgba(255,255,255,0.18)'
-          : 'transparent',
-        ':hover': { backgroundColor: active ? 'background.default' : 'action.hover' },
+        // iPad pill: active = purple wash + ring + accent text; no underline.
+        color: active ? accentActiveText(theme) : 'text.secondary',
+        backgroundColor: active ? accentWash(theme) : 'transparent',
+        boxShadow: active ? accentRing(theme) : 'none',
+        ':hover': {
+          backgroundColor: active ? accentWash(theme) : 'action.hover',
+          color: active ? accentActiveText(theme) : 'text.primary',
+        },
         ':active': { cursor: draggable ? 'grabbing' : 'pointer' },
-        fontSize: 13,
+        fontSize: 12.5,
+        fontWeight: active ? 600 : 500,
         whiteSpace: 'nowrap',
         flexShrink: 0,
+        // Stretch-in on mount — a newly added tab expands the (content-width,
+        // centered) bar open. overflow:hidden clips the content while max-width
+        // animates from 0. Runs once per tab (keyed elements aren't remounted).
+        overflow: 'hidden',
+        // easeInOutCubic — motion is spread evenly across the 500ms so it reads
+        // as a real animation (an ease-out front-loads and looks instant).
+        animation: 'wt-tab-in 500ms cubic-bezier(0.65,0,0.35,1)',
+        transition:
+          'background-color 500ms cubic-bezier(0.65,0,0.35,1), color 500ms cubic-bezier(0.65,0,0.35,1), box-shadow 500ms cubic-bezier(0.65,0,0.35,1)',
       }}
     >
       {attention ? (
@@ -96,23 +98,19 @@ function TabButton({
           <WarningRoundedIcon
             aria-label={`${label} needs your attention`}
             sx={{
-              fontSize: 20,
-              // Explicit yellow (theme `warning.main` is amber); a touch
-              // deeper in light mode so it stays legible on the white strip.
-              color: (theme) => (theme.palette.mode === 'dark' ? '#facc15' : '#eab308'),
+              fontSize: 17,
               flexShrink: 0,
+              // Design amber + a soft glow so it reads as a live alert.
+              color: ATTENTION_AMBER,
+              filter: `drop-shadow(0 0 5px ${ATTENTION_AMBER}aa)`,
             }}
           />
         </Tooltip>
       ) : (
         <Box
-          sx={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            backgroundColor: dotColor(id, accent),
-            flexShrink: 0,
-          }}
+          // Always show the project-accent dot (never grey); it glows when the
+          // tab is active, and sits flat but colorful otherwise.
+          sx={statusDot(active ? 'active' : 'idle', dotColor(id, accent), theme)}
         />
       )}
       <span>{label}</span>
@@ -238,6 +236,7 @@ export function TabStrip({
   onHideTab,
   onNew,
 }: Props) {
+  const theme = useTheme();
   // The dashboard tab id is the workspace's empty-state fallback leaf, not a
   // user-facing tab — never render it in the strip.
   const visibleTabs = tabs.filter((t) => t.id !== DASHBOARD_TAB_ID);
@@ -246,15 +245,18 @@ export function TabStrip({
 
   return (
     <Box
-      style={DRAG_REGION}
       sx={{
         display: 'flex',
-        alignItems: 'stretch',
-        minHeight: 40,
-        pl: TRAFFIC_LIGHT_INSET,
-        borderBottom: 1,
-        borderColor: 'divider',
-        backgroundColor: 'background.paper',
+        alignItems: 'center',
+        minHeight: 34,
+        // Floating frosted pill bar — sized to its content and centered at the
+        // top of the Instances content (alignSelf stops the flex-column stretch).
+        ...glassFloating(theme, { radius: 14, elevation: 1 }),
+        alignSelf: 'center',
+        maxWidth: 'calc(100% - 16px)',
+        mt: '8px',
+        mb: '4px',
+        px: 0.75,
         flexShrink: 0,
         overflowX: 'auto',
         overflowY: 'hidden',
@@ -262,7 +264,7 @@ export function TabStrip({
     >
       {/* No DndContext here — App provides one so a tab drag can also drop on workspace leaves. */}
       <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
-        <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, pl: 0.5 }}>
           {visibleTabs.map((t) => (
             <Box
               key={t.id}
@@ -286,13 +288,11 @@ export function TabStrip({
           ))}
         </Box>
       </SortableContext>
-      <Box sx={{ flex: 1, minWidth: 0 }} />
-      <Tooltip title="New instance" placement="left">
+      <Tooltip title="New instance" placement="bottom">
         <IconButton
           onClick={onNew}
           size="small"
-          style={NO_DRAG_REGION}
-          sx={{ mr: 1, color: 'text.secondary', ':hover': { color: 'primary.main' } }}
+          sx={{ ml: 0.25, color: 'text.secondary', ':hover': { color: 'primary.main' } }}
         >
           <AddIcon fontSize="small" />
         </IconButton>

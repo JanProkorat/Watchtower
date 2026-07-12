@@ -11,6 +11,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import { glassSurface } from '../../theme/glass.js';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
@@ -78,6 +80,7 @@ export function ProjectDetailPane({
   onOpenInstanceForCwd,
   onOpenTerminalForCwd,
 }: Props) {
+  const theme = useTheme();
   const state = useProject(projectId);
   useEffect(() => {
     if (refreshTick > 0) void state.refresh();
@@ -173,13 +176,11 @@ export function ProjectDetailPane({
       }}
     >
       <Stack spacing={2.5} sx={{ p: 3 }}>
-        {/* Header card */}
+        {/* Header card — raw Box, so Phase-A Paper override doesn't apply; use glassSurface. */}
         <Box
           sx={{
-            border: 1,
-            borderColor: 'divider',
+            ...glassSurface(theme, { elevation: 1 }),
             borderRadius: 2,
-            bgcolor: 'background.paper',
             position: 'relative',
             overflow: 'hidden',
           }}

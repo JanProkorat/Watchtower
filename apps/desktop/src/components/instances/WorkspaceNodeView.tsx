@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Box } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { LeafView } from './LeafView.js';
 import { SplitDropZones } from './SplitDropZones.js';
@@ -20,6 +20,7 @@ interface Props {
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(tabId: string): void;
+  onAddSessionAfter(afterInstanceId: string, cwd: string, kind: 'claude' | 'shell'): void;
   onSetTask?(instanceId: string, taskId: number | null): void;
   dashboardOnNew?(): void;
 }
@@ -58,6 +59,7 @@ export function WorkspaceNodeView(props: Props) {
           onHideSession={props.onHideSession}
           onUnhideSession={props.onUnhideSession}
           onAddSession={() => props.onAddSession(tab.id)}
+          onAddSessionAfter={props.onAddSessionAfter}
           onSetTask={props.onSetTask}
           dashboardOnNew={props.dashboardOnNew}
         />
@@ -96,6 +98,8 @@ function PanelGroupSlot({
   dir: 'row' | 'col';
   children: ReactNode;
 }) {
+  // Use theme divider so the hairline is visible in both dark and light mode.
+  const theme = useTheme();
   return (
     <>
       <Panel defaultSize={defaultSize} minSize={10}>
@@ -103,9 +107,9 @@ function PanelGroupSlot({
       </Panel>
       {!isLast &&
         (dir === 'row' ? (
-          <PanelResizeHandle style={{ width: 4, background: 'rgba(255,255,255,0.08)' }} />
+          <PanelResizeHandle style={{ width: 4, background: theme.palette.divider }} />
         ) : (
-          <PanelResizeHandle style={{ height: 4, background: 'rgba(255,255,255,0.08)' }} />
+          <PanelResizeHandle style={{ height: 4, background: theme.palette.divider }} />
         ))}
     </>
   );

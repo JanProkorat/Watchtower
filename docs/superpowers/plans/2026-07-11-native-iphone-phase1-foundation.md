@@ -17,6 +17,7 @@
 - **Bundle identifier: `cz.greencode.watchtower.ios`** — deliberately distinct from the Capacitor app's `cz.greencode.watchtower.iphone` so both install side-by-side during the parity period.
 - **Secrets never committed.** `SUPABASE_URL` + `SUPABASE_ANON_KEY` come from a git-ignored `Secrets.xcconfig` surfaced through `Info.plist`; dev Supabase URL default is `https://xggihnrvsmbzbkhsnuky.supabase.co`.
 - **Palette (from `@watchtower/ui-core`):** `baseBg #0b0c11`, `textPrimary #e5e7eb`, `textMuted #9aa1ab`, `textDim #5a6072`, `accent #7c6df0`, `accentIcon #c9bdff`, cta gradient `#8b7cf2 → #6d5fe0`.
+- **Headless `xcodebuild` build/test commands MUST include `-skipMacroValidation -skipPackagePluginValidation`** — the TCA dependency vends Swift macros, and CLI builds have no GUI trust prompt; without these flags the build fails with a macro-fingerprint-trust error. (`swift test` on the package does not need them. `Package.swift` also declares `.macOS(.v13)` so host `swift test` matches the TCA/Supabase macOS floor.)
 - **Every reducer ships with `TestStore` tests.** A task with a reducer is not done until its reducer tests pass.
 
 ---
@@ -245,7 +246,7 @@ git commit -m "feat(ios): scaffold WatchtowerCore package + XcodeGen iPhone app 
 
 ### Task 2: Theme palette + hex color initializer
 
-The one piece of Phase-1 theme with real logic worth a test: a `Color(hex:)` initializer. Ships the shared `Palette` all later views read from.
+The one piece of Phase-1 theme with real logic worth a test: hex parsing. We factor the parse into a host-agnostic pure function `hexRGB(_:)` (no UIKit/AppKit — so `swift test` compiles and runs on the macOS host), and `Color(hex:)` wraps it. Ships the shared `Palette` all later views read from.
 
 **Files:**
 - Create: `swift/WatchtowerCore/Sources/WatchtowerCore/Theme/Palette.swift`
@@ -253,56 +254,68 @@ The one piece of Phase-1 theme with real logic worth a test: a `Color(hex:)` ini
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `Color(hex: String)` initializer; `enum Palette` with static `Color`s: `baseBg`, `textPrimary`, `textMuted`, `textDim`, `accent`, `accentIcon`; `Palette.ctaGradient: LinearGradient`.
+- Produces: `func hexRGB(_ hex: String) -> (red: Double, green: Double, blue: Double)?` (internal — visible to tests via `@testable import`); `Color(hex: String)` initializer; `enum Palette` with static `Color`s: `baseBg`, `textPrimary`, `textMuted`, `textDim`, `accent`, `accentIcon`; `Palette.ctaGradient: LinearGradient`.
 
-- [ ] **Step 1: Write the failing test**
+> **Do NOT use `UIColor`/`NSColor` in the test.** `swift test` runs on the macOS host where `UIColor` does not exist. Assert on `hexRGB(_:)`'s `Double` components directly — that is the real logic and it is platform-free.
+
+- [ ] **Step 1: Write the failing tests**
 
 `PaletteTests.swift`:
 ```swift
 import XCTest
-import SwiftUI
 @testable import WatchtowerCore
 
 final class PaletteTests: XCTestCase {
-    func testHexParsesToComponents() {
-        let c = Color(hex: "#7c6df0")
-        let ui = UIColor(c)
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        ui.getRed(&r, green: &g, blue: &b, alpha: &a)
-        XCTAssertEqual(r, 0x7c / 255, accuracy: 0.01)
-        XCTAssertEqual(g, 0x6d / 255, accuracy: 0.01)
-        XCTAssertEqual(b, 0xf0 / 255, accuracy: 0.01)
-        XCTAssertEqual(a, 1.0, accuracy: 0.01)
+    func testHexParsesToComponents() throws {
+        let c = try XCTUnwrap(hexRGB("#7c6df0"))
+        XCTAssertEqual(c.red, 0x7c / 255.0, accuracy: 0.001)
+        XCTAssertEqual(c.green, 0x6d / 255.0, accuracy: 0.001)
+        XCTAssertEqual(c.blue, 0xf0 / 255.0, accuracy: 0.001)
     }
 
-    func testPaletteAccentMatchesToken() {
-        XCTAssertEqual(UIColor(Palette.accent), UIColor(Color(hex: "#7c6df0")))
+    func testHexAcceptsNoHashPrefix() {
+        XCTAssertEqual(hexRGB("7c6df0")?.red, hexRGB("#7c6df0")?.red)
+    }
+
+    func testMalformedHexReturnsNil() {
+        XCTAssertNil(hexRGB("#zzzzzz"))  // non-hex
+        XCTAssertNil(hexRGB("#12345"))   // wrong length
+        XCTAssertNil(hexRGB(""))         // empty
     }
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run tests to verify they fail**
 
 Run: `cd swift/WatchtowerCore && swift test --filter PaletteTests`
-Expected: FAIL — `Color(hex:)` / `Palette` are undefined.
+Expected: FAIL — `hexRGB` is undefined.
 
 - [ ] **Step 3: Implement `Palette.swift`**
 
 ```swift
 import SwiftUI
 
+/// Parse a `#RRGGBB` (or `RRGGBB`) hex string into sRGB components in 0...1.
+/// Returns nil on malformed input. Host-agnostic (no UIKit/AppKit) so it is
+/// unit-testable under `swift test` on macOS.
+func hexRGB(_ hex: String) -> (red: Double, green: Double, blue: Double)? {
+    let s = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+    guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
+    return (
+        red: Double((v >> 16) & 0xff) / 255,
+        green: Double((v >> 8) & 0xff) / 255,
+        blue: Double(v & 0xff) / 255
+    )
+}
+
 public extension Color {
-    /// Parse a `#RRGGBB` (or `RRGGBB`) hex string. Falls back to clear on bad input.
+    /// Parse a `#RRGGBB` hex string. Falls back to clear on bad input.
     init(hex: String) {
-        let s = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
-        guard s.count == 6, let v = UInt32(s, radix: 16) else { self = .clear; return }
-        self.init(
-            .sRGB,
-            red: Double((v >> 16) & 0xff) / 255,
-            green: Double((v >> 8) & 0xff) / 255,
-            blue: Double(v & 0xff) / 255,
-            opacity: 1
-        )
+        if let c = hexRGB(hex) {
+            self.init(.sRGB, red: c.red, green: c.green, blue: c.blue, opacity: 1)
+        } else {
+            self = .clear
+        }
     }
 }
 
@@ -1003,8 +1016,8 @@ struct AppShellView: View {
 
 - [ ] **Step 3: Regenerate the project and build for the simulator**
 
-Run: `cd apps/iphone-native && xcodegen generate && xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination 'generic/platform=iOS Simulator' build`
-Expected: **BUILD SUCCEEDED**. (Regenerate because `Views/` added new files under the `Watchtower` source folder.)
+Run: `cd apps/iphone-native && xcodegen generate && xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination 'generic/platform=iOS Simulator' -skipMacroValidation -skipPackagePluginValidation build`
+Expected: **BUILD SUCCEEDED**. (Regenerate because `Views/` added new files under the `Watchtower` source folder. The `-skipMacroValidation -skipPackagePluginValidation` flags are required for headless `xcodebuild` of the TCA macro-vending package graph — see Global Constraints.)
 
 - [ ] **Step 4: Commit**
 
@@ -1078,7 +1091,7 @@ Run:
 cd apps/iphone-native
 xcodegen generate
 DEST='platform=iOS Simulator,name=iPhone 16e'
-xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination "$DEST" build
+xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -destination "$DEST" -skipMacroValidation -skipPackagePluginValidation build
 xcrun simctl boot "iPhone 16e" 2>/dev/null; open -a Simulator
 APP="$(xcodebuild -project Watchtower.xcodeproj -scheme Watchtower -showBuildSettings -destination "$DEST" | awk '/ CODESIGNING_FOLDER_PATH/{ $1=""; print substr($0,2) }')"
 xcrun simctl install booted "$APP"

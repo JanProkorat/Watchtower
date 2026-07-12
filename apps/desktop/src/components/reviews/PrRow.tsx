@@ -1,4 +1,5 @@
 import { Box, Typography, Chip, Button } from '@mui/material';
+import { alpha, type SxProps, type Theme } from '@mui/material/styles';
 import type { PullRequestPayload } from '@watchtower/shared/ipcContract.js';
 import { relativeAge } from '../../state/useReviews.js';
 
@@ -32,7 +33,29 @@ export function reviewStateDisplay(reviewState: ReviewState): { color: string; l
   return { color: d.color, label: d.label(reviewState?.findingCount ?? 0) };
 }
 
-export function PrRow({ pr, nowMs, onOpen, reviewState = null, onReview, onCancel }: {
+// Filled accent "Review" CTA with a soft glow (prototype); the accent follows
+// the theme primary so it re-themes with the rest of the app.
+const REVIEW_BTN_SX: SxProps<Theme> = {
+  minWidth: 0,
+  fontSize: 11,
+  fontWeight: 600,
+  px: 1.5,
+  boxShadow: (t) => `0 3px 14px ${alpha(t.palette.primary.main, 0.45)}`,
+  ':hover': { boxShadow: (t) => `0 4px 18px ${alpha(t.palette.primary.main, 0.6)}` },
+};
+
+// Neutral outlined "Open report" / "View" button.
+const GHOST_BTN_SX: SxProps<Theme> = {
+  minWidth: 0,
+  fontSize: 11,
+  fontWeight: 600,
+  px: 1.25,
+  color: 'text.primary',
+  borderColor: 'divider',
+  ':hover': { borderColor: 'text.disabled', backgroundColor: 'action.hover' },
+};
+
+export function PrRow({ pr, nowMs, onOpen, reviewState = null, onReview }: {
   pr: PullRequestPayload; nowMs: number; onOpen(pr: PullRequestPayload): void; reviewState?: ReviewState;
   onReview?(pr: PullRequestPayload): void; onCancel?(pr: PullRequestPayload): void;
 }): JSX.Element {
@@ -73,17 +96,17 @@ export function PrRow({ pr, nowMs, onOpen, reviewState = null, onReview, onCance
         <Box component="span" sx={{ color: 'text.secondary' }}>{display.label}</Box>
       </Box>
       {reviewState?.status === 'running' ? (
-        <Button size="small" variant="text" color="error"
-          onClick={(e) => { e.stopPropagation(); onCancel?.(pr); }}
-          sx={{ minWidth: 0, fontSize: 11 }}>
-          Cancel
+        // Reviewing: an outlined "View" that opens the drawer to watch progress
+        // (Cancel lives in the drawer's report tab).
+        <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); onOpen(pr); }} sx={GHOST_BTN_SX}>
+          View ▸
         </Button>
       ) : reviewState?.status === 'done' ? (
-        <Button size="small" variant="text" onClick={(e) => { e.stopPropagation(); onOpen(pr); }} sx={{ minWidth: 0, fontSize: 11 }}>
-          Open ▸
+        <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); onOpen(pr); }} sx={GHOST_BTN_SX}>
+          Open report
         </Button>
       ) : (
-        <Button size="small" variant="text" onClick={(e) => { e.stopPropagation(); onReview?.(pr); }} sx={{ minWidth: 0, fontSize: 11 }}>
+        <Button size="small" variant="contained" onClick={(e) => { e.stopPropagation(); onReview?.(pr); }} sx={REVIEW_BTN_SX}>
           Review ▸
         </Button>
       )}

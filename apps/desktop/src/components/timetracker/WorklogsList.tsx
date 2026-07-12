@@ -11,14 +11,15 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs, { type Dayjs } from 'dayjs';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import {
-  useWorklogs,
-  type PeriodPreset,
-  type SourceFilter,
-} from '../../state/useWorklogs.js';
+import { glassFill } from '../../theme/glass.js';
+import { useWorklogs } from '../../state/useWorklogs.js';
+import { CZ_DATE_FORMAT } from '../../util/format.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
 import { WorklogDrawer } from './WorklogDrawer.js';
@@ -134,32 +135,20 @@ export function WorklogsList({ projectId }: Props) {
             ))}
           </TextField>
         )}
-        <TextField
-          select
-          size="small"
-          label="Period"
-          value={state.filter.period}
-          onChange={(e) => state.setPeriod(e.target.value as PeriodPreset)}
-          sx={{ minWidth: 140 }}
-        >
-          <MenuItem value="today">Today</MenuItem>
-          <MenuItem value="week">This week</MenuItem>
-          <MenuItem value="month">This month</MenuItem>
-          <MenuItem value="all">All time</MenuItem>
-        </TextField>
-        <TextField
-          select
-          size="small"
-          label="Source"
-          value={state.filter.source}
-          onChange={(e) => state.setSource(e.target.value as SourceFilter)}
-          sx={{ minWidth: 140 }}
-        >
-          <MenuItem value="all">Any source</MenuItem>
-          <MenuItem value="manual">Manual</MenuItem>
-          <MenuItem value="watchtower-auto">Watchtower auto</MenuItem>
-          <MenuItem value="jira-sync">Jira sync</MenuItem>
-        </TextField>
+        <DatePicker
+          label="From"
+          value={dayjs(state.filter.from)}
+          onChange={(v: Dayjs | null) => v && state.setFrom(v.format('YYYY-MM-DD'))}
+          format={CZ_DATE_FORMAT}
+          slotProps={{ textField: { size: 'small', sx: { minWidth: 150 } } }}
+        />
+        <DatePicker
+          label="To"
+          value={dayjs(state.filter.to)}
+          onChange={(v: Dayjs | null) => v && state.setTo(v.format('YYYY-MM-DD'))}
+          format={CZ_DATE_FORMAT}
+          slotProps={{ textField: { size: 'small', sx: { minWidth: 150 } } }}
+        />
         <TextField
           size="small"
           placeholder="Search comment / key / title…"
@@ -240,7 +229,7 @@ export function WorklogsList({ projectId }: Props) {
                 sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
               >
                 {group.rows.length} {group.rows.length === 1 ? 'entry' : 'entries'} ·{' '}
-                <strong style={{ color: 'rgba(255,255,255,0.92)' }}>
+                <strong style={{ color: 'inherit' }}>
                   {fmtMinutes(group.total)}
                 </strong>
               </Typography>
@@ -307,6 +296,7 @@ function WorklogRow({
   onEdit(): void;
   onDelete(): void;
 }) {
+  const theme = useTheme();
   const sourceLabel =
     worklog.source && SOURCE_LABELS[worklog.source] ? SOURCE_LABELS[worklog.source] : worklog.source;
   // Surface reported_minutes only when it's explicitly different from the
@@ -314,6 +304,10 @@ function WorklogRow({
   // compact for the common case.
   const reportedDiffers =
     worklog.reportedMinutes != null && worklog.reportedMinutes !== worklog.minutes;
+  // Dense data rows: use glassFill (no per-row backdropFilter) — the parent
+  // container's frosted backdrop already handles the blur; stacking a second
+  // GPU pass per-row costs frames without adding visible effect.
+  const rowGlass = glassFill(theme, { elevation: 2 });
   return (
     <Box
       sx={{
@@ -323,10 +317,8 @@ function WorklogRow({
         alignItems: 'center',
         px: 1.25,
         py: 1,
-        border: 1,
-        borderColor: 'divider',
         borderRadius: 1,
-        backgroundColor: 'background.paper',
+        ...rowGlass,
       }}
     >
       <Box

@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, nativeTheme } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getOrchestrator } from './orchestratorHost.js';
@@ -16,6 +16,12 @@ export function createMainWindow(): BrowserWindow {
     mainWindow.show();
     return mainWindow;
   }
+  // Default to dark until the renderer fires appearance:set with its persisted
+  // preference. The renderer reads localStorage synchronously at load time and
+  // calls appearance:set on its first render, so the OS material flips quickly.
+  // We cannot read renderer localStorage from the main process directly.
+  nativeTheme.themeSource = 'dark';
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -28,7 +34,12 @@ export function createMainWindow(): BrowserWindow {
     // bar (default y sits too high once the bar replaces the OS title bar).
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 12, y: 14 },
-    backgroundColor: '#0e0f12',
+    // Fully transparent — vibrancy provides the translucent base. Do NOT also
+    // set transparent: true; combining it with vibrancy on macOS causes window
+    // shadow and rounded-corner glitches.
+    backgroundColor: '#00000000',
+    vibrancy: 'under-window',
+    visualEffectState: 'active',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

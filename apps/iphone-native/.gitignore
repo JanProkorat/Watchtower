@@ -1,0 +1,12 @@
+# XcodeGen output (regenerated from project.yml — never committed)
+Watchtower.xcodeproj/
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+# Secrets (never commit)
+Watchtower/Secrets.xcconfig
+# SPM
+.swiftpm/
+.build/

@@ -9,6 +9,10 @@ describe('ELECTRON_ONLY_KINDS', () => {
     expect(ELECTRON_ONLY_KINDS.has('projects:list')).toBe(false);
     expect(ELECTRON_ONLY_KINDS.has('listInstances')).toBe(false);
   });
+
+  it('includes appearance:set (electron-only OS theme sync)', () => {
+    expect(ELECTRON_ONLY_KINDS.has('appearance:set')).toBe(true);
+  });
 });
 
 describe('cloudSync IPC', () => {

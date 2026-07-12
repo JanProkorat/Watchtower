@@ -194,6 +194,8 @@ export function ReportsTab() {
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'auto' }}>
+      {/* Sticky filter bar — <Paper> so Phase-A glass override applies; no explicit
+          backgroundColor override here so the glassSurface fill is not clobbered. */}
       <Paper
         variant="outlined"
         sx={{
@@ -203,7 +205,6 @@ export function ReportsTab() {
           position: 'sticky',
           top: 0,
           zIndex: 2,
-          backgroundColor: 'background.default',
         }}
       >
         <Stack
