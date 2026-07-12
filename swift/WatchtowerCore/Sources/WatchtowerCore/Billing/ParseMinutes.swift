@@ -3,13 +3,15 @@ import Foundation
 /// Ported from packages/shared/src/billing/parseMinutes.ts — returns nil where TS returns NaN.
 public func parseMinutes(_ input: String) -> Int? {
     // Trim, lowercase, replace FIRST comma with dot (String.replace w/o /g).
-    var trimmed = input.trimmingCharacters(in: .whitespaces).lowercased()
+    var trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     if let comma = trimmed.firstIndex(of: ",") { trimmed.replaceSubrange(comma...comma, with: ".") }
     if trimmed.isEmpty { return nil }
 
     // 1) pure decimal hours: ^\d+(\.\d+)?$
     if matches(trimmed, #"^\d+(\.\d+)?$"#), let hours = Double(trimmed) {
-        return Int((hours * 60).rounded())
+        let minutes = (hours * 60).rounded()
+        guard minutes.isFinite else { return nil }
+        return Int(minutes)
     }
     // 2) H:MM colon form: ^(\d+):(\d{1,2})$  (minutes NOT clamped)
     if let g = capture(trimmed, #"^(\d+):(\d{1,2})$"#), let h = Int(g[0]), let m = Int(g[1]) {
@@ -19,7 +21,9 @@ public func parseMinutes(_ input: String) -> Int? {
     if let g = optionalCapture(trimmed, #"^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+)\s*m)?$"#) {
         let hStr = g[0], mStr = g[1]
         if !hStr.isEmpty || !mStr.isEmpty {
-            let hoursPart = Int(((Double(hStr) ?? 0) * 60).rounded())
+            let hoursMinutes = ((Double(hStr) ?? 0) * 60).rounded()
+            guard hoursMinutes.isFinite else { return nil }
+            let hoursPart = Int(hoursMinutes)
             let minsPart = Int(mStr) ?? 0
             return hoursPart + minsPart
         }

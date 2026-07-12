@@ -27,4 +27,14 @@ final class ParseMinutesTests: XCTestCase {
         XCTAssertNil(parseMinutes("h"))
         XCTAssertNil(parseMinutes("-1"))
     }
+    func testNewlineTrimming() {
+        XCTAssertEqual(parseMinutes("5\n"), 300)
+        XCTAssertEqual(parseMinutes("\n1.5"), 90)
+        XCTAssertEqual(parseMinutes("\r\n2h\r\n"), 120)
+    }
+    func testPathologicalInputDoesNotCrash() {
+        let hugeNumeral = String(repeating: "9", count: 400)
+        XCTAssertNil(parseMinutes(hugeNumeral))
+        XCTAssertNil(parseMinutes(hugeNumeral + "h"))
+    }
 }
