@@ -56,7 +56,11 @@ public struct BillingFeature {
                 )
 
             case let .cacheLoaded(dataset):
-                guard let dataset else { return .none }
+                // SWR invariant: never regress to staler data once fresher has
+                // rendered. onAppear runs cache-load and fetch concurrently, so a
+                // fetchResponse.success (→ .fresh) can land before this cacheLoaded;
+                // apply the cache only while still in the initial load.
+                guard state.loadState == .loading, let dataset else { return .none }
                 state.dataset = dataset
                 state.loadState = .cached
                 state.lastUpdated = dataset.fetchedAt

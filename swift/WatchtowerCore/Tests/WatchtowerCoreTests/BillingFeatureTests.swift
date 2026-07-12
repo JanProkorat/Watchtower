@@ -62,6 +62,32 @@ final class BillingFeatureTests: XCTestCase {
         }
     }
 
+    func testCacheLoadedDoesNotRegressFreshState() async {
+        // Drive to .fresh first, then a late cacheLoaded (older cached snapshot)
+        // must be a no-op — proves the SWR race guard closes the window where a
+        // concurrent cache-load lands after the fresh fetch.
+        let store = TestStore(initialState: BillingFeature.State()) { BillingFeature() } withDependencies: {
+            $0.billingCache.save = { _ in }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.fetchResponse(.success(ds("fresh")))) {
+            $0.dataset = self.ds("fresh"); $0.loadState = .fresh; $0.lastUpdated = "fresh"
+        }
+        // Late cacheLoaded with an older dataset: no state change expected.
+        await store.send(.cacheLoaded(ds("cached")))
+    }
+
+    func testCacheLoadedNilStaysLoading() async {
+        let store = TestStore(initialState: BillingFeature.State()) { BillingFeature() }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        // Empty-cache no-op: loadState stays .loading, dataset stays nil.
+        await store.send(.cacheLoaded(nil))
+        XCTAssertEqual(store.state.loadState, .loading)
+        XCTAssertNil(store.state.dataset)
+    }
+
     func testRefreshShowsToastThenExpires() async {
         let clock = TestClock()
         let store = TestStore(initialState: BillingFeature.State()) { BillingFeature() } withDependencies: {
