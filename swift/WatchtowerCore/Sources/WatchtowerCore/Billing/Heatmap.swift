@@ -121,3 +121,9 @@ public func activityHeatmap(_ rows: [WorklogRow], today: String, windowDays: Int
     let fromDate = heatmapAddDays(today, -(windowDays - 1))
     return buildHeatmap(rows, fromDate: fromDate, toDate: today)
 }
+
+/// Range-scoped variant: caller supplies the inclusive [from, to] window directly
+/// (mirrors `packages/shared/src/billing/heatmap.ts` `activityHeatmapRange`).
+public func activityHeatmapRange(_ rows: [WorklogRow], from: String, to: String) -> HeatmapResult {
+    buildHeatmap(rows, fromDate: from, toDate: to)
+}

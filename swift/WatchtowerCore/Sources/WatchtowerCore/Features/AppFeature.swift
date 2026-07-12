@@ -30,6 +30,7 @@ public struct AppFeature {
         public var billing = BillingFeature.State()
         public var dashboard = DashboardFeature.State()
         public var earnings = EarningsFeature.State()
+        public var reports = ReportsFeature.State()
         public init(phase: Phase = .loading, selectedTab: Tab = .dashboard) {
             self.phase = phase
             self.selectedTab = selectedTab
@@ -45,6 +46,7 @@ public struct AppFeature {
         case billing(BillingFeature.Action)
         case dashboard(DashboardFeature.Action)
         case earnings(EarningsFeature.Action)
+        case reports(ReportsFeature.Action)
     }
 
     @Dependency(\.supabase) var supabase
@@ -73,8 +75,16 @@ public struct AppFeature {
                     // bare onAppear (auth isn't known yet) and never on the
                     // already-signedIn no-op branch above (token-refresh
                     // re-emissions of `present == true` must not refetch).
+                    // `earliest` isn't known yet (it derives from the billing
+                    // dataset, which hasn't loaded) — seed with nil here; the
+                    // `.billing` case below re-seeds it once a dataset first
+                    // arrives (cache-load or network fetch).
                     return present
-                        ? .merge(.send(.billing(.onAppear)), .send(.earnings(.onAppear)))
+                        ? .merge(
+                            .send(.billing(.onAppear)),
+                            .send(.earnings(.onAppear)),
+                            .send(.reports(.onAppear(earliest: nil)))
+                        )
                         : .none
                 }
 
@@ -88,13 +98,36 @@ public struct AppFeature {
             case .auth:
                 return .none
 
-            case .billing:
-                return .none
+            case let .billing(billingAction):
+                // Re-seed the Reports "all"-preset lower bound the first time
+                // a billing dataset lands (cache-load or network fetch) — at
+                // sign-in the dataset isn't loaded yet, so `earliest` was
+                // sent as nil. This runs BEFORE the `Scope(\.billing)` below,
+                // so `state.billing.dataset` here still reflects the
+                // pre-mutation value: nil ⇒ this is the first arrival.
+                guard state.billing.dataset == nil else { return .none }
+                let newDataset: BillingDataset?
+                switch billingAction {
+                case let .cacheLoaded(dataset):
+                    newDataset = dataset
+                case let .fetchResponse(.success(dataset)):
+                    newDataset = dataset
+                case let .refreshResponse(.success(dataset)):
+                    newDataset = dataset
+                default:
+                    newDataset = nil
+                }
+                guard let newDataset else { return .none }
+                let earliest = newDataset.worklogs.map(\.workDate).min()
+                return .send(.reports(.onAppear(earliest: earliest)))
 
             case .dashboard:
                 return .none
 
             case .earnings:
+                return .none
+
+            case .reports:
                 return .none
             }
         }
@@ -109,6 +142,9 @@ public struct AppFeature {
         }
         Scope(state: \.earnings, action: \.earnings) {
             EarningsFeature()
+        }
+        Scope(state: \.reports, action: \.reports) {
+            ReportsFeature()
         }
     }
 }
