@@ -401,6 +401,30 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       db.exec(`CREATE INDEX IF NOT EXISTS idx_pr_reviews_pr ON pr_reviews(host, repo_key, pr_number)`);
     },
   },
+  {
+    version: 21,
+    up: (db) => {
+      // PR notifications: pr_watch_state holds per-PR high-water marks so the
+      // PrWatcher only notifies on genuinely-new activity. Keyed by
+      // (host, repo_key, pr_number). Booleans stored as 0/1.
+      db.exec(`CREATE TABLE IF NOT EXISTS pr_watch_state (
+        host                  TEXT    NOT NULL,
+        repo_key              TEXT    NOT NULL,
+        repo_label            TEXT    NOT NULL DEFAULT '',
+        pr_number             INTEGER NOT NULL,
+        title                 TEXT    NOT NULL DEFAULT '',
+        my_role               TEXT    NOT NULL,
+        review_requested_seen INTEGER NOT NULL DEFAULT 0,
+        last_comment_ts       TEXT,
+        last_review_ts        TEXT,
+        approved              INTEGER NOT NULL DEFAULT 0,
+        mergeable             INTEGER NOT NULL DEFAULT 0,
+        merge_blocked_reason  TEXT,
+        updated_at            TEXT    NOT NULL,
+        PRIMARY KEY (host, repo_key, pr_number)
+      )`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {
