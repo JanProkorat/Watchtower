@@ -16,6 +16,8 @@ export type IpcRequest =
   | { kind: 'setSetting'; payload: { key: string; value: string } }
   | { kind: 'hub:getConfig'; payload: Record<string, never> }
   | { kind: 'hub:setConfig'; payload: { config: HubConfig } }
+  | { kind: 'cloudSync:getConfig'; payload: Record<string, never> }
+  | { kind: 'cloudSync:setConfig'; payload: { enabled: boolean; url?: string | null } }
   | { kind: 'previewHookInstall'; payload: Record<string, never> }
   | { kind: 'installHooks'; payload: Record<string, never> }
   | { kind: 'uninstallHooks'; payload: Record<string, never> }
@@ -604,6 +606,8 @@ export type IpcResponse =
   | { kind: 'setSetting'; payload: { ok: true } }
   | { kind: 'hub:getConfig'; payload: { config: HubConfig } }
   | { kind: 'hub:setConfig'; payload: { ok: true } }
+  | { kind: 'cloudSync:getConfig'; payload: { enabled: boolean; configured: boolean } }
+  | { kind: 'cloudSync:setConfig'; payload: { ok: true; needsRestart: boolean } }
   | {
       kind: 'previewHookInstall';
       payload: {
@@ -864,6 +868,8 @@ export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'board:signIn',
   'devops:setPat',
   'devops:hasPat',
+  'cloudSync:getConfig',
+  'cloudSync:setConfig',
 ]);
 
 export interface WatchtowerBridge {

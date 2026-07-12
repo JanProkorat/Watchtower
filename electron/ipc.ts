@@ -8,6 +8,7 @@ import { getOrchestrator } from './orchestratorHost.js';
 import { fireMacNotification, fireTestNotification } from './notifications.js';
 import { runBoardSignIn } from './boardSignIn.js';
 import { setPat, hasPat, getPats } from './devopsPat.js';
+import { getCloudSyncConfig, setCloudSyncConfig } from './cloudSync.js';
 
 export function registerIpc(): void {
   // Push events from the orchestrator are forwarded to the renderer verbatim;
@@ -103,6 +104,15 @@ export function registerIpc(): void {
 
       if (kind === 'devops:hasPat') {
         return { hasPat: await hasPat((payload as { host: string }).host) };
+      }
+
+      if (kind === 'cloudSync:getConfig') {
+        return getCloudSyncConfig();
+      }
+
+      if (kind === 'cloudSync:setConfig') {
+        setCloudSyncConfig(payload as { enabled: boolean; url?: string | null });
+        return { ok: true, needsRestart: true };
       }
 
       if (kind === 'prs:refresh' || kind === 'prs:diff' || kind === 'prs:comments' || kind === 'prReview:postComments') {
