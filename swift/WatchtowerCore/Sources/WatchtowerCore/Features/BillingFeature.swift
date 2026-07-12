@@ -15,8 +15,8 @@ public struct BillingFeature {
 
     @ObservableState
     public struct State: Equatable {
-        public var dataset: BillingDataset?
-        public var loadState: LoadState = .loading
+        @Shared(.inMemory("billingDataset")) public var dataset: BillingDataset? = nil
+        @Shared(.inMemory("billingLoadState")) public var loadState: LoadState = .loading
         public var lastUpdated: String?
         public var showRefreshToast: Bool = false
         public init() {}
@@ -65,8 +65,8 @@ public struct BillingFeature {
                 // from .offline to .cached instead of stranding the user offline
                 // with valid data on disk.
                 guard state.dataset == nil, let dataset else { return .none }
-                state.dataset = dataset
-                state.loadState = .cached
+                state.$dataset.withLock { $0 = dataset }
+                state.$loadState.withLock { $0 = .cached }
                 state.lastUpdated = dataset.fetchedAt
                 return .none
 
@@ -112,8 +112,8 @@ public struct BillingFeature {
     ) -> Effect<Action> {
         switch result {
         case let .success(dataset):
-            state.dataset = dataset
-            state.loadState = .fresh
+            state.$dataset.withLock { $0 = dataset }
+            state.$loadState.withLock { $0 = .fresh }
             state.lastUpdated = dataset.fetchedAt
             var effects: [Effect<Action>] = [
                 .run { _ in await billingCache.save(dataset) }
@@ -132,10 +132,10 @@ public struct BillingFeature {
 
         case .failure:
             if state.dataset != nil {
-                state.loadState = .cached
+                state.$loadState.withLock { $0 = .cached }
             } else {
-                state.dataset = nil
-                state.loadState = .offline
+                state.$dataset.withLock { $0 = nil }
+                state.$loadState.withLock { $0 = .offline }
                 state.lastUpdated = nil
             }
             return .none
