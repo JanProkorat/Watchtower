@@ -115,7 +115,8 @@ export type OrchRequest =
         findingIndexes: number[];
         devopsPats?: Record<string, string>;
       };
-    };
+    }
+  | { id: string; kind: 'prWatch:setPats'; payload: { pats: Record<string, string> } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -602,7 +603,8 @@ export type OrchResponse =
   | { kind: 'prReview:get'; payload: { review: import('./ipcContract.js').PrReviewPayload | null } }
   | { kind: 'prReview:list'; payload: { reviews: import('./ipcContract.js').PrReviewPayload[] } }
   | { kind: 'prReview:cancel'; payload: { ok: true } }
-  | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } };
+  | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } }
+  | { kind: 'prWatch:setPats'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
@@ -628,7 +630,8 @@ export type OrchPush =
   | { kind: 'badge'; payload: { count: number } }
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
-  | { kind: 'prReviewDone'; payload: { reviewId: number } };
+  | { kind: 'prReviewDone'; payload: { reviewId: number } }
+  | { kind: 'prWatchEvent'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } };
 
 type AnyPort = {
   postMessage(data: unknown): void;

@@ -69,6 +69,11 @@ import { ReviewsService } from './services/reviews.js';
 import { runReview } from './services/prReview.js';
 import { postGithubComment, postAzdoComment } from './services/prProviders/postComment.js';
 import { PrReviewsRepo, type PrReviewRow } from './db/repositories/prReviews.js';
+import { PrWatcher } from './services/prWatch/PrWatcher.js';
+import { githubWatched, azdoWatched } from './services/prWatch/queries.js';
+import { resolveGithubLogin, resolveAzdoUser } from './services/prWatch/identity.js';
+import { PrWatchStateRepo } from './db/repositories/prWatchState.js';
+import type { WatchedPr, WatchEvent } from './services/prWatch/types.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
@@ -255,6 +260,118 @@ function reviewPayloadOf(row: PrReviewRow): PrReviewPayload {
     createdAt: row.created_at,
     finishedAt: row.finished_at,
   };
+}
+
+// Azure DevOps PATs, decrypted in electron main (safeStorage) and pushed here
+// once at startup + on every change via `prWatch:setPats` — the orchestrator
+// itself cannot safeStorage.decryptString. Keyed by devopsHost. Empty until
+// the first push arrives, so DevOps watching quietly stays off until then.
+let watchPats: Record<string, string> = {};
+
+/** Exported for unit testing (see tests/orchestrator/notificationBody.test.ts). */
+export function notificationBody(pr: WatchedPr, ev: WatchEvent): string {
+  switch (ev.type) {
+    case 'review_requested': return `Review requested on "${pr.title}"`;
+    case 'commented': return `${ev.author} commented on "${pr.title}"`;
+    case 'reviewed': return `${ev.author} reviewed "${pr.title}"`;
+    case 'approved': return `${ev.author} approved "${pr.title}"`;
+    case 'changes_requested': return `${ev.author} requested changes on "${pr.title}"`;
+  }
+}
+
+const PR_WATCH_FOCUSED_MS = 60_000;
+const PR_WATCH_UNFOCUSED_MS = 300_000;
+let prWatchTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Boots the cross-repo PR watcher: an adaptive poll (60s while the app window
+ * is focused, 300s otherwise) that diffs each watched PR's state against
+ * `pr_watch_state` and fires a notification + push per new event (review
+ * requested, comment, review, approve, changes-requested).
+ */
+function startPrWatch(): void {
+  const stateRepo = new PrWatchStateRepo(handle!.db);
+
+  const fetchWatched = async (): Promise<WatchedPr[]> => {
+    const out: WatchedPr[] = [];
+    // GitHub: truly account-wide (gh CLI's own auth), independent of configured projects.
+    try {
+      const login = await resolveGithubLogin();
+      out.push(...(await githubWatched(login)));
+    } catch (err) {
+      console.error('[prWatch] github', err);
+    }
+    // Azure DevOps: one (host, org) per configured devops remote that has a PAT.
+    try {
+      const { azdo } = await reviewsSvc().resolveRepos();
+      const orgs = new Map<string, { apiBase: string; devopsHost: string; org: string }>();
+      for (const r of azdo) {
+        if (orgs.has(r.apiBase)) continue;
+        const org = new URL(r.apiBase).pathname.split('/').filter(Boolean)[0] ?? '';
+        orgs.set(r.apiBase, { apiBase: r.apiBase, devopsHost: r.devopsHost, org });
+      }
+      for (const { apiBase, devopsHost, org } of orgs.values()) {
+        const pat = watchPats[devopsHost];
+        if (!pat) {
+          console.error('[prWatch] azdo: skipping org (no PAT for host)', devopsHost);
+          continue;
+        }
+        try {
+          const user = await resolveAzdoUser(apiBase, pat);
+          out.push(...(await azdoWatched(apiBase, org, user, pat)));
+        } catch (err) {
+          console.error('[prWatch] azdo org', org, err);
+        }
+      }
+    } catch (err) {
+      console.error('[prWatch] azdo', err);
+    }
+    return out;
+  };
+
+  const watcher = new PrWatcher({
+    repo: stateRepo,
+    // Thread the resolved GitHub login through so computeEvents can filter
+    // out the user's own comments/reviews on GitHub PRs (azdo authors are
+    // already filtered by id inside parseAzdoPr).
+    me: async () => ({ github: await resolveGithubLogin().catch(() => null), azdo: new Map() }),
+    fetchWatched,
+    now: () => new Date().toISOString(),
+    onEvent: (pr, ev) => {
+      const body = notificationBody(pr, ev);
+      emitPush({
+        kind: 'notify',
+        payload: {
+          target: 'pr',
+          host: pr.host,
+          repoKey: pr.repoKey,
+          prNumber: pr.prNumber,
+          title: pr.title,
+          repoLabel: pr.repoLabel,
+          event: ev.type,
+          body,
+        },
+      });
+      try {
+        new NotificationsRepo(handle!.db).log(`pr:${pr.host}:${pr.repoKey}#${pr.prNumber}`, `pr-${ev.type}`, body, Date.now());
+      } catch (err) {
+        console.error('[prWatch] notification log failed', err);
+      }
+      emitPush({ kind: 'prWatchEvent', payload: { host: pr.host, repoKey: pr.repoKey, prNumber: pr.prNumber } });
+    },
+  });
+
+  const tick = async (): Promise<void> => {
+    try {
+      await watcher.cycle();
+    } catch (err) {
+      console.error('[prWatch] cycle', err);
+    }
+    const focused = notifier?.isWindowFocused() ?? true;
+    prWatchTimer = setTimeout(() => void tick(), focused ? PR_WATCH_FOCUSED_MS : PR_WATCH_UNFOCUSED_MS);
+    prWatchTimer.unref?.();
+  };
+  void tick();
 }
 
 function epicsRepo(): EpicsRepo {
@@ -1310,6 +1427,10 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       }
     }
 
+    case 'prWatch:setPats':
+      watchPats = req.payload.pats;
+      return { ok: true };
+
   }
 }
 
@@ -1515,6 +1636,8 @@ function respawnIncompleteRowsOnBoot(): void {
     // Begin polling ccusage for the 5h-block token usage and pushing it to the
     // renderer dashboard + tray.
     startTokenUsagePolling();
+    // Begin the cross-repo PR watch (adaptive poll, notify + pr_watch_state).
+    startPrWatch();
     void statusOf; // referenced for future use; quiet TS unused warning
   },
 );

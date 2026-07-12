@@ -11,6 +11,15 @@ import { setPat, hasPat, getPats } from './devopsPat.js';
 import { getCloudSyncConfig, setCloudSyncConfig } from './cloudSync.js';
 
 export function registerIpc(): void {
+  // Seed the orchestrator's in-memory DevOps PAT map so the autonomous
+  // PrWatcher poll can watch Azure DevOps PRs from boot onward — the
+  // orchestrator can't safeStorage.decryptString itself (main-process only),
+  // so main pushes the already-decrypted map once here; the devops:setPat
+  // handler below re-sends it on every change.
+  void getPats()
+    .then((pats) => getOrchestrator().invoke('prWatch:setPats', { pats }))
+    .catch((err) => console.error('[ipc] initial prWatch:setPats failed:', err));
+
   // Push events from the orchestrator are forwarded to the renderer verbatim;
   // a few also trigger native side-effects (macOS notifications) in main.
   getOrchestrator().onPush((msg) => {
@@ -123,6 +132,11 @@ export function registerIpc(): void {
       if (kind === 'devops:setPat') {
         const { host, pat } = payload as { host: string; pat: string };
         await setPat(host, pat);
+        // Keep the orchestrator's in-memory PAT bridge (used by the autonomous
+        // PrWatcher poll, which can't safeStorage.decryptString itself) current.
+        void orch.invoke('prWatch:setPats', { pats: await getPats() }).catch((err) => {
+          console.error('[ipc] prWatch:setPats re-send failed:', err);
+        });
         return { ok: true };
       }
 

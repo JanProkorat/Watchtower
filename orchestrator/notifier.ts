@@ -36,6 +36,13 @@ export class Notifier {
     this.windowFocused = focused;
   }
 
+  /** Whether the app window itself currently has OS focus (any tab). Used by
+   *  callers outside the per-instance notify rules (e.g. PrWatcher's adaptive
+   *  poll interval) that just need a coarse "is the user looking at us" signal. */
+  isWindowFocused(): boolean {
+    return this.windowFocused;
+  }
+
   /** id of the focused instance, or null — used to acknowledge it on window refocus. */
   focusedId(): string | null {
     return this.focused;

@@ -94,6 +94,7 @@ export type IpcRequest =
   | { kind: 'prReview:postComments'; payload: { reviewId: number; findingIndexes: number[]; devopsPats?: Record<string, string> } }
   | { kind: 'devops:setPat'; payload: { host: string; pat: string } }
   | { kind: 'devops:hasPat'; payload: { host: string } }
+  | { kind: 'prWatch:setPats'; payload: { pats: Record<string, string> } }
   | { kind: 'appearance:set'; payload: { mode: 'dark' | 'light' } };
 
 export interface RunningInstancePayload {
@@ -689,6 +690,7 @@ export type IpcResponse =
   | { kind: 'reviews:projectRepo'; payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null } }
   | { kind: 'devops:setPat'; payload: { ok: true } }
   | { kind: 'devops:hasPat'; payload: { hasPat: boolean } }
+  | { kind: 'prWatch:setPats'; payload: { ok: true } }
   | { kind: 'prReview:start'; payload: { reviewId: number } }
   | { kind: 'prReview:get'; payload: { review: PrReviewPayload | null } }
   | { kind: 'prReview:list'; payload: { reviews: PrReviewPayload[] } }
@@ -871,7 +873,8 @@ export type IpcPush =
       payload: { code: number | null; restarting: boolean };
     }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
-  | { kind: 'prReviewDone'; payload: { reviewId: number } };
+  | { kind: 'prReviewDone'; payload: { reviewId: number } }
+  | { kind: 'prWatchEvent'; payload: { host: PrHost; repoKey: string; prNumber: number } };
 
 export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'chooseDirectory',
