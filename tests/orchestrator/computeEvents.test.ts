@@ -70,4 +70,49 @@ describe('computeEvents', () => {
     const prev = state({ lastCommentTs: '2026-07-12T04:00:00.000Z' });
     expect(computeEvents(prev, pr, 'me', NOW).events).toEqual([]);
   });
+
+  it('stale snapshot does not regress high-water mark for comments and reviews', () => {
+    // Simulate a paginated provider response with only an old comment.
+    // Previous state has a later timestamp from a prior poll.
+    const pr = basePr({
+      comments: [{ author: 'bob', ts: '2026-07-12T04:00:00.000Z' }],
+      reviews: [{ author: 'bob', state: 'approved', ts: '2026-07-12T05:00:00.000Z' }],
+    });
+    const prev = state({
+      lastCommentTs: '2026-07-12T09:00:00.000Z',
+      lastReviewTs: '2026-07-12T10:00:00.000Z',
+    });
+    const { events, next } = computeEvents(prev, pr, 'me', NOW);
+    // Old comments/reviews are below the mark, so no events
+    expect(events).toEqual([]);
+    // High-water marks must not regress
+    expect(next.lastCommentTs).toBe('2026-07-12T09:00:00.000Z');
+    expect(next.lastReviewTs).toBe('2026-07-12T10:00:00.000Z');
+  });
+
+  it('reviewer role suppresses author-side events', () => {
+    // Reviewer has already seen the review request, but there are new comments and reviews.
+    const pr = basePr({
+      myRole: 'reviewer',
+      reviewRequestedOfMe: true,
+      comments: [
+        { author: 'bob', ts: '2026-07-12T08:00:00.000Z' },
+        { author: 'alice', ts: '2026-07-12T09:00:00.000Z' },
+      ],
+      reviews: [
+        { author: 'bob', state: 'approved', ts: '2026-07-12T09:30:00.000Z' },
+        { author: 'alice', state: 'changes_requested', ts: '2026-07-12T09:45:00.000Z' },
+      ],
+    });
+    const prev = state({
+      myRole: 'reviewer',
+      reviewRequestedSeen: true,
+      lastCommentTs: '2026-07-12T07:00:00.000Z',
+      lastReviewTs: '2026-07-12T08:00:00.000Z',
+    });
+    const { events } = computeEvents(prev, pr, 'me', NOW);
+    // No events: review_requested is suppressed (already seen),
+    // and author-side events (commented/approved/changes_requested/reviewed) are gated by myRole === 'author'
+    expect(events).toEqual([]);
+  });
 });
