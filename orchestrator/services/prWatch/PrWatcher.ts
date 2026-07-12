@@ -26,10 +26,15 @@ export class PrWatcher {
     const meScalar = id.github ?? '';
 
     for (const pr of prs) {
-      const prev = this.deps.repo.get(pr.host, pr.repoKey, pr.prNumber);
-      const { events, next } = computeEvents(prev, pr, meScalar, now);
-      this.deps.repo.upsert(next);
-      for (const ev of events) this.deps.onEvent(pr, ev);
+      try {
+        const prev = this.deps.repo.get(pr.host, pr.repoKey, pr.prNumber);
+        const { events, next } = computeEvents(prev, pr, meScalar, now);
+        this.deps.repo.upsert(next);
+        for (const ev of events) this.deps.onEvent(pr, ev);
+      } catch (err) {
+        console.error('[prWatch] pr', pr.host, pr.repoKey, pr.prNumber, err);
+        continue;
+      }
     }
 
     this.deps.repo.prune(prs.map((p) => ({ host: p.host, repoKey: p.repoKey, prNumber: p.prNumber })));
