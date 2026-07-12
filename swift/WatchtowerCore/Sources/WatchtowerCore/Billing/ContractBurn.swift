@@ -42,7 +42,11 @@ public struct ContractBurn: Equatable, Sendable {
 }
 
 private func round2(_ n: Double) -> Double {
-    (n * 100).rounded() / 100
+    // Mirror JS Math.round exactly (round half toward +∞), so a negative
+    // over-budget mdsRemaining matches the TypeScript source at half-cent
+    // boundaries. Swift's bare .rounded() is away-from-zero and would diverge
+    // for negative values.
+    ((n * 100 + 0.5).rounded(.down)) / 100
 }
 
 private func ymd(_ d: Date, _ cal: Calendar) -> String {
@@ -172,7 +176,7 @@ public func contractBurn(
         result.append(ContractBurn(
             projectId: rate.projectId,
             projectName: proj?.name ?? "",
-            projectColor: proj?.color ?? nil,
+            projectColor: proj?.color,
             mdsUsed: mdsUsed,
             mdLimit: rate.mdLimit,
             mdsRemaining: mdsRemaining,
