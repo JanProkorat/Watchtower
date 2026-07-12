@@ -70,10 +70,10 @@ if (process.platform === 'darwin' && !app.isPackaged && app.dock) {
 }
 
 app.whenReady().then(() => {
-  // Cloud Sync: the persisted, safeStorage-encrypted hub URL is the packaged-app
-  // path to enabling Supabase sync (replacing the WATCHTOWER_PG_URL launchd hack).
-  // The orchestrator fork inherits this env. An explicit env var (dev / launchd
-  // override) still wins.
+  // Cloud Sync: when the toggle is on, the build-baked hub URL (electron/hubBake.ts)
+  // is the packaged-app path to enabling Supabase sync (replacing the
+  // WATCHTOWER_PG_URL launchd hack). The orchestrator fork inherits this env. An
+  // explicit env var (dev / launchd override) still wins.
   if (!process.env.WATCHTOWER_PG_URL) {
     const cloudUrl = resolveCloudSyncUrl();
     if (cloudUrl) process.env.WATCHTOWER_PG_URL = cloudUrl;
