@@ -2,17 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 
 export interface CloudSyncState {
   enabled: boolean;
-  configured: boolean;
+  /** Whether this build has a baked hub URL to sync to. */
+  available: boolean;
   loading: boolean;
   error: string | null;
   needsRestart: boolean;
-  save(next: { enabled: boolean; url?: string | null }): Promise<void>;
+  save(next: { enabled: boolean }): Promise<void>;
   refresh(): Promise<void>;
 }
 
 export function useCloudSyncConfig(): CloudSyncState {
   const [enabled, setEnabled] = useState(false);
-  const [configured, setConfigured] = useState(false);
+  const [available, setAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [needsRestart, setNeedsRestart] = useState(false);
@@ -23,7 +24,7 @@ export function useCloudSyncConfig(): CloudSyncState {
     try {
       const res = await window.watchtower.invoke('cloudSync:getConfig', {});
       setEnabled(res.enabled);
-      setConfigured(res.configured);
+      setAvailable(res.available);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -32,7 +33,7 @@ export function useCloudSyncConfig(): CloudSyncState {
   }, []);
 
   const save = useCallback(
-    async (next: { enabled: boolean; url?: string | null }) => {
+    async (next: { enabled: boolean }) => {
       setError(null);
       try {
         const res = await window.watchtower.invoke('cloudSync:setConfig', next);
@@ -50,5 +51,5 @@ export function useCloudSyncConfig(): CloudSyncState {
     void refresh();
   }, [refresh]);
 
-  return { enabled, configured, loading, error, needsRestart, save, refresh };
+  return { enabled, available, loading, error, needsRestart, save, refresh };
 }

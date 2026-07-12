@@ -3,6 +3,19 @@
 **Date:** 2026-07-12
 **Scope:** Watchtower desktop app (`electron/`, `orchestrator/` boundary, `apps/desktop/`, `packages/shared/`).
 
+> **Revision (post-implementation, per user feedback):** pasting a connection
+> string into Settings was rejected as too clunky. The URL is now **baked into
+> the build** at `dist:mac` time from `.env.production` (`electron/hubBake.ts`
+> via `scripts/bake-hub-url.mjs`, restored to `undefined` afterward by
+> `scripts/dist-mac.mjs` so the secret ships only inside the packaged `.app`,
+> never in git). The Settings **"Cloud Sync"** tab is now just an **on/off
+> toggle** (plus an `available` hint when no URL was baked). Because the only
+> persisted state is a boolean, **`safeStorage` and all encrypt/decrypt/URL
+> handling are removed** — `cloud-sync.json` holds `{ enabled }` only. The
+> startup injection and "apply = restart" model are unchanged. The sections
+> below describe the original encrypted-field design; the toggle/baked design
+> supersedes the storage + UI parts.
+
 ## Problem
 
 The Supabase Postgres "hub" that the desktop app syncs billing data to is

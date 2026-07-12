@@ -111,7 +111,7 @@ export function registerIpc(): void {
       }
 
       if (kind === 'cloudSync:setConfig') {
-        setCloudSyncConfig(payload as { enabled: boolean; url?: string | null });
+        setCloudSyncConfig(payload as { enabled: boolean });
         return { ok: true, needsRestart: true };
       }
 
