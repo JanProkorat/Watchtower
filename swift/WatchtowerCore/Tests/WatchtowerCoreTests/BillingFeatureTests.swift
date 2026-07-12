@@ -78,6 +78,29 @@ final class BillingFeatureTests: XCTestCase {
         await store.send(.cacheLoaded(ds("cached")))
     }
 
+    func testFetchFailsBeforeCacheThenCacheRecovers() async {
+        // onAppear's cache-load and fetch run concurrently. If the fetch fails
+        // FIRST (no cache yet -> .offline) and the cacheLoaded(dataset) arrives
+        // after, the offline-race guard must still apply the cache rather than
+        // stranding the user offline with valid data on disk.
+        struct Boom: Error {}
+        let store = TestStore(initialState: BillingFeature.State()) { BillingFeature() } withDependencies: {
+            $0.billingClient.fetchBillingDataset = { throw Boom() }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.fetchResponse(.failure(.fetchFailed))) {
+            $0.dataset = nil
+            $0.loadState = .offline
+            $0.lastUpdated = nil
+        }
+        await store.send(.cacheLoaded(ds("cached"))) {
+            $0.dataset = self.ds("cached")
+            $0.loadState = .cached
+            $0.lastUpdated = "cached"
+        }
+    }
+
     func testCacheLoadedNilStaysLoading() async {
         let store = TestStore(initialState: BillingFeature.State()) { BillingFeature() }
         store.exhaustivity = .off(showSkippedAssertions: false)

@@ -87,7 +87,7 @@ public func topProjects(_ rows: [WorklogRow], _ month: String, _ limit: Int) -> 
         .filter { $0.minutes > 0 }
         .sorted {
             if $0.minutes != $1.minutes { return $0.minutes > $1.minutes }
-            if $0.name != $1.name { return $0.name < $1.name }
+            if $0.name != $1.name { return $0.name.localizedCompare($1.name) == .orderedAscending }
             return (position[$0.projectId] ?? 0) < (position[$1.projectId] ?? 0)
         }
         .prefix(limit)

@@ -55,16 +55,12 @@ public struct AppFeature {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                return .merge(
-                    .run { send in
-                        await send(.authEvent(supabase.currentSessionExists()))
-                        for await present in supabase.authEvents() {
-                            await send(.authEvent(present))
-                        }
-                    },
-                    .send(.billing(.onAppear)),
-                    .send(.earnings(.onAppear))
-                )
+                return .run { send in
+                    await send(.authEvent(supabase.currentSessionExists()))
+                    for await present in supabase.authEvents() {
+                        await send(.authEvent(present))
+                    }
+                }
 
             case let .authEvent(present):
                 switch state.phase {
@@ -72,7 +68,14 @@ public struct AppFeature {
                     return .none
                 default:
                     state.phase = present ? .signedIn : .signedOut(AuthFeature.State())
-                    return .none
+                    // Load billing/earnings only on the transition INTO signedIn
+                    // (fresh sign-in or cold-launch session restore) — never on
+                    // bare onAppear (auth isn't known yet) and never on the
+                    // already-signedIn no-op branch above (token-refresh
+                    // re-emissions of `present == true` must not refetch).
+                    return present
+                        ? .merge(.send(.billing(.onAppear)), .send(.earnings(.onAppear)))
+                        : .none
                 }
 
             case let .tabSelected(tab):
