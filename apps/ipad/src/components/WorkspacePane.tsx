@@ -21,6 +21,12 @@ interface Props {
   groupInstanceIds: string[];
   /** Human-readable label for an instance id (for the picker). */
   labelFor: (instanceId: string) => string;
+  /**
+   * Gutter around the tiled pool, as a CSS `inset` shorthand (top right bottom
+   * left). Applied on the absolute container — parent padding can't inset an
+   * `inset:0` absolute child, so the gutter has to live here. Defaults to none.
+   */
+  inset?: string;
 }
 
 interface Divider {
@@ -46,7 +52,7 @@ interface PendingSplit {
  * gaps between sibling panes; each pane's chrome splits/closes it; a split opens
  * the instance picker to choose what fills the new pane.
  */
-export function WorkspacePane({ layout, onFocusLeaf, onResize, onSplit, onClose, onKill, groupInstanceIds, labelFor }: Props) {
+export function WorkspacePane({ layout, onFocusLeaf, onResize, onSplit, onClose, onKill, groupInstanceIds, labelFor, inset = '0' }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [pending, setPending] = useState<PendingSplit | null>(null);
@@ -132,7 +138,7 @@ export function WorkspacePane({ layout, onFocusLeaf, onResize, onSplit, onClose,
   // the % height resolves against the viewport and the panes overflow below the
   // tab strip, clipping the terminal's last line.
   return (
-    <div ref={containerRef} style={{ position: 'absolute', inset: 0 }}>
+    <div ref={containerRef} style={{ position: 'absolute', inset }}>
       {size.w > 0 && leaves.map(({ leafId, instanceId }) => {
         const rect = rects.get(leafId);
         if (!rect) return null;
