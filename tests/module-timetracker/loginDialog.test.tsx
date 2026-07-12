@@ -23,6 +23,14 @@ describe('LoginDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('does not close when the card interior is clicked', () => {
+    const onClose = vi.fn();
+    render(<LoginDialog open onClose={onClose} signIn={vi.fn(async () => ({}))} />);
+    // Click the heading (inside the card): stopPropagation must keep it open.
+    fireEvent.click(screen.getByText('Přihlášení'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('closes after a successful sign-in', async () => {
     const onClose = vi.fn();
     render(<LoginDialog open onClose={onClose} signIn={vi.fn(async () => ({}))} />);
