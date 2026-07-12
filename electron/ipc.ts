@@ -15,16 +15,34 @@ export function registerIpc(): void {
   // a few also trigger native side-effects (macOS notifications) in main.
   getOrchestrator().onPush((msg) => {
     if (msg.kind === 'notify') {
-      const p = msg.payload as { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
-      fireMacNotification({
-        instanceId: p.instanceId,
-        cwd: p.cwd,
-        kind: p.kind,
-        onClick: (instanceId) => {
-          // Tell the renderer to activate this tab.
-          pushToRenderer('activateInstance', { instanceId });
-        },
-      });
+      const p = msg.payload;
+      if (p.target === 'pr') {
+        fireMacNotification({
+          target: 'pr',
+          host: p.host,
+          repoKey: p.repoKey,
+          prNumber: p.prNumber,
+          title: p.title,
+          repoLabel: p.repoLabel,
+          event: p.event,
+          body: p.body,
+          onClick: (pr) => {
+            // fireMacNotification already restores/focuses the main window
+            // before invoking onClick; just forward the deep link.
+            getMainWindow()?.webContents.send('deep-link', { module: 'reviews', ...pr });
+          },
+        });
+      } else {
+        fireMacNotification({
+          instanceId: p.instanceId,
+          cwd: p.cwd,
+          kind: p.kind,
+          onClick: (instanceId) => {
+            // Tell the renderer to activate this tab.
+            pushToRenderer('activateInstance', { instanceId });
+          },
+        });
+      }
     }
     pushToRenderer(msg.kind, msg.payload);
   });

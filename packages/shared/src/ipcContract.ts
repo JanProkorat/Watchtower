@@ -847,7 +847,18 @@ export type IpcPush =
   | { kind: 'stateChanged'; payload: { instanceId: string; status: string } }
   | {
       kind: 'notify';
-      payload: { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
+      payload:
+        | { target?: 'instance'; instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' }
+        | {
+            target: 'pr';
+            host: PrHost;
+            repoKey: string;
+            prNumber: number;
+            title: string;
+            repoLabel: string;
+            event: string; // WatchEvent['type']
+            body: string; // ready-to-display notification body
+          };
     }
   | { kind: 'clearAttention'; payload: { instanceId: string } }
   | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }

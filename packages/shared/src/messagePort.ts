@@ -610,7 +610,18 @@ export type OrchPush =
   | { kind: 'stateChanged'; payload: { instanceId: string; status: string } }
   | {
       kind: 'notify';
-      payload: { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
+      payload:
+        | { target?: 'instance'; instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' }
+        | {
+            target: 'pr';
+            host: import('./ipcContract.js').PrHost;
+            repoKey: string;
+            prNumber: number;
+            title: string;
+            repoLabel: string;
+            event: string;
+            body: string;
+          };
     }
   | { kind: 'clearAttention'; payload: { instanceId: string } }
   | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
