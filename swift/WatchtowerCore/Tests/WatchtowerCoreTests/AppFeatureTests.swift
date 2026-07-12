@@ -4,11 +4,19 @@ import ComposableArchitecture
 
 @MainActor
 final class AppFeatureTests: XCTestCase {
+    private func ds() -> BillingDataset {
+        BillingDataset(worklogs: [], contracts: [], daysOff: [], projects: [], tasks: [], epics: [], fetchedAt: "stamp")
+    }
+
     func testOnAppearWithNoSessionGoesSignedOut() async {
         let events = AsyncStream<Bool>.makeStream()
         let store = TestStore(initialState: AppFeature.State()) { AppFeature() } withDependencies: {
             $0.supabase.currentSessionExists = { false }
             $0.supabase.authEvents = { events.stream }
+            $0.billingCache.load = { nil }
+            $0.billingCache.save = { _ in }
+            $0.billingClient.fetchBillingDataset = { self.ds() }
+            $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
         await store.send(.onAppear)
@@ -19,10 +27,86 @@ final class AppFeatureTests: XCTestCase {
         events.continuation.finish()
     }
 
+    func testOnAppearTriggersBillingLoad() async {
+        // Billing/earnings must load once the auth event flips the phase INTO
+        // .signedIn — not on bare onAppear (auth isn't known yet).
+        let events = AsyncStream<Bool>.makeStream()
+        let cacheLoaded = LockIsolated(false)
+        let fetched = LockIsolated(false)
+        let store = TestStore(initialState: AppFeature.State()) { AppFeature() } withDependencies: {
+            $0.supabase.currentSessionExists = { true }
+            $0.supabase.authEvents = { events.stream }
+            $0.billingCache.load = { cacheLoaded.setValue(true); return self.ds() }
+            $0.billingCache.save = { _ in }
+            $0.billingClient.fetchBillingDataset = { fetched.setValue(true); return self.ds() }
+            $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.onAppear)
+        await store.receive(\.authEvent) {
+            $0.phase = .signedIn
+        }
+        // The billing load path (cache read + network fetch) runs as part of
+        // the effect returned by the signed-in transition, not by onAppear.
+        await store.receive(\.billing.cacheLoaded) {
+            $0.billing.dataset = self.ds()
+            $0.billing.loadState = .cached
+            $0.billing.lastUpdated = "stamp"
+        }
+        await store.receive(\.billing.fetchResponse.success) {
+            $0.billing.dataset = self.ds()
+            $0.billing.loadState = .fresh
+            $0.billing.lastUpdated = "stamp"
+        }
+        XCTAssertTrue(cacheLoaded.value)
+        XCTAssertTrue(fetched.value)
+
+        await store.send(.tabSelected(.reports)) // keep the long-living stream effect tidy
+        events.continuation.finish()
+    }
+
+    func testSignedOutDoesNotLoadBilling() async {
+        // When the auth event resolves signed-out, no billing fetch/cache
+        // read should run — onAppear alone must not trigger a load, and
+        // neither should the signedOut transition.
+        let events = AsyncStream<Bool>.makeStream()
+        let cacheLoaded = LockIsolated(false)
+        let fetched = LockIsolated(false)
+        let store = TestStore(initialState: AppFeature.State()) { AppFeature() } withDependencies: {
+            $0.supabase.currentSessionExists = { false }
+            $0.supabase.authEvents = { events.stream }
+            $0.billingCache.load = { cacheLoaded.setValue(true); return nil }
+            $0.billingCache.save = { _ in }
+            $0.billingClient.fetchBillingDataset = { fetched.setValue(true); return self.ds() }
+            $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.onAppear)
+        await store.receive(\.authEvent) {
+            $0.phase = .signedOut(AuthFeature.State())
+        }
+        XCTAssertFalse(cacheLoaded.value)
+        XCTAssertFalse(fetched.value)
+
+        await store.send(.tabSelected(.reports)) // keep the long-living stream effect tidy
+        events.continuation.finish()
+    }
+
     func testAuthEventTrueFlipsToSignedIn() async {
+        // The signed-in transition also kicks off the billing/earnings load
+        // (Fix 2); stub those dependencies and relax exhaustivity since this
+        // test's focus is the phase transition, not the load itself.
         let store = TestStore(initialState: AppFeature.State(phase: .signedOut(AuthFeature.State()))) {
             AppFeature()
+        } withDependencies: {
+            $0.billingCache.load = { nil }
+            $0.billingCache.save = { _ in }
+            $0.billingClient.fetchBillingDataset = { self.ds() }
+            $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
         }
+        store.exhaustivity = .off(showSkippedAssertions: false)
         await store.send(.authEvent(true)) { $0.phase = .signedIn }
     }
 
@@ -73,6 +157,10 @@ final class AppFeatureTests: XCTestCase {
         let store = TestStore(initialState: AppFeature.State()) { AppFeature() } withDependencies: {
             $0.supabase.currentSessionExists = { false }
             $0.supabase.authEvents = { events.stream }
+            $0.billingCache.load = { nil }
+            $0.billingCache.save = { _ in }
+            $0.billingClient.fetchBillingDataset = { self.ds() }
+            $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
         await store.send(.onAppear)

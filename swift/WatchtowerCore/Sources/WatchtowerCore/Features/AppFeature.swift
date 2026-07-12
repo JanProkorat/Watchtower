@@ -27,6 +27,9 @@ public struct AppFeature {
     public struct State: Equatable {
         public var phase: Phase
         public var selectedTab: Tab
+        public var billing = BillingFeature.State()
+        public var dashboard = DashboardFeature.State()
+        public var earnings = EarningsFeature.State()
         public init(phase: Phase = .loading, selectedTab: Tab = .dashboard) {
             self.phase = phase
             self.selectedTab = selectedTab
@@ -39,6 +42,9 @@ public struct AppFeature {
         case tabSelected(Tab)
         case signOutTapped
         case auth(AuthFeature.Action)
+        case billing(BillingFeature.Action)
+        case dashboard(DashboardFeature.Action)
+        case earnings(EarningsFeature.Action)
     }
 
     @Dependency(\.supabase) var supabase
@@ -62,7 +68,14 @@ public struct AppFeature {
                     return .none
                 default:
                     state.phase = present ? .signedIn : .signedOut(AuthFeature.State())
-                    return .none
+                    // Load billing/earnings only on the transition INTO signedIn
+                    // (fresh sign-in or cold-launch session restore) — never on
+                    // bare onAppear (auth isn't known yet) and never on the
+                    // already-signedIn no-op branch above (token-refresh
+                    // re-emissions of `present == true` must not refetch).
+                    return present
+                        ? .merge(.send(.billing(.onAppear)), .send(.earnings(.onAppear)))
+                        : .none
                 }
 
             case let .tabSelected(tab):
@@ -74,10 +87,28 @@ public struct AppFeature {
 
             case .auth:
                 return .none
+
+            case .billing:
+                return .none
+
+            case .dashboard:
+                return .none
+
+            case .earnings:
+                return .none
             }
         }
         .ifLet(\.signedOutAuth, action: \.auth) {
             AuthFeature()
+        }
+        Scope(state: \.billing, action: \.billing) {
+            BillingFeature()
+        }
+        Scope(state: \.dashboard, action: \.dashboard) {
+            DashboardFeature()
+        }
+        Scope(state: \.earnings, action: \.earnings) {
+            EarningsFeature()
         }
     }
 }

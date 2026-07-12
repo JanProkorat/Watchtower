@@ -37,4 +37,8 @@ public enum Palette {
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
+
+    public static let chartViolet = Color(hex: "#a78bfa")
+    public static let chartCyan = Color(hex: "#22d3ee")
+    public static let chartAmber = Color(hex: "#fbbf24")
 }

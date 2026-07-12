@@ -18,12 +18,32 @@ struct AppShellView: View {
         case .signedIn:
             TabView(selection: $store.selectedTab.sending(\.tabSelected)) {
                 ForEach(AppFeature.Tab.allCases, id: \.self) { tab in
-                    placeholder(tab)
+                    tabContent(tab)
                         .tabItem { Label(tab.title, systemImage: icon(tab)) }
                         .tag(tab)
                 }
             }
             .tint(Palette.accent)
+        }
+    }
+
+    @ViewBuilder
+    private func tabContent(_ tab: AppFeature.Tab) -> some View {
+        switch tab {
+        case .dashboard:
+            DashboardView(
+                billing: store.scope(state: \.billing, action: \.billing),
+                dashboard: store.scope(state: \.dashboard, action: \.dashboard)
+            )
+
+        case .earnings:
+            EarningsView(
+                billing: store.scope(state: \.billing, action: \.billing),
+                earnings: store.scope(state: \.earnings, action: \.earnings)
+            )
+
+        case .reports, .records:
+            placeholder(tab)
         }
     }
 
