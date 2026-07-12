@@ -190,7 +190,7 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
 
       {/* Terminal body — padded so the terminal panel floats off the tab strip
           and window edges, consistent with the glass surfaces around it. */}
-      <div style={{ flex: 1, minHeight: 0, position: 'relative', padding: '10px 12px 12px', boxSizing: 'border-box' }}>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', padding: '10px 22px 16px', boxSizing: 'border-box' }}>
         {activeId && activeTabKey ? (
           <WorkspacePane
             key={activeTabKey}
