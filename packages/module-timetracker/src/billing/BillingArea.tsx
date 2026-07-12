@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSupabaseAuth } from '@watchtower/data-supabase';
 import type { BillingSection } from './types.js';
-import { text } from '@watchtower/ui-core';
-import { BillingLogin } from './BillingLogin.js';
+import { NotConnectedToast } from './NotConnectedToast.js';
+import { LoginDialog } from './LoginDialog.js';
 import { BoardView, type BoardActions } from './BoardView.js';
 import { DashboardView } from './DashboardView.js';
 import { EarningsMonthView } from './EarningsMonthView.js';
@@ -31,33 +31,33 @@ interface Props {
 }
 
 export function BillingArea({ module, section, boardActions }: Props): JSX.Element {
-  const { status, signIn } = useSupabaseAuth();
+  const { status, signIn, session } = useSupabaseAuth();
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
   // Month the caller was viewing when drilling in, so the detail opens on it
   // (not on today). Undefined → detail defaults to the current month.
   const [selectedMonth, setSelectedMonth] = useState<string | undefined>(undefined);
+  const [loginOpen, setLoginOpen] = useState(false);
 
   // Drill-down resets whenever the rail navigates to a different module/section.
   useEffect(() => { setSelectedProject(null); }, [module, section]);
 
-  if (status === 'loading') {
-    return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: text.muted, fontSize: 15, fontFamily: 'system-ui, sans-serif' }}>
-        Načítání…
-      </div>
-    );
-  }
-  if (status === 'out') return <BillingLogin signIn={signIn} />;
-
   const openProject = (id: number, month?: string) => { setSelectedProject(id); setSelectedMonth(month); };
 
+  // No auth gate: content always renders. useBilling drives its own loading and
+  // returns cached/empty data with or without a session, and write-gating keys
+  // off data freshness — so signed-out is automatically read-only.
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden', background: 'transparent' }}>
-      {/* Module content. The dashboard (pull-to-refresh) and the task grid
-          (sticky header + pinned footer) own their own scroll and fill the
-          height, so we don't double-scroll those here; other sections scroll
-          in this wrapper. */}
-      <div style={{ flex: 1, overflow: module === 'dashboard' || section === 'records-grid' || section === 'board' ? 'hidden' : 'auto', minHeight: 0 }}>
+    // position:relative anchors the floating NotConnectedToast (an absolute
+    // top-right overlay) to this content area — it must not push content down.
+    <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden', background: 'transparent' }}>
+      {status === 'out' && <NotConnectedToast onSignIn={() => setLoginOpen(true)} />}
+
+      {/* Keyed by session identity: signing in/out remounts the active view so
+          useBilling refetches (fresh when authed, cached/offline otherwise). */}
+      <div
+        key={session?.user?.id ?? 'anon'}
+        style={{ flex: 1, overflow: module === 'dashboard' || section === 'records-grid' || section === 'board' ? 'hidden' : 'auto', minHeight: 0 }}
+      >
         {selectedProject !== null ? (
           <ProjectDetailView projectId={selectedProject} initialMonth={selectedMonth} onBack={() => setSelectedProject(null)} />
         ) : module === 'dashboard' ? (
@@ -78,6 +78,8 @@ export function BillingArea({ module, section, boardActions }: Props): JSX.Eleme
           <TimeOffView />
         )}
       </div>
+
+      <LoginDialog open={loginOpen} onClose={() => setLoginOpen(false)} signIn={signIn} />
     </div>
   );
 }

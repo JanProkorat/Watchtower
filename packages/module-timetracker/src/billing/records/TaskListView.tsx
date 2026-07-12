@@ -15,8 +15,8 @@ const STATUS_OPTIONS = ['open', 'in_progress', 'to_accept', 'done'];
 // Status chip styles — preserves the status→color/label mapping (open/done muted, in_progress/to_accept violet).
 function statusChipStyle(status: string): React.CSSProperties {
   const base: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', padding: '2px 8px', borderRadius: 999, flexShrink: 0 };
-  if (status === 'in_progress') return { ...base, color: C.violet, background: 'rgba(168,156,240,0.18)', border: '1px solid rgba(168,156,240,0.40)' };
-  if (status === 'to_accept') return { ...base, color: C.violet, background: 'rgba(168,156,240,0.28)', border: '1px solid rgba(168,156,240,0.55)' };
+  if (status === 'in_progress') return { ...base, color: C.violet, background: 'rgba(56,189,248,0.18)', border: '1px solid rgba(56,189,248,0.40)' };
+  if (status === 'to_accept') return { ...base, color: C.violet, background: 'rgba(56,189,248,0.28)', border: '1px solid rgba(56,189,248,0.55)' };
   return { ...base, color: C.muted, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' };
 }
 

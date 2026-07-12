@@ -188,12 +188,14 @@ function InstancesModule({ activeId, setActiveId, ackedIds }: { activeId: string
         onNew={() => setSpawnOpen(true)}
       />
 
-      {/* Terminal body — padded so the terminal panel floats off the tab strip
-          and window edges, consistent with the glass surfaces around it. */}
-      <div style={{ flex: 1, minHeight: 0, position: 'relative', padding: '10px 12px 12px', boxSizing: 'border-box' }}>
+      {/* Terminal body. The gutter can't be parent padding — WorkspacePane's
+          pool is an `inset:0` absolute layer that would ignore it — so it's
+          passed to WorkspacePane as an `inset` and applied on that layer. */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', boxSizing: 'border-box' }}>
         {activeId && activeTabKey ? (
           <WorkspacePane
             key={activeTabKey}
+            inset="10px 22px 16px"
             layout={workspace.getTabLayout(activeTabKey, activeGroup?.instanceIds ?? [activeId], activeId)}
             onFocusLeaf={(leafId, instanceId) => {
               workspace.actions.focus(activeTabKey, leafId, activeId);
@@ -613,7 +615,7 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
         justifyContent: 'center',
       }}
     >
-      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 18, color: '#c9bdff', letterSpacing: 0.2 }}>
+      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 18, color: '#bae6fd', letterSpacing: 0.2 }}>
         Watchtower
       </h1>
       <div style={{ ...glassPanel({ radius: 18 }), display: 'grid', gap: 10, width: '100%', maxWidth: 380, padding: 20 }}>
@@ -625,7 +627,7 @@ function ConnectionForm({ onConnected }: ConnectionFormProps) {
             padding: '10px 0',
             borderRadius: 12,
             border: 'none',
-            background: connecting ? 'rgba(124,109,240,0.35)' : ctaGradient,
+            background: connecting ? 'rgba(56,189,248,0.35)' : ctaGradient,
             boxShadow: connecting ? 'none' : ctaGlow,
             color: connecting ? text.muted : '#fff',
             fontSize: 15,

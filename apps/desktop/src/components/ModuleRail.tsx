@@ -23,6 +23,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CableIcon from '@mui/icons-material/Cable';
 import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone';
+import CloudSyncIcon from '@mui/icons-material/CloudSync';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import type { ThemeMode } from '../theme.js';
@@ -77,6 +78,7 @@ const SETTINGS_SUB_TABS: Array<SubTabMeta<SettingsTab>> = [
   { id: 'agents', label: 'Agents', icon: <SmartToyIcon fontSize="inherit" /> },
   { id: 'mcp', label: 'MCP', icon: <CableIcon fontSize="inherit" /> },
   { id: 'hub', label: 'Messaging hub', icon: <PhoneIphoneIcon fontSize="inherit" /> },
+  { id: 'cloud-sync', label: 'Cloud Sync', icon: <CloudSyncIcon fontSize="inherit" /> },
 ];
 
 // Wide enough to clear the macOS traffic lights (which the OS pins to the

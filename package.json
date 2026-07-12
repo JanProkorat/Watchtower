@@ -26,7 +26,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b packages/shared/tsconfig.json && tsc -p packages/transport/tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit && tsc -p orchestrator/tsconfig.json --noEmit && tsc -p apps/desktop/tsconfig.json --noEmit && tsc -p apps/ipad/tsconfig.json --noEmit && tsc -p apps/iphone/tsconfig.json --noEmit",
     "typecheck:ci": "tsc -b packages/shared/tsconfig.json && tsc -p packages/transport/tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit && tsc -p orchestrator/tsconfig.json --noEmit && tsc -p apps/desktop/tsconfig.json --noEmit && tsc -p apps/ipad/tsconfig.json --noEmit && tsc -p apps/iphone/tsconfig.json --noEmit",
-    "dist:mac": "npm run build && electron-builder --mac"
+    "dist:mac": "node scripts/dist-mac.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

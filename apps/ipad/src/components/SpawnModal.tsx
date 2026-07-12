@@ -227,15 +227,15 @@ export function SpawnModal({
                         padding: '8px 12px',
                         borderRadius: 11,
                         border: checked
-                          ? `1px solid rgba(124,109,240,0.55)`
+                          ? `1px solid rgba(56,189,248,0.55)`
                           : '1px solid rgba(255,255,255,0.13)',
                         background: checked
-                          ? 'rgba(168,156,240,0.18)'
+                          ? 'rgba(56,189,248,0.18)'
                           : 'rgba(255,255,255,0.07)',
                         cursor: 'pointer',
                         transition: 'background 120ms ease, border-color 120ms ease',
                         boxShadow: checked
-                          ? `0 0 0 1px rgba(124,109,240,0.30), inset 0 1px 0 rgba(255,255,255,0.15)`
+                          ? `0 0 0 1px rgba(56,189,248,0.30), inset 0 1px 0 rgba(255,255,255,0.15)`
                           : 'inset 0 1px 0 rgba(255,255,255,0.08)',
                       }}
                     >
@@ -248,7 +248,7 @@ export function SpawnModal({
                         style={{ accentColor: accent, flexShrink: 0 }}
                       />
                       <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                        <span style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: checked ? '#c9bdff' : text.secondary }}>
+                        <span style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: checked ? '#bae6fd' : text.secondary }}>
                           {p.name}
                         </span>
                         <span style={{ fontSize: 11, color: text.dim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -288,7 +288,7 @@ export function SpawnModal({
                     borderRadius: 7,
                     border: 'none',
                     background: instanceKind === k
-                      ? 'rgba(168,156,240,0.22)'
+                      ? 'rgba(56,189,248,0.22)'
                       : 'transparent',
                     boxShadow: instanceKind === k
                       ? 'inset 0 1px 0 rgba(255,255,255,0.20)'
@@ -413,7 +413,7 @@ export function SpawnModal({
               borderRadius: 12,
               border: 'none',
               background: spawning || selectedProject === null
-                ? 'rgba(124,109,240,0.35)'
+                ? 'rgba(56,189,248,0.35)'
                 : ctaGradient,
               boxShadow: spawning || selectedProject === null
                 ? 'none'

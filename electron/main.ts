@@ -6,6 +6,7 @@ import { createMainWindow, getMainWindow } from './window.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { registerIpc, pushToRenderer } from './ipc.js';
 import { startOrchestrator, getOrchestrator, onOrchestratorCrash } from './orchestratorHost.js';
+import { resolveCloudSyncUrl } from './cloudSync.js';
 import { applyUserShellPath } from './shellPath.js';
 import {
   focusInstanceTab,
@@ -69,6 +70,15 @@ if (process.platform === 'darwin' && !app.isPackaged && app.dock) {
 }
 
 app.whenReady().then(() => {
+  // Cloud Sync: when the toggle is on, the build-baked hub URL (electron/hubBake.ts)
+  // is the packaged-app path to enabling Supabase sync (replacing the
+  // WATCHTOWER_PG_URL launchd hack). The orchestrator fork inherits this env. An
+  // explicit env var (dev / launchd override) still wins.
+  if (!process.env.WATCHTOWER_PG_URL) {
+    const cloudUrl = resolveCloudSyncUrl();
+    if (cloudUrl) process.env.WATCHTOWER_PG_URL = cloudUrl;
+  }
+
   const orch = startOrchestrator();
   registerIpc();
   onOrchestratorCrash((info) => {

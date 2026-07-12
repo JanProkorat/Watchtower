@@ -14,3 +14,10 @@ describe('ELECTRON_ONLY_KINDS', () => {
     expect(ELECTRON_ONLY_KINDS.has('appearance:set')).toBe(true);
   });
 });
+
+describe('cloudSync IPC', () => {
+  it('cloudSync kinds are electron-only (never proxied to the orchestrator)', () => {
+    expect(ELECTRON_ONLY_KINDS.has('cloudSync:getConfig')).toBe(true);
+    expect(ELECTRON_ONLY_KINDS.has('cloudSync:setConfig')).toBe(true);
+  });
+});

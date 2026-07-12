@@ -279,7 +279,7 @@ const headerTitle: CSSProperties = {
   fontSize: 20,
   fontWeight: 700,
   letterSpacing: 0.2,
-  color: '#c9bdff',
+  color: '#bae6fd',
 };
 
 const signOutBtn: CSSProperties = {
@@ -405,7 +405,7 @@ const tabItem: CSSProperties = {
 
 // Active tab reads as a lit glass lozenge inside the pill.
 const tabItemActive: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(140,124,242,0.30), rgba(124,109,240,0.16))',
+  background: 'linear-gradient(180deg, rgba(56,189,248,0.30), rgba(56,189,248,0.16))',
   color: '#ffffff',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.30), 0 2px 8px rgba(124,109,240,0.28)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.30), 0 2px 8px rgba(56,189,248,0.28)',
 };

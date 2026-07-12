@@ -75,7 +75,7 @@ export function WorklogDrawer({ title, tasks, contracts, initial, lockedTask, in
             <input style={field} placeholder="Hledat úkol…" value={taskQuery} onChange={(e) => setTaskQuery(e.target.value)} />
             <div style={{ maxHeight: 180, overflowY: 'auto', marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {filteredTasks.map((t) => (
-                <button key={t.taskId} onClick={() => setTaskId(t.taskId)} style={{ ...glassCard(10), padding: '7px 11px', textAlign: 'left', cursor: 'pointer', border: taskId === t.taskId ? '2px solid #a89cf0' : '1px solid rgba(255,255,255,0.10)', display: 'flex', gap: 9, alignItems: 'center', fontFamily: 'inherit', color: C.text, width: '100%' }}>
+                <button key={t.taskId} onClick={() => setTaskId(t.taskId)} style={{ ...glassCard(10), padding: '7px 11px', textAlign: 'left', cursor: 'pointer', border: taskId === t.taskId ? '2px solid #7dd3fc' : '1px solid rgba(255,255,255,0.10)', display: 'flex', gap: 9, alignItems: 'center', fontFamily: 'inherit', color: C.text, width: '100%' }}>
                   {t.projectColor && <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.projectColor, flexShrink: 0 }} />}
                   <span style={{ fontFamily: 'monospace', fontSize: 11, color: C.muted }}>{t.taskNumber ?? '—'}</span>
                   <span style={{ fontSize: 12, color: '#d7dbe6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.taskTitle}</span>

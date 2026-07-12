@@ -45,9 +45,11 @@ export function TabStrip({
   }, [instances]);
 
   return (
-    /* Outer gutter: the glass strip floats 16px from all edges */
+    /* Outer gutter: center the content-sized pill, matching the desktop bar. */
     <div
       style={{
+        display: 'flex',
+        justifyContent: 'center',
         padding: '8px 16px',
         flexShrink: 0,
       }}
@@ -58,6 +60,9 @@ export function TabStrip({
           flexDirection: 'row',
           alignItems: 'center',
           height: 38,
+          // Sized to its content and centered by the wrapper (like desktop);
+          // scrolls horizontally only once the tabs exceed the available width.
+          maxWidth: '100%',
           overflowX: 'auto',
           overflowY: 'hidden',
           WebkitOverflowScrolling: 'touch',
@@ -94,10 +99,7 @@ export function TabStrip({
           );
         })}
 
-        {/* Spacer pushes the + button to the right */}
-        <div style={{ flex: 1 }} />
-
-        {/* New-instance button — soft glass chip */}
+        {/* New-instance button — soft glass chip, right after the tabs */}
         <button
           onClick={onNew}
           title="Nová instance"

@@ -7,6 +7,7 @@ import { SkillsTab } from './SkillsTab.js';
 import { AgentsTab } from './AgentsTab.js';
 import { McpTab } from './McpTab.js';
 import { HubTab } from './HubTab.js';
+import { CloudSyncTab } from './CloudSyncTab.js';
 
 interface Props {
   /** Lifted view state — sub-tab. Owned by `App`. */
@@ -29,6 +30,7 @@ export function ModuleSettings({ view }: Props) {
         {view.tab === 'agents' && <AgentsTab />}
         {view.tab === 'mcp' && <McpTab />}
         {view.tab === 'hub' && <HubTab />}
+        {view.tab === 'cloud-sync' && <CloudSyncTab />}
       </Box>
     </Box>
   );
