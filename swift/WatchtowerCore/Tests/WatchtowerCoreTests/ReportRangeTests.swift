@@ -20,5 +20,12 @@ final class ReportRangeTests: XCTestCase {
         // 366-day range with .day → clamps to .week
         XCTAssertEqual(clampGranularity(.day, from: "2025-01-01", to: "2026-01-01"), .week)
         XCTAssertEqual(clampGranularity(.day, from: "2026-06-01", to: "2026-06-30"), .day) // 30 ≤ 92
+        // Non-cascading (JS parity): a .day input NEVER reaches the week→month check.
+        // span > 1100 with .day input stays .week, does NOT become .month.
+        XCTAssertEqual(clampGranularity(.day, from: "2020-01-01", to: "2026-06-15"), .week)
+        // A .week INPUT with span > 1100 becomes .month.
+        XCTAssertEqual(clampGranularity(.week, from: "2020-01-01", to: "2026-06-15"), .month)
+        // A .week input with span ≤ 1100 stays .week.
+        XCTAssertEqual(clampGranularity(.week, from: "2026-01-01", to: "2026-02-01"), .week)
     }
 }

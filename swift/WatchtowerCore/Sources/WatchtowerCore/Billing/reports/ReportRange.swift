@@ -64,15 +64,12 @@ public func defaultGranularity(_ preset: Preset) -> Granularity {
 }
 
 /// Clamps a requested granularity down for very wide ranges, so the bucket
-/// count stays reasonable. Applied sequentially: day→week, then week→month.
+/// count stays reasonable. Non-cascading: two independent early-returns on the
+/// ORIGINAL `g`, matching `useReportsFilters.ts`. A `.day` input NEVER reaches
+/// the week→month check — a `.day` span > 1100 returns `.week`, not `.month`.
 public func clampGranularity(_ g: Granularity, from: String, to: String) -> Granularity {
     let span = spanDays(from, to)
-    var result = g
-    if result == .day && span > 92 {
-        result = .week
-    }
-    if result == .week && span > 1100 {
-        result = .month
-    }
-    return result
+    if g == .day && span > 92 { return .week }
+    if g == .week && span > 1100 { return .month }
+    return g
 }
