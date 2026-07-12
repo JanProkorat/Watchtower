@@ -14,7 +14,13 @@ function filePath(): string {
 
 function load(): CloudSyncFile {
   const p = filePath();
-  return parseConfig(existsSync(p) ? readFileSync(p, 'utf8') : null);
+  let raw: string | null = null;
+  try {
+    if (existsSync(p)) raw = readFileSync(p, 'utf8');
+  } catch (err) {
+    console.warn('[cloudSync] failed to read', p, err);
+  }
+  return parseConfig(raw);
 }
 
 /** Renderer-facing status (enabled + whether a secret is stored). Never the URL. */
@@ -30,5 +36,10 @@ export function setCloudSyncConfig(next: CloudSyncUpdate): void {
 
 /** Startup: the decrypted URL to inject into the orchestrator env, or null. */
 export function resolveCloudSyncUrl(): string | null {
-  return resolveUrl(load(), safeStorage);
+  const file = load();
+  const url = resolveUrl(file, safeStorage);
+  if (!url && file.enabled && file.url) {
+    console.warn('[cloudSync] enabled but the connection string could not be decrypted; sync stays dormant.');
+  }
+  return url;
 }
