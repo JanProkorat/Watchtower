@@ -86,7 +86,7 @@ public struct ExpectedEarnings: Equatable, Sendable {
 /// Computes capacity (workdays * 8h) and expected earnings (sum over each
 /// workday x each billable project of the contract rate active that day) for
 /// `month` ("YYYY-MM"). Ported from `TaskGridView.tsx:100-116`.
-public func expectedEarnings(month: String, worklogs: [WorklogRow], contracts: [ContractRow], daysOff: [DayOffRow]) -> ExpectedEarnings {
+public func expectedEarnings(month: String, worklogs: [WorklogRow], contracts: [ContractRow], daysOff: [DayOffRow], projectIds: [Int]) -> ExpectedEarnings {
     let parts = month.split(separator: "-").compactMap { Int($0) }
     guard parts.count == 2 else { return ExpectedEarnings(capacityMinutes: 0, expectedCzk: 0) }
     let year = parts[0]
@@ -103,10 +103,12 @@ public func expectedEarnings(month: String, worklogs: [WorklogRow], contracts: [
     let workdays = workdayDates(monthStart, monthEnd, daysOffSet)
     let capacityMinutes = workdays.count * 8 * 60
 
-    let monthWorklogs = worklogs.filter { $0.workDate >= monthStart && $0.workDate <= monthEnd }
+    // billableProjectIds: distinct projectId of ALL worklogs (no month filter,
+    // matching TaskGridView.tsx:110-111 / desktop grid) that pass the project
+    // filter (empty = all) and are billable with a real projectId.
     var seenProjectIds: [Int] = []
     var seenSet = Set<Int>()
-    for w in monthWorklogs where w.isBillable && w.projectId != 0 {
+    for w in worklogs where (projectIds.isEmpty || projectIds.contains(w.projectId)) && w.isBillable && w.projectId != 0 {
         if !seenSet.contains(w.projectId) {
             seenSet.insert(w.projectId)
             seenProjectIds.append(w.projectId)
