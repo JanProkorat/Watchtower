@@ -3,16 +3,25 @@ import type { SqliteLike } from '../db/migrations.js';
 import type { PrHost, PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
 import type { GithubRepoConfig, AzdoRepoConfig, Exec } from './prProviders/types.js';
 import { listGithubPrs, fetchGithubDiff, fetchGithubComments, parseGitRemoteNwo } from './prProviders/github.js';
-import { listAzdoPrs, fetchAzdoDiff, fetchAzdoComments, parseAzureRemote } from './prProviders/azureDevops.js';
+import { listAzdoPrs, fetchAzdoDiff, fetchAzdoComments, fetchAzdoPrDetail, parseAzureRemote } from './prProviders/azureDevops.js';
 import { defaultExec } from './prProviders/exec.js';
 
 export interface ReviewsDeps {
   db: SqliteLike;
   listGithub?: (repo: GithubRepoConfig) => Promise<PullRequestPayload[]>;
   listAzdo?: (repo: AzdoRepoConfig, pat: string) => Promise<PullRequestPayload[]>;
+  azdoPrDetail?: (repo: AzdoRepoConfig, prNumber: number, pat: string) => Promise<{ lastMergeSourceCommitId: string }>;
   gitRemote?: (cwd: string) => Promise<string | null>;
   projects?: () => Array<{ id: number; name: string; folder_path: string | null }>;
   exec?: Exec;
+}
+
+/** Everything mergeAzdoPr needs, resolved from the repo config + a fresh PR GET. */
+export interface AzdoMergeTarget {
+  apiBase: string;
+  repo: string;
+  devopsHost: string;
+  lastMergeSourceCommitId: string;
 }
 
 const realGitRemote = (cwd: string) => new Promise<string | null>((resolve) => {
@@ -32,6 +41,7 @@ export class ReviewsService {
   private syncedAt: string | null = null;
   private listGithub: (r: GithubRepoConfig) => Promise<PullRequestPayload[]>;
   private listAzdo: (r: AzdoRepoConfig, pat: string) => Promise<PullRequestPayload[]>;
+  private azdoPrDetail: (r: AzdoRepoConfig, prNumber: number, pat: string) => Promise<{ lastMergeSourceCommitId: string }>;
   private gitRemote: (cwd: string) => Promise<string | null>;
   private projectsFn: () => Array<{ id: number; name: string; folder_path: string | null }>;
   private exec: Exec;
@@ -39,6 +49,7 @@ export class ReviewsService {
   constructor(deps: ReviewsDeps) {
     this.listGithub = deps.listGithub ?? ((r) => listGithubPrs(r));
     this.listAzdo = deps.listAzdo ?? ((r, pat) => listAzdoPrs(r, pat));
+    this.azdoPrDetail = deps.azdoPrDetail ?? ((r, prNumber, pat) => fetchAzdoPrDetail(r, prNumber, pat));
     this.gitRemote = deps.gitRemote ?? realGitRemote;
     this.projectsFn = deps.projects ?? (() => []);
     this.exec = deps.exec ?? defaultExec;
@@ -152,6 +163,23 @@ export class ReviewsService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Resolve everything `mergeAzdoPr` needs to complete a DevOps PR: the repo's
+   * apiBase/repo/devopsHost (from the resolved config) plus a *fresh*
+   * `lastMergeSourceCommit.commitId` (Azure rejects a completion PATCH whose
+   * source commit is stale). Looks up the PAT by the resolved devopsHost and
+   * throws a clear error if one isn't provided.
+   */
+  async azdoMergeTarget(repoKey: string, prNumber: number, devopsPats: Record<string, string> | undefined): Promise<AzdoMergeTarget> {
+    const { azdo } = await this.resolveRepos();
+    const repo = azdo.find((r) => r.repoKey === repoKey);
+    if (!repo) throw new Error(`Cannot resolve DevOps repo for ${repoKey}`);
+    const pat = devopsPats?.[repo.devopsHost];
+    if (!pat) throw new Error(`Missing DevOps PAT for ${repo.devopsHost}`);
+    const { lastMergeSourceCommitId } = await this.azdoPrDetail(repo, prNumber, pat);
+    return { apiBase: repo.apiBase, repo: repo.repo, devopsHost: repo.devopsHost, lastMergeSourceCommitId };
   }
 
   async projectRepo(projectId: number): Promise<{ host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null }> {

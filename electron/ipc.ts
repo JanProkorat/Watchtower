@@ -153,7 +153,7 @@ export function registerIpc(): void {
         return { ok: true, needsRestart: true };
       }
 
-      if (kind === 'prs:refresh' || kind === 'prs:diff' || kind === 'prs:comments' || kind === 'prReview:postComments') {
+      if (kind === 'prs:refresh' || kind === 'prs:diff' || kind === 'prs:comments' || kind === 'prReview:postComments' || kind === 'prs:merge') {
         return orch.invoke(kind as 'prs:refresh', {
           ...(payload as object),
           devopsPats: await getPats(),

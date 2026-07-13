@@ -47,6 +47,22 @@ export async function listAzdoPrs(repo: AzdoRepoConfig, pat: string, get: HttpGe
   return parseAzdoPrList(await get(url, pat), repo);
 }
 
+/**
+ * Fresh GET of a single PR to read its current `lastMergeSourceCommit.commitId`.
+ * Azure rejects a completion PATCH carrying a stale source commit, so this must
+ * be fetched at merge time rather than reused from the list cache. Uses the same
+ * Basic-auth GET helper as the rest of the DevOps provider.
+ */
+export async function fetchAzdoPrDetail(
+  repo: AzdoRepoConfig, prNumber: number, pat: string, get: HttpGet = defaultGet,
+): Promise<{ lastMergeSourceCommitId: string }> {
+  const url = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}?${API}`;
+  const data = (await get(url, pat)) as { lastMergeSourceCommit?: { commitId?: string } };
+  const commitId = data.lastMergeSourceCommit?.commitId;
+  if (!commitId) throw new Error(`Azure DevOps PR ${prNumber} has no lastMergeSourceCommit`);
+  return { lastMergeSourceCommitId: commitId };
+}
+
 export async function fetchAzdoDiff(
   repo: AzdoRepoConfig, sourceBranch: string, targetBranch: string, exec: Exec = defaultExec,
 ): Promise<DiffFilePayload[]> {

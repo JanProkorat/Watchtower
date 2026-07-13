@@ -86,6 +86,7 @@ export type IpcRequest =
   | { kind: 'prs:refresh'; payload: { devopsPats?: Record<string, string> } }
   | { kind: 'prs:diff'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
   | { kind: 'prs:comments'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
+  | { kind: 'prs:merge'; payload: { host: PrHost; repoKey: string; prNumber: number; deleteBranch: boolean; devopsPats?: Record<string, string> } }
   | { kind: 'reviews:projectRepo'; payload: { projectId: number } }
   | { kind: 'prReview:start'; payload: { host: PrHost; repoKey: string; prNumber: number } }
   | { kind: 'prReview:get'; payload: { reviewId: number } }
@@ -704,6 +705,7 @@ export type IpcResponse =
   | { kind: 'prs:refresh'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
   | { kind: 'prs:diff'; payload: { files: DiffFilePayload[] } }
   | { kind: 'prs:comments'; payload: { threads: PrCommentThreadPayload[] } }
+  | { kind: 'prs:merge'; payload: { ok: true } }
   | { kind: 'reviews:projectRepo'; payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null } }
   | { kind: 'devops:setPat'; payload: { ok: true } }
   | { kind: 'devops:hasPat'; payload: { hasPat: boolean } }

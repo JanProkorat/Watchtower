@@ -69,6 +69,7 @@ import { ReviewsService } from './services/reviews.js';
 import { runReview } from './services/prReview.js';
 import { postGithubComment, postAzdoComment } from './services/prProviders/postComment.js';
 import { PrReviewsRepo, type PrReviewRow } from './db/repositories/prReviews.js';
+import { mergeGithubPr, mergeAzdoPr } from './services/prWatch/merge.js';
 import { PrWatcher } from './services/prWatch/PrWatcher.js';
 import { githubWatched, azdoWatched } from './services/prWatch/queries.js';
 import { resolveGithubLogin, resolveAzdoUser } from './services/prWatch/identity.js';
@@ -1320,6 +1321,24 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'prs:comments': {
       const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> };
       return { threads: await reviewsSvc().comments(p.host, p.repoKey, p.prNumber, p.devopsPats) };
+    }
+    case 'prs:merge': {
+      const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; deleteBranch: boolean; devopsPats?: Record<string, string> };
+      if (p.host === 'github') {
+        // github repoKey is `gh:<owner>/<name>`; `gh pr merge` needs the bare nwo.
+        // Resolve the config so we use its authoritative `.nwo` rather than
+        // re-parsing the key.
+        const { github } = await reviewsSvc().resolveRepos();
+        const repo = github.find((r) => r.repoKey === p.repoKey);
+        if (!repo) throw new Error(`Cannot resolve GitHub repo for merge: ${p.repoKey}`);
+        await mergeGithubPr(repo.nwo, p.prNumber, p.deleteBranch);
+      } else {
+        const target = await reviewsSvc().azdoMergeTarget(p.repoKey, p.prNumber, p.devopsPats);
+        const pat = p.devopsPats?.[target.devopsHost];
+        if (!pat) throw new Error(`Missing DevOps PAT for ${target.devopsHost}`);
+        await mergeAzdoPr(target.apiBase, target.repo, p.prNumber, target.lastMergeSourceCommitId, p.deleteBranch, pat);
+      }
+      return { ok: true };
     }
     case 'reviews:projectRepo':
       return reviewsSvc().projectRepo((req.payload as { projectId: number }).projectId);

@@ -98,6 +98,17 @@ export type OrchRequest =
         devopsPats?: Record<string, string>;
       };
     }
+  | {
+      id: string;
+      kind: 'prs:merge';
+      payload: {
+        host: import('./ipcContract.js').PrHost;
+        repoKey: string;
+        prNumber: number;
+        deleteBranch: boolean;
+        devopsPats?: Record<string, string>;
+      };
+    }
   | { id: string; kind: 'reviews:projectRepo'; payload: { projectId: number } }
   | {
       id: string;
@@ -597,6 +608,7 @@ export type OrchResponse =
     }
   | { kind: 'prs:diff'; payload: { files: import('./ipcContract.js').DiffFilePayload[] } }
   | { kind: 'prs:comments'; payload: { threads: import('./ipcContract.js').PrCommentThreadPayload[] } }
+  | { kind: 'prs:merge'; payload: { ok: true } }
   | {
       kind: 'reviews:projectRepo';
       payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null };
