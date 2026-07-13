@@ -59,16 +59,20 @@ final class AppFeatureTests: XCTestCase {
         }
         // The billing load path (cache read + network fetch) runs as part of
         // the effect returned by the signed-in transition, not by onAppear.
-        await store.receive(\.billing.cacheLoaded) {
-            $0.billing.dataset = self.ds()
-            $0.billing.loadState = .cached
-            $0.billing.lastUpdated = "stamp"
+        // The two effects race (see
+        // BillingFeatureTests.testOnAppearCacheHitThenFreshFetch for why),
+        // so accept either interleaving and assert only on the converged
+        // end state.
+        for _ in 0..<2 {
+            await store.receive { action in
+                if case .billing(.cacheLoaded) = action { return true }
+                if case .billing(.fetchResponse) = action { return true }
+                return false
+            }
         }
-        await store.receive(\.billing.fetchResponse.success) {
-            $0.billing.dataset = self.ds()
-            $0.billing.loadState = .fresh
-            $0.billing.lastUpdated = "stamp"
-        }
+        XCTAssertEqual(store.state.billing.dataset, self.ds())
+        XCTAssertEqual(store.state.billing.loadState, .fresh)
+        XCTAssertEqual(store.state.billing.lastUpdated, "stamp")
         XCTAssertTrue(cacheLoaded.value)
         XCTAssertTrue(fetched.value)
 
@@ -144,19 +148,31 @@ final class AppFeatureTests: XCTestCase {
             $0.reports.today = "2026-05-28"
             $0.reports.earliest = nil
         }
-        await store.receive(\.billing.cacheLoaded) {
-            $0.billing.dataset = dataset
-            $0.billing.loadState = .cached
-            $0.billing.lastUpdated = "stamp"
+
+        // The billing cache-load and network-fetch effects race (see
+        // BillingFeatureTests.testOnAppearCacheHitThenFreshFetch for why),
+        // so accept either interleaving. Whichever billing action arrives
+        // FIRST is also the one that triggers the earliest-reseed below,
+        // since AppFeature's `.billing` case only reseeds on the first
+        // (nil -> non-nil) dataset transition.
+        await store.receive { action in
+            if case .billing(.cacheLoaded) = action { return true }
+            if case .billing(.fetchResponse) = action { return true }
+            return false
         }
         await store.receive(\.reports.onAppear) {
             $0.reports.earliest = "2025-01-01"
         }
-        await store.receive(\.billing.fetchResponse.success) {
-            $0.billing.dataset = dataset
-            $0.billing.loadState = .fresh
-            $0.billing.lastUpdated = "stamp"
+        await store.receive { action in
+            if case .billing(.cacheLoaded) = action { return true }
+            if case .billing(.fetchResponse) = action { return true }
+            return false
         }
+
+        XCTAssertEqual(store.state.billing.dataset, dataset)
+        XCTAssertEqual(store.state.billing.loadState, .fresh)
+        XCTAssertEqual(store.state.billing.lastUpdated, "stamp")
+        XCTAssertEqual(store.state.reports.earliest, "2025-01-01")
 
         await store.send(.tabSelected(.reports)) // keep the long-living stream effect tidy
         events.continuation.finish()

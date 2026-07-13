@@ -45,8 +45,7 @@ struct AppShellView: View {
         case .reports:
             ReportsView(
                 billing: store.scope(state: \.billing, action: \.billing),
-                reports: store.scope(state: \.reports, action: \.reports),
-                onOpenProject: { _ in }  // TODO(later phase): route to ProjectDetail
+                reports: store.scope(state: \.reports, action: \.reports)
             )
 
         case .records:

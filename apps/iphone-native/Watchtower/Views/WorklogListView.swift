@@ -9,9 +9,10 @@ private let worklogSourceLabels: [String: String] = [
 ]
 
 /// Native port of `packages/module-timetracker/src/billing/records/WorklogListView.tsx`.
-/// Read-only this phase: rows are not tappable and there is no "+ Add" affordance
-/// (mutations land in a later phase). Reads the shared `BillingFeature` dataset and
-/// the `RecordsFeature` worklog-list filter cursor (month + project).
+/// Rows are tappable (→ `worklogRowTapped`, opens the edit sheet) and the month
+/// bar carries a "+" affordance (→ `addWorklogTapped`) seeded with a task from
+/// the current project filter (or the first known task) and either today's date
+/// or the first day of the visible month, whichever falls inside it.
 struct WorklogListView: View {
     let billing: StoreOf<BillingFeature>
     let records: StoreOf<RecordsFeature>
@@ -26,6 +27,38 @@ struct WorklogListView: View {
 
     private var isLoading: Bool {
         billing.loadState == .loading && billing.dataset == nil
+    }
+
+    // MARK: - "+ Add worklog" default task/date
+
+    /// The task the "+" button seeds the new-worklog sheet with: the first task
+    /// under the currently-selected project filter, or the first known task if
+    /// no filter is active. `nil` (button disabled) if there is no matching task
+    /// — when a project filter IS active, this never falls back to another
+    /// project's task, since that would misattribute the new worklog's billing.
+    private var defaultWorklogTask: TaskRow? {
+        if let projectId = records.worklogProjectId {
+            return dataset.tasks.first { $0.projectId == projectId }
+        }
+        return dataset.tasks.first
+    }
+
+    /// Today if the visible month is the current month, else the 1st of the
+    /// visible month — keeps the new entry's date inside what's on screen.
+    private var defaultWorklogDate: String {
+        let today = Self.utcTodayIso()
+        return String(today.prefix(7)) == records.worklogMonth ? today : "\(records.worklogMonth)-01"
+    }
+
+    private static let utcCalendarForToday: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "UTC")!
+        return c
+    }()
+
+    private static func utcTodayIso() -> String {
+        let c = utcCalendarForToday.dateComponents([.year, .month, .day], from: Date())
+        return String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
     }
 
     var body: some View {
@@ -98,6 +131,8 @@ struct WorklogListView: View {
                 .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
 
                 Spacer()
+
+                addButton
             }
 
             projectMenu
@@ -148,6 +183,19 @@ struct WorklogListView: View {
         return project.name.isEmpty ? "(no name)" : project.name
     }
 
+    private var addButton: some View {
+        Button {
+            records.send(.addWorklogTapped(date: defaultWorklogDate, task: defaultWorklogTask))
+        } label: {
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 22))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Palette.accentIcon)
+        .disabled(defaultWorklogTask == nil)
+        .accessibilityLabel("Add worklog")
+    }
+
     // MARK: - Day section
 
     @ViewBuilder
@@ -166,7 +214,12 @@ struct WorklogListView: View {
             GlassCard {
                 VStack(spacing: 0) {
                     ForEach(Array(day.entries.enumerated()), id: \.element.syncId) { index, entry in
-                        WorklogRowView(entry: entry)
+                        Button {
+                            records.send(.worklogRowTapped(entry))
+                        } label: {
+                            WorklogRowView(entry: entry)
+                        }
+                        .buttonStyle(.plain)
                         if index < day.entries.count - 1 {
                             Divider().overlay(Color.white.opacity(0.10))
                         }

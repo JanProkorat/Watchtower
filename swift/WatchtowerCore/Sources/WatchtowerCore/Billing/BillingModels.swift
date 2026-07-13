@@ -167,6 +167,32 @@ public struct BillingDataset: Equatable, Codable, Sendable {
     }
 }
 
+extension BillingDataset {
+    /// Rebuilds the dataset with one or more arrays replaced, copying every
+    /// other field through unchanged. `BillingDataset`'s arrays are all
+    /// `let` (an immutable snapshot value from the fetch layer), so an
+    /// optimistic in-place patch by an editor feature (worklog/task/contract/
+    /// day-off form) means constructing a whole new value rather than
+    /// mutating a stored array — this is the single shared helper for that,
+    /// replacing each editor feature's private `withX` rebuild helper.
+    public func replacing(
+        worklogs: [WorklogRow]? = nil,
+        tasks: [TaskRow]? = nil,
+        contracts: [ContractRow]? = nil,
+        daysOff: [DayOffRow]? = nil
+    ) -> BillingDataset {
+        BillingDataset(
+            worklogs: worklogs ?? self.worklogs,
+            contracts: contracts ?? self.contracts,
+            daysOff: daysOff ?? self.daysOff,
+            projects: self.projects,
+            tasks: tasks ?? self.tasks,
+            epics: self.epics,
+            fetchedAt: self.fetchedAt
+        )
+    }
+}
+
 public struct ProjectEarning: Equatable, Sendable {
     public let projectId: Int
     public let name: String

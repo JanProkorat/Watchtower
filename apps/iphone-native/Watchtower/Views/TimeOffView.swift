@@ -27,11 +27,12 @@ private func kindLabel(_ kind: TimeOffKind) -> String {
 }
 
 /// Native port of `packages/module-timetracker/src/billing/records/TimeOffView.tsx`.
-/// Read-only this phase: day cells are plain (non-tappable) and there is no
-/// bottom-sheet kind picker (mutations land in a later phase). The web view
-/// renders a 3-month strip on iPad and a single focused month on phone-narrow
-/// layouts (`isNarrow` branch) — iPhone always takes the narrow path, so this
-/// view only ever renders `model.months[1]` (the focused month).
+/// Day cells cycle through the user-settable kinds on tap (see `dayCell` below)
+/// via `setDayOff`/`clearDayOff`; there is no bottom-sheet kind picker (that
+/// stays a later phase). The web view renders a 3-month strip on iPad and a
+/// single focused month on phone-narrow layouts (`isNarrow` branch) — iPhone
+/// always takes the narrow path, so this view only ever renders
+/// `model.months[1]` (the focused month).
 struct TimeOffView: View {
     let billing: StoreOf<BillingFeature>
     let records: StoreOf<RecordsFeature>
@@ -196,17 +197,40 @@ struct TimeOffView: View {
         }
     }
 
+    /// Tap-to-cycle a day cell through the user-settable kinds: none → vacation
+    /// → sick → other → none (`clearDayOff`). `.holiday` is a computed Czech
+    /// public holiday, not a `days_off` row — it isn't user-editable, so a
+    /// holiday cell (and pad cells outside the month) don't respond to taps.
     @ViewBuilder
     private func dayCell(_ day: CalDay) -> some View {
         let dayNumber = day.date.flatMap { Int($0.suffix(2)) }
+        let isEditable = day.date != nil && day.kind != .holiday
 
-        Text(dayNumber.map(String.init) ?? "")
-            .font(.system(size: 11, weight: day.kind != nil ? .bold : .regular))
-            .foregroundStyle(dayNumberColor(day))
-            .frame(maxWidth: .infinity)
-            .aspectRatio(1, contentMode: .fit)
-            .background(dayCellBackground(day))
-            .overlay(dayCellBorder(day))
+        Button {
+            guard let date = day.date else { return }
+            switch day.kind {
+            case nil:
+                records.send(.setDayOff(date: date, kind: "vacation"))
+            case .vacation:
+                records.send(.setDayOff(date: date, kind: "sick"))
+            case .sick:
+                records.send(.setDayOff(date: date, kind: "other"))
+            case .other:
+                records.send(.clearDayOff(date: date))
+            case .holiday:
+                break
+            }
+        } label: {
+            Text(dayNumber.map(String.init) ?? "")
+                .font(.system(size: 11, weight: day.kind != nil ? .bold : .regular))
+                .foregroundStyle(dayNumberColor(day))
+                .frame(maxWidth: .infinity)
+                .aspectRatio(1, contentMode: .fit)
+                .background(dayCellBackground(day))
+                .overlay(dayCellBorder(day))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEditable)
     }
 
     private func dayNumberColor(_ day: CalDay) -> Color {

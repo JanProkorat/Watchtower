@@ -345,7 +345,7 @@ struct TaskGridView: View {
                 ForEach(g.tasks, id: \.key) { t in
                     HStack(spacing: 0) {
                         ForEach(Array(t.perDay.enumerated()), id: \.offset) { i, v in
-                            dayBodyCell(v, meta[i]).frame(width: dayW, height: rowH)
+                            dayBodyCell(v, meta[i], task: t).frame(width: dayW, height: rowH)
                         }
                     }
                 }
@@ -384,16 +384,36 @@ struct TaskGridView: View {
         )
     }
 
-    private func dayBodyCell(_ minutes: Double, _ m: GridDayMeta) -> some View {
-        Text(hrsBare(minutes))
-            .font(.system(size: 10))
-            .foregroundStyle(minutes != 0 ? Palette.textPrimary : Palette.textDim)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(dayTint(m))
-            .overlay(
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(Palette.accent, lineWidth: m.isToday ? 1.2 : 0)
-            )
+    /// Tappable cell → `gridCellTapped`. The task/worklog to seed the sheet
+    /// with are resolved from the shared dataset by `(projectId, taskNumber)`
+    /// — the same key `TaskGridRow` itself is keyed by (see the `estimatesByKey`
+    /// comment above on the accepted collision risk of that key). A cell with
+    /// no resolvable task (e.g. the "(no task)" row) is disabled — there's
+    /// nothing to attach a new worklog to.
+    private func dayBodyCell(_ minutes: Double, _ m: GridDayMeta, task: TaskGridRow) -> some View {
+        let matchedTask = dataset.tasks.first {
+            $0.projectId == task.projectId && ($0.taskNumber ?? "") == (task.taskNumber ?? "")
+        }
+        let existingWorklog = dataset.worklogs.first {
+            $0.projectId == task.projectId && ($0.taskNumber ?? "") == (task.taskNumber ?? "") && $0.workDate == m.date
+        }
+
+        return Button {
+            guard let matchedTask else { return }
+            records.send(.gridCellTapped(taskId: matchedTask.taskId, date: m.date, existing: existingWorklog))
+        } label: {
+            Text(hrsBare(minutes))
+                .font(.system(size: 10))
+                .foregroundStyle(minutes != 0 ? Palette.textPrimary : Palette.textDim)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(dayTint(m))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Palette.accent, lineWidth: m.isToday ? 1.2 : 0)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(matchedTask == nil)
     }
 
     private func footerCell(_ text: String, _ m: GridDayMeta, color: Color) -> some View {

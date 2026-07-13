@@ -15,4 +15,24 @@ final class EarningsFeatureTests: XCTestCase {
         await store.send(.monthStepped(-1)) { $0.selectedMonth = "2025-12" }
         await store.send(.monthStepped(1)) { $0.selectedMonth = "2026-01" }
     }
+
+    // MARK: - ProjectDetail presentation (Task 17)
+
+    func testOpenProjectTappedPresentsProjectDetailSeededWithSelectedMonth() async {
+        let store = TestStore(initialState: EarningsFeature.State(selectedMonth: "2026-03")) { EarningsFeature() }
+
+        await store.send(.openProjectTapped(42)) {
+            $0.projectDetail = ProjectDetailFeature.State(projectId: 42, initialMonth: "2026-03")
+        }
+    }
+
+    func testProjectDetailDismissedClearsPresentation() async {
+        var initial = EarningsFeature.State(selectedMonth: "2026-03")
+        initial.projectDetail = ProjectDetailFeature.State(projectId: 42, initialMonth: "2026-03")
+        let store = TestStore(initialState: initial) { EarningsFeature() }
+
+        await store.send(.projectDetail(.dismiss)) {
+            $0.projectDetail = nil
+        }
+    }
 }

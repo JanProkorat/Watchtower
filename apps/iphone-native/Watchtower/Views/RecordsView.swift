@@ -3,16 +3,16 @@ import ComposableArchitecture
 import WatchtowerCore
 
 /// Top-level shell for the Records tab: a segmented control over
-/// `RecordsFeature.Section` (List / Grid / Tasks / Time off) switching
-/// between the four read-only sub-views. Each sub-view owns its own
+/// `RecordsFeature.Section` (List / Grid / Tasks / Time off / Board) switching
+/// between the five read-only sub-views. Each sub-view owns its own
 /// loading gate and reads the shared `BillingFeature` dataset plus its
 /// slice of `RecordsFeature` filter state.
 struct RecordsView: View {
     let billing: StoreOf<BillingFeature>
-    let records: StoreOf<RecordsFeature>
+    @Bindable var records: StoreOf<RecordsFeature>
 
     private static let sections: [(RecordsFeature.Section, String)] = [
-        (.list, "List"), (.grid, "Grid"), (.tasks, "Tasks"), (.timeOff, "Time off"),
+        (.list, "List"), (.grid, "Grid"), (.tasks, "Tasks"), (.timeOff, "Time off"), (.board, "Board"),
     ]
 
     var body: some View {
@@ -28,6 +28,12 @@ struct RecordsView: View {
                 content
             }
         }
+        .sheet(item: $records.scope(state: \.worklogForm, action: \.worklogForm)) { formStore in
+            WorklogFormView(store: formStore)
+        }
+        .sheet(item: $records.scope(state: \.taskForm, action: \.taskForm)) { formStore in
+            TaskFormView(store: formStore)
+        }
     }
 
     @ViewBuilder
@@ -41,6 +47,8 @@ struct RecordsView: View {
             TaskListView(billing: billing, records: records)
         case .timeOff:
             TimeOffView(billing: billing, records: records)
+        case .board:
+            BoardView(records: records, billing: billing)
         }
     }
 
