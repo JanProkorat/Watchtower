@@ -8,8 +8,7 @@ import WatchtowerCore
 /// the `ReportsFeature` filter selection.
 struct ReportsView: View {
     let billing: StoreOf<BillingFeature>
-    let reports: StoreOf<ReportsFeature>
-    let onOpenProject: (Int) -> Void
+    @Bindable var reports: StoreOf<ReportsFeature>
 
     private var dataset: BillingDataset {
         billing.dataset ?? BillingDataset(worklogs: [], contracts: [], daysOff: [], projects: [], tasks: [], epics: [], fetchedAt: "")
@@ -44,39 +43,44 @@ struct ReportsView: View {
     }
 
     var body: some View {
-        ZStack {
-            Palette.baseBg.ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                Palette.baseBg.ignoresSafeArea()
 
-            if isLoading {
-                VStack(spacing: 12) {
-                    ProgressView().tint(Palette.accentIcon)
-                    Text("Loading…").foregroundStyle(Palette.textMuted)
-                }
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        ReportsFilterBar(store: reports, projects: dataset.projects)
-
-                        section(title: "Trend") {
-                            TrendChartPanel(series: trend, markers: markers, from: range.from, to: range.to, granularity: granularity)
-                        }
-
-                        section(title: "Earnings") {
-                            EarningsSummaryPanel(summary: earnings, onOpenProject: onOpenProject)
-                        }
-
-                        section(title: "By projects") {
-                            ProjectDonutPanel(slices: breakdown, onOpenProject: onOpenProject)
-                        }
-
-                        section(title: "Activity") {
-                            ActivityHeatmapPanel(heatmap: heat)
-                        }
+                if isLoading {
+                    VStack(spacing: 12) {
+                        ProgressView().tint(Palette.accentIcon)
+                        Text("Loading…").foregroundStyle(Palette.textMuted)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 32)
-                    .padding(.top, 16)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            ReportsFilterBar(store: reports, projects: dataset.projects)
+
+                            section(title: "Trend") {
+                                TrendChartPanel(series: trend, markers: markers, from: range.from, to: range.to, granularity: granularity)
+                            }
+
+                            section(title: "Earnings") {
+                                EarningsSummaryPanel(summary: earnings, onOpenProject: { reports.send(.openProjectTapped($0)) })
+                            }
+
+                            section(title: "By projects") {
+                                ProjectDonutPanel(slices: breakdown, onOpenProject: { reports.send(.openProjectTapped($0)) })
+                            }
+
+                            section(title: "Activity") {
+                                ActivityHeatmapPanel(heatmap: heat)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 32)
+                        .padding(.top, 16)
+                    }
                 }
+            }
+            .navigationDestination(item: $reports.scope(state: \.projectDetail, action: \.projectDetail)) { detailStore in
+                ProjectDetailView(store: detailStore, billing: billing)
             }
         }
     }

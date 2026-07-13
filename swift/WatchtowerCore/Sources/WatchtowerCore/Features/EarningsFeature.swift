@@ -18,15 +18,24 @@ public struct EarningsFeature {
     @ObservableState
     public struct State: Equatable {
         public var selectedMonth: String
+
+        @Presents public var projectDetail: ProjectDetailFeature.State?
+
         public init(selectedMonth: String = "") {
             self.selectedMonth = selectedMonth
         }
     }
 
-    public enum Action: Equatable {
+    // NOT `Equatable` (mirroring `RecordsFeature.Action` / `ProjectDetailFeature.Action`):
+    // it embeds `PresentationAction<ProjectDetailFeature.Action>`, and
+    // `ProjectDetailFeature.Action` isn't itself `Equatable` (it embeds
+    // `PresentationAction<ContractDrawerFeature.Action>`). Tests match via
+    // case-key-path `store.receive(\.foo)` instead of full-action equality.
+    public enum Action {
         case onAppear
         case monthStepped(Int)
         case openProjectTapped(Int)
+        case projectDetail(PresentationAction<ProjectDetailFeature.Action>)
     }
 
     @Dependency(\.date.now) var now
@@ -46,10 +55,16 @@ public struct EarningsFeature {
                 state.selectedMonth = CzFormat.addMonths(state.selectedMonth, delta)
                 return .none
 
-            case .openProjectTapped:
-                // TODO(phase-4/5): route to ProjectDetail
+            case let .openProjectTapped(projectId):
+                state.projectDetail = ProjectDetailFeature.State(projectId: projectId, initialMonth: state.selectedMonth)
+                return .none
+
+            case .projectDetail:
                 return .none
             }
+        }
+        .ifLet(\.$projectDetail, action: \.projectDetail) {
+            ProjectDetailFeature()
         }
     }
 }

@@ -24,6 +24,8 @@ public struct ReportsFeature {
         public var today: String
         public var earliest: String?
 
+        @Presents public var projectDetail: ProjectDetailFeature.State?
+
         public init(
             preset: Preset = .d30,
             granularityChoice: Granularity? = nil,
@@ -50,12 +52,17 @@ public struct ReportsFeature {
         }
     }
 
-    public enum Action: Equatable {
+    // NOT `Equatable` (mirroring `EarningsFeature.Action` / `RecordsFeature.Action`):
+    // it embeds `PresentationAction<ProjectDetailFeature.Action>`, and
+    // `ProjectDetailFeature.Action` isn't itself `Equatable`. Tests match via
+    // case-key-path `store.receive(\.foo)` instead of full-action equality.
+    public enum Action {
         case onAppear(earliest: String?)
         case presetChanged(Preset)
         case granularityChanged(Granularity)
         case projectChanged(Int?)
         case openProjectTapped(Int)
+        case projectDetail(PresentationAction<ProjectDetailFeature.Action>)
     }
 
     @Dependency(\.date.now) var now
@@ -83,10 +90,22 @@ public struct ReportsFeature {
                 state.projectId = id
                 return .none
 
-            case .openProjectTapped:
-                // TODO(later phase): route to ProjectDetail
+            case let .openProjectTapped(projectId):
+                // Seeded with `today`'s month, NOT the report range's start —
+                // mirrors the React reference: `ReportsView`'s `onOpenProject`
+                // has no month param, so `BillingArea.openProject` passes
+                // `month: undefined` and `ProjectDetailView` falls back to
+                // `today.slice(0, 7)`.
+                let referenceMonth = String(state.today.prefix(7))
+                state.projectDetail = ProjectDetailFeature.State(projectId: projectId, initialMonth: referenceMonth)
+                return .none
+
+            case .projectDetail:
                 return .none
             }
+        }
+        .ifLet(\.$projectDetail, action: \.projectDetail) {
+            ProjectDetailFeature()
         }
     }
 }

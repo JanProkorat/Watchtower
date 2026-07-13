@@ -7,7 +7,7 @@ import WatchtowerCore
 /// selected-month cursor; per-project rows drill down via `openProjectTapped`.
 struct EarningsView: View {
     let billing: StoreOf<BillingFeature>
-    let earnings: StoreOf<EarningsFeature>
+    @Bindable var earnings: StoreOf<EarningsFeature>
 
     private var selectedMonth: String { earnings.selectedMonth }
 
@@ -32,31 +32,36 @@ struct EarningsView: View {
     }
 
     var body: some View {
-        ZStack {
-            Palette.baseBg.ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                Palette.baseBg.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                monthPicker
+                VStack(spacing: 0) {
+                    monthPicker
 
-                if isLoading {
-                    Spacer()
-                    VStack(spacing: 12) {
-                        ProgressView().tint(Palette.accentIcon)
-                        Text("Loading…").foregroundStyle(Palette.textMuted)
-                    }
-                    Spacer()
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            heroTotal
-                            trendSection
-                            projectsSection
+                    if isLoading {
+                        Spacer()
+                        VStack(spacing: 12) {
+                            ProgressView().tint(Palette.accentIcon)
+                            Text("Loading…").foregroundStyle(Palette.textMuted)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 32)
-                        .padding(.top, 16)
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 24) {
+                                heroTotal
+                                trendSection
+                                projectsSection
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 32)
+                            .padding(.top, 16)
+                        }
                     }
                 }
+            }
+            .navigationDestination(item: $earnings.scope(state: \.projectDetail, action: \.projectDetail)) { detailStore in
+                ProjectDetailView(store: detailStore, billing: billing)
             }
         }
     }
