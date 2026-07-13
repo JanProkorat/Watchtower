@@ -27,11 +27,12 @@ private func kindLabel(_ kind: TimeOffKind) -> String {
 }
 
 /// Native port of `packages/module-timetracker/src/billing/records/TimeOffView.tsx`.
-/// Read-only this phase: day cells are plain (non-tappable) and there is no
-/// bottom-sheet kind picker (mutations land in a later phase). The web view
-/// renders a 3-month strip on iPad and a single focused month on phone-narrow
-/// layouts (`isNarrow` branch) — iPhone always takes the narrow path, so this
-/// view only ever renders `model.months[1]` (the focused month).
+/// Day cells cycle through the user-settable kinds on tap (see `dayCell` below)
+/// via `setDayOff`/`clearDayOff`; there is no bottom-sheet kind picker (that
+/// stays a later phase). The web view renders a 3-month strip on iPad and a
+/// single focused month on phone-narrow layouts (`isNarrow` branch) — iPhone
+/// always takes the narrow path, so this view only ever renders
+/// `model.months[1]` (the focused month).
 struct TimeOffView: View {
     let billing: StoreOf<BillingFeature>
     let records: StoreOf<RecordsFeature>

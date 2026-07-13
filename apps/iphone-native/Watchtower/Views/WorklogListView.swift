@@ -33,10 +33,12 @@ struct WorklogListView: View {
 
     /// The task the "+" button seeds the new-worklog sheet with: the first task
     /// under the currently-selected project filter, or the first known task if
-    /// no filter is active. `nil` (button disabled) if there is no task at all.
+    /// no filter is active. `nil` (button disabled) if there is no matching task
+    /// — when a project filter IS active, this never falls back to another
+    /// project's task, since that would misattribute the new worklog's billing.
     private var defaultWorklogTask: TaskRow? {
         if let projectId = records.worklogProjectId {
-            return dataset.tasks.first { $0.projectId == projectId } ?? dataset.tasks.first
+            return dataset.tasks.first { $0.projectId == projectId }
         }
         return dataset.tasks.first
     }
