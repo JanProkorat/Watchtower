@@ -42,4 +42,19 @@ describe('parseAzdoPr', () => {
     expect(pr.comments).toEqual([{ author: 'ann', ts: '2026-07-12T03:00:00Z' }]);
     expect(pr.reviews).toEqual([{ author: 'ann', state: 'approved', ts: '2026-07-12T03:00:00Z' }]);
   });
+
+  it('excludes self-authored comments by author GUID', () => {
+    const raw = {
+      pullRequestId: 8, title: 'AzDO PR', createdBy: { id: 'me' },
+      reviewers: [], repository: { name: 'repo' }, mergeStatus: 'succeeded',
+    };
+    const threads = [{
+      comments: [
+        { author: { id: 'me', uniqueName: 'me@example.com' }, publishedDate: '2026-07-12T04:00:00Z' },
+        { author: { id: 'ann-guid', uniqueName: 'ann@example.com' }, publishedDate: '2026-07-12T05:00:00Z' },
+      ],
+    }];
+    const pr = parseAzdoPr(raw, threads, 'me', 'dev.azure.com', 'https://dev.azure.com/org');
+    expect(pr.comments).toEqual([{ author: 'ann@example.com', ts: '2026-07-12T05:00:00Z' }]);
+  });
 });

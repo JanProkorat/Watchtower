@@ -87,7 +87,7 @@ interface AzdoPrRaw {
   pullRequestId: number; title: string; createdBy?: { id?: string };
   reviewers?: AzdoReviewer[]; repository?: { name?: string }; mergeStatus?: string;
 }
-interface AzdoThread { comments?: { author?: { uniqueName?: string }; publishedDate?: string }[] }
+interface AzdoThread { comments?: { author?: { id?: string; uniqueName?: string }; publishedDate?: string }[] }
 
 export function parseAzdoPr(
   raw: AzdoPrRaw, threads: AzdoThread[], userId: string, devopsHost: string, apiBase: string,
@@ -99,7 +99,7 @@ export function parseAzdoPr(
   const mergeable = raw.mergeStatus === 'succeeded';
   const comments = threads.flatMap((t) =>
     (t.comments ?? [])
-      .filter((c) => c.author?.uniqueName && c.publishedDate)
+      .filter((c) => c.author?.uniqueName && c.publishedDate && c.author.id !== userId)
       .map((c) => ({ author: c.author!.uniqueName!, ts: c.publishedDate! })),
   );
   // DevOps has no distinct "review submit" event; treat a non-author comment as a review signal,
