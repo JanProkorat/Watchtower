@@ -3,20 +3,16 @@ import ComposableArchitecture
 import WatchtowerCore
 
 /// Top-level shell for the Records tab: a segmented control over
-/// `RecordsFeature.Section` (List / Grid / Tasks / Time off) switching
-/// between the four read-only sub-views. Each sub-view owns its own
+/// `RecordsFeature.Section` (List / Grid / Tasks / Time off / Board) switching
+/// between the five read-only sub-views. Each sub-view owns its own
 /// loading gate and reads the shared `BillingFeature` dataset plus its
 /// slice of `RecordsFeature` filter state.
 struct RecordsView: View {
     let billing: StoreOf<BillingFeature>
     @Bindable var records: StoreOf<RecordsFeature>
 
-    // NOTE: the segmented control deliberately does NOT list `.board` yet — the
-    // real BoardView (and its tab affordance) lands in a later task. `.board`
-    // only needs a placeholder in `content` below to keep the section switch
-    // exhaustive.
     private static let sections: [(RecordsFeature.Section, String)] = [
-        (.list, "List"), (.grid, "Grid"), (.tasks, "Tasks"), (.timeOff, "Time off"),
+        (.list, "List"), (.grid, "Grid"), (.tasks, "Tasks"), (.timeOff, "Time off"), (.board, "Board"),
     ]
 
     var body: some View {
@@ -52,14 +48,7 @@ struct RecordsView: View {
         case .timeOff:
             TimeOffView(billing: billing, records: records)
         case .board:
-            // Placeholder — the real board view is built in a later task.
-            VStack {
-                Spacer()
-                Text("Board")
-                    .font(.subheadline)
-                    .foregroundStyle(Palette.textMuted)
-                Spacer()
-            }
+            BoardView(records: records, billing: billing)
         }
     }
 
