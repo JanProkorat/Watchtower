@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Drawer, Box, Typography, Tabs, Tab, Alert, CircularProgress, Stack } from '@mui/material';
-import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrReviewPayload } from '@watchtower/shared/ipcContract.js';
+import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrReviewPayload, PrWatchInboxItem } from '@watchtower/shared/ipcContract.js';
 import { DiffView } from './DiffView.js';
 import { CommentThread } from './CommentThread.js';
 import { ReviewReport } from './ReviewReport.js';
+import { MergeButton } from './MergeButton.js';
 import { useToast } from '../../state/useToast.js';
 
-export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments }: {
+export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments, watchItem, mergePr }: {
   pr: PullRequestPayload | null; onClose(): void;
   loadDiff(pr: PullRequestPayload): Promise<DiffFilePayload[]>;
   loadComments(pr: PullRequestPayload): Promise<PrCommentThreadPayload[]>;
@@ -16,6 +17,11 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   runReview(pr: PullRequestPayload): Promise<number>;
   cancelReview(pr: PullRequestPayload): Promise<void>;
   postComments(reviewId: number, findingIndexes: number[]): Promise<{ posted: number; skipped: number; errors: string[] }>;
+  // The matching prWatch inbox item for the open PR (looked up by ModuleReviews from
+  // the already-loaded watchItems — no extra IPC round-trip). Null when the PR has
+  // never been polled by the watch inbox yet.
+  watchItem: PrWatchInboxItem | null;
+  mergePr(host: PullRequestPayload['host'], repoKey: string, prNumber: number, deleteBranch: boolean): Promise<void>;
 }): JSX.Element {
   const [tab, setTab] = useState(0);
   const [files, setFiles] = useState<DiffFilePayload[]>([]);
@@ -48,6 +54,12 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
     cancelReview(pr).catch((e) => showError(e instanceof Error ? e.message : String(e)));
   };
 
+  const handleMerge = (deleteBranch: boolean): Promise<void> => {
+    if (!pr) return Promise.resolve();
+    return mergePr(pr.host, pr.repoKey, pr.number, deleteBranch)
+      .catch((e) => showError(e instanceof Error ? e.message : String(e)));
+  };
+
   return (
     <Drawer anchor="right" open={pr != null} onClose={onClose} PaperProps={{ sx: { width: 'min(1200px, 92vw)', maxWidth: '92vw', display: 'flex', flexDirection: 'column' } }}>
       {pr && (
@@ -60,11 +72,23 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
               {pr.repoLabel} · {pr.sourceBranch} → {pr.targetBranch} · {pr.author}
             </Typography>
           </Box>
-          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 1, minHeight: 40 }}>
-            <Tab label={`Diff${files.length ? ` (${files.length})` : ''}`} sx={{ minHeight: 40 }} />
-            <Tab label={`Comments (${threads.length})`} sx={{ minHeight: 40 }} />
-            <Tab label={`Report${review?.status === 'done' ? ` (${review.findings.length})` : ''}`} sx={{ minHeight: 40 }} />
-          </Tabs>
+          <Box sx={{ display: 'flex', alignItems: 'center', px: 1 }}>
+            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ flex: 1, minHeight: 40 }}>
+              <Tab label={`Diff${files.length ? ` (${files.length})` : ''}`} sx={{ minHeight: 40 }} />
+              <Tab label={`Comments (${threads.length})`} sx={{ minHeight: 40 }} />
+              <Tab label={`Report${review?.status === 'done' ? ` (${review.findings.length})` : ''}`} sx={{ minHeight: 40 }} />
+            </Tabs>
+            {/* Only the PR's own author can merge — a reviewer-role PR (or one the
+                watch inbox hasn't polled yet) shows no merge button at all. */}
+            {watchItem && watchItem.myRole === 'author' && (
+              <MergeButton
+                approved={watchItem.approved}
+                mergeable={watchItem.mergeable}
+                mergeBlockedReason={watchItem.mergeBlockedReason}
+                onMerge={handleMerge}
+              />
+            )}
+          </Box>
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {tab === 0 && (
               <>

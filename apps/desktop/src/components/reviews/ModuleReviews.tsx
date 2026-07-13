@@ -10,7 +10,7 @@ import { glassSurface } from '../../theme/glass.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 
 export function ModuleReviews(): JSX.Element {
-  const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
+  const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
     review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments } = useReviews();
   const { items: watchItems, unread, markSeen } = usePrWatch();
   const { showError } = useToast();
@@ -20,6 +20,13 @@ export function ModuleReviews(): JSX.Element {
   const [open, setOpen] = useState<PullRequestPayload | null>(null);
   const nowMs = Date.now();
   const groups = useMemo(() => groupPrsByHost(applyPrFilter(pullRequests, host, query)), [pullRequests, host, query]);
+  // The prWatch inbox item for the currently open PR (Task 11's Merge button reads
+  // approved/mergeable/mergeBlockedReason/myRole from it) — reuses the already-loaded
+  // watchItems rather than a fresh IPC round-trip.
+  const openWatchItem = useMemo(() => {
+    if (!open) return null;
+    return watchItems.find((w) => w.host === open.host && w.repoKey === open.repoKey && w.prNumber === open.number) ?? null;
+  }, [open, watchItems]);
 
   // Opened via a macOS notification click while the app was already running
   // (see electron/ipc.ts + electron/preload.ts). A cold-start deep-link sent
@@ -89,7 +96,7 @@ export function ModuleReviews(): JSX.Element {
 
       <PrInspectorDrawer pr={open} onClose={() => setOpen(null)} loadDiff={loadDiff} loadComments={loadComments}
         review={review} reviewRunning={reviewRunning} openReviewFor={openReviewFor} runReview={runReview}
-        cancelReview={cancelReview} postComments={postComments} />
+        cancelReview={cancelReview} postComments={postComments} watchItem={openWatchItem} mergePr={mergePr} />
     </Box>
   );
 }
