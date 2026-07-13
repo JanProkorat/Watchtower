@@ -3,9 +3,10 @@ import ComposableArchitecture
 import WatchtowerCore
 
 /// Native port of `packages/module-timetracker/src/billing/records/TaskListView.tsx`.
-/// Read-only this phase: rows are not tappable and there is no "+ Add task" affordance
-/// (mutations land in a later phase). Reads the shared `BillingFeature` dataset and
-/// the `RecordsFeature` task-search query cursor.
+/// Rows are tappable (→ `taskRowTapped`, opens the edit sheet) and the search
+/// bar carries a "+" affordance (→ `addTaskTapped`) seeded with the epic of the
+/// first visible (filtered) row — "the visible epic" — falling back to the
+/// first known epic if the list is empty.
 struct TaskListView: View {
     let billing: StoreOf<BillingFeature>
     let records: StoreOf<RecordsFeature>
@@ -35,6 +36,12 @@ struct TaskListView: View {
         Binding(get: { records.taskQuery }, set: { records.send(.taskQueryChanged($0)) })
     }
 
+    /// The epic the "+" button seeds the new-task sheet with, or `nil`
+    /// (button disabled) if there is no epic at all.
+    private var defaultEpicId: Int? {
+        rows.first?.epicId ?? dataset.epics.first?.epicId
+    }
+
     var body: some View {
         ZStack {
             Palette.baseBg.ignoresSafeArea()
@@ -60,7 +67,12 @@ struct TaskListView: View {
                         GlassCard {
                             VStack(spacing: 0) {
                                 ForEach(Array(rows.enumerated()), id: \.element.syncId) { index, task in
-                                    TaskRowView(task: task)
+                                    Button {
+                                        records.send(.taskRowTapped(task))
+                                    } label: {
+                                        TaskRowView(task: task)
+                                    }
+                                    .buttonStyle(.plain)
                                     if index < rows.count - 1 {
                                         Divider().overlay(Color.white.opacity(0.10))
                                     }
@@ -79,7 +91,7 @@ struct TaskListView: View {
     // MARK: - Search bar
 
     private var searchBar: some View {
-        HStack {
+        HStack(spacing: 8) {
             TextField("Search task…", text: searchBinding)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
@@ -91,12 +103,28 @@ struct TaskListView: View {
                     RoundedRectangle(cornerRadius: 9)
                         .stroke(Color.white.opacity(0.12), lineWidth: 1)
                 )
+
+            addButton
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 16)
         .padding(.top, 12)
+    }
+
+    private var addButton: some View {
+        Button {
+            guard let epicId = defaultEpicId else { return }
+            records.send(.addTaskTapped(epicId: epicId))
+        } label: {
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 22))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Palette.accentIcon)
+        .disabled(defaultEpicId == nil)
+        .accessibilityLabel("Add task")
     }
 }
 

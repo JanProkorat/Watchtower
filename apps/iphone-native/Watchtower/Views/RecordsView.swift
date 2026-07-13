@@ -9,8 +9,12 @@ import WatchtowerCore
 /// slice of `RecordsFeature` filter state.
 struct RecordsView: View {
     let billing: StoreOf<BillingFeature>
-    let records: StoreOf<RecordsFeature>
+    @Bindable var records: StoreOf<RecordsFeature>
 
+    // NOTE: the segmented control deliberately does NOT list `.board` yet — the
+    // real BoardView (and its tab affordance) lands in a later task. `.board`
+    // only needs a placeholder in `content` below to keep the section switch
+    // exhaustive.
     private static let sections: [(RecordsFeature.Section, String)] = [
         (.list, "List"), (.grid, "Grid"), (.tasks, "Tasks"), (.timeOff, "Time off"),
     ]
@@ -28,6 +32,12 @@ struct RecordsView: View {
                 content
             }
         }
+        .sheet(item: $records.scope(state: \.worklogForm, action: \.worklogForm)) { formStore in
+            WorklogFormView(store: formStore)
+        }
+        .sheet(item: $records.scope(state: \.taskForm, action: \.taskForm)) { formStore in
+            TaskFormView(store: formStore)
+        }
     }
 
     @ViewBuilder
@@ -41,6 +51,15 @@ struct RecordsView: View {
             TaskListView(billing: billing, records: records)
         case .timeOff:
             TimeOffView(billing: billing, records: records)
+        case .board:
+            // Placeholder — the real board view is built in a later task.
+            VStack {
+                Spacer()
+                Text("Board")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.textMuted)
+                Spacer()
+            }
         }
     }
 

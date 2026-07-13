@@ -196,17 +196,40 @@ struct TimeOffView: View {
         }
     }
 
+    /// Tap-to-cycle a day cell through the user-settable kinds: none → vacation
+    /// → sick → other → none (`clearDayOff`). `.holiday` is a computed Czech
+    /// public holiday, not a `days_off` row — it isn't user-editable, so a
+    /// holiday cell (and pad cells outside the month) don't respond to taps.
     @ViewBuilder
     private func dayCell(_ day: CalDay) -> some View {
         let dayNumber = day.date.flatMap { Int($0.suffix(2)) }
+        let isEditable = day.date != nil && day.kind != .holiday
 
-        Text(dayNumber.map(String.init) ?? "")
-            .font(.system(size: 11, weight: day.kind != nil ? .bold : .regular))
-            .foregroundStyle(dayNumberColor(day))
-            .frame(maxWidth: .infinity)
-            .aspectRatio(1, contentMode: .fit)
-            .background(dayCellBackground(day))
-            .overlay(dayCellBorder(day))
+        Button {
+            guard let date = day.date else { return }
+            switch day.kind {
+            case nil:
+                records.send(.setDayOff(date: date, kind: "vacation"))
+            case .vacation:
+                records.send(.setDayOff(date: date, kind: "sick"))
+            case .sick:
+                records.send(.setDayOff(date: date, kind: "other"))
+            case .other:
+                records.send(.clearDayOff(date: date))
+            case .holiday:
+                break
+            }
+        } label: {
+            Text(dayNumber.map(String.init) ?? "")
+                .font(.system(size: 11, weight: day.kind != nil ? .bold : .regular))
+                .foregroundStyle(dayNumberColor(day))
+                .frame(maxWidth: .infinity)
+                .aspectRatio(1, contentMode: .fit)
+                .background(dayCellBackground(day))
+                .overlay(dayCellBorder(day))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEditable)
     }
 
     private func dayNumberColor(_ day: CalDay) -> Color {
