@@ -8,21 +8,19 @@ import WatchtowerCore
 /// presentation) with data read from the shared `BillingFeature` dataset,
 /// mirroring `EarningsView`'s `billing`/feature-store split.
 ///
-/// Four sections, same order as the React reference:
-///   1. back/title bar
-///   2. header card — project name, month stepper, hours stat, active-rate stat
-///   3. rate-history list (`rollupEarningsByContract`, shared-group badge,
+/// Three sections, same order as the React reference (minus the standalone
+/// back/title bar — this view is pushed via `.navigationDestination` from
+/// both `EarningsView` and `ReportsView`, so the system `NavigationStack`
+/// already supplies a correctly-labeled back button; a redundant custom
+/// pill previously duplicated it and, since neither call site wires
+/// `onBack`, was permanently dead):
+///   1. header card — project name, month stepper, hours stat, active-rate stat
+///   2. rate-history list (`rollupEarningsByContract`, shared-group badge,
 ///      "+ Add rate" gated on `canEdit`)
-///   4. monthly worklog ledger (desc by date, total footer)
-///
-/// `onBack` is a plain closure rather than a reducer action because
-/// `ProjectDetailFeature` intentionally owns no "back" state — navigation
-/// wiring (this view isn't reachable yet) is a later task; the default no-op
-/// lets this view compile and be exercised standalone until then.
+///   3. monthly worklog ledger (desc by date, total footer)
 struct ProjectDetailView: View {
     @Bindable var store: StoreOf<ProjectDetailFeature>
     let billing: StoreOf<BillingFeature>
-    var onBack: () -> Void = {}
 
     // UTC calendar for the "today" date string — matches WatchtowerCore's
     // date-arithmetic convention (never the local time zone). Same pattern
@@ -88,51 +86,25 @@ struct ProjectDetailView: View {
         ZStack {
             Palette.baseBg.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                backBar
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        headerCard
-                        rateHistorySection
-                        ledgerSection
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 32)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    headerCard
+                    rateHistorySection
+                    ledgerSection
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
             }
         }
+        .navigationTitle(projectName)
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $store.scope(state: \.contractDrawer, action: \.contractDrawer)) { drawerStore in
             ContractDrawerView(store: drawerStore, billing: billing)
         }
     }
 
-    // MARK: - 1. Back bar
-
-    private var backBar: some View {
-        HStack {
-            Button(action: onBack) {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left")
-                    Text("Earnings")
-                }
-                .font(.system(size: 16))
-                .foregroundStyle(Palette.accentIcon)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Back to earnings")
-
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
-    }
-
-    // MARK: - 2. Header card
+    // MARK: - 1. Header card
 
     private var headerCard: some View {
         GlassCard {
@@ -198,7 +170,7 @@ struct ProjectDetailView: View {
         }
     }
 
-    // MARK: - 3. Rate history
+    // MARK: - 2. Rate history
 
     private var rateHistorySection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -247,7 +219,7 @@ struct ProjectDetailView: View {
         }
     }
 
-    // MARK: - 4. Worklog ledger
+    // MARK: - 3. Worklog ledger
 
     private var ledgerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
