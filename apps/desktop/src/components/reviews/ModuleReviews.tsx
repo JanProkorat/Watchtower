@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Box, Typography, Alert, Chip, TextField, Button, Stack, CircularProgress } from '@mui/material';
+import { useEffect, useMemo, useState } from 'react';
+import { Box, Typography, Alert, Chip, TextField, Button, Stack, CircularProgress, Badge } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useReviews, applyPrFilter, groupPrsByHost, type HostFilter } from '../../state/useReviews.js';
+import { usePrWatch } from '../../state/usePrWatch.js';
 import type { PullRequestPayload } from '@watchtower/shared/ipcContract.js';
 import { PrRow } from './PrRow.js';
 import { PrInspectorDrawer } from './PrInspectorDrawer.js';
@@ -11,6 +12,7 @@ import { useToast, toastMessage } from '../../state/useToast.js';
 export function ModuleReviews(): JSX.Element {
   const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
     review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments } = useReviews();
+  const { items: watchItems, unread, markSeen } = usePrWatch();
   const { showError } = useToast();
   const theme = useTheme();
   const [host, setHost] = useState<HostFilter>('all');
@@ -19,10 +21,34 @@ export function ModuleReviews(): JSX.Element {
   const nowMs = Date.now();
   const groups = useMemo(() => groupPrsByHost(applyPrFilter(pullRequests, host, query)), [pullRequests, host, query]);
 
+  // Opened via a macOS notification click while the app was already running
+  // (see electron/ipc.ts + electron/preload.ts). A cold-start deep-link sent
+  // before this hook subscribes is a known, deferred limitation.
+  useEffect(() => {
+    return window.watchtower.on('deep-link', (d) => {
+      if (d.module !== 'reviews') return;
+      const pr = pullRequests.find((p) => p.host === d.host && p.repoKey === d.repoKey && p.number === d.prNumber);
+      if (!pr) return;
+      setOpen(pr);
+      void markSeen(d.host, d.repoKey, d.prNumber).catch((e) => showError(toastMessage(e)));
+    });
+  }, [pullRequests, markSeen, showError]);
+
+  // Manual open (row click, not deep-link): also clear the unread flag when
+  // the opened PR is one the watch inbox is tracking.
+  const openPr = (pr: PullRequestPayload) => {
+    setOpen(pr);
+    if (watchItems.some((w) => w.host === pr.host && w.repoKey === pr.repoKey && w.prNumber === pr.number)) {
+      void markSeen(pr.host, pr.repoKey, pr.number).catch((e) => showError(toastMessage(e)));
+    }
+  };
+
   return (
     <Box sx={{ p: 2, height: '100%', overflow: 'auto' }}>
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
-        <Typography variant="h5">Reviews</Typography>
+        <Badge badgeContent={unread} color="error">
+          <Typography variant="h5">Reviews</Typography>
+        </Badge>
         <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
           {pullRequests.length} open{syncedAt ? ` · synced ${new Date(syncedAt).toLocaleTimeString('cs-CZ')}` : ''}
         </Typography>
@@ -53,8 +79,8 @@ export function ModuleReviews(): JSX.Element {
               for the whole list; the PrRows inside stay bare (hover only). */}
           <Box sx={{ ...glassSurface(theme, { elevation: 1 }), borderRadius: 2, p: 0.75 }}>
             <Stack spacing={0.25}>{g.prs.map((pr) => (
-              <PrRow key={`${pr.repoKey}-${pr.number}`} pr={pr} nowMs={nowMs} onOpen={setOpen} reviewState={reviewStateFor(pr)}
-                onReview={(p) => { setOpen(p); void runReview(p).catch((e) => showError(toastMessage(e))); }}
+              <PrRow key={`${pr.repoKey}-${pr.number}`} pr={pr} nowMs={nowMs} onOpen={openPr} reviewState={reviewStateFor(pr)}
+                onReview={(p) => { openPr(p); void runReview(p).catch((e) => showError(toastMessage(e))); }}
                 onCancel={(p) => void cancelReview(p).catch((e) => showError(toastMessage(e)))} />
             ))}</Stack>
           </Box>
