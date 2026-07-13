@@ -3,13 +3,19 @@ import { Box, Typography, Alert, Chip, TextField, Button, Stack, CircularProgres
 import { useTheme } from '@mui/material/styles';
 import { useReviews, applyPrFilter, groupPrsByHost, type HostFilter } from '../../state/useReviews.js';
 import { usePrWatch } from '../../state/usePrWatch.js';
-import type { PullRequestPayload } from '@watchtower/shared/ipcContract.js';
+import type { PullRequestPayload, PrHost } from '@watchtower/shared/ipcContract.js';
 import { PrRow } from './PrRow.js';
 import { PrInspectorDrawer } from './PrInspectorDrawer.js';
 import { glassSurface } from '../../theme/glass.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 
-export function ModuleReviews(): JSX.Element {
+export function ModuleReviews(props: {
+  /** Set when a macOS PR-notification click deep-linked here (App-level). */
+  deepLinkTarget?: { host: PrHost; repoKey: string; prNumber: number } | null;
+  /** Called once the target PR has been opened, so App can clear it. */
+  onConsumeDeepLink?: () => void;
+} = {}): JSX.Element {
+  const { deepLinkTarget, onConsumeDeepLink } = props;
   const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
     review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments } = useReviews();
   const { items: watchItems, unread, error: watchError, markSeen } = usePrWatch();
@@ -28,18 +34,20 @@ export function ModuleReviews(): JSX.Element {
     return watchItems.find((w) => w.host === open.host && w.repoKey === open.repoKey && w.prNumber === open.number) ?? null;
   }, [open, watchItems]);
 
-  // Opened via a macOS notification click while the app was already running
-  // (see electron/ipc.ts + electron/preload.ts). A cold-start deep-link sent
-  // before this hook subscribes is a known, deferred limitation.
+  // Open the PR a macOS notification deep-linked to. App owns the 'deep-link'
+  // subscription (it must switch to the reviews module, which mounts this
+  // component) and passes the target down. This effect re-runs when
+  // pullRequests loads, so a target set before the list arrives still opens.
   useEffect(() => {
-    return window.watchtower.on('deep-link', (d) => {
-      if (d.module !== 'reviews') return;
-      const pr = pullRequests.find((p) => p.host === d.host && p.repoKey === d.repoKey && p.number === d.prNumber);
-      if (!pr) return;
-      setOpen(pr);
-      void markSeen(d.host, d.repoKey, d.prNumber).catch((e) => showError(toastMessage(e)));
-    });
-  }, [pullRequests, markSeen, showError]);
+    if (!deepLinkTarget) return;
+    const pr = pullRequests.find(
+      (p) => p.host === deepLinkTarget.host && p.repoKey === deepLinkTarget.repoKey && p.number === deepLinkTarget.prNumber,
+    );
+    if (!pr) return; // list not loaded yet (or PR not in a configured repo) — wait
+    setOpen(pr);
+    void markSeen(deepLinkTarget.host, deepLinkTarget.repoKey, deepLinkTarget.prNumber).catch((e) => showError(toastMessage(e)));
+    onConsumeDeepLink?.();
+  }, [deepLinkTarget, pullRequests, markSeen, showError, onConsumeDeepLink]);
 
   // Manual open (row click, not deep-link): also clear the unread flag when
   // the opened PR is one the watch inbox is tracking.

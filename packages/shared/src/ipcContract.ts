@@ -87,6 +87,9 @@ export type IpcRequest =
   | { kind: 'prs:diff'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
   | { kind: 'prs:comments'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
   | { kind: 'prs:merge'; payload: { host: PrHost; repoKey: string; prNumber: number; deleteBranch: boolean; devopsPats?: Record<string, string> } }
+  // Renderer signals it has mounted and subscribed to the 'deep-link' channel,
+  // so electron-main flushes any deep-link buffered during a cold-start window.
+  | { kind: 'deepLink:ready'; payload: Record<string, never> }
   | { kind: 'reviews:projectRepo'; payload: { projectId: number } }
   | { kind: 'prReview:start'; payload: { host: PrHost; repoKey: string; prNumber: number } }
   | { kind: 'prReview:get'; payload: { reviewId: number } }
@@ -706,6 +709,7 @@ export type IpcResponse =
   | { kind: 'prs:diff'; payload: { files: DiffFilePayload[] } }
   | { kind: 'prs:comments'; payload: { threads: PrCommentThreadPayload[] } }
   | { kind: 'prs:merge'; payload: { ok: true } }
+  | { kind: 'deepLink:ready'; payload: { ok: true } }
   | { kind: 'reviews:projectRepo'; payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null } }
   | { kind: 'devops:setPat'; payload: { ok: true } }
   | { kind: 'devops:hasPat'; payload: { hasPat: boolean } }
@@ -912,6 +916,7 @@ export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'devops:hasPat',
   'cloudSync:getConfig',
   'cloudSync:setConfig',
+  'deepLink:ready',
 ]);
 
 export interface WatchtowerBridge {

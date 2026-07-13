@@ -2,13 +2,37 @@ import { ipcMain, dialog, shell, nativeTheme } from 'electron';
 import { exec } from 'node:child_process';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { type IpcRequest, type IpcResponse, ELECTRON_ONLY_KINDS } from '@watchtower/shared/ipcContract.js';
+import { type IpcRequest, type IpcResponse, type IpcPush, ELECTRON_ONLY_KINDS } from '@watchtower/shared/ipcContract.js';
 import { getMainWindow, createMainWindow } from './window.js';
 import { getOrchestrator } from './orchestratorHost.js';
 import { fireMacNotification, fireTestNotification } from './notifications.js';
 import { runBoardSignIn } from './boardSignIn.js';
 import { setPat, hasPat, getPats } from './devopsPat.js';
 import { getCloudSyncConfig, setCloudSyncConfig } from './cloudSync.js';
+
+type DeepLinkPayload = Extract<IpcPush, { kind: 'deep-link' }>['payload'];
+
+// A macOS notification click can recreate a previously-closed main window
+// (the app stays alive in the tray). The deep-link would then be sent before
+// the renderer has mounted and subscribed, and get dropped. So buffer the
+// latest deep-link and only deliver it to a renderer that has signalled ready
+// via `deepLink:ready`. Readiness is keyed on webContents id, so a recreated
+// window is "not ready" until its fresh renderer signals again.
+let pendingDeepLink: DeepLinkPayload | null = null;
+let readyWebContentsId: number | null = null;
+
+function flushDeepLink(): void {
+  const win = getMainWindow();
+  if (pendingDeepLink && win && !win.isDestroyed() && win.webContents.id === readyWebContentsId) {
+    win.webContents.send('deep-link', pendingDeepLink);
+    pendingDeepLink = null;
+  }
+}
+
+function queueDeepLink(payload: DeepLinkPayload): void {
+  pendingDeepLink = payload;
+  flushDeepLink(); // delivers immediately if the current window already signalled ready
+}
 
 export function registerIpc(): void {
   // Seed the orchestrator's in-memory DevOps PAT map so the autonomous
@@ -35,10 +59,13 @@ export function registerIpc(): void {
           repoLabel: p.repoLabel,
           event: p.event,
           body: p.body,
-          onClick: (pr) => {
-            // fireMacNotification already restores/focuses the main window
-            // before invoking onClick; just forward the deep link.
-            getMainWindow()?.webContents.send('deep-link', { module: 'reviews', ...pr });
+          onClick: () => {
+            // fireMacNotification already restores/focuses the main window (or
+            // recreates it) before invoking onClick. Buffer + deliver on ready
+            // so a freshly-recreated window doesn't miss the deep link. Use the
+            // typed notify payload `p` (PrHost) rather than the stringly-typed
+            // onClick callback arg.
+            queueDeepLink({ module: 'reviews', host: p.host, repoKey: p.repoKey, prNumber: p.prNumber });
           },
         });
       } else {
@@ -158,6 +185,12 @@ export function registerIpc(): void {
           ...(payload as object),
           devopsPats: await getPats(),
         } as never);
+      }
+
+      if (kind === 'deepLink:ready') {
+        readyWebContentsId = getMainWindow()?.webContents.id ?? null;
+        flushDeepLink();
+        return { ok: true };
       }
 
       if (ELECTRON_ONLY_KINDS.has(kind)) {
