@@ -97,14 +97,19 @@ export function parseAzdoPr(
   const approved = (raw.reviewers ?? []).some((r) => (r.vote ?? 0) >= 10)
     && !(raw.reviewers ?? []).some((r) => (r.vote ?? 0) < 0);
   const mergeable = raw.mergeStatus === 'succeeded';
-  const comments = threads.flatMap((t) =>
+  const allComments = threads.flatMap((t) =>
     (t.comments ?? [])
-      .filter((c) => c.author?.uniqueName && c.publishedDate && c.author.id !== userId)
-      .map((c) => ({ author: c.author!.uniqueName!, ts: c.publishedDate! })),
+      .filter((c) => c.author?.uniqueName && c.publishedDate)
+      .map((c) => ({ author: c.author!.uniqueName!, ts: c.publishedDate!, self: c.author!.id === userId })),
   );
+  // Notification candidates exclude your own comments (identity by GUID) — the
+  // computeEvents me-filter can't catch them (it compares the GitHub login).
+  const comments = allComments.filter((c) => !c.self).map((c) => ({ author: c.author, ts: c.ts }));
   // DevOps has no distinct "review submit" event; treat a non-author comment as a review signal,
   // and approving votes as the approval signal (timestamped with the latest thread activity).
-  const latestTs = comments.reduce<string | null>((a, c) => (a === null || c.ts > a ? c.ts : a), null);
+  // Use ALL activity (incl. your own comments) as the timestamp basis so an approval on your PR
+  // still surfaces when the only thread comment is your own.
+  const latestTs = allComments.reduce<string | null>((a, c) => (a === null || c.ts > a ? c.ts : a), null);
   const reviews = (raw.reviewers ?? [])
     .filter((r) => r.id !== userId && (r.vote ?? 0) !== 0 && latestTs)
     .map((r) => ({

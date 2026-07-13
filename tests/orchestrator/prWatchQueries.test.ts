@@ -57,4 +57,20 @@ describe('parseAzdoPr', () => {
     const pr = parseAzdoPr(raw, threads, 'me', 'dev.azure.com', 'https://dev.azure.com/org');
     expect(pr.comments).toEqual([{ author: 'ann@example.com', ts: '2026-07-12T05:00:00Z' }]);
   });
+
+  it('still surfaces a reviewer approval when the only thread comment is your own', () => {
+    // Excluding self-comments must not blank the review timestamp basis: an
+    // approval on your own PR should still notify even if you were the only
+    // one who left a text comment.
+    const raw = {
+      pullRequestId: 9, title: 'AzDO PR', createdBy: { id: 'me' },
+      reviewers: [{ id: 'ann-guid', vote: 10 }], repository: { name: 'repo' }, mergeStatus: 'succeeded',
+    };
+    const threads = [{
+      comments: [{ author: { id: 'me', uniqueName: 'me@example.com' }, publishedDate: '2026-07-12T06:00:00Z' }],
+    }];
+    const pr = parseAzdoPr(raw, threads, 'me', 'dev.azure.com', 'https://dev.azure.com/org');
+    expect(pr.comments).toEqual([]); // self-comment excluded from notification candidates
+    expect(pr.reviews).toEqual([{ author: 'ann-guid', state: 'approved', ts: '2026-07-12T06:00:00Z' }]);
+  });
 });
