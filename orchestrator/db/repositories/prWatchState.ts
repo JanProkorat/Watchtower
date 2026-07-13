@@ -65,11 +65,11 @@ export class PrWatchStateRepo {
   /** Delete rows whose (host,repoKey,prNumber) is not in `keep`. Returns count deleted. */
   prune(keep: { host: PrHost; repoKey: string; prNumber: number }[]): number {
     const live = new Set(keep.map((k) => keyOf(k.host, k.repoKey, k.prNumber)));
+    const del = this.db.prepare(`DELETE FROM pr_watch_state WHERE host = ? AND repo_key = ? AND pr_number = ?`);
     let deleted = 0;
     for (const r of this.all()) {
       if (!live.has(keyOf(r.host, r.repoKey, r.prNumber))) {
-        this.db.prepare(`DELETE FROM pr_watch_state WHERE host = ? AND repo_key = ? AND pr_number = ?`)
-          .run(r.host, r.repoKey, r.prNumber);
+        del.run(r.host, r.repoKey, r.prNumber);
         deleted++;
       }
     }

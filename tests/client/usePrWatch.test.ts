@@ -27,4 +27,12 @@ describe('usePrWatch', () => {
     await act(async () => { await result.current.markSeen('github', 'acme/w', 42); });
     expect((window as any).watchtower.invoke).toHaveBeenCalledWith('prWatch:markSeen', { host: 'github', repoKey: 'acme/w', prNumber: 42 });
   });
+
+  it('surfaces a failed prWatch:list via the error field instead of a silent empty inbox', async () => {
+    (window as any).watchtower.invoke = vi.fn(async () => { throw new Error('list boom'); });
+    const { result } = renderHook(() => usePrWatch());
+    await waitFor(() => expect(result.current.error).toBe('list boom'));
+    expect(result.current.items).toEqual([]);
+    expect(result.current.unread).toBe(0);
+  });
 });

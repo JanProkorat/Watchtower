@@ -54,10 +54,17 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
     cancelReview(pr).catch((e) => showError(e instanceof Error ? e.message : String(e)));
   };
 
-  const handleMerge = (deleteBranch: boolean): Promise<void> => {
-    if (!pr) return Promise.resolve();
-    return mergePr(pr.host, pr.repoKey, pr.number, deleteBranch)
-      .catch((e) => showError(e instanceof Error ? e.message : String(e)));
+  const handleMerge = async (deleteBranch: boolean): Promise<void> => {
+    if (!pr) return;
+    try {
+      await mergePr(pr.host, pr.repoKey, pr.number, deleteBranch);
+      // Success: the merged PR is evicted from `pullRequests` by mergePr's
+      // refresh, so close the drawer rather than leave it rendering the stale
+      // (now-gone) PR. On failure we keep it open and surface the error.
+      onClose();
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e));
+    }
   };
 
   return (

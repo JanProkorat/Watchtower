@@ -11,7 +11,7 @@ export function MergeButton(props: {
   const [deleteBranch, setDeleteBranch] = useState(true);
   const [busy, setBusy] = useState(false);
   const enabled = props.approved && props.mergeable;
-  const reason = !props.approved ? 'Not yet approved' : props.mergeBlockedReason ?? '';
+  const reason = !props.approved ? 'Not yet approved' : props.mergeBlockedReason ?? 'Not mergeable';
 
   const btn = (
     <span>

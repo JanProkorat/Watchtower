@@ -35,8 +35,8 @@ describe('parseAzdoPr', () => {
       mergeStatus: 'succeeded',
     };
     const threads = [{ comments: [{ author: { uniqueName: 'ann' }, publishedDate: '2026-07-12T03:00:00Z' }] }];
-    const pr = parseAzdoPr(raw, threads, 'me', 'org', 'https://host/org');
-    expect(pr.repoKey).toBe('org/repo');
+    const pr = parseAzdoPr(raw, threads, 'me', 'dev.azure.com', 'https://dev.azure.com/org');
+    expect(pr.repoKey).toBe('azdo:dev.azure.com/repo');
     expect(pr.approved).toBe(true);
     expect(pr.mergeable).toBe(true);
     expect(pr.comments).toEqual([{ author: 'ann', ts: '2026-07-12T03:00:00Z' }]);

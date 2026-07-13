@@ -16,8 +16,8 @@ export function computeEvents(
     host: pr.host, repoKey: pr.repoKey, repoLabel: pr.repoLabel, prNumber: pr.prNumber,
     title: pr.title, myRole: pr.myRole,
     reviewRequestedSeen: (prev?.reviewRequestedSeen ?? false) || pr.reviewRequestedOfMe,
-    lastCommentTs: maxTs(pr.comments, prev?.lastCommentTs ?? null) ?? prev?.lastCommentTs ?? null,
-    lastReviewTs: maxTs(pr.reviews, prev?.lastReviewTs ?? null) ?? prev?.lastReviewTs ?? null,
+    lastCommentTs: maxTs(pr.comments, prev?.lastCommentTs ?? null),
+    lastReviewTs: maxTs(pr.reviews, prev?.lastReviewTs ?? null),
     approved: pr.approved, mergeable: pr.mergeable, mergeBlockedReason: pr.mergeBlockedReason,
     updatedAt: now,
   };

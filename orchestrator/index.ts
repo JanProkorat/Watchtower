@@ -320,7 +320,9 @@ function startPrWatch(): void {
         }
         try {
           const user = await resolveAzdoUser(apiBase, pat);
-          out.push(...(await azdoWatched(apiBase, org, user, pat)));
+          // Pass devopsHost (not org) so azdoWatched mints the canonical
+          // `azdo:${devopsHost}/${repo}` repoKey — matching resolveRepos().
+          out.push(...(await azdoWatched(apiBase, devopsHost, user, pat)));
         } catch (err) {
           console.error('[prWatch] azdo org', org, err);
         }

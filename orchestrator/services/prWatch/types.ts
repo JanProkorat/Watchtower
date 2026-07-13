@@ -27,7 +27,7 @@ export interface PrWatchStateRow {
 /** Provider-agnostic snapshot of a PR the user cares about, built each poll. */
 export interface WatchedPr {
   host: PrHost;
-  repoKey: string;    // stable id: gh 'owner/name' or azdo 'org/repo'
+  repoKey: string;    // canonical id (matches resolveRepos): 'gh:owner/name' or 'azdo:host/repo'
   repoLabel: string;
   prNumber: number;
   title: string;

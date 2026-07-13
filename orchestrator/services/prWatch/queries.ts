@@ -73,7 +73,8 @@ export async function githubWatched(login: string, exec: Exec = defaultExec): Pr
       seen.add(key);
       const detailJson = await exec('gh', ['pr', 'view', String(number), '--repo', nwo, '--json', GH_DETAIL]).catch(() => null);
       if (!detailJson) continue;
-      out.push(parseGithubDetail(JSON.parse(detailJson) as GhDetail, nwo, nwo.split('/')[1] ?? nwo, login, role));
+      // Canonical repoKey must match resolveRepos() in reviews.ts: `gh:${nwo}`.
+      out.push(parseGithubDetail(JSON.parse(detailJson) as GhDetail, `gh:${nwo}`, nwo.split('/')[1] ?? nwo, login, role));
     }
   }
   return out;
@@ -89,7 +90,7 @@ interface AzdoPrRaw {
 interface AzdoThread { comments?: { author?: { uniqueName?: string }; publishedDate?: string }[] }
 
 export function parseAzdoPr(
-  raw: AzdoPrRaw, threads: AzdoThread[], userId: string, org: string, apiBase: string,
+  raw: AzdoPrRaw, threads: AzdoThread[], userId: string, devopsHost: string, apiBase: string,
 ): WatchedPr {
   const role: MyRole = raw.createdBy?.id === userId ? 'author' : 'reviewer';
   const repo = raw.repository?.name ?? 'repo';
@@ -113,7 +114,8 @@ export function parseAzdoPr(
       ts: latestTs!,
     }));
   return {
-    host: 'azdo', repoKey: `${org}/${repo}`, repoLabel: repo, prNumber: raw.pullRequestId,
+    // Canonical repoKey must match resolveRepos() in reviews.ts: `azdo:${devopsHost}/${repo}`.
+    host: 'azdo', repoKey: `azdo:${devopsHost}/${repo}`, repoLabel: repo, prNumber: raw.pullRequestId,
     title: raw.title, url: `${apiBase}/_git/${repo}/pullrequest/${raw.pullRequestId}`,
     myRole: role,
     reviewRequestedOfMe: role === 'reviewer',
@@ -123,7 +125,7 @@ export function parseAzdoPr(
 }
 
 export async function azdoWatched(
-  apiBase: string, org: string, user: { id: string }, pat: string, get: HttpGet = defaultGet,
+  apiBase: string, devopsHost: string, user: { id: string }, pat: string, get: HttpGet = defaultGet,
 ): Promise<WatchedPr[]> {
   const base = `${apiBase}/_apis/git/pullrequests`;
   const q = `searchCriteria.status=active&$top=100&${API}`;
@@ -136,7 +138,7 @@ export async function azdoWatched(
     const repo = raw.repository?.name ?? '';
     const threadsUrl = `${apiBase}/_apis/git/repositories/${repo}/pullRequests/${raw.pullRequestId}/threads?${API}`;
     const threads = (await get(threadsUrl, pat).catch(() => ({ value: [] }))) as { value: AzdoThread[] };
-    out.push(parseAzdoPr(raw, threads.value, user.id, org, apiBase));
+    out.push(parseAzdoPr(raw, threads.value, user.id, devopsHost, apiBase));
   }
   return out;
 }

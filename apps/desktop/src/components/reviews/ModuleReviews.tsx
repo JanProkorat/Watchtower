@@ -12,7 +12,7 @@ import { useToast, toastMessage } from '../../state/useToast.js';
 export function ModuleReviews(): JSX.Element {
   const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
     review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments } = useReviews();
-  const { items: watchItems, unread, markSeen } = usePrWatch();
+  const { items: watchItems, unread, error: watchError, markSeen } = usePrWatch();
   const { showError } = useToast();
   const theme = useTheme();
   const [host, setHost] = useState<HostFilter>('all');
@@ -74,6 +74,7 @@ export function ModuleReviews(): JSX.Element {
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+      {watchError && <Alert severity="error" sx={{ mb: 1.5 }}>PR watch inbox failed to load: {watchError}</Alert>}
       {loading && pullRequests.length === 0 && <CircularProgress size={20} />}
       {!loading && pullRequests.length === 0 && !error && (
         <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>No open PRs. Try Refresh. For Azure DevOps, set a PAT in the project editor.</Typography>

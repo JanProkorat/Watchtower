@@ -2,17 +2,26 @@ import { useCallback, useEffect, useState } from 'react';
 import type { PrWatchInboxItem, PrHost } from '@watchtower/shared/ipcContract.js';
 
 export function usePrWatch(): {
-  items: PrWatchInboxItem[]; unread: number;
+  items: PrWatchInboxItem[]; unread: number; error: string | null;
   refresh: () => Promise<void>;
   markSeen: (host: PrHost, repoKey: string, prNumber: number) => Promise<void>;
 } {
   const [items, setItems] = useState<PrWatchInboxItem[]>([]);
   const [unread, setUnread] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
+  // Read path: never leave a failure silent (repo CLAUDE.md "Surfacing IPC
+  // errors"). A rejected prWatch:list would otherwise show an empty inbox and
+  // a permanently-zero unread badge; surface it via the hook's `error` field.
   const refresh = useCallback(async () => {
-    const res = await window.watchtower.invoke('prWatch:list', {});
-    setItems(res.items);
-    setUnread(res.unread);
+    try {
+      const res = await window.watchtower.invoke('prWatch:list', {});
+      setItems(res.items);
+      setUnread(res.unread);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }, []);
 
   const markSeen = useCallback(async (host: PrHost, repoKey: string, prNumber: number) => {
@@ -27,5 +36,5 @@ export function usePrWatch(): {
     return () => { off(); };
   }, [refresh]);
 
-  return { items, unread, refresh, markSeen };
+  return { items, unread, error, refresh, markSeen };
 }
