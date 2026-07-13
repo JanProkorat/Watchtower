@@ -64,7 +64,7 @@ import { selectGlobalTab } from './layout/selectGlobalTab.js';
 import { DASHBOARD_TAB_ID, type TabId } from '@watchtower/shared/layout.js';
 import { useTimeTrackerView } from './state/useTimeTrackerView.js';
 import { useSettingsView } from './state/useSettingsView.js';
-import type { WatchtowerBridge } from '@watchtower/shared/ipcContract.js';
+import type { WatchtowerBridge, PrHost } from '@watchtower/shared/ipcContract.js';
 
 declare global {
   interface Window {
@@ -248,6 +248,23 @@ export function App() {
   useEffect(() => {
     return window.watchtower.on('triggerNewInstance', () => setNewOpen(true));
   }, []);
+
+  // A macOS PR-notification click deep-links here. Handled at App level (not
+  // inside ModuleReviews, which only mounts on the reviews module) so it can
+  // switch to the reviews module first, then hand the target PR down. Signal
+  // main we're ready so it flushes any deep-link buffered during cold start.
+  const [deepLinkTarget, setDeepLinkTarget] = useState<
+    { host: PrHost; repoKey: string; prNumber: number } | null
+  >(null);
+  useEffect(() => {
+    const off = window.watchtower.on('deep-link', (d) => {
+      if (d.module !== 'reviews') return;
+      setActiveModule('reviews');
+      setDeepLinkTarget({ host: d.host, repoKey: d.repoKey, prNumber: d.prNumber });
+    });
+    void window.watchtower.invoke('deepLink:ready', {}).catch(() => {});
+    return off;
+  }, [setActiveModule]);
 
   const [orchDown, setOrchDown] = useState<null | { code: number | null; restarting: boolean }>(
     null,
@@ -510,7 +527,12 @@ export function App() {
                   />
                 )}
                 {activeModule === 'settings' && <ModuleSettings view={settingsView.view} />}
-                {activeModule === 'reviews' && <ModuleReviews />}
+                {activeModule === 'reviews' && (
+                  <ModuleReviews
+                    deepLinkTarget={deepLinkTarget}
+                    onConsumeDeepLink={() => setDeepLinkTarget(null)}
+                  />
+                )}
                 {activeModule === 'billing' && (
                   <ModuleTimeTracker
                     view={billingView.view}

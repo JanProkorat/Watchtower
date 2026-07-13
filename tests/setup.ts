@@ -8,5 +8,6 @@
 // and throws. Cleaning up after every test keeps the DOM isolated across files.
 import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
 
 afterEach(() => cleanup());

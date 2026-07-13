@@ -79,6 +79,13 @@ export function useReviews() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Squash-merge a PR (Task 11's Merge button). electron-main injects any
+  // devopsPats needed for Azure DevOps — the renderer never sends them.
+  const mergePr = useCallback(async (host: PrHost, repoKey: string, prNumber: number, deleteBranch: boolean): Promise<void> => {
+    await window.watchtower.invoke('prs:merge', { host, repoKey, prNumber, deleteBranch });
+    await refresh();
+  }, [refresh]);
+
   const loadDiff = useCallback(async (pr: PullRequestPayload): Promise<DiffFilePayload[]> => {
     const res = await window.watchtower.invoke('prs:diff', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
     return res.files;
@@ -220,7 +227,7 @@ export function useReviews() {
   }, [getReview]);
 
   return {
-    pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments,
+    pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
     review, reviewRunning, openReviewFor, runReview, startReview, cancelReview, getReview, listReviews, latestReviewFor,
     reviewStateFor, postComments,
   };

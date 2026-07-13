@@ -86,6 +86,10 @@ export type IpcRequest =
   | { kind: 'prs:refresh'; payload: { devopsPats?: Record<string, string> } }
   | { kind: 'prs:diff'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
   | { kind: 'prs:comments'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
+  | { kind: 'prs:merge'; payload: { host: PrHost; repoKey: string; prNumber: number; deleteBranch: boolean; devopsPats?: Record<string, string> } }
+  // Renderer signals it has mounted and subscribed to the 'deep-link' channel,
+  // so electron-main flushes any deep-link buffered during a cold-start window.
+  | { kind: 'deepLink:ready'; payload: Record<string, never> }
   | { kind: 'reviews:projectRepo'; payload: { projectId: number } }
   | { kind: 'prReview:start'; payload: { host: PrHost; repoKey: string; prNumber: number } }
   | { kind: 'prReview:get'; payload: { reviewId: number } }
@@ -94,6 +98,9 @@ export type IpcRequest =
   | { kind: 'prReview:postComments'; payload: { reviewId: number; findingIndexes: number[]; devopsPats?: Record<string, string> } }
   | { kind: 'devops:setPat'; payload: { host: string; pat: string } }
   | { kind: 'devops:hasPat'; payload: { host: string } }
+  | { kind: 'prWatch:setPats'; payload: { pats: Record<string, string> } }
+  | { kind: 'prWatch:list'; payload: Record<string, never> }
+  | { kind: 'prWatch:markSeen'; payload: { host: PrHost; repoKey: string; prNumber: number } }
   | { kind: 'appearance:set'; payload: { mode: 'dark' | 'light' } };
 
 export interface RunningInstancePayload {
@@ -532,6 +539,21 @@ export interface PullRequestPayload {
   reviewable: boolean; // false when repo not cloned locally
 }
 
+export interface PrWatchInboxItem {
+  host: PrHost;
+  repoKey: string;
+  repoLabel: string;
+  prNumber: number;
+  title: string;
+  myRole: 'author' | 'reviewer';
+  approved: boolean;
+  mergeable: boolean;
+  mergeBlockedReason: string | null;
+  latestEvent: string;
+  latestAt: string;
+  unread: boolean;
+}
+
 export interface DiffLinePayload {
   kind: 'add' | 'del' | 'ctx' | 'hunk';
   oldNo: number | null;
@@ -686,9 +708,14 @@ export type IpcResponse =
   | { kind: 'prs:refresh'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
   | { kind: 'prs:diff'; payload: { files: DiffFilePayload[] } }
   | { kind: 'prs:comments'; payload: { threads: PrCommentThreadPayload[] } }
+  | { kind: 'prs:merge'; payload: { ok: true } }
+  | { kind: 'deepLink:ready'; payload: { ok: true } }
   | { kind: 'reviews:projectRepo'; payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null } }
   | { kind: 'devops:setPat'; payload: { ok: true } }
   | { kind: 'devops:hasPat'; payload: { hasPat: boolean } }
+  | { kind: 'prWatch:setPats'; payload: { ok: true } }
+  | { kind: 'prWatch:list'; payload: { items: PrWatchInboxItem[]; unread: number } }
+  | { kind: 'prWatch:markSeen'; payload: { ok: true } }
   | { kind: 'prReview:start'; payload: { reviewId: number } }
   | { kind: 'prReview:get'; payload: { review: PrReviewPayload | null } }
   | { kind: 'prReview:list'; payload: { reviews: PrReviewPayload[] } }
@@ -847,7 +874,18 @@ export type IpcPush =
   | { kind: 'stateChanged'; payload: { instanceId: string; status: string } }
   | {
       kind: 'notify';
-      payload: { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
+      payload:
+        | { target?: 'instance'; instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' }
+        | {
+            target: 'pr';
+            host: PrHost;
+            repoKey: string;
+            prNumber: number;
+            title: string;
+            repoLabel: string;
+            event: string; // WatchEvent['type']
+            body: string; // ready-to-display notification body
+          };
     }
   | { kind: 'clearAttention'; payload: { instanceId: string } }
   | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
@@ -860,7 +898,12 @@ export type IpcPush =
       payload: { code: number | null; restarting: boolean };
     }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
-  | { kind: 'prReviewDone'; payload: { reviewId: number } };
+  | { kind: 'prReviewDone'; payload: { reviewId: number } }
+  | { kind: 'prWatchEvent'; payload: { host: PrHost; repoKey: string; prNumber: number } }
+  // Sent by electron/ipc.ts's macOS notification click handler directly on the
+  // 'deep-link' webContents channel (not multiplexed through 'watchtower:push'),
+  // so the preload bridges it separately — see electron/preload.ts.
+  | { kind: 'deep-link'; payload: { module: 'reviews'; host: PrHost; repoKey: string; prNumber: number } };
 
 export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'chooseDirectory',
@@ -873,6 +916,7 @@ export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'devops:hasPat',
   'cloudSync:getConfig',
   'cloudSync:setConfig',
+  'deepLink:ready',
 ]);
 
 export interface WatchtowerBridge {

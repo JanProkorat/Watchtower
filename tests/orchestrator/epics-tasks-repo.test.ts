@@ -327,6 +327,6 @@ describe('migrations · v5 extends epics + tasks', () => {
   it('bumps schema version to latest', () => {
     const db = freshDb();
     const row = db.prepare(`SELECT MAX(version) v FROM schema_version`).get() as { v: number };
-    expect(row.v).toBe(20);
+    expect(row.v).toBe(22);
   });
 });

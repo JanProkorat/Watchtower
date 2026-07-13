@@ -98,6 +98,17 @@ export type OrchRequest =
         devopsPats?: Record<string, string>;
       };
     }
+  | {
+      id: string;
+      kind: 'prs:merge';
+      payload: {
+        host: import('./ipcContract.js').PrHost;
+        repoKey: string;
+        prNumber: number;
+        deleteBranch: boolean;
+        devopsPats?: Record<string, string>;
+      };
+    }
   | { id: string; kind: 'reviews:projectRepo'; payload: { projectId: number } }
   | {
       id: string;
@@ -115,7 +126,10 @@ export type OrchRequest =
         findingIndexes: number[];
         devopsPats?: Record<string, string>;
       };
-    };
+    }
+  | { id: string; kind: 'prWatch:setPats'; payload: { pats: Record<string, string> } }
+  | { id: string; kind: 'prWatch:list'; payload: Record<string, never> }
+  | { id: string; kind: 'prWatch:markSeen'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -594,6 +608,7 @@ export type OrchResponse =
     }
   | { kind: 'prs:diff'; payload: { files: import('./ipcContract.js').DiffFilePayload[] } }
   | { kind: 'prs:comments'; payload: { threads: import('./ipcContract.js').PrCommentThreadPayload[] } }
+  | { kind: 'prs:merge'; payload: { ok: true } }
   | {
       kind: 'reviews:projectRepo';
       payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null };
@@ -602,7 +617,10 @@ export type OrchResponse =
   | { kind: 'prReview:get'; payload: { review: import('./ipcContract.js').PrReviewPayload | null } }
   | { kind: 'prReview:list'; payload: { reviews: import('./ipcContract.js').PrReviewPayload[] } }
   | { kind: 'prReview:cancel'; payload: { ok: true } }
-  | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } };
+  | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } }
+  | { kind: 'prWatch:setPats'; payload: { ok: true } }
+  | { kind: 'prWatch:list'; payload: { items: import('./ipcContract.js').PrWatchInboxItem[]; unread: number } }
+  | { kind: 'prWatch:markSeen'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
@@ -610,14 +628,26 @@ export type OrchPush =
   | { kind: 'stateChanged'; payload: { instanceId: string; status: string } }
   | {
       kind: 'notify';
-      payload: { instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' };
+      payload:
+        | { target?: 'instance'; instanceId: string; cwd: string; kind: 'waiting-permission' | 'idle-notify' }
+        | {
+            target: 'pr';
+            host: import('./ipcContract.js').PrHost;
+            repoKey: string;
+            prNumber: number;
+            title: string;
+            repoLabel: string;
+            event: string;
+            body: string;
+          };
     }
   | { kind: 'clearAttention'; payload: { instanceId: string } }
   | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
   | { kind: 'badge'; payload: { count: number } }
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
-  | { kind: 'prReviewDone'; payload: { reviewId: number } };
+  | { kind: 'prReviewDone'; payload: { reviewId: number } }
+  | { kind: 'prWatchEvent'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } };
 
 type AnyPort = {
   postMessage(data: unknown): void;

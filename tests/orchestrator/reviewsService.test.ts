@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import { runMigrations, type SqliteLike } from '../../orchestrator/db/migrations.js';
 import { ReviewsService } from '../../orchestrator/services/reviews.js';
@@ -62,6 +62,35 @@ describe('ReviewsService', () => {
     const res = await svc.refresh(undefined);
     expect(res.pullRequests.every((p) => p.host === 'github')).toBe(true);
   });
+  it('azdoMergeTarget() resolves apiBase/repo/devopsHost + a fresh source commit', async () => {
+    const azdoPrDetail = vi.fn(async () => ({ lastMergeSourceCommitId: 'sha-fresh' }));
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+      azdoPrDetail,
+    });
+    const target = await svc.azdoMergeTarget('azdo:devops.skoda.vwgroup.com/technology', 7, { 'devops.skoda.vwgroup.com': 'pat-value' });
+    expect(target).toEqual({
+      apiBase: 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop',
+      repo: 'technology',
+      devopsHost: 'devops.skoda.vwgroup.com',
+      lastMergeSourceCommitId: 'sha-fresh',
+    });
+    expect(azdoPrDetail).toHaveBeenCalledWith(expect.objectContaining({ repo: 'technology' }), 7, 'pat-value');
+  });
+
+  it('azdoMergeTarget() throws a clear error when the PAT for the host is missing', async () => {
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+      azdoPrDetail: async () => ({ lastMergeSourceCommitId: 'sha' }),
+    });
+    await expect(svc.azdoMergeTarget('azdo:devops.skoda.vwgroup.com/technology', 7, {}))
+      .rejects.toThrow(/Missing DevOps PAT/);
+  });
+
   it('refresh() throws an aggregated error when every repo fails and nothing was fetched', async () => {
     const svc = new ReviewsService({
       ...deps(),
