@@ -73,6 +73,7 @@ import { PrWatcher } from './services/prWatch/PrWatcher.js';
 import { githubWatched, azdoWatched } from './services/prWatch/queries.js';
 import { resolveGithubLogin, resolveAzdoUser } from './services/prWatch/identity.js';
 import { PrWatchStateRepo } from './db/repositories/prWatchState.js';
+import { buildInbox, markPrSeen } from './services/prWatch/inbox.js';
 import type { WatchedPr, WatchEvent } from './services/prWatch/types.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
@@ -1430,6 +1431,15 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'prWatch:setPats':
       watchPats = req.payload.pats;
       return { ok: true };
+
+    case 'prWatch:list':
+      return buildInbox(handle!.db);
+
+    case 'prWatch:markSeen': {
+      const p = req.payload;
+      markPrSeen(handle!.db, p.host, p.repoKey, p.prNumber);
+      return { ok: true };
+    }
 
   }
 }

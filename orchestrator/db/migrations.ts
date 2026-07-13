@@ -425,6 +425,36 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       )`);
     },
   },
+  {
+    version: 22,
+    up: (db) => {
+      // notifications.instance_id originally FK-referenced instances(id), but
+      // Task 7 started reusing this table for PR-watch notifications keyed by
+      // a synthetic `pr:host:repoKey#prNumber` string (not a real instance
+      // row) — see pr_watch_state / PrWatcher onEvent wiring. With
+      // `PRAGMA foreign_keys = ON` (the default from migration 9 onward, and
+      // in production via connection.ts), inserting those synthetic keys
+      // violated the FK and every PR notification silently failed to log
+      // (swallowed by a try/catch). Rebuild the table without the FK so both
+      // instance-scoped and PR-scoped notifications can coexist.
+      db.exec(`PRAGMA foreign_keys = OFF`);
+      db.exec(`
+        CREATE TABLE notifications_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          instance_id TEXT,
+          kind TEXT NOT NULL,
+          fired_at INTEGER NOT NULL,
+          dismissed_at INTEGER,
+          body TEXT NOT NULL
+        );
+        INSERT INTO notifications_new (id, instance_id, kind, fired_at, dismissed_at, body)
+          SELECT id, instance_id, kind, fired_at, dismissed_at, body FROM notifications;
+        DROP TABLE notifications;
+        ALTER TABLE notifications_new RENAME TO notifications;
+      `);
+      db.exec(`PRAGMA foreign_keys = ON`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

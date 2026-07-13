@@ -95,6 +95,8 @@ export type IpcRequest =
   | { kind: 'devops:setPat'; payload: { host: string; pat: string } }
   | { kind: 'devops:hasPat'; payload: { host: string } }
   | { kind: 'prWatch:setPats'; payload: { pats: Record<string, string> } }
+  | { kind: 'prWatch:list'; payload: Record<string, never> }
+  | { kind: 'prWatch:markSeen'; payload: { host: PrHost; repoKey: string; prNumber: number } }
   | { kind: 'appearance:set'; payload: { mode: 'dark' | 'light' } };
 
 export interface RunningInstancePayload {
@@ -533,6 +535,21 @@ export interface PullRequestPayload {
   reviewable: boolean; // false when repo not cloned locally
 }
 
+export interface PrWatchInboxItem {
+  host: PrHost;
+  repoKey: string;
+  repoLabel: string;
+  prNumber: number;
+  title: string;
+  myRole: 'author' | 'reviewer';
+  approved: boolean;
+  mergeable: boolean;
+  mergeBlockedReason: string | null;
+  latestEvent: string;
+  latestAt: string;
+  unread: boolean;
+}
+
 export interface DiffLinePayload {
   kind: 'add' | 'del' | 'ctx' | 'hunk';
   oldNo: number | null;
@@ -691,6 +708,8 @@ export type IpcResponse =
   | { kind: 'devops:setPat'; payload: { ok: true } }
   | { kind: 'devops:hasPat'; payload: { hasPat: boolean } }
   | { kind: 'prWatch:setPats'; payload: { ok: true } }
+  | { kind: 'prWatch:list'; payload: { items: PrWatchInboxItem[]; unread: number } }
+  | { kind: 'prWatch:markSeen'; payload: { ok: true } }
   | { kind: 'prReview:start'; payload: { reviewId: number } }
   | { kind: 'prReview:get'; payload: { review: PrReviewPayload | null } }
   | { kind: 'prReview:list'; payload: { reviews: PrReviewPayload[] } }

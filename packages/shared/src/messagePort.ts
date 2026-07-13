@@ -116,7 +116,9 @@ export type OrchRequest =
         devopsPats?: Record<string, string>;
       };
     }
-  | { id: string; kind: 'prWatch:setPats'; payload: { pats: Record<string, string> } };
+  | { id: string; kind: 'prWatch:setPats'; payload: { pats: Record<string, string> } }
+  | { id: string; kind: 'prWatch:list'; payload: Record<string, never> }
+  | { id: string; kind: 'prWatch:markSeen'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } };
 
 export interface OrchRunningInstance {
   id: string;
@@ -604,7 +606,9 @@ export type OrchResponse =
   | { kind: 'prReview:list'; payload: { reviews: import('./ipcContract.js').PrReviewPayload[] } }
   | { kind: 'prReview:cancel'; payload: { ok: true } }
   | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } }
-  | { kind: 'prWatch:setPats'; payload: { ok: true } };
+  | { kind: 'prWatch:setPats'; payload: { ok: true } }
+  | { kind: 'prWatch:list'; payload: { items: import('./ipcContract.js').PrWatchInboxItem[]; unread: number } }
+  | { kind: 'prWatch:markSeen'; payload: { ok: true } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }
