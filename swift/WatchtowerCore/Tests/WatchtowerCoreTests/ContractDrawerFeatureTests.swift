@@ -317,4 +317,97 @@ final class ContractDrawerFeatureTests: XCTestCase {
         XCTAssertEqual(updated.value?.0, "c10")
         XCTAssertEqual(updated.value?.1.rateAmount, 700)
     }
+
+    // MARK: - 9. Solo create rollback on write error — dataset restores to the
+    // exact pre-mutation snapshot (closed prior reopens, rebilled worklog
+    // reverts) and errorMessage is set.
+
+    func testSoloCreateRollbackOnWriteError() async {
+        let prior = contractRow(syncId: "c-prior", projectId: 10, from: "2024-01-01", rateAmount: 400)
+        // Dated AFTER the new contract's effectiveFrom, so it flips from the
+        // (soon-to-be-closed) prior's rate to the new contract's rate —
+        // giving the rollback something concrete to restore.
+        let worklog = worklogRow(syncId: "w1", projectId: 10, workDate: "2025-07-01", minutes: 120, earnedAmount: 800)
+
+        let initial = seededState(
+            mode: .create(projectId: 10), contracts: [prior], worklogs: [worklog],
+            effectiveFromText: "2025-06-01", rateAmountText: "600", hoursPerDayText: "8"
+        )
+
+        struct Boom: Error {}
+        let store = TestStore(initialState: initial) { ContractDrawerFeature() } withDependencies: {
+            $0.uuid = .incrementing
+            $0.date.now = fixedNow
+            $0.billingWriteClient.updateContractEndDate = { _, _ in }
+            $0.billingWriteClient.insertContracts = { _ in throw Boom() }
+        }
+
+        let expectedSyncId = UUID(0).uuidString
+        let closedPrior = contractRow(syncId: "c-prior", projectId: 10, from: "2024-01-01", end: "2025-05-31", rateAmount: 400)
+        let newContract = contractRow(syncId: expectedSyncId, projectId: 10, from: "2025-06-01", rateAmount: 600, hoursPerDay: 8)
+        let rebilledWorklog = worklogRow(syncId: "w1", projectId: 10, workDate: "2025-07-01", minutes: 120, earnedAmount: 1200)
+
+        await store.send(.saveTapped) {
+            // Optimistic patch applies first — same as testSoloCreateClosesPriorAndRebills.
+            $0.$dataset.withLock { $0 = self.datasetWith(contracts: [closedPrior, newContract], worklogs: [rebilledWorklog]) }
+            $0.isSaving = true
+            $0.errorMessage = nil
+        }
+        await store.receive(\.writeFinished) {
+            // The write throws -> the effect's catch block restores the
+            // captured `previousDataset` snapshot: the prior contract is
+            // open-ended again, and the worklog's rebill reverts to its
+            // pre-mutation earnedAmount. If rollback were broken this would
+            // still show the optimistic (closed/rebilled) values and fail.
+            $0.$dataset.withLock { $0 = self.datasetWith(contracts: [prior], worklogs: [worklog]) }
+            $0.isSaving = false
+            $0.errorMessage = "Save failed. Please try again."
+        }
+    }
+
+    // MARK: - 10. Group create rollback on write error — ALL target projects'
+    // contracts+worklogs restore, proving the multi-project rollback covers
+    // every array, not just the first member.
+
+    func testGroupCreateRollbackOnWriteError() async {
+        let w10 = worklogRow(syncId: "w10", projectId: 10, workDate: "2025-07-01", minutes: 60)
+        let w20 = worklogRow(syncId: "w20", projectId: 20, workDate: "2025-07-01", minutes: 60)
+
+        let initial = seededState(
+            mode: .create(projectId: 10), contracts: [], worklogs: [w10, w20],
+            effectiveFromText: "2025-06-01", rateAmountText: "300", hoursPerDayText: "8",
+            sharedProjectIds: [20]
+        )
+
+        struct Boom: Error {}
+        let store = TestStore(initialState: initial) { ContractDrawerFeature() } withDependencies: {
+            $0.uuid = .incrementing
+            $0.date.now = fixedNow
+            $0.billingWriteClient.insertContracts = { _ in throw Boom() }
+        }
+
+        let groupId = UUID(2).uuidString // 2 member syncIds minted first (indices 0,1), then the group id
+        let c10 = contractRow(syncId: UUID(0).uuidString, projectId: 10, from: "2025-06-01", rateAmount: 300, groupId: groupId)
+        let c20 = contractRow(syncId: UUID(1).uuidString, projectId: 20, from: "2025-06-01", rateAmount: 300, groupId: groupId)
+        let rebilled10 = worklogRow(syncId: "w10", projectId: 10, workDate: "2025-07-01", minutes: 60, earnedAmount: 300)
+        let rebilled20 = worklogRow(syncId: "w20", projectId: 20, workDate: "2025-07-01", minutes: 60, earnedAmount: 300)
+
+        await store.send(.saveTapped) {
+            // Optimistic patch applies to BOTH target projects first — same
+            // as testGroupCreateAllClearInsertsAllAndRebills.
+            $0.$dataset.withLock { $0 = self.datasetWith(contracts: [c10, c20], worklogs: [rebilled10, rebilled20]) }
+            $0.isSaving = true
+            $0.errorMessage = nil
+        }
+        await store.receive(\.writeFinished) {
+            // The single insertContracts call covers the whole group, so a
+            // failure rolls the ENTIRE previous snapshot back — no contracts
+            // for either project, and both worklogs revert to unbilled.
+            // Asserting both projects here (not just the first) is what
+            // proves the multi-project rollback restores every array.
+            $0.$dataset.withLock { $0 = self.datasetWith(contracts: [], worklogs: [w10, w20]) }
+            $0.isSaving = false
+            $0.errorMessage = "Save failed. Please try again."
+        }
+    }
 }
