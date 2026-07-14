@@ -50,6 +50,7 @@ final class AppFeatureTests: XCTestCase {
             $0.billingCache.save = { _ in }
             $0.billingClient.fetchBillingDataset = { fetched.setValue(true); return self.ds() }
             $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+            $0.attentionClient.listThreads = { [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -91,6 +92,7 @@ final class AppFeatureTests: XCTestCase {
             $0.billingCache.save = { _ in }
             $0.billingClient.fetchBillingDataset = { self.ds() }
             $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+            $0.attentionClient.listThreads = { [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
         await store.send(.authEvent(true)) { $0.phase = .signedIn }
@@ -111,6 +113,7 @@ final class AppFeatureTests: XCTestCase {
             $0.billingCache.save = { _ in }
             $0.billingClient.fetchBillingDataset = { self.ds() }
             $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+            $0.attentionClient.listThreads = { [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
         await store.send(.authEvent(true)) { $0.phase = .signedIn }
@@ -119,6 +122,28 @@ final class AppFeatureTests: XCTestCase {
             $0.records.gridMonth = "2026-05"
             $0.records.timeOffFocus = "2026-05"
         }
+    }
+
+    func testAuthEventTrueFiresAttentionOnAppear() async {
+        // The bell badge (`unansweredCount`) derives from `attention.threads`,
+        // which otherwise stays empty until the drawer's own `.onAppear`
+        // first runs — dead badge on cold launch until the user opens the
+        // drawer once. Assert the sign-in transition also kicks off the
+        // attention load, seeding the badge alongside billing/earnings/
+        // reports/records.
+        let store = TestStore(initialState: AppFeature.State(phase: .signedOut(AuthFeature.State()))) {
+            AppFeature()
+        } withDependencies: {
+            $0.billingCache.load = { nil }
+            $0.billingCache.save = { _ in }
+            $0.billingClient.fetchBillingDataset = { self.ds() }
+            $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+            $0.attentionClient.listThreads = { [] }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        await store.send(.authEvent(true)) { $0.phase = .signedIn }
+        await store.receive(\.attention.onAppear) { $0.attention.isLoading = true }
+        await store.receive(\.attention.threadsLoaded.success) { $0.attention.isLoading = false }
     }
 
     func testFirstBillingDatasetReseedsReportsEarliest() async {
@@ -139,6 +164,7 @@ final class AppFeatureTests: XCTestCase {
             $0.billingCache.save = { _ in }
             $0.billingClient.fetchBillingDataset = { dataset }
             $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+            $0.attentionClient.listThreads = { [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -217,6 +243,7 @@ final class AppFeatureTests: XCTestCase {
             $0.billingCache.save = { _ in }
             $0.billingClient.fetchBillingDataset = { self.ds() }
             $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+            $0.attentionClient.listThreads = { [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
         await store.send(.authEvent(true)) { $0.phase = .signedIn }
@@ -285,6 +312,7 @@ final class AppFeatureTests: XCTestCase {
             $0.billingCache.save = { _ in }
             $0.billingClient.fetchBillingDataset = { self.ds() }
             $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+            $0.attentionClient.listThreads = { [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
         await store.send(.onAppear)

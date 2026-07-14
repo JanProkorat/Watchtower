@@ -88,7 +88,8 @@ public struct AppFeature {
                             .send(.billing(.onAppear)),
                             .send(.earnings(.onAppear)),
                             .send(.reports(.onAppear(earliest: nil))),
-                            .send(.records(.onAppear))
+                            .send(.records(.onAppear)),
+                            .send(.attention(.onAppear))
                         )
                         : .none
                 }
