@@ -8,6 +8,12 @@ import WatchtowerCore
 struct EarningsView: View {
     let billing: StoreOf<BillingFeature>
     @Bindable var earnings: StoreOf<EarningsFeature>
+    /// The parent `AppFeature` store + the shell's sheet-presentation flag,
+    /// threaded through so the shared attention bell/badge toolbar (Task 12
+    /// fix) can attach to THIS view's own inner `NavigationStack` rather than
+    /// nesting a second stack around it — see `AttentionToolbarModifier`.
+    let appStore: StoreOf<AppFeature>
+    @Binding var showAttention: Bool
 
     private var selectedMonth: String { earnings.selectedMonth }
 
@@ -63,6 +69,7 @@ struct EarningsView: View {
             .navigationDestination(item: $earnings.scope(state: \.projectDetail, action: \.projectDetail)) { detailStore in
                 ProjectDetailView(store: detailStore, billing: billing)
             }
+            .attentionToolbar(store: appStore, showAttention: $showAttention)
         }
     }
 

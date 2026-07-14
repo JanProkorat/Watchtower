@@ -29,6 +29,7 @@ export async function sendApns(
   cfg: HubConfig,
   deviceToken: string,
   msg: { title: string; body: string; data: Record<string, unknown> },
+  topic: string = HUB_BUNDLE_ID,
   http2mod: typeof http2 = http2,
 ): Promise<{ ok: boolean; status: number; reason?: string }> {
   const nowSec = Math.floor(Date.now() / 1000);
@@ -42,7 +43,7 @@ export async function sendApns(
     const req = client.request({
       ':method': 'POST', ':path': `/3/device/${deviceToken}`,
       authorization: `bearer ${cachedJwt!.token}`,
-      'apns-topic': HUB_BUNDLE_ID, 'apns-push-type': 'alert', 'apns-priority': '10',
+      'apns-topic': topic, 'apns-push-type': 'alert', 'apns-priority': '10',
       'content-type': 'application/json',
     });
     let status = 0; let data = '';

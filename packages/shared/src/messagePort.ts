@@ -75,7 +75,7 @@ export type OrchRequest =
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
   | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } }
-  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string } }
+  | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string; bundleId?: string } }
   | { id: string; kind: 'prs:list'; payload: Record<string, never> }
   | { id: string; kind: 'prs:refresh'; payload: { devopsPats?: Record<string, string> } }
   | {

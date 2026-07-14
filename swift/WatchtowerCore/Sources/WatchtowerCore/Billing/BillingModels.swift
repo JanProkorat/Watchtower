@@ -193,6 +193,79 @@ extension BillingDataset {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Attention (escalation reply) models — verbatim port of
+// packages/data-supabase/src/attentionCache.ts's `AttentionMessage` /
+// `AttentionThread` types. Dates stay opaque ISO strings, never `Date`.
+// ---------------------------------------------------------------------------
+
+/// One selectable reply option offered alongside a `claude`-authored
+/// attention message. Mirrors the TS `{ number: number; label: string }[]`
+/// shape of `AttentionMessage.options` verbatim (NOT `[String]`).
+public struct AttentionOption: Equatable, Codable, Sendable {
+    public let number: Int
+    public let label: String
+
+    public init(number: Int, label: String) {
+        self.number = number
+        self.label = label
+    }
+}
+
+public struct AttentionMessage: Equatable, Codable, Sendable {
+    public let syncId: String
+    public let instanceId: String
+    public let projectLabel: String?
+    public let role: String          // "claude" | "user"
+    public let kind: String?
+    public let body: String?
+    public let options: [AttentionOption]
+    public let replyTo: String?
+    public let injectedAt: String?
+    public let closedAt: String?
+    public let createdAt: String
+
+    public init(syncId: String, instanceId: String, projectLabel: String?, role: String,
+                kind: String?, body: String?, options: [AttentionOption], replyTo: String?,
+                injectedAt: String?, closedAt: String?, createdAt: String) {
+        self.syncId = syncId
+        self.instanceId = instanceId
+        self.projectLabel = projectLabel
+        self.role = role
+        self.kind = kind
+        self.body = body
+        self.options = options
+        self.replyTo = replyTo
+        self.injectedAt = injectedAt
+        self.closedAt = closedAt
+        self.createdAt = createdAt
+    }
+}
+
+/// A grouping of `AttentionMessage` rows sharing an `instanceId`, as produced
+/// by `groupThreads`. `label`/`kind` are derived (first message's
+/// `projectLabel`, falling back to `instanceId`; last `claude` message's
+/// `kind`) — NOT a passthrough `projectLabel` field, matching the TS
+/// `AttentionThread` shape exactly (`label: string`, `kind: string | null`).
+public struct AttentionThread: Equatable, Codable, Sendable {
+    public let instanceId: String
+    public let label: String
+    public let kind: String?
+    public let messages: [AttentionMessage]
+    public let unanswered: Bool
+    public let closed: Bool
+
+    public init(instanceId: String, label: String, kind: String?, messages: [AttentionMessage],
+                unanswered: Bool, closed: Bool) {
+        self.instanceId = instanceId
+        self.label = label
+        self.kind = kind
+        self.messages = messages
+        self.unanswered = unanswered
+        self.closed = closed
+    }
+}
+
 public struct ProjectEarning: Equatable, Sendable {
     public let projectId: Int
     public let name: String

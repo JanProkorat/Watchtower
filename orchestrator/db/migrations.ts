@@ -455,6 +455,24 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       db.exec(`PRAGMA foreign_keys = ON`);
     },
   },
+  {
+    version: 23,
+    up: (db) => {
+      // Native iPhone Phase 6a: APNs push goes multi-topic. bundle_id records
+      // which app (iPad vs iPhone) a device token belongs to, so the sender
+      // can route to the right APNs topic. Constant default (not an
+      // expression) — non-constant ADD COLUMN defaults diverge between
+      // better-sqlite3 (prod) and node:sqlite (tests); see memory
+      // sqlite-add-column-engine-divergence. Existing rows (all iPad, the
+      // only registered platform so far) backfill to the iPad bundle id.
+      addColumnIfMissing(
+        db,
+        'push_devices',
+        'bundle_id',
+        "TEXT NOT NULL DEFAULT 'cz.greencode.watchtower.ipad'",
+      );
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

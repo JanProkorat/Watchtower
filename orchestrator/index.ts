@@ -1309,7 +1309,9 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       return latestTokenUsage ?? (await refreshTokenUsage());
 
     case 'push:registerDevice':
-      new PushDevicesRepo(handle!.db).register(req.payload.token, req.payload.platform, Date.now());
+      new PushDevicesRepo(handle!.db).register(
+        req.payload.token, req.payload.platform, Date.now(), req.payload.bundleId,
+      );
       return { ok: true };
 
     case 'prs:list':
@@ -1609,15 +1611,20 @@ function respawnIncompleteRowsOnBoot(): void {
     });
     const hubSender = createHubSender({
       getConfig: () => readHubConfig(new SettingsRepo(handle!.db)),
-      listTokens: async () =>
-        Array.from(
-          new Set([
-            ...new PushDevicesRepo(handle!.db).listTokens(),
-            ...(await readPgPushTokens(handle!.pg)),
-          ]),
-        ),
+      listTokens: async () => {
+        const sqlite = new PushDevicesRepo(handle!.db).listTokens();
+        const pg = await readPgPushTokens(handle!.pg);
+        const seen = new Set<string>();
+        const merged: { token: string; bundleId: string }[] = [];
+        for (const d of [...sqlite, ...pg]) {
+          if (seen.has(d.token)) continue;
+          seen.add(d.token);
+          merged.push(d);
+        }
+        return merged;
+      },
       removeToken: (token) => new PushDevicesRepo(handle!.db).remove(token),
-      sendApns,
+      sendApns: (cfg, token, msg, topic) => sendApns(cfg, token, msg, topic),
       buildContext: (instanceId, cwd, kind) => {
         const name = cwd.split('/').filter(Boolean).pop() || instanceId;
         const title =

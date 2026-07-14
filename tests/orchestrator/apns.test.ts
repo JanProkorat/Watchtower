@@ -1,10 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, test } from 'vitest';
 import crypto from 'node:crypto';
-import { buildApnsJwt, buildApnsPayload, apnsHost } from '../../orchestrator/services/apns.js';
+import { buildApnsJwt, buildApnsPayload, apnsHost, sendApns } from '../../orchestrator/services/apns.js';
+import { HUB_BUNDLE_ID } from '@watchtower/shared/hubConfig.js';
 
 // A throwaway P-256 key pair for signing/verification in the test.
 const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
-const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+const TEST_P8 = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+const pem = TEST_P8;
 
 describe('apns', () => {
   it('selects host by env', () => {
@@ -30,4 +32,48 @@ describe('apns', () => {
       instanceId: 'i1',
     });
   });
+});
+
+test('sendApns sends the given topic in apns-topic header', async () => {
+  let sentHeaders: Record<string, string> = {};
+  const fakeReq: any = {
+    on: (ev: string, cb: (arg?: unknown) => void) => {
+      if (ev === 'response') cb({ ':status': 200 });
+      if (ev === 'end') cb();
+      return fakeReq;
+    },
+    end: () => {},
+  };
+  const fakeClient: any = {
+    on: () => fakeClient,
+    request: (h: Record<string, string>) => { sentHeaders = h; return fakeReq; },
+    close: () => {},
+  };
+  const http2mod: any = { connect: () => fakeClient };
+  const cfg: any = { apnsKey: TEST_P8, apnsKeyId: 'K', apnsTeamId: 'T', apnsEnv: 'sandbox' };
+
+  await sendApns(cfg, 'devtoken', { title: 't', body: 'b', data: {} }, 'cz.greencode.watchtower.ios', http2mod);
+  expect(sentHeaders['apns-topic']).toBe('cz.greencode.watchtower.ios');
+});
+
+test('sendApns defaults apns-topic to HUB_BUNDLE_ID', async () => {
+  let sentHeaders: Record<string, string> = {};
+  const fakeReq: any = {
+    on: (ev: string, cb: (arg?: unknown) => void) => {
+      if (ev === 'response') cb({ ':status': 200 });
+      if (ev === 'end') cb();
+      return fakeReq;
+    },
+    end: () => {},
+  };
+  const fakeClient: any = {
+    on: () => fakeClient,
+    request: (h: Record<string, string>) => { sentHeaders = h; return fakeReq; },
+    close: () => {},
+  };
+  const http2mod: any = { connect: () => fakeClient };
+  const cfg: any = { apnsKey: TEST_P8, apnsKeyId: 'K', apnsTeamId: 'T', apnsEnv: 'sandbox' };
+
+  await sendApns(cfg, 'devtoken', { title: 't', body: 'b', data: {} }, undefined, http2mod);
+  expect(sentHeaders['apns-topic']).toBe(HUB_BUNDLE_ID);
 });

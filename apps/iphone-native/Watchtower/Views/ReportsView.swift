@@ -9,6 +9,12 @@ import WatchtowerCore
 struct ReportsView: View {
     let billing: StoreOf<BillingFeature>
     @Bindable var reports: StoreOf<ReportsFeature>
+    /// The parent `AppFeature` store + the shell's sheet-presentation flag,
+    /// threaded through so the shared attention bell/badge toolbar (Task 12
+    /// fix) can attach to THIS view's own inner `NavigationStack` rather than
+    /// nesting a second stack around it — see `AttentionToolbarModifier`.
+    let appStore: StoreOf<AppFeature>
+    @Binding var showAttention: Bool
 
     private var dataset: BillingDataset {
         billing.dataset ?? BillingDataset(worklogs: [], contracts: [], daysOff: [], projects: [], tasks: [], epics: [], fetchedAt: "")
@@ -82,6 +88,7 @@ struct ReportsView: View {
             .navigationDestination(item: $reports.scope(state: \.projectDetail, action: \.projectDetail)) { detailStore in
                 ProjectDetailView(store: detailStore, billing: billing)
             }
+            .attentionToolbar(store: appStore, showAttention: $showAttention)
         }
     }
 

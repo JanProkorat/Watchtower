@@ -385,7 +385,9 @@ export function Shell({ connection, onConnectionChange }: ShellProps) {
       onToken: (cb) => {
         listenerHandle = PushNotifications.addListener('registration', (t) => cb(t.value));
       },
-      sendToken: (t) => bridge.invoke('push:registerDevice', { token: t, platform: 'ios' }).then(() => undefined),
+      sendToken: (t) => bridge.invoke('push:registerDevice', {
+        token: t, platform: 'ios', bundleId: 'cz.greencode.watchtower.ipad',
+      }).then(() => undefined),
     });
     return () => { if (listenerHandle) void (listenerHandle as Promise<{ remove(): void }>).then((l) => l.remove()); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
