@@ -94,9 +94,12 @@ export function TaskGridView(): JSX.Element {
 
   // Capacity + expected targets for the footer "total / target" (matches the
   // desktop grid): workdays = Mon-Fri minus Czech holidays minus user days off;
-  // capacity = workdays × 8h; expected = Σ over workdays × each billable project
-  // that contributed worklogs, of the MD rate active that day (daily →
-  // rateAmount, hourly → rateAmount × hoursPerDay).
+  // capacity = workdays × 8h; expected = Σ over workdays of the MD rate active
+  // that day (daily → rateAmount, hourly → rateAmount × hoursPerDay), counted
+  // once per contract. A pooled contract shared across several projects (same
+  // contractGroupId) is one working day of capacity, so it is deduped per day —
+  // counting it per member project would multiply the target by the number of
+  // shared projects.
   const contracts = data?.contracts ?? [];
   const { createWorklog, updateWorklog, deleteWorklog, error } = useWorklogMutations({ worklogs, contracts, patchWorklogs });
   const monthStart = `${month}-01`;
@@ -108,9 +111,14 @@ export function TaskGridView(): JSX.Element {
   const billableProjectIds = [...new Set(filteredWl.filter((w) => w.isBillable && w.projectId).map((w) => w.projectId))];
   let expectedCzk = 0;
   for (const date of workdays) {
+    const seenGroups = new Set<string>();
     for (const pid of billableProjectIds) {
       const c = contracts.find((k) => k.projectId === pid && k.effectiveFrom <= date && (k.endDate == null || date <= k.endDate));
-      if (c) expectedCzk += c.rateType === 'daily' ? c.rateAmount : c.rateAmount * c.hoursPerDay;
+      if (!c) continue;
+      const groupKey = c.contractGroupId ?? c.syncId;
+      if (seenGroups.has(groupKey)) continue;
+      seenGroups.add(groupKey);
+      expectedCzk += c.rateType === 'daily' ? c.rateAmount : c.rateAmount * c.hoursPerDay;
     }
   }
   expectedCzk = Math.round(expectedCzk);

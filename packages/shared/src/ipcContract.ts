@@ -212,6 +212,13 @@ export interface DashboardActiveContractPayload {
   projectName: string;
   projectColor: string;
   contract: ContractReportRowPayload['contract'];
+  /**
+   * Every project this contract covers. A solo contract has a single entry
+   * (the same project as `projectId`); a pooled contract shared across
+   * projects (same contract_group_id) lists all its live member projects,
+   * sorted by name. The card renders one dot + name per entry.
+   */
+  groupProjects: { id: number; name: string; color: string | null }[];
 }
 
 export interface DashboardOverviewResponsePayload {
