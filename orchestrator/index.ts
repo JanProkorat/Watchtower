@@ -1613,7 +1613,7 @@ function respawnIncompleteRowsOnBoot(): void {
         Array.from(
           new Set([
             ...new PushDevicesRepo(handle!.db).listTokens().map((d) => d.token),
-            ...(await readPgPushTokens(handle!.pg)),
+            ...(await readPgPushTokens(handle!.pg)).map((d) => d.token),
           ]),
         ),
       removeToken: (token) => new PushDevicesRepo(handle!.db).remove(token),

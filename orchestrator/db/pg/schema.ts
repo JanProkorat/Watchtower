@@ -346,4 +346,12 @@ DO $$ BEGIN
 END $$;`,
     ],
   },
+  {
+    version: 13,
+    up: [
+      `ALTER TABLE push_devices
+         ADD COLUMN IF NOT EXISTS bundle_id TEXT NOT NULL
+         DEFAULT 'cz.greencode.watchtower.ipad'`,
+    ],
+  },
 ];
