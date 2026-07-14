@@ -1309,7 +1309,9 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       return latestTokenUsage ?? (await refreshTokenUsage());
 
     case 'push:registerDevice':
-      new PushDevicesRepo(handle!.db).register(req.payload.token, req.payload.platform, Date.now());
+      new PushDevicesRepo(handle!.db).register(
+        req.payload.token, req.payload.platform, Date.now(), req.payload.bundleId,
+      );
       return { ok: true };
 
     case 'prs:list':

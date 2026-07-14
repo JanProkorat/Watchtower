@@ -30,6 +30,17 @@ describe('PushDevicesRepo', () => {
     expect(repo.listTokens()).toEqual([{ token: 't', bundleId: 'cz.greencode.watchtower.ios' }]);
   });
 
+  it('registerDevice handler defaults bundleId to ipad when omitted', () => {
+    // Locks the IPC handler's contract: orchestrator/index.ts's
+    // `push:registerDevice` case passes `req.payload.bundleId` straight through
+    // as the repo's 4th arg. An omitted (undefined) bundleId must still funnel
+    // to the ipad default rather than storing `undefined`/null.
+    const repo = new PushDevicesRepo(db() as never);
+    const payload: { token: string; platform: string; bundleId?: string } = { token: 't', platform: 'ios' };
+    repo.register(payload.token, payload.platform, 1000, payload.bundleId);
+    expect(repo.listTokens()).toEqual([{ token: 't', bundleId: 'cz.greencode.watchtower.ipad' }]);
+  });
+
   it('registers (idempotent on token), lists, removes', () => {
     const repo = new PushDevicesRepo(db() as never);
     repo.register('tokA', 'ios', 1);

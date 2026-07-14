@@ -81,7 +81,7 @@ export type IpcRequest =
   | { kind: 'tokens:usage'; payload: Record<string, never> }
   | { kind: 'openExternalUrl'; payload: { url: string } }
   | { kind: 'terminalFocus'; payload: { instanceId: string } }
-  | { kind: 'push:registerDevice'; payload: { token: string; platform: string } }
+  | { kind: 'push:registerDevice'; payload: { token: string; platform: string; bundleId?: string } }
   | { kind: 'prs:list'; payload: Record<string, never> }
   | { kind: 'prs:refresh'; payload: { devopsPats?: Record<string, string> } }
   | { kind: 'prs:diff'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
