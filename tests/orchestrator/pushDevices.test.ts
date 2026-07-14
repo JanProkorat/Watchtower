@@ -11,13 +11,32 @@ const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
 function db() { const d = new DatabaseSync(':memory:'); runMigrations(d as never); return d; }
 
 describe('PushDevicesRepo', () => {
+  it('register defaults bundle_id to ipad and listTokens returns {token,bundleId}', () => {
+    const repo = new PushDevicesRepo(db() as never);
+    repo.register('tok-ipad', 'ios', 1000);
+    expect(repo.listTokens()).toEqual([{ token: 'tok-ipad', bundleId: 'cz.greencode.watchtower.ipad' }]);
+  });
+
+  it('register stores an explicit bundle_id', () => {
+    const repo = new PushDevicesRepo(db() as never);
+    repo.register('tok-ios', 'ios', 1000, 'cz.greencode.watchtower.ios');
+    expect(repo.listTokens()).toEqual([{ token: 'tok-ios', bundleId: 'cz.greencode.watchtower.ios' }]);
+  });
+
+  it('register upsert updates bundle_id on conflict', () => {
+    const repo = new PushDevicesRepo(db() as never);
+    repo.register('t', 'ios', 1000, 'cz.greencode.watchtower.ipad');
+    repo.register('t', 'ios', 2000, 'cz.greencode.watchtower.ios');
+    expect(repo.listTokens()).toEqual([{ token: 't', bundleId: 'cz.greencode.watchtower.ios' }]);
+  });
+
   it('registers (idempotent on token), lists, removes', () => {
     const repo = new PushDevicesRepo(db() as never);
     repo.register('tokA', 'ios', 1);
     repo.register('tokA', 'ios', 2); // upsert, no dup
     repo.register('tokB', 'ios', 3);
-    expect(repo.listTokens().sort()).toEqual(['tokA', 'tokB']);
+    expect(repo.listTokens().map((t) => t.token).sort()).toEqual(['tokA', 'tokB']);
     repo.remove('tokA');
-    expect(repo.listTokens()).toEqual(['tokB']);
+    expect(repo.listTokens().map((t) => t.token)).toEqual(['tokB']);
   });
 });

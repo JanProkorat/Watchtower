@@ -1612,7 +1612,7 @@ function respawnIncompleteRowsOnBoot(): void {
       listTokens: async () =>
         Array.from(
           new Set([
-            ...new PushDevicesRepo(handle!.db).listTokens(),
+            ...new PushDevicesRepo(handle!.db).listTokens().map((d) => d.token),
             ...(await readPgPushTokens(handle!.pg)),
           ]),
         ),
