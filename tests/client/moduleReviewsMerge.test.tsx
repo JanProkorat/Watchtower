@@ -19,14 +19,23 @@ const pr = {
 
 const reviewState = { amIAuthor: true, approved: true, mergeable: true, mergeBlockedReason: null };
 
-beforeEach(() => {
+// A matching watch-inbox item using the SAME canonical (gh:-prefixed) repoKey —
+// used by the markSeen regression guard below.
+const inboxItem = {
+  host: 'github', repoKey: REPO_KEY, repoLabel: 'w', prNumber: 42, title: 'Add sprockets',
+  myRole: 'author', approved: true, mergeable: true, mergeBlockedReason: null,
+  latestEvent: 'pr-approved', latestAt: '2026-07-12T10:00:00Z', unread: true,
+};
+
+function mountWatchtower(inboxItems: unknown[]): void {
   (globalThis as any).window = (globalThis as any).window ?? {};
   (window as any).watchtower = {
     invoke: vi.fn(async (kind: string) => {
       switch (kind) {
         case 'prs:list':
         case 'prs:refresh': return { pullRequests: [pr], syncedAt: '2026-07-12T10:00:00Z' };
-        case 'prWatch:list': return { items: [], unread: 0 };
+        case 'prWatch:list': return { items: inboxItems, unread: inboxItems.length };
+        case 'prWatch:markSeen': return { ok: true };
         case 'prs:diff': return { files: [] };
         case 'prs:comments': return { threads: [] };
         case 'prReview:list': return { reviews: [] };
@@ -37,9 +46,11 @@ beforeEach(() => {
     }),
     on: vi.fn(() => () => {}),
   };
-});
+}
 
 describe('ModuleReviews merge button', () => {
+  beforeEach(() => mountWatchtower([]));
+
   it('renders the Merge button fed from prs:reviewState, even when the PR is not in the watch inbox', async () => {
     render(<ToastProvider><ModuleReviews /></ToastProvider>);
     // Wait for the PR row to load, then open its drawer.
@@ -50,5 +61,24 @@ describe('ModuleReviews merge button', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /^Merge$/ })).toBeInTheDocument());
     // amIAuthor: true → the Approve button (self-approve) must not render.
     expect(screen.queryByRole('button', { name: /^Approve$/ })).not.toBeInTheDocument();
+  });
+});
+
+// Regression guard for the #181 repoKey namespace mismatch. Merge no longer
+// joins prs:list ↔ prWatch:list, but the markSeen path in ModuleReviews still
+// matches an opened PR against the watch inbox by exact repoKey equality
+// (ModuleReviews.tsx:50). If the two sources ever diverge again ('acme/w' vs
+// 'gh:acme/w') the join is null and markSeen never fires — this asserts the
+// canonical gh:-prefixed key flows through on a real producer path.
+describe('ModuleReviews markSeen repoKey-format join', () => {
+  beforeEach(() => mountWatchtower([inboxItem]));
+
+  it('fires prWatch:markSeen with the canonical gh: repoKey when opening a watched PR', async () => {
+    render(<ToastProvider><ModuleReviews /></ToastProvider>);
+    const title = await screen.findByText('Add sprockets');
+    fireEvent.click(title);
+    await waitFor(() => expect((window as any).watchtower.invoke).toHaveBeenCalledWith(
+      'prWatch:markSeen', { host: 'github', repoKey: REPO_KEY, prNumber: 42 },
+    ));
   });
 });

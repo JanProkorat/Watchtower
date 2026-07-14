@@ -55,7 +55,9 @@ describe('ModuleReviews deep-link target', () => {
         />
       </ToastProvider>,
     );
-    // Drawer opens without a row click → the author-role Merge button appears.
+    // Drawer opens without a row click → the Merge button appears. It renders
+    // regardless of role now; it's enabled here only because the prs:reviewState
+    // mock returns approved + mergeable.
     await waitFor(() => expect(screen.getByRole('button', { name: /^Merge$/ })).toBeInTheDocument());
     // The PR was marked seen and the target consumed exactly once.
     expect((window as any).watchtower.invoke).toHaveBeenCalledWith(

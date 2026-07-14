@@ -32,6 +32,8 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   const [approving, setApproving] = useState(false);
   const { showError } = useToast();
 
+  // A fast PR switch can let a slow fetch resolve into the newer PR's state (same
+  // uncancelled-set race as loadDiff→setFiles below); acceptable and out of scope.
   const loadReviewState = (target: PullRequestPayload): void => {
     setReviewStateLoading(true);
     void fetchReviewState(target.host, target.repoKey, target.number)
