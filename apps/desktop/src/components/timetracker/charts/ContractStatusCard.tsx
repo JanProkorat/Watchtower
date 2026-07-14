@@ -18,6 +18,12 @@ interface Props {
   /** When present, render a header row with the name + color dot. */
   projectName?: string;
   projectColor?: string;
+  /**
+   * Every project this contract covers. When it holds more than one entry
+   * (a pooled contract shared across projects), the header renders a dot +
+   * name for each. Falls back to `projectName` / `projectColor` when omitted.
+   */
+  projects?: { name: string; color: string | null }[];
   variant?: 'inline' | 'card';
 }
 
@@ -33,8 +39,18 @@ export default function ContractStatusCard({
   contract,
   projectName,
   projectColor,
+  projects,
   variant = 'card',
 }: Props) {
+  // Prefer the explicit multi-project list; otherwise synthesize a single
+  // entry from the legacy projectName / projectColor props.
+  const headerProjects: { name: string; color: string | null }[] =
+    projects && projects.length > 0
+      ? projects
+      : projectName
+        ? [{ name: projectName, color: projectColor ?? null }]
+        : [];
+  const hasHeader = headerProjects.length > 0;
   const limit = contract.mdLimit;
   const used = contract.mdsUsed;
   const remaining = contract.mdsRemaining;
@@ -65,30 +81,51 @@ export default function ContractStatusCard({
               border: 1,
               borderColor: 'divider',
               borderRadius: 1.5,
-              bgcolor: projectColor ? alpha(projectColor, 0.04) : 'transparent',
+              bgcolor: headerProjects[0]?.color
+                ? alpha(headerProjects[0].color, 0.04)
+                : 'transparent',
             }
           : { py: 1 }
       }
     >
-      {projectName && (
+      {hasHeader && (
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-          {projectColor && (
-            <Box
-              sx={{
-                width: 10,
-                height: 10,
-                borderRadius: '50%',
-                bgcolor: projectColor,
-                flexShrink: 0,
-              }}
-            />
-          )}
-          <Typography variant="body2" sx={{ fontWeight: 600, flexGrow: 1, minWidth: 0 }} noWrap>
-            {projectName}
-          </Typography>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={1.5}
+            flexWrap="wrap"
+            rowGap={0.25}
+            sx={{ flexGrow: 1, minWidth: 0 }}
+          >
+            {headerProjects.map((p, i) => (
+              <Stack
+                key={`${p.name}-${i}`}
+                direction="row"
+                alignItems="center"
+                spacing={0.75}
+                sx={{ minWidth: 0 }}
+              >
+                {p.color && (
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      bgcolor: p.color,
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+                <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 0 }} noWrap>
+                  {p.name}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
           {endDateLabel && (
             <Tooltip title={`Contract ends ${endDateLabel}`}>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
                 ends {endDateLabel}
               </Typography>
             </Tooltip>
@@ -189,7 +226,7 @@ export default function ContractStatusCard({
             contract.totalWorkdays != null ? String(contract.totalWorkdays) : '—'
           }
         />
-        {!projectName && endDateLabel && <Metric label="Contract ends" value={endDateLabel} />}
+        {!hasHeader && endDateLabel && <Metric label="Contract ends" value={endDateLabel} />}
       </Stack>
     </Box>
   );

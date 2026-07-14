@@ -404,6 +404,49 @@ describe('TaskGridService', () => {
       const res = s.service.get(2026, 5);
       expect(res.earningsByCurrency).toHaveLength(1);
     });
+
+    it('counts a pooled contract once, not once per shared project', () => {
+      // Two projects share ONE pooled contract (same contract_group_id) at
+      // 5000 CZK/MD. Both log billable work in the month. The capacity target
+      // must count the pooled daily rate ONCE per workday — not once per
+      // member project — because it is one working day of capacity.
+      const pA = s.projectsRepo.create({ name: 'PPS', kind: 'work' });
+      const pB = s.projectsRepo.create({ name: 'Spot', kind: 'work' });
+      s.ratesRepo.createGroup(
+        { effectiveFrom: '2026-01-01', rateType: 'daily', rateAmount: 5000, hoursPerDay: 8 },
+        [pA.id, pB.id],
+      );
+      for (const p of [pA, pB]) {
+        const epic = s.epicsRepo.create({ projectId: p.id, name: 'E' });
+        const task = s.tasksRepo.create({ epicId: epic.id, number: `${p.name}-T`, title: 'X' });
+        s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-10', minutes: 60 });
+      }
+      const res = s.service.get(2026, 5);
+      // May 2026 has 19 workdays. Pooled → 19 × 5000 = 95000 (NOT 190000).
+      expect(res.earningsByCurrency).toHaveLength(1);
+      expect(res.earningsByCurrency[0].expectedAmount).toBe(95000);
+    });
+
+    it('sums distinct contracts across projects that do NOT share a group', () => {
+      // Two projects, two independent (solo) contracts at 5000 CZK/MD each.
+      // These are genuinely separate contracts, so both count per workday.
+      for (const name of ['P1', 'P2']) {
+        const p = s.projectsRepo.create({ name, kind: 'work' });
+        const epic = s.epicsRepo.create({ projectId: p.id, name: 'E' });
+        const task = s.tasksRepo.create({ epicId: epic.id, number: `${name}-T`, title: 'X' });
+        s.worklogsRepo.create({ taskId: task.id, workDate: '2026-05-10', minutes: 60 });
+        s.ratesRepo.create({
+          projectId: p.id,
+          effectiveFrom: '2026-01-01',
+          rateType: 'daily',
+          rateAmount: 5000,
+          hoursPerDay: 8,
+        });
+      }
+      const res = s.service.get(2026, 5);
+      // 19 workdays × 2 distinct contracts × 5000 = 190000.
+      expect(res.earningsByCurrency[0].expectedAmount).toBe(190000);
+    });
   });
 
   it('soft-deleted worklog is excluded from task grid', () => {

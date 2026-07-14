@@ -12,6 +12,10 @@ export interface ActiveContractsCardProps {
 export function ActiveContractsCard({ contracts, onOpenProject }: ActiveContractsCardProps) {
   if (contracts.length === 0) return null;
 
+  // A pooled contract covers several projects but shows as one card, so count
+  // distinct projects across every card rather than the number of cards.
+  const projectCount = new Set(contracts.flatMap((c) => c.groupProjects.map((p) => p.id))).size;
+
   return (
     <Paper variant="outlined" sx={{ p: 2.5 }}>
       <Stack direction="row" alignItems="baseline" sx={{ mb: 2 }}>
@@ -19,7 +23,7 @@ export function ActiveContractsCard({ contracts, onOpenProject }: ActiveContract
           Active contracts
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          {contracts.length} {contracts.length === 1 ? 'project' : 'projects'}
+          {projectCount} {projectCount === 1 ? 'project' : 'projects'}
         </Typography>
       </Stack>
       <Grid container spacing={2}>
@@ -45,6 +49,7 @@ export function ActiveContractsCard({ contracts, onOpenProject }: ActiveContract
                   contract={c.contract}
                   projectName={c.projectName}
                   projectColor={c.projectColor}
+                  projects={c.groupProjects.map((p) => ({ name: p.name, color: p.color }))}
                 />
               </Box>
             </ButtonBase>

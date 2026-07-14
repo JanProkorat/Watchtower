@@ -101,6 +101,7 @@ interface RateRow {
   rate_type: 'hourly' | 'daily';
   rate_amount: number;
   hours_per_day: number;
+  contract_group_id: string | null;
 }
 
 function pad2(n: number): string {
@@ -304,7 +305,7 @@ export class TaskGridService {
     if (projectIds.length === 0) return [];
 
     const ratesSql = `
-      SELECT id, project_id, effective_from, end_date, rate_type, rate_amount, hours_per_day
+      SELECT id, project_id, effective_from, end_date, rate_type, rate_amount, hours_per_day, contract_group_id
         FROM contracts
        WHERE project_id IN (${projectIds.map(() => '?').join(',')})
          AND deleted_at IS NULL
@@ -360,14 +361,23 @@ export class TaskGridService {
 
     if (czk.projects.size === 0) return [];
 
-    // Expected (capacity-based) total: workdays × MD rate, summed across
-    // all projects that contributed worklogs. Per-day rate lookup so a
-    // contract that changes mid-month produces a faithful target.
+    // Expected (capacity-based) total: workdays × MD rate. Per-day rate lookup
+    // so a contract that changes mid-month produces a faithful target.
+    //
+    // A pooled contract shared across several projects (same
+    // contract_group_id) is ONE working day of capacity, not one per member
+    // project — counting it once per project would multiply the target by the
+    // number of shared projects. Dedup per day by contract group; solo
+    // contracts key on their own project so they still each count.
     let expectedAmount = 0;
-    for (const projectId of czk.projects) {
-      for (const date of workdays) {
+    for (const date of workdays) {
+      const seenGroups = new Set<string>();
+      for (const projectId of czk.projects) {
         const rate = findRateForDate(projectId, date);
         if (!rate) continue;
+        const groupKey = rate.contract_group_id ?? `p:${projectId}`;
+        if (seenGroups.has(groupKey)) continue;
+        seenGroups.add(groupKey);
         const md =
           rate.rate_type === 'daily'
             ? rate.rate_amount

@@ -623,6 +623,37 @@ describe('DashboardOverviewService', () => {
       // contract on a third project still appears. (Solo's smaller mdLimit
       // gives it a higher overshoot score at zero usage, so it sorts first.)
       expect(res.activeContracts.map((c) => c.projectName)).toEqual(['Solo', 'Alpha']);
+
+      // The pooled card names every member project (sorted by name); the solo
+      // card names just its own.
+      const soloCard = res.activeContracts[0];
+      const groupCard = res.activeContracts[1];
+      expect(soloCard.groupProjects.map((p) => p.name)).toEqual(['Solo']);
+      expect(groupCard.groupProjects).toEqual([
+        { id: a.id, name: 'Alpha', color: '#aaa' },
+        { id: b.id, name: 'Bravo', color: '#bbb' },
+      ]);
+    });
+
+    it('a solo contract lists exactly its own project in groupProjects', () => {
+      const p = projects.create({ name: 'Solo', color: '#abc', kind: 'work' });
+      rates.create({
+        projectId: p.id,
+        effectiveFrom: '2026-01-01',
+        rateType: 'daily',
+        rateAmount: 10000,
+        endDate: '2026-12-31',
+        mdLimit: 100,
+      });
+
+      const res = service.run({
+        projectId: null,
+        sprintAnchor: '2026-05-27',
+        todayDate: '2026-05-27',
+      });
+      expect(res.activeContracts[0].groupProjects).toEqual([
+        { id: p.id, name: 'Solo', color: '#abc' },
+      ]);
     });
   });
 

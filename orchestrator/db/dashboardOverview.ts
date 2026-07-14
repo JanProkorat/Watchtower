@@ -142,11 +142,17 @@ export class DashboardOverviewService {
         if (seenGroups.has(groupId)) continue;
         seenGroups.add(groupId);
       }
+      // Every project this contract covers: for a pooled contract, all live
+      // member projects; for a solo contract, just this one. The card renders
+      // a dot + name per entry so a shared contract names all its projects.
+      const memberIds = groupId != null ? ratesRepo.listGroupMembers(groupId) : [r.project_id];
+      const groupProjects = this.projectsByIds(memberIds);
       out.push({
         projectId: r.project_id,
         projectName: r.project_name,
         projectColor: r.project_color,
         contract,
+        groupProjects,
       });
     }
 
@@ -157,6 +163,22 @@ export class DashboardOverviewService {
       return a.projectName.localeCompare(b.projectName);
     });
     return out;
+  }
+
+  /** Live, non-archived projects for the given ids, sorted by name. */
+  private projectsByIds(ids: number[]): { id: number; name: string; color: string | null }[] {
+    if (ids.length === 0) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    return this.db
+      .prepare(
+        `SELECT id, name, color
+           FROM projects
+          WHERE id IN (${placeholders})
+            AND archived = 0
+            AND deleted_at IS NULL
+          ORDER BY name ASC`,
+      )
+      .all(...ids) as { id: number; name: string; color: string | null }[];
   }
 
   private sumForDate(date: string, projectIds: number[]): number {
