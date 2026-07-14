@@ -42,4 +42,49 @@ final class AttentionFeatureTests: XCTestCase {
             $0.errorMessage = "Couldn't load messages."
         }
     }
+
+    // MARK: - Reply (Task 11)
+
+    func testSendReplySuccess() async {
+        let captured = LockIsolated<[String]>([])
+        var initial = AttentionFeature.State()
+        initial.threads = groupThreads([AttentionMessage(syncId: "c1", instanceId: "i1", projectLabel: "p",
+            role: "claude", kind: nil, body: "q", options: [], replyTo: nil,
+            injectedAt: nil, closedAt: nil, createdAt: "2026-07-14T10:00:00Z")])
+        initial.replyDrafts["i1"] = "my answer"
+        let store = TestStore(initialState: initial) { AttentionFeature() } withDependencies: {
+            $0.uuid = .incrementing
+            $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+            $0.attentionClient.reply = { _, _, body, _, _ in captured.withValue { $0.append(body) } }
+        }
+        await store.send(.sendReply(instanceId: "i1", replyTo: "c1")) {
+            $0.isSending = true
+            $0.replyDrafts["i1"] = ""
+        }
+        await store.receive(\.replyFinished) { $0.isSending = false }
+        XCTAssertEqual(captured.value, ["my answer"])
+    }
+
+    func testSendReplyFailureRollsBackDraft() async {
+        struct Boom: Error {}
+        var initial = AttentionFeature.State()
+        initial.threads = groupThreads([AttentionMessage(syncId: "c1", instanceId: "i1", projectLabel: "p",
+            role: "claude", kind: nil, body: "q", options: [], replyTo: nil,
+            injectedAt: nil, closedAt: nil, createdAt: "2026-07-14T10:00:00Z")])
+        initial.replyDrafts["i1"] = "my answer"
+        let store = TestStore(initialState: initial) { AttentionFeature() } withDependencies: {
+            $0.uuid = .incrementing
+            $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+            $0.attentionClient.reply = { _, _, _, _, _ in throw Boom() }
+        }
+        await store.send(.sendReply(instanceId: "i1", replyTo: "c1")) {
+            $0.isSending = true
+            $0.replyDrafts["i1"] = ""
+        }
+        await store.receive(\.replyFinished) {
+            $0.isSending = false
+            $0.replyDrafts["i1"] = "my answer"   // rolled back
+            $0.errorMessage = "Couldn't send reply."
+        }
+    }
 }
