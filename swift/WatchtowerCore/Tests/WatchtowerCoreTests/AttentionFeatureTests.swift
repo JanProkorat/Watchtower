@@ -87,4 +87,27 @@ final class AttentionFeatureTests: XCTestCase {
             $0.errorMessage = "Couldn't send reply."
         }
     }
+
+    // MARK: - Poll lifecycle (Task 12)
+
+    func testStartPollingTickSendsRefresh() async {
+        // `startPolling` (fired by the drawer sheet's onAppear) must send
+        // `.refresh` every 5s via the injected clock, and `stopPolling`
+        // (fired by the sheet's onDisappear) must cancel that loop so it
+        // doesn't keep ticking while the drawer is closed.
+        let clock = TestClock()
+        let store = TestStore(initialState: AttentionFeature.State()) {
+            AttentionFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.attentionClient.listThreads = { [] }
+        }
+
+        await store.send(.startPolling)
+        await clock.advance(by: .seconds(5))
+        await store.receive(\.refresh) { $0.isLoading = true }
+        await store.receive(\.threadsLoaded.success) { $0.isLoading = false }
+
+        await store.send(.stopPolling)
+    }
 }

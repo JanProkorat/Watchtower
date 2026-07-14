@@ -57,6 +57,12 @@ public struct AttentionFeature: Sendable {
         case replyDraftChanged(instanceId: String, text: String)
         case sendReply(instanceId: String, replyTo: String)
         case replyFinished(Result<Void, AttentionError>)
+        /// Poll lifecycle (Task 12): started/stopped by the drawer's
+        /// sheet appearing/disappearing. `startPolling` fires `.refresh`
+        /// every 5s via `continuousClock` until `stopPolling` cancels it —
+        /// keeps the poll from running while the drawer is closed.
+        case startPolling
+        case stopPolling
     }
 
     public enum AttentionError: Error, Equatable {
@@ -64,9 +70,14 @@ public struct AttentionFeature: Sendable {
         case replyFailed(instanceId: String, draft: String)
     }
 
+    private enum CancelID {
+        case poll
+    }
+
     @Dependency(\.attentionClient) var attentionClient
     @Dependency(\.uuid) var uuid
     @Dependency(\.date.now) var now
+    @Dependency(\.continuousClock) var clock
 
     public init() {}
 
@@ -130,6 +141,17 @@ public struct AttentionFeature: Sendable {
                 }
                 state.errorMessage = "Couldn't send reply."
                 return .none
+
+            case .startPolling:
+                return .run { send in
+                    for await _ in clock.timer(interval: .seconds(5)) {
+                        await send(.refresh)
+                    }
+                }
+                .cancellable(id: CancelID.poll, cancelInFlight: true)
+
+            case .stopPolling:
+                return .cancel(id: CancelID.poll)
             }
         }
     }

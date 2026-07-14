@@ -32,6 +32,7 @@ public struct AppFeature {
         public var earnings = EarningsFeature.State()
         public var reports = ReportsFeature.State()
         public var records = RecordsFeature.State()
+        public var attention = AttentionFeature.State()
         public init(phase: Phase = .loading, selectedTab: Tab = .dashboard) {
             self.phase = phase
             self.selectedTab = selectedTab
@@ -49,6 +50,7 @@ public struct AppFeature {
         case earnings(EarningsFeature.Action)
         case reports(ReportsFeature.Action)
         case records(RecordsFeature.Action)
+        case attention(AttentionFeature.Action)
     }
 
     @Dependency(\.supabase) var supabase
@@ -135,6 +137,9 @@ public struct AppFeature {
 
             case .records:
                 return .none
+
+            case .attention:
+                return .none
             }
         }
         .ifLet(\.signedOutAuth, action: \.auth) {
@@ -154,6 +159,9 @@ public struct AppFeature {
         }
         Scope(state: \.records, action: \.records) {
             RecordsFeature()
+        }
+        Scope(state: \.attention, action: \.attention) {
+            AttentionFeature()
         }
     }
 }

@@ -264,6 +264,18 @@ final class AppFeatureTests: XCTestCase {
         }
     }
 
+    func testAttentionScopeRoutesOnAppear() async {
+        // The attention feature is scoped into AppFeature regardless of
+        // phase (like billing/dashboard/etc.) — assert `.attention` actions
+        // route through the parent Scope and drive the child reducer.
+        let store = TestStore(initialState: AppFeature.State()) { AppFeature() } withDependencies: {
+            $0.attentionClient.listThreads = { [] }
+            $0.continuousClock = ImmediateClock()
+        }
+        await store.send(.attention(.onAppear)) { $0.attention.isLoading = true }
+        await store.receive(\.attention.threadsLoaded.success) { $0.attention.isLoading = false }
+    }
+
     func testOnAppearForwardsStreamEvents() async {
         let events = AsyncStream<Bool>.makeStream()
         let store = TestStore(initialState: AppFeature.State()) { AppFeature() } withDependencies: {
