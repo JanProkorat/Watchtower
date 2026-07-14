@@ -19,7 +19,7 @@ export type ReviewStatePayload = GithubReviewState | AzdoReviewState;
 export interface ReviewsDeps {
   db: SqliteLike;
   listGithub?: (repo: GithubRepoConfig) => Promise<PullRequestPayload[]>;
-  listAzdo?: (repo: AzdoRepoConfig, pat: string) => Promise<PullRequestPayload[]>;
+  listAzdo?: (repo: AzdoRepoConfig, pat: string, userId: string) => Promise<PullRequestPayload[]>;
   azdoPrDetail?: (repo: AzdoRepoConfig, prNumber: number, pat: string) => Promise<{ lastMergeSourceCommitId: string }>;
   gitRemote?: (cwd: string) => Promise<string | null>;
   projects?: () => Array<{ id: number; name: string; folder_path: string | null }>;
@@ -56,7 +56,7 @@ export class ReviewsService {
   private cache: PullRequestPayload[] = [];
   private syncedAt: string | null = null;
   private listGithub: (r: GithubRepoConfig) => Promise<PullRequestPayload[]>;
-  private listAzdo: (r: AzdoRepoConfig, pat: string) => Promise<PullRequestPayload[]>;
+  private listAzdo: (r: AzdoRepoConfig, pat: string, userId: string) => Promise<PullRequestPayload[]>;
   private azdoPrDetail: (r: AzdoRepoConfig, prNumber: number, pat: string) => Promise<{ lastMergeSourceCommitId: string }>;
   private gitRemote: (cwd: string) => Promise<string | null>;
   private projectsFn: () => Array<{ id: number; name: string; folder_path: string | null }>;
@@ -72,7 +72,7 @@ export class ReviewsService {
 
   constructor(deps: ReviewsDeps) {
     this.listGithub = deps.listGithub ?? ((r) => listGithubPrs(r));
-    this.listAzdo = deps.listAzdo ?? ((r, pat) => listAzdoPrs(r, pat));
+    this.listAzdo = deps.listAzdo ?? ((r, pat, userId) => listAzdoPrs(r, pat, userId));
     this.azdoPrDetail = deps.azdoPrDetail ?? ((r, prNumber, pat) => fetchAzdoPrDetail(r, prNumber, pat));
     this.gitRemote = deps.gitRemote ?? realGitRemote;
     this.projectsFn = deps.projects ?? (() => []);
@@ -135,8 +135,10 @@ export class ReviewsService {
     for (const r of azdo) {
       const pat = devopsPats?.[r.devopsHost];
       if (!pat) { errors.push(`${r.repoLabel}: chybí PAT`); continue; }
-      try { results.push(...(await this.listAzdo(r, pat))); }
-      catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
+      try {
+        const user = await this.azdoUser(r.apiBase, pat);
+        results.push(...(await this.listAzdo(r, pat, user.id)));
+      } catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
     }
     this.cache = results;
     this.syncedAt = isoNow();

@@ -43,9 +43,24 @@ const defaultGet: HttpGet = async (url, pat) => {
   return res.json();
 };
 
-export async function listAzdoPrs(repo: AzdoRepoConfig, pat: string, get: HttpGet = defaultGet): Promise<PullRequestPayload[]> {
-  const url = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullrequests?searchCriteria.status=active&$top=100&${API}`;
-  return parseAzdoPrList(await get(url, pat), repo);
+/**
+ * Two-query merge (repo-scoped) — PRs I created OR am a reviewer on — mirroring
+ * the watcher's `azdoWatched` (prWatch/queries.ts). Dedupes by `pullRequestId`
+ * before mapping via `parseAzdoPrList`, so a PR that's both mine and one I'm
+ * reviewing on doesn't appear twice.
+ */
+export async function listAzdoPrs(
+  repo: AzdoRepoConfig, pat: string, userId: string, get: HttpGet = defaultGet,
+): Promise<PullRequestPayload[]> {
+  const base = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullrequests`;
+  const q = `searchCriteria.status=active&$top=100&${API}`;
+  const mine = (await get(`${base}?searchCriteria.creatorId=${userId}&${q}`, pat)) as { value?: Array<Record<string, unknown>> };
+  const toReview = (await get(`${base}?searchCriteria.reviewerId=${userId}&${q}`, pat)) as { value?: Array<Record<string, unknown>> };
+  const byId = new Map<number, Record<string, unknown>>();
+  for (const p of [...(mine.value ?? []), ...(toReview.value ?? [])]) {
+    byId.set(p.pullRequestId as number, p);
+  }
+  return parseAzdoPrList({ value: Array.from(byId.values()) }, repo);
 }
 
 /**

@@ -34,19 +34,38 @@ describe('ReviewsService', () => {
     expect(res.syncedAt).not.toBeNull();
     expect(svc.list().pullRequests).toHaveLength(1); // cached
   });
-  it('refresh() lists a DevOps project when its host has a matching PAT', async () => {
+  it('refresh() lists a DevOps project when its host has a matching PAT, resolving the azdo user id first', async () => {
+    const resolveAzdoUser = vi.fn(async () => ({ id: 'me-guid', displayName: 'Jan' }));
+    const listAzdo = vi.fn(async (repo) => [{ host: 'azdo', repoKey: repo.repoKey, repoLabel: repo.repoLabel,
+      number: 7, title: 'y', author: 'jan', sourceBranch: 'b', targetBranch: 'main',
+      url: 'u', updatedAt: '2026-07-10T00:00:00Z', reviewable: true }]);
     const svc = new ReviewsService({
       ...deps(),
       projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
       gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
       listGithub: async () => [],
-      listAzdo: async (repo) => [{ host: 'azdo', repoKey: repo.repoKey, repoLabel: repo.repoLabel,
-        number: 7, title: 'y', author: 'jan', sourceBranch: 'b', targetBranch: 'main',
-        url: 'u', updatedAt: '2026-07-10T00:00:00Z', reviewable: true }],
+      resolveAzdoUser,
+      listAzdo,
     });
     const res = await svc.refresh({ 'devops.skoda.vwgroup.com': 'pat-value' });
     expect(res.pullRequests).toHaveLength(1);
     expect(res.pullRequests[0]!.host).toBe('azdo');
+    expect(resolveAzdoUser).toHaveBeenCalledWith('https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop', 'pat-value');
+    expect(listAzdo).toHaveBeenCalledWith(expect.objectContaining({ repo: 'technology' }), 'pat-value', 'me-guid');
+  });
+  it('refresh() surfaces an error (no fallback to an unfiltered list) when azdo identity resolution fails', async () => {
+    const resolveAzdoUser = vi.fn(async () => { throw new Error('Could not resolve Azure DevOps user'); });
+    const listAzdo = vi.fn(async () => { throw new Error('listAzdo must not be called when identity resolution fails'); });
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+      listGithub: async () => [],
+      resolveAzdoUser,
+      listAzdo,
+    });
+    await expect(svc.refresh({ 'devops.skoda.vwgroup.com': 'pat-value' })).rejects.toThrow(/selhalo/);
+    expect(listAzdo).not.toHaveBeenCalled();
   });
   it('refresh() skips DevOps when no PAT for its host and reports only github', async () => {
     const svc = new ReviewsService({
