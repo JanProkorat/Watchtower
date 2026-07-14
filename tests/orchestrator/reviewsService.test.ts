@@ -98,4 +98,89 @@ describe('ReviewsService', () => {
     });
     await expect(svc.refresh(undefined)).rejects.toThrow(/selhalo/);
   });
+
+  it('reviewState() resolves the GitHub login then delegates to githubReviewState', async () => {
+    const resolveGithubLogin = vi.fn(async () => 'jan');
+    const githubReviewState = vi.fn(async () => ({ amIAuthor: true, approved: true, mergeable: true, mergeBlockedReason: null }));
+    const svc = new ReviewsService({ ...deps(), resolveGithubLogin, githubReviewState });
+    const state = await svc.reviewState('github', 'gh:jan/watchtower', 1, undefined);
+    expect(resolveGithubLogin).toHaveBeenCalled();
+    expect(githubReviewState).toHaveBeenCalledWith(expect.objectContaining({ repoKey: 'gh:jan/watchtower' }), 1, 'jan');
+    expect(state).toEqual({ amIAuthor: true, approved: true, mergeable: true, mergeBlockedReason: null });
+  });
+
+  it('reviewState() resolves the azdo user id then delegates to azdoReviewState', async () => {
+    const resolveAzdoUser = vi.fn(async () => ({ id: 'me-guid', displayName: 'Jan' }));
+    const azdoReviewState = vi.fn(async () => ({ amIAuthor: false, approved: false, mergeable: false, mergeBlockedReason: 'Merge status: conflicts' }));
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+      resolveAzdoUser, azdoReviewState,
+    });
+    const state = await svc.reviewState('azdo', 'azdo:devops.skoda.vwgroup.com/technology', 7, { 'devops.skoda.vwgroup.com': 'pat-value' });
+    expect(resolveAzdoUser).toHaveBeenCalledWith('https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop', 'pat-value');
+    expect(azdoReviewState).toHaveBeenCalledWith(expect.objectContaining({ repo: 'technology' }), 7, 'pat-value', 'me-guid');
+    expect(state.mergeBlockedReason).toBe('Merge status: conflicts');
+  });
+
+  it('reviewState() throws a clear error when the azdo PAT is missing', async () => {
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+    });
+    await expect(svc.reviewState('azdo', 'azdo:devops.skoda.vwgroup.com/technology', 7, {}))
+      .rejects.toThrow(/Missing DevOps PAT/);
+  });
+
+  it('azdoUser() is memoized per apiBase — a second reviewState() call reuses the cached id', async () => {
+    const resolveAzdoUser = vi.fn(async () => ({ id: 'me-guid', displayName: 'Jan' }));
+    const azdoReviewState = vi.fn(async () => ({ amIAuthor: false, approved: false, mergeable: true, mergeBlockedReason: null }));
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+      resolveAzdoUser, azdoReviewState,
+    });
+    const pats = { 'devops.skoda.vwgroup.com': 'pat-value' };
+    await svc.reviewState('azdo', 'azdo:devops.skoda.vwgroup.com/technology', 7, pats);
+    await svc.reviewState('azdo', 'azdo:devops.skoda.vwgroup.com/technology', 8, pats);
+    expect(resolveAzdoUser).toHaveBeenCalledTimes(1);
+    expect(azdoReviewState).toHaveBeenCalledTimes(2);
+  });
+
+  it('approve() delegates to approveGithubPr for github and returns {ok:true}', async () => {
+    const approveGithubPr = vi.fn(async () => {});
+    const svc = new ReviewsService({ ...deps(), approveGithubPr });
+    const res = await svc.approve('github', 'gh:jan/watchtower', 1, undefined);
+    expect(approveGithubPr).toHaveBeenCalledWith('jan/watchtower', 1);
+    expect(res).toEqual({ ok: true });
+  });
+
+  it('approve() resolves the azdo user id then delegates to approveAzdoPr', async () => {
+    const resolveAzdoUser = vi.fn(async () => ({ id: 'me-guid', displayName: 'Jan' }));
+    const approveAzdoPr = vi.fn(async () => {});
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+      resolveAzdoUser, approveAzdoPr,
+    });
+    const res = await svc.approve('azdo', 'azdo:devops.skoda.vwgroup.com/technology', 7, { 'devops.skoda.vwgroup.com': 'pat-value' });
+    expect(approveAzdoPr).toHaveBeenCalledWith(
+      'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop', 'technology', 7, 'me-guid', 'pat-value',
+    );
+    expect(res).toEqual({ ok: true });
+  });
+
+  it('approve() throws a clear error when the azdo PAT is missing', async () => {
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+    });
+    await expect(svc.approve('azdo', 'azdo:devops.skoda.vwgroup.com/technology', 7, {}))
+      .rejects.toThrow(/Missing DevOps PAT/);
+  });
 });

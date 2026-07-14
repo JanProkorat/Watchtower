@@ -2,8 +2,12 @@ import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from
 import type { Exec, GithubRepoConfig } from './types.js';
 import { parseUnifiedDiff } from './diffParse.js';
 import { defaultExec } from './exec.js';
+import { deriveGithubMergeState } from '../prWatch/queries.js';
 
 const GH_FIELDS = 'number,title,author,headRefName,baseRefName,updatedAt,url';
+// Same fields the watcher's GH_DETAIL reads for merge-state derivation, plus
+// `author` (the watcher omits it — it doesn't need amIAuthor).
+const GH_REVIEW_STATE_FIELDS = 'author,reviewDecision,mergeable,mergeStateStatus';
 
 export function parseGitRemoteNwo(remoteUrl: string): string | null {
   const u = remoteUrl.trim();
@@ -57,4 +61,20 @@ export async function fetchGithubComments(repo: GithubRepoConfig, prNumber: numb
   const reviewJson = await exec('gh', ['api', `repos/${repo.nwo}/pulls/${prNumber}/comments`, '--paginate']).catch(() => '[]');
   const convoJson = await exec('gh', ['pr', 'view', String(prNumber), '--repo', repo.nwo, '--json', 'comments']).catch(() => '{"comments":[]}');
   return parseGithubComments(reviewJson, convoJson);
+}
+
+export interface GithubReviewState { amIAuthor: boolean; approved: boolean; mergeable: boolean; mergeBlockedReason: string | null }
+
+/** Live approval/merge state for the Reviews drawer's "reviewState" IPC. Reuses
+ *  `deriveGithubMergeState` (shared with the PR watcher) so the two agree. */
+export async function githubReviewState(
+  repo: GithubRepoConfig, prNumber: number, login: string, exec: Exec = defaultExec,
+): Promise<GithubReviewState> {
+  const out = await exec('gh', ['pr', 'view', String(prNumber), '--repo', repo.nwo, '--json', GH_REVIEW_STATE_FIELDS]);
+  const raw = JSON.parse(out) as { author?: { login?: string }; reviewDecision?: string; mergeable?: string; mergeStateStatus?: string };
+  return { amIAuthor: raw.author?.login === login, ...deriveGithubMergeState(raw) };
+}
+
+export async function approveGithubPr(nwo: string, prNumber: number, exec: Exec = defaultExec): Promise<void> {
+  await exec('gh', ['pr', 'review', String(prNumber), '--repo', nwo, '--approve']);
 }

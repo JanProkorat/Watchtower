@@ -1,5 +1,49 @@
 import { describe, it, expect } from 'vitest';
-import { parseGithubDetail, parseAzdoPr } from '../../orchestrator/services/prWatch/queries.js';
+import { parseGithubDetail, parseAzdoPr, deriveGithubMergeState, deriveAzdoMergeState } from '../../orchestrator/services/prWatch/queries.js';
+
+describe('deriveGithubMergeState', () => {
+  it('approved + mergeable when CLEAN/MERGEABLE/APPROVED', () => {
+    const state = deriveGithubMergeState({ reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN' });
+    expect(state).toEqual({ approved: true, mergeable: true, mergeBlockedReason: null });
+  });
+  it('not approved when reviewDecision is not APPROVED', () => {
+    const state = deriveGithubMergeState({ reviewDecision: 'REVIEW_REQUIRED', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN' });
+    expect(state.approved).toBe(false);
+  });
+  it('reason: Merge conflicts when mergeable is CONFLICTING', () => {
+    const state = deriveGithubMergeState({ reviewDecision: 'APPROVED', mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' });
+    expect(state.mergeable).toBe(false);
+    expect(state.mergeBlockedReason).toBe('Merge conflicts');
+  });
+  it('reason: Required checks/approvals not satisfied when BLOCKED', () => {
+    const state = deriveGithubMergeState({ reviewDecision: 'REVIEW_REQUIRED', mergeable: 'MERGEABLE', mergeStateStatus: 'BLOCKED' });
+    expect(state.mergeBlockedReason).toBe('Required checks/approvals not satisfied');
+  });
+  it('reason: falls back to Not mergeable (<status>) for anything else', () => {
+    const state = deriveGithubMergeState({ reviewDecision: 'REVIEW_REQUIRED', mergeable: 'UNKNOWN', mergeStateStatus: 'UNSTABLE' });
+    expect(state.mergeBlockedReason).toBe('Not mergeable (UNSTABLE)');
+  });
+});
+
+describe('deriveAzdoMergeState', () => {
+  it('approved when a reviewer voted >=10 and nobody voted <0', () => {
+    const state = deriveAzdoMergeState([{ id: 'a', vote: 10 }], 'succeeded');
+    expect(state).toEqual({ approved: true, mergeable: true, mergeBlockedReason: null });
+  });
+  it('not approved when a reviewer rejected (vote < 0), even if another approved', () => {
+    const state = deriveAzdoMergeState([{ id: 'a', vote: 10 }, { id: 'b', vote: -10 }], 'succeeded');
+    expect(state.approved).toBe(false);
+  });
+  it('not mergeable with reason when mergeStatus is not succeeded', () => {
+    const state = deriveAzdoMergeState([], 'conflicts');
+    expect(state.mergeable).toBe(false);
+    expect(state.mergeBlockedReason).toBe('Merge status: conflicts');
+  });
+  it('reason falls back to "unknown" when mergeStatus is undefined', () => {
+    const state = deriveAzdoMergeState(undefined, undefined);
+    expect(state.mergeBlockedReason).toBe('Merge status: unknown');
+  });
+});
 
 describe('parseGithubDetail', () => {
   it('normalizes reviews, comments, and approval/mergeability', () => {

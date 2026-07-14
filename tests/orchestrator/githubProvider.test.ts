@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseGithubPrList, parseGitRemoteNwo } from '../../orchestrator/services/prProviders/github.js';
+import { describe, it, expect, vi } from 'vitest';
+import { parseGithubPrList, parseGitRemoteNwo, githubReviewState, approveGithubPr } from '../../orchestrator/services/prProviders/github.js';
 
 const REPO = { host: 'github' as const, repoKey: 'gh:o/r', repoLabel: 'r', nwo: 'o/r', localClonePath: '/tmp/r' };
 const GH_JSON = JSON.stringify([
@@ -23,5 +23,34 @@ describe('github provider', () => {
     expect(parseGitRemoteNwo('git@github.com:o/r.git')).toBe('o/r');
     expect(parseGitRemoteNwo('https://github.com/o/r.git')).toBe('o/r');
     expect(parseGitRemoteNwo('https://gitlab.com/o/r.git')).toBeNull();
+  });
+});
+
+describe('githubReviewState', () => {
+  it('fetches author,reviewDecision,mergeable,mergeStateStatus and derives state', async () => {
+    const exec = vi.fn(async () => JSON.stringify({
+      author: { login: 'jan' }, reviewDecision: 'APPROVED', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN',
+    }));
+    const state = await githubReviewState(REPO, 165, 'jan', exec);
+    expect(exec).toHaveBeenCalledWith('gh', ['pr', 'view', '165', '--repo', 'o/r', '--json', 'author,reviewDecision,mergeable,mergeStateStatus']);
+    expect(state).toEqual({ amIAuthor: true, approved: true, mergeable: true, mergeBlockedReason: null });
+  });
+
+  it('amIAuthor is false when the login does not match the PR author', async () => {
+    const exec = vi.fn(async () => JSON.stringify({
+      author: { login: 'someoneelse' }, reviewDecision: 'REVIEW_REQUIRED', mergeable: 'MERGEABLE', mergeStateStatus: 'BLOCKED',
+    }));
+    const state = await githubReviewState(REPO, 165, 'jan', exec);
+    expect(state.amIAuthor).toBe(false);
+    expect(state.approved).toBe(false);
+    expect(state.mergeBlockedReason).toBe('Required checks/approvals not satisfied');
+  });
+});
+
+describe('approveGithubPr', () => {
+  it('runs gh pr review --approve', async () => {
+    const exec = vi.fn(async () => '');
+    await approveGithubPr('o/r', 165, exec);
+    expect(exec).toHaveBeenCalledWith('gh', ['pr', 'review', '165', '--repo', 'o/r', '--approve']);
   });
 });
