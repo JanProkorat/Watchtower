@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrHost, PrReviewPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
 
+export type PrReviewState = { amIAuthor: boolean; approved: boolean; mergeable: boolean; mergeBlockedReason: string | null };
+
 export type HostFilter = 'all' | 'github' | 'azdo';
 const HOST_LABEL: Record<PrHost, string> = { github: 'GitHub', azdo: 'Azure DevOps · Škoda' };
 
@@ -85,6 +87,19 @@ export function useReviews() {
     await window.watchtower.invoke('prs:merge', { host, repoKey, prNumber, deleteBranch });
     await refresh();
   }, [refresh]);
+
+  // Fresh (not watch-inbox-cached) approve/mergeable state for the drawer's action
+  // row. electron-main injects any devopsPats needed for Azure DevOps — the
+  // renderer never sends them.
+  const fetchReviewState = useCallback(async (host: PrHost, repoKey: string, number: number): Promise<PrReviewState> => {
+    return window.watchtower.invoke('prs:reviewState', { host, repoKey, number });
+  }, []);
+
+  // Approve a PR (GitHub `gh pr review --approve` / ADO reviewer vote). The
+  // renderer never sends devopsPats — electron-main injects them for this kind.
+  const approvePr = useCallback(async (host: PrHost, repoKey: string, number: number): Promise<void> => {
+    await window.watchtower.invoke('prs:approve', { host, repoKey, number });
+  }, []);
 
   const loadDiff = useCallback(async (pr: PullRequestPayload): Promise<DiffFilePayload[]> => {
     const res = await window.watchtower.invoke('prs:diff', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
@@ -228,6 +243,7 @@ export function useReviews() {
 
   return {
     pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
+    fetchReviewState, approvePr,
     review, reviewRunning, openReviewFor, runReview, startReview, cancelReview, getReview, listReviews, latestReviewFor,
     reviewStateFor, postComments,
   };

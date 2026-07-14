@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Drawer, Box, Typography, Tabs, Tab, Alert, CircularProgress, Stack } from '@mui/material';
-import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrReviewPayload, PrWatchInboxItem } from '@watchtower/shared/ipcContract.js';
+import { Drawer, Box, Typography, Tabs, Tab, Alert, CircularProgress, Stack, Button } from '@mui/material';
+import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrReviewPayload } from '@watchtower/shared/ipcContract.js';
 import { DiffView } from './DiffView.js';
 import { CommentThread } from './CommentThread.js';
 import { ReviewReport } from './ReviewReport.js';
 import { MergeButton } from './MergeButton.js';
 import { useToast } from '../../state/useToast.js';
+import type { PrReviewState } from '../../state/useReviews.js';
 
-export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments, watchItem, mergePr }: {
+export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments, mergePr, fetchReviewState, approvePr }: {
   pr: PullRequestPayload | null; onClose(): void;
   loadDiff(pr: PullRequestPayload): Promise<DiffFilePayload[]>;
   loadComments(pr: PullRequestPayload): Promise<PrCommentThreadPayload[]>;
@@ -17,22 +18,32 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   runReview(pr: PullRequestPayload): Promise<number>;
   cancelReview(pr: PullRequestPayload): Promise<void>;
   postComments(reviewId: number, findingIndexes: number[]): Promise<{ posted: number; skipped: number; errors: string[] }>;
-  // The matching prWatch inbox item for the open PR (looked up by ModuleReviews from
-  // the already-loaded watchItems — no extra IPC round-trip). Null when the PR has
-  // never been polled by the watch inbox yet.
-  watchItem: PrWatchInboxItem | null;
   mergePr(host: PullRequestPayload['host'], repoKey: string, prNumber: number, deleteBranch: boolean): Promise<void>;
+  fetchReviewState(host: PullRequestPayload['host'], repoKey: string, number: number): Promise<PrReviewState>;
+  approvePr(host: PullRequestPayload['host'], repoKey: string, number: number): Promise<void>;
 }): JSX.Element {
   const [tab, setTab] = useState(0);
   const [files, setFiles] = useState<DiffFilePayload[]>([]);
   const [threads, setThreads] = useState<PrCommentThreadPayload[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reviewState, setReviewState] = useState<PrReviewState | null>(null);
+  const [reviewStateLoading, setReviewStateLoading] = useState(false);
+  const [approving, setApproving] = useState(false);
   const { showError } = useToast();
+
+  const loadReviewState = (target: PullRequestPayload): void => {
+    setReviewStateLoading(true);
+    void fetchReviewState(target.host, target.repoKey, target.number)
+      .then(setReviewState)
+      .catch((e) => showError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setReviewStateLoading(false));
+  };
 
   useEffect(() => {
     if (!pr) return;
     setTab(0); setFiles([]); setThreads([]); setError(null); setLoading(true);
+    setReviewState(null);
     void Promise.all([
       loadDiff(pr).then(setFiles).catch((e) => setError(e instanceof Error ? e.message : String(e))),
       // A comments-fetch failure must not blank the diff — degrade to 0 threads.
@@ -42,6 +53,10 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
     // label can show a finding count without waiting for the user to click it. Runs
     // independently of the diff/comments load so a slow review lookup can't stall them.
     void openReviewFor(pr).catch((e) => showError(e instanceof Error ? e.message : String(e)));
+    // Fresh approve/mergeable state for the action row — independent of the loads
+    // above so a failure here can't blank the diff (or vice versa).
+    loadReviewState(pr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pr, loadDiff, loadComments, openReviewFor]);
 
   const handleRun = (): void => {
@@ -67,6 +82,21 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
     }
   };
 
+  const handleApprove = async (): Promise<void> => {
+    if (!pr) return;
+    setApproving(true);
+    try {
+      await approvePr(pr.host, pr.repoKey, pr.number);
+      // Re-fetch so Merge lights up immediately without waiting for the drawer
+      // to be reopened.
+      loadReviewState(pr);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setApproving(false);
+    }
+  };
+
   return (
     <Drawer anchor="right" open={pr != null} onClose={onClose} PaperProps={{ sx: { width: 'min(1200px, 92vw)', maxWidth: '92vw', display: 'flex', flexDirection: 'column' } }}>
       {pr && (
@@ -85,16 +115,23 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
               <Tab label={`Comments (${threads.length})`} sx={{ minHeight: 40 }} />
               <Tab label={`Report${review?.status === 'done' ? ` (${review.findings.length})` : ''}`} sx={{ minHeight: 40 }} />
             </Tabs>
-            {/* Only the PR's own author can merge — a reviewer-role PR (or one the
-                watch inbox hasn't polled yet) shows no merge button at all. */}
-            {watchItem && watchItem.myRole === 'author' && (
-              <MergeButton
-                approved={watchItem.approved}
-                mergeable={watchItem.mergeable}
-                mergeBlockedReason={watchItem.mergeBlockedReason}
-                onMerge={handleMerge}
-              />
+            {reviewStateLoading && !reviewState && <CircularProgress size={16} sx={{ mr: 1 }} />}
+            {/* Hidden on my own PRs — GitHub rejects self-approval and ADO's is
+                pointless. Shown for anyone else's PR regardless of my role. */}
+            {reviewState && !reviewState.amIAuthor && (
+              <Button variant="outlined" size="small" disabled={approving} onClick={() => void handleApprove()} sx={{ mr: 1 }}>
+                Approve
+              </Button>
             )}
+            {/* Merge is available for any approved + mergeable PR, regardless of
+                who authored it — state comes live from prs:reviewState, not the
+                (potentially stale) background watch-inbox item. */}
+            <MergeButton
+              approved={reviewState?.approved ?? false}
+              mergeable={reviewState?.mergeable ?? false}
+              mergeBlockedReason={reviewState?.mergeBlockedReason ?? null}
+              onMerge={handleMerge}
+            />
           </Box>
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {tab === 0 && (

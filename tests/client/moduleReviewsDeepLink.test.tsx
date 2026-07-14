@@ -36,6 +36,7 @@ beforeEach(() => {
         case 'prs:comments': return { threads: [] };
         case 'prReview:list': return { reviews: [] };
         case 'prReview:get': return { review: null };
+        case 'prs:reviewState': return { amIAuthor: true, approved: true, mergeable: true, mergeBlockedReason: null };
         default: return {};
       }
     }),

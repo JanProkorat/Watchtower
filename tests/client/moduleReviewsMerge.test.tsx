@@ -4,11 +4,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ModuleReviews } from '../../apps/desktop/src/components/reviews/ModuleReviews.js';
 import { ToastProvider } from '../../apps/desktop/src/state/useToast.js';
 
-// Regression guard for the repoKey namespace mismatch: with a MATCHING
-// canonical repoKey on both the prs:list PR and the prWatch:list inbox item,
-// opening the PR's drawer must render the author-only Merge button. Before the
-// fix the two keys diverged ('acme/w' vs 'gh:acme/w') so the join was always
-// null and the button never appeared.
+// The drawer's Merge button is now fed by a live prs:reviewState fetch (not the
+// background watch-inbox item), so it must render for ANY PR — including one
+// the watch-inbox poller hasn't seen yet (empty prWatch:list) — as long as
+// prs:reviewState resolves for the matching host/repoKey/number.
 
 const REPO_KEY = 'gh:acme/w';
 
@@ -18,11 +17,7 @@ const pr = {
   url: 'u', updatedAt: '2026-07-12T10:00:00Z', reviewable: true,
 };
 
-const inboxItem = {
-  host: 'github', repoKey: REPO_KEY, repoLabel: 'w', prNumber: 42, title: 'Add sprockets',
-  myRole: 'author', approved: true, mergeable: true, mergeBlockedReason: null,
-  latestEvent: 'pr-approved', latestAt: '2026-07-12T10:00:00Z', unread: false,
-};
+const reviewState = { amIAuthor: true, approved: true, mergeable: true, mergeBlockedReason: null };
 
 beforeEach(() => {
   (globalThis as any).window = (globalThis as any).window ?? {};
@@ -31,11 +26,12 @@ beforeEach(() => {
       switch (kind) {
         case 'prs:list':
         case 'prs:refresh': return { pullRequests: [pr], syncedAt: '2026-07-12T10:00:00Z' };
-        case 'prWatch:list': return { items: [inboxItem], unread: 0 };
+        case 'prWatch:list': return { items: [], unread: 0 };
         case 'prs:diff': return { files: [] };
         case 'prs:comments': return { threads: [] };
         case 'prReview:list': return { reviews: [] };
         case 'prReview:get': return { review: null };
+        case 'prs:reviewState': return reviewState;
         default: return {};
       }
     }),
@@ -43,13 +39,16 @@ beforeEach(() => {
   };
 });
 
-describe('ModuleReviews merge button join', () => {
-  it('renders the Merge button when prs:list and prWatch:list share the canonical repoKey', async () => {
+describe('ModuleReviews merge button', () => {
+  it('renders the Merge button fed from prs:reviewState, even when the PR is not in the watch inbox', async () => {
     render(<ToastProvider><ModuleReviews /></ToastProvider>);
     // Wait for the PR row to load, then open its drawer.
     const title = await screen.findByText('Add sprockets');
     fireEvent.click(title);
-    // Author-role + matching repoKey/number → the Merge button appears in the drawer.
+    // Merge renders regardless of role/watch-inbox membership, driven by the
+    // live reviewState fetch.
     await waitFor(() => expect(screen.getByRole('button', { name: /^Merge$/ })).toBeInTheDocument());
+    // amIAuthor: true → the Approve button (self-approve) must not render.
+    expect(screen.queryByRole('button', { name: /^Approve$/ })).not.toBeInTheDocument();
   });
 });
