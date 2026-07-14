@@ -15,8 +15,10 @@ const store = {
 
 const isIos = Capacitor.getPlatform() === 'ios';
 
-export function RemoteMacView({ connection }: {
+export function RemoteMacView({ connection, onEditConnection }: {
   connection: Connection;
+  /** Jump to Settings (pre-filled connection editor) — recovery from a stale host. */
+  onEditConnection?: () => void;
 }) {
   useConnection(); // ensures we're inside the provider
   const [creds, setCreds] = useState<VncCreds | null>(null);
@@ -128,17 +130,19 @@ export function RemoteMacView({ connection }: {
           connection={connection}
           onRetry={() => setNonce((n) => n + 1)}
           onChangeLogin={() => setLoginOpen(true)}
+          onEditConnection={onEditConnection}
         />
       )}
     </div>
   );
 }
 
-function StatusBanner({ status, connection, onRetry, onChangeLogin }: {
+function StatusBanner({ status, connection, onRetry, onChangeLogin, onEditConnection }: {
   status: VncState;
   connection: Connection;
   onRetry: () => void;
   onChangeLogin: () => void;
+  onEditConnection?: () => void;
 }) {
   const g = statusGlass(status === 'disconnected' ? 'disconnected' : 'connecting');
   return (
@@ -155,6 +159,9 @@ function StatusBanner({ status, connection, onRetry, onChangeLogin }: {
           <span>Odpojeno – zkontrolujte Sdílení obrazovky na Macu</span>
           <button onClick={onRetry} style={glassBtn(g.accent)}>Zkusit znovu</button>
           <button onClick={onChangeLogin} style={glassBtn(g.accent)}>Změnit přihlášení</button>
+          {onEditConnection && (
+            <button onClick={onEditConnection} style={glassBtn(g.accent)}>Upravit připojení</button>
+          )}
           {connection.mac && <WakeButton connection={connection} />}
         </>
       )}
