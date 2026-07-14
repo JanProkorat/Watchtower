@@ -1344,6 +1344,14 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       }
       return { ok: true };
     }
+    case 'prs:reviewState': {
+      const p = req.payload as { host: PrHost; repoKey: string; number: number; devopsPats?: Record<string, string> };
+      return reviewsSvc().reviewState(p.host, p.repoKey, p.number, p.devopsPats);
+    }
+    case 'prs:approve': {
+      const p = req.payload as { host: PrHost; repoKey: string; number: number; devopsPats?: Record<string, string> };
+      return reviewsSvc().approve(p.host, p.repoKey, p.number, p.devopsPats);
+    }
     case 'reviews:projectRepo':
       return reviewsSvc().projectRepo((req.payload as { projectId: number }).projectId);
 

@@ -2,18 +2,34 @@ import { execFile } from 'node:child_process';
 import type { SqliteLike } from '../db/migrations.js';
 import type { PrHost, PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
 import type { GithubRepoConfig, AzdoRepoConfig, Exec } from './prProviders/types.js';
-import { listGithubPrs, fetchGithubDiff, fetchGithubComments, parseGitRemoteNwo } from './prProviders/github.js';
-import { listAzdoPrs, fetchAzdoDiff, fetchAzdoComments, fetchAzdoPrDetail, parseAzureRemote } from './prProviders/azureDevops.js';
+import {
+  listGithubPrs, fetchGithubDiff, fetchGithubComments, parseGitRemoteNwo, githubReviewState, approveGithubPr,
+  type GithubReviewState,
+} from './prProviders/github.js';
+import {
+  listAzdoPrs, fetchAzdoDiff, fetchAzdoComments, fetchAzdoPrDetail, parseAzureRemote, fetchAzdoReviewState, approveAzdoPr,
+  type AzdoReviewState,
+} from './prProviders/azureDevops.js';
 import { defaultExec } from './prProviders/exec.js';
+import { resolveGithubLogin, resolveAzdoUser } from './prWatch/identity.js';
+
+/** Same shape from both providers — what the `prs:reviewState` IPC returns. */
+export type ReviewStatePayload = GithubReviewState | AzdoReviewState;
 
 export interface ReviewsDeps {
   db: SqliteLike;
   listGithub?: (repo: GithubRepoConfig) => Promise<PullRequestPayload[]>;
-  listAzdo?: (repo: AzdoRepoConfig, pat: string) => Promise<PullRequestPayload[]>;
+  listAzdo?: (repo: AzdoRepoConfig, pat: string, userId: string) => Promise<PullRequestPayload[]>;
   azdoPrDetail?: (repo: AzdoRepoConfig, prNumber: number, pat: string) => Promise<{ lastMergeSourceCommitId: string }>;
   gitRemote?: (cwd: string) => Promise<string | null>;
   projects?: () => Array<{ id: number; name: string; folder_path: string | null }>;
   exec?: Exec;
+  githubReviewState?: (repo: GithubRepoConfig, prNumber: number, login: string) => Promise<GithubReviewState>;
+  approveGithubPr?: (nwo: string, prNumber: number) => Promise<void>;
+  azdoReviewState?: (repo: AzdoRepoConfig, prNumber: number, pat: string, myId: string) => Promise<AzdoReviewState>;
+  approveAzdoPr?: (apiBase: string, repo: string, prNumber: number, myId: string, pat: string) => Promise<void>;
+  resolveGithubLogin?: () => Promise<string>;
+  resolveAzdoUser?: (apiBase: string, pat: string) => Promise<{ id: string; displayName: string }>;
 }
 
 /** Everything mergeAzdoPr needs, resolved from the repo config + a fresh PR GET. */
@@ -40,19 +56,42 @@ export class ReviewsService {
   private cache: PullRequestPayload[] = [];
   private syncedAt: string | null = null;
   private listGithub: (r: GithubRepoConfig) => Promise<PullRequestPayload[]>;
-  private listAzdo: (r: AzdoRepoConfig, pat: string) => Promise<PullRequestPayload[]>;
+  private listAzdo: (r: AzdoRepoConfig, pat: string, userId: string) => Promise<PullRequestPayload[]>;
   private azdoPrDetail: (r: AzdoRepoConfig, prNumber: number, pat: string) => Promise<{ lastMergeSourceCommitId: string }>;
   private gitRemote: (cwd: string) => Promise<string | null>;
   private projectsFn: () => Array<{ id: number; name: string; folder_path: string | null }>;
   private exec: Exec;
+  private githubReviewStateFn: (repo: GithubRepoConfig, prNumber: number, login: string) => Promise<GithubReviewState>;
+  private approveGithubPrFn: (nwo: string, prNumber: number) => Promise<void>;
+  private azdoReviewStateFn: (repo: AzdoRepoConfig, prNumber: number, pat: string, myId: string) => Promise<AzdoReviewState>;
+  private approveAzdoPrFn: (apiBase: string, repo: string, prNumber: number, myId: string, pat: string) => Promise<void>;
+  private resolveGithubLoginFn: () => Promise<string>;
+  private resolveAzdoUserFn: (apiBase: string, pat: string) => Promise<{ id: string; displayName: string }>;
+  /** Memoized per apiBase — `Task 2` (ADO list filter) reuses this cache via `azdoUser()`. */
+  private azdoUserCache = new Map<string, { id: string; displayName: string }>();
 
   constructor(deps: ReviewsDeps) {
     this.listGithub = deps.listGithub ?? ((r) => listGithubPrs(r));
-    this.listAzdo = deps.listAzdo ?? ((r, pat) => listAzdoPrs(r, pat));
+    this.listAzdo = deps.listAzdo ?? ((r, pat, userId) => listAzdoPrs(r, pat, userId));
     this.azdoPrDetail = deps.azdoPrDetail ?? ((r, prNumber, pat) => fetchAzdoPrDetail(r, prNumber, pat));
     this.gitRemote = deps.gitRemote ?? realGitRemote;
     this.projectsFn = deps.projects ?? (() => []);
     this.exec = deps.exec ?? defaultExec;
+    this.githubReviewStateFn = deps.githubReviewState ?? ((r, n, login) => githubReviewState(r, n, login));
+    this.approveGithubPrFn = deps.approveGithubPr ?? ((nwo, n) => approveGithubPr(nwo, n));
+    this.azdoReviewStateFn = deps.azdoReviewState ?? ((r, n, pat, myId) => fetchAzdoReviewState(r, n, pat, myId));
+    this.approveAzdoPrFn = deps.approveAzdoPr ?? ((apiBase, repo, n, myId, pat) => approveAzdoPr(apiBase, repo, n, myId, pat));
+    this.resolveGithubLoginFn = deps.resolveGithubLogin ?? (() => resolveGithubLogin());
+    this.resolveAzdoUserFn = deps.resolveAzdoUser ?? ((apiBase, pat) => resolveAzdoUser(apiBase, pat));
+  }
+
+  /** Memoized ADO user-id resolver, cached per apiBase (an org can host multiple repos). */
+  private async azdoUser(apiBase: string, pat: string): Promise<{ id: string; displayName: string }> {
+    const cached = this.azdoUserCache.get(apiBase);
+    if (cached) return cached;
+    const user = await this.resolveAzdoUserFn(apiBase, pat);
+    this.azdoUserCache.set(apiBase, user);
+    return user;
   }
 
   async resolveRepos(): Promise<{ github: GithubRepoConfig[]; azdo: AzdoRepoConfig[] }> {
@@ -96,8 +135,10 @@ export class ReviewsService {
     for (const r of azdo) {
       const pat = devopsPats?.[r.devopsHost];
       if (!pat) { errors.push(`${r.repoLabel}: chybí PAT`); continue; }
-      try { results.push(...(await this.listAzdo(r, pat))); }
-      catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
+      try {
+        const user = await this.azdoUser(r.apiBase, pat);
+        results.push(...(await this.listAzdo(r, pat, user.id)));
+      } catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
     }
     this.cache = results;
     this.syncedAt = isoNow();
@@ -180,6 +221,45 @@ export class ReviewsService {
     if (!pat) throw new Error(`Missing DevOps PAT for ${repo.devopsHost}`);
     const { lastMergeSourceCommitId } = await this.azdoPrDetail(repo, prNumber, pat);
     return { apiBase: repo.apiBase, repo: repo.repo, devopsHost: repo.devopsHost, lastMergeSourceCommitId };
+  }
+
+  /** Live approval/merge state for the Reviews drawer's "reviewState" IPC. */
+  async reviewState(
+    host: PrHost, repoKey: string, prNumber: number, devopsPats: Record<string, string> | undefined,
+  ): Promise<ReviewStatePayload> {
+    const { github, azdo } = await this.resolveRepos();
+    if (host === 'github') {
+      const repo = github.find((r) => r.repoKey === repoKey);
+      if (!repo) throw new Error(`Cannot resolve GitHub repo for ${repoKey}`);
+      const login = await this.resolveGithubLoginFn();
+      return this.githubReviewStateFn(repo, prNumber, login);
+    }
+    const repo = azdo.find((r) => r.repoKey === repoKey);
+    if (!repo) throw new Error(`Cannot resolve DevOps repo for ${repoKey}`);
+    const pat = devopsPats?.[repo.devopsHost];
+    if (!pat) throw new Error(`Missing DevOps PAT for ${repo.devopsHost}`);
+    const user = await this.azdoUser(repo.apiBase, pat);
+    return this.azdoReviewStateFn(repo, prNumber, pat, user.id);
+  }
+
+  /** Approves a PR (GitHub review approval / DevOps vote:10). */
+  async approve(
+    host: PrHost, repoKey: string, prNumber: number, devopsPats: Record<string, string> | undefined,
+  ): Promise<{ ok: true }> {
+    const { github, azdo } = await this.resolveRepos();
+    if (host === 'github') {
+      const repo = github.find((r) => r.repoKey === repoKey);
+      if (!repo) throw new Error(`Cannot resolve GitHub repo for ${repoKey}`);
+      await this.approveGithubPrFn(repo.nwo, prNumber);
+      return { ok: true };
+    }
+    const repo = azdo.find((r) => r.repoKey === repoKey);
+    if (!repo) throw new Error(`Cannot resolve DevOps repo for ${repoKey}`);
+    const pat = devopsPats?.[repo.devopsHost];
+    if (!pat) throw new Error(`Missing DevOps PAT for ${repo.devopsHost}`);
+    const user = await this.azdoUser(repo.apiBase, pat);
+    await this.approveAzdoPrFn(repo.apiBase, repo.repo, prNumber, user.id, pat);
+    return { ok: true };
   }
 
   async projectRepo(projectId: number): Promise<{ host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null }> {

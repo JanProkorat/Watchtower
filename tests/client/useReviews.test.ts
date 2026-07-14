@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { groupPrsByHost, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex } from '../../apps/desktop/src/state/useReviews.js';
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import { groupPrsByHost, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex, useReviews } from '../../apps/desktop/src/state/useReviews.js';
 import type { PrFindingPayload } from '../../packages/shared/src/ipcContract.js';
 
 const pr = (o: Partial<any> = {}) => ({ host: 'github', repoKey: 'gh:o/r', repoLabel: 'r', number: 1,
@@ -62,5 +64,39 @@ describe('useReviews helpers', () => {
     const findings = [finding({ severity: 'info' }), finding({ severity: 'error' })];
     sortFindingsWithIndex(findings);
     expect(findings.map((f) => f.severity)).toEqual(['info', 'error']);
+  });
+});
+
+describe('useReviews IPC wrappers', () => {
+  beforeEach(() => {
+    (globalThis as any).window = (globalThis as any).window ?? {};
+    (window as any).watchtower = {
+      invoke: vi.fn(async (kind: string) => {
+        switch (kind) {
+          case 'prs:list':
+          case 'prs:refresh': return { pullRequests: [], syncedAt: '2026-07-14T10:00:00Z' };
+          case 'prReview:list': return { reviews: [] };
+          case 'prs:reviewState': return { amIAuthor: false, approved: true, mergeable: true, mergeBlockedReason: null };
+          case 'prs:approve': return { ok: true };
+          default: return {};
+        }
+      }),
+      on: vi.fn(() => () => {}),
+    };
+  });
+
+  it('fetchReviewState invokes prs:reviewState and returns the payload (no PATs sent by the renderer)', async () => {
+    const { result } = renderHook(() => useReviews());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const state = await act(async () => result.current.fetchReviewState('github', 'gh:acme/w', 42));
+    expect((window as any).watchtower.invoke).toHaveBeenCalledWith('prs:reviewState', { host: 'github', repoKey: 'gh:acme/w', number: 42 });
+    expect(state).toEqual({ amIAuthor: false, approved: true, mergeable: true, mergeBlockedReason: null });
+  });
+
+  it('approvePr invokes prs:approve (no PATs sent by the renderer)', async () => {
+    const { result } = renderHook(() => useReviews());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.approvePr('github', 'gh:acme/w', 42); });
+    expect((window as any).watchtower.invoke).toHaveBeenCalledWith('prs:approve', { host: 'github', repoKey: 'gh:acme/w', number: 42 });
   });
 });

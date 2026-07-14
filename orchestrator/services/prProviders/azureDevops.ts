@@ -2,6 +2,7 @@ import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from
 import type { AzdoRepoConfig, HttpGet, Exec } from './types.js';
 import { parseUnifiedDiff } from './diffParse.js';
 import { defaultExec } from './exec.js';
+import { deriveAzdoMergeState } from '../prWatch/queries.js';
 
 const API = 'api-version=7.1';
 const stripRef = (r: string) => r.replace(/^refs\/heads\//, '');
@@ -42,9 +43,24 @@ const defaultGet: HttpGet = async (url, pat) => {
   return res.json();
 };
 
-export async function listAzdoPrs(repo: AzdoRepoConfig, pat: string, get: HttpGet = defaultGet): Promise<PullRequestPayload[]> {
-  const url = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullrequests?searchCriteria.status=active&$top=100&${API}`;
-  return parseAzdoPrList(await get(url, pat), repo);
+/**
+ * Two-query merge (repo-scoped) — PRs I created OR am a reviewer on — mirroring
+ * the watcher's `azdoWatched` (prWatch/queries.ts). Dedupes by `pullRequestId`
+ * before mapping via `parseAzdoPrList`, so a PR that's both mine and one I'm
+ * reviewing on doesn't appear twice.
+ */
+export async function listAzdoPrs(
+  repo: AzdoRepoConfig, pat: string, userId: string, get: HttpGet = defaultGet,
+): Promise<PullRequestPayload[]> {
+  const base = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullrequests`;
+  const q = `searchCriteria.status=active&$top=100&${API}`;
+  const mine = (await get(`${base}?searchCriteria.creatorId=${userId}&${q}`, pat)) as { value?: Array<Record<string, unknown>> };
+  const toReview = (await get(`${base}?searchCriteria.reviewerId=${userId}&${q}`, pat)) as { value?: Array<Record<string, unknown>> };
+  const byId = new Map<number, Record<string, unknown>>();
+  for (const p of [...(mine.value ?? []), ...(toReview.value ?? [])]) {
+    byId.set(p.pullRequestId as number, p);
+  }
+  return parseAzdoPrList({ value: Array.from(byId.values()) }, repo);
 }
 
 /**
@@ -74,6 +90,42 @@ export async function fetchAzdoDiff(
     `+${sourceBranch}:refs/wt-review/src`, `+${targetBranch}:refs/wt-review/tgt`]);
   const out = await exec('git', ['-C', clone, 'diff', 'refs/wt-review/tgt...refs/wt-review/src']);
   return parseUnifiedDiff(out);
+}
+
+export interface AzdoReviewState { amIAuthor: boolean; approved: boolean; mergeable: boolean; mergeBlockedReason: string | null }
+
+/** Live approval/merge state for the Reviews drawer's "reviewState" IPC. Reuses
+ *  `deriveAzdoMergeState` (shared with the PR watcher) so the two agree. */
+export async function fetchAzdoReviewState(
+  repo: AzdoRepoConfig, prNumber: number, pat: string, myId: string, get: HttpGet = defaultGet,
+): Promise<AzdoReviewState> {
+  const url = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}?${API}`;
+  const data = (await get(url, pat)) as {
+    createdBy?: { id?: string };
+    reviewers?: { id: string; vote?: number }[];
+    mergeStatus?: string;
+  };
+  return { amIAuthor: data.createdBy?.id === myId, ...deriveAzdoMergeState(data.reviewers, data.mergeStatus) };
+}
+
+export type HttpPut = (url: string, pat: string, body: unknown) => Promise<void>;
+
+const defaultPut: HttpPut = async (url, pat, body) => {
+  const auth = Buffer.from(`:${pat}`).toString('base64');
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Azure DevOps ${res.status} approving PR: ${await res.text().catch(() => '')}`);
+};
+
+/** `vote: 10` is the "approved" value the codebase already reads (see `deriveAzdoMergeState`). */
+export async function approveAzdoPr(
+  apiBase: string, repo: string, prNumber: number, myId: string, pat: string, put: HttpPut = defaultPut,
+): Promise<void> {
+  const url = `${apiBase}/_apis/git/repositories/${repo}/pullRequests/${prNumber}/reviewers/${myId}?${API}`;
+  await put(url, pat, { vote: 10 });
 }
 
 export async function fetchAzdoComments(repo: AzdoRepoConfig, prNumber: number, pat: string, get: HttpGet = defaultGet): Promise<PrCommentThreadPayload[]> {

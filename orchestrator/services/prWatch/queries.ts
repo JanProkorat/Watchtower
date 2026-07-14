@@ -27,15 +27,45 @@ const GH_REVIEW_STATE: Record<string, 'approved' | 'changes_requested' | 'commen
   APPROVED: 'approved', CHANGES_REQUESTED: 'changes_requested', COMMENTED: 'commented',
 };
 
+export interface MergeState { approved: boolean; mergeable: boolean; mergeBlockedReason: string | null }
+
+/**
+ * Pure derivation of approved/mergeable/mergeBlockedReason from the fields
+ * `gh pr view` returns. Shared between the watcher's `parseGithubDetail` and
+ * the reviewState IPC path (`githubReviewState` in prProviders/github.ts) so
+ * the two never drift.
+ */
+export function deriveGithubMergeState(
+  input: { reviewDecision?: string; mergeable?: string; mergeStateStatus?: string },
+): MergeState {
+  const approved = input.reviewDecision === 'APPROVED';
+  const clean = input.mergeStateStatus === 'CLEAN' && input.mergeable === 'MERGEABLE';
+  const mergeBlockedReason = clean ? null
+    : input.mergeable === 'CONFLICTING' ? 'Merge conflicts'
+    : input.mergeStateStatus === 'BLOCKED' ? 'Required checks/approvals not satisfied'
+    : `Not mergeable (${input.mergeStateStatus ?? 'unknown'})`;
+  return { approved, mergeable: clean, mergeBlockedReason };
+}
+
+/**
+ * Pure derivation of approved/mergeable/mergeBlockedReason from an Azure
+ * DevOps PR's reviewer votes + mergeStatus. Shared between the watcher's
+ * `parseAzdoPr` and the reviewState IPC path (`fetchAzdoReviewState` in
+ * prProviders/azureDevops.ts).
+ */
+export function deriveAzdoMergeState(
+  reviewers: { id: string; vote?: number }[] | undefined, mergeStatus: string | undefined,
+): MergeState {
+  const approved = (reviewers ?? []).some((r) => (r.vote ?? 0) >= 10)
+    && !(reviewers ?? []).some((r) => (r.vote ?? 0) < 0);
+  const mergeable = mergeStatus === 'succeeded';
+  return { approved, mergeable, mergeBlockedReason: mergeable ? null : `Merge status: ${mergeStatus ?? 'unknown'}` };
+}
+
 export function parseGithubDetail(
   raw: GhDetail, repoKey: string, repoLabel: string, me: string, role: MyRole,
 ): WatchedPr {
-  const approved = raw.reviewDecision === 'APPROVED';
-  const clean = raw.mergeStateStatus === 'CLEAN' && raw.mergeable === 'MERGEABLE';
-  const mergeBlockedReason = clean ? null
-    : raw.mergeable === 'CONFLICTING' ? 'Merge conflicts'
-    : raw.mergeStateStatus === 'BLOCKED' ? 'Required checks/approvals not satisfied'
-    : `Not mergeable (${raw.mergeStateStatus ?? 'unknown'})`;
+  const { approved, mergeable, mergeBlockedReason } = deriveGithubMergeState(raw);
   return {
     host: 'github', repoKey, repoLabel, prNumber: raw.number, title: raw.title, url: raw.url,
     myRole: role,
@@ -47,7 +77,7 @@ export function parseGithubDetail(
       .filter((r) => r.author?.login && r.submittedAt && GH_REVIEW_STATE[r.state ?? ''])
       .map((r) => ({ author: r.author!.login!, state: GH_REVIEW_STATE[r.state!]!, ts: r.submittedAt! })),
     approved,
-    mergeable: clean,
+    mergeable,
     mergeBlockedReason,
   };
 }
@@ -94,9 +124,7 @@ export function parseAzdoPr(
 ): WatchedPr {
   const role: MyRole = raw.createdBy?.id === userId ? 'author' : 'reviewer';
   const repo = raw.repository?.name ?? 'repo';
-  const approved = (raw.reviewers ?? []).some((r) => (r.vote ?? 0) >= 10)
-    && !(raw.reviewers ?? []).some((r) => (r.vote ?? 0) < 0);
-  const mergeable = raw.mergeStatus === 'succeeded';
+  const { approved, mergeable, mergeBlockedReason } = deriveAzdoMergeState(raw.reviewers, raw.mergeStatus);
   const allComments = threads.flatMap((t) =>
     (t.comments ?? [])
       .filter((c) => c.author?.uniqueName && c.publishedDate)
@@ -125,7 +153,7 @@ export function parseAzdoPr(
     myRole: role,
     reviewRequestedOfMe: role === 'reviewer',
     comments, reviews, approved,
-    mergeable, mergeBlockedReason: mergeable ? null : `Merge status: ${raw.mergeStatus ?? 'unknown'}`,
+    mergeable, mergeBlockedReason,
   };
 }
 

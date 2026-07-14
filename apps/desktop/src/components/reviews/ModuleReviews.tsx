@@ -17,7 +17,8 @@ export function ModuleReviews(props: {
 } = {}): JSX.Element {
   const { deepLinkTarget, onConsumeDeepLink } = props;
   const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
-    review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments } = useReviews();
+    review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments,
+    fetchReviewState, approvePr } = useReviews();
   const { items: watchItems, unread, error: watchError, markSeen } = usePrWatch();
   const { showError } = useToast();
   const theme = useTheme();
@@ -26,13 +27,6 @@ export function ModuleReviews(props: {
   const [open, setOpen] = useState<PullRequestPayload | null>(null);
   const nowMs = Date.now();
   const groups = useMemo(() => groupPrsByHost(applyPrFilter(pullRequests, host, query)), [pullRequests, host, query]);
-  // The prWatch inbox item for the currently open PR (Task 11's Merge button reads
-  // approved/mergeable/mergeBlockedReason/myRole from it) — reuses the already-loaded
-  // watchItems rather than a fresh IPC round-trip.
-  const openWatchItem = useMemo(() => {
-    if (!open) return null;
-    return watchItems.find((w) => w.host === open.host && w.repoKey === open.repoKey && w.prNumber === open.number) ?? null;
-  }, [open, watchItems]);
 
   // Open the PR a macOS notification deep-linked to. App owns the 'deep-link'
   // subscription (it must switch to the reviews module, which mounts this
@@ -105,7 +99,8 @@ export function ModuleReviews(props: {
 
       <PrInspectorDrawer pr={open} onClose={() => setOpen(null)} loadDiff={loadDiff} loadComments={loadComments}
         review={review} reviewRunning={reviewRunning} openReviewFor={openReviewFor} runReview={runReview}
-        cancelReview={cancelReview} postComments={postComments} watchItem={openWatchItem} mergePr={mergePr} />
+        cancelReview={cancelReview} postComments={postComments} mergePr={mergePr}
+        fetchReviewState={fetchReviewState} approvePr={approvePr} />
     </Box>
   );
 }
