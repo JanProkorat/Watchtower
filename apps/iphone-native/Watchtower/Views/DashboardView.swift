@@ -344,7 +344,7 @@ private struct TopRow: View {
                     .foregroundStyle(Palette.textMuted)
                     .frame(width: 18, alignment: .trailing)
                 Circle()
-                    .fill(Color(hex: project.color ?? "#a78bfa"))
+                    .fill(Color(hex: project.color ?? "#38bdf8"))
                     .frame(width: 8, height: 8)
                 Text(project.name.isEmpty ? "(no name)" : project.name)
                     .font(.subheadline)
@@ -366,7 +366,7 @@ private struct TopRow: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.10))
                     Capsule()
-                        .fill(Color(hex: project.color ?? "#a78bfa"))
+                        .fill(Color(hex: project.color ?? "#38bdf8"))
                         .frame(width: geo.size.width * min(1, fraction))
                 }
             }

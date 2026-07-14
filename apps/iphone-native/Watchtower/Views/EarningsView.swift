@@ -233,7 +233,7 @@ private struct ProjectRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Circle()
-                        .fill(Color(hex: project.color ?? "#6d5fbb"))
+                        .fill(Color(hex: project.color ?? "#38bdf8"))
                         .frame(width: 10, height: 10)
                     Text(project.name.isEmpty ? "(no name)" : project.name)
                         .font(.subheadline.weight(.medium))
@@ -256,7 +256,7 @@ private struct ProjectRow: View {
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.white.opacity(0.10))
                         Capsule()
-                            .fill(Color(hex: project.color ?? "#a78bfa"))
+                            .fill(Color(hex: project.color ?? "#38bdf8"))
                             .frame(width: geo.size.width * min(1, max(0, CGFloat(barFraction))))
                     }
                 }

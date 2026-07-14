@@ -24,21 +24,26 @@ public extension Color {
     }
 }
 
+// Ocean-blue palette — mirrors the shared desktop/iPad tokens in
+// packages/ui-core/src/glass.ts and packages/module-timetracker reports/tokens.ts.
+// Keep these hexes in sync with that source of truth.
 public enum Palette {
-    public static let baseBg = Color(hex: "#0b0c11")
+    public static let baseBg = Color(hex: "#0a0d13")
     public static let textPrimary = Color(hex: "#e5e7eb")
     public static let textMuted = Color(hex: "#9aa1ab")
     public static let textDim = Color(hex: "#5a6072")
-    public static let accent = Color(hex: "#7c6df0")
-    public static let accentIcon = Color(hex: "#c9bdff")
+    public static let accent = Color(hex: "#38bdf8")
+    public static let accentIcon = Color(hex: "#bae6fd")
 
     public static let ctaGradient = LinearGradient(
-        colors: [Color(hex: "#8b7cf2"), Color(hex: "#6d5fe0")],
+        colors: [Color(hex: "#38bdf8"), Color(hex: "#0284c7")],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
-    public static let chartViolet = Color(hex: "#a78bfa")
+    // Primary chart series. Named `violet` to match the shared TS token, which
+    // kept the name after the ocean remap even though the value is now sky-blue.
+    public static let chartViolet = Color(hex: "#38bdf8")
     public static let chartCyan = Color(hex: "#22d3ee")
     public static let chartAmber = Color(hex: "#fbbf24")
 }
