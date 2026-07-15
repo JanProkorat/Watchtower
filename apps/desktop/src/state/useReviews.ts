@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrHost, PrReviewPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
 import { invoke } from './ipc';
+import { toast } from './useToast';
 
 export type PrReviewState = { amIAuthor: boolean; approved: boolean; mergeable: boolean; mergeBlockedReason: string | null };
 
@@ -62,15 +63,15 @@ export function useReviews() {
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Per-repo failures that didn't abort the whole list (e.g. one DevOps repo
-  // failed while GitHub loaded) — rendered as a non-blocking warning.
-  const [warnings, setWarnings] = useState<string[]>([]);
 
   const load = useCallback(async (kind: 'prs:list' | 'prs:refresh') => {
     setLoading(true); setError(null);
     try {
       const res = await invoke(kind, {});
-      setPullRequests(res.pullRequests); setSyncedAt(res.syncedAt); setWarnings(res.warnings ?? []);
+      setPullRequests(res.pullRequests); setSyncedAt(res.syncedAt);
+      // Per-repo failures that didn't abort the whole list (e.g. one DevOps repo
+      // failed while GitHub loaded) surface as non-blocking warning toasts.
+      for (const w of res.warnings ?? []) toast.showWarning(w);
       return res;
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); return null; }
     finally { setLoading(false); }
@@ -246,7 +247,7 @@ export function useReviews() {
   }, [getReview]);
 
   return {
-    pullRequests, syncedAt, loading, error, warnings, refresh, loadDiff, loadComments, mergePr,
+    pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
     fetchReviewState, approvePr,
     review, reviewRunning, openReviewFor, runReview, startReview, cancelReview, getReview, listReviews, latestReviewFor,
     reviewStateFor, postComments,

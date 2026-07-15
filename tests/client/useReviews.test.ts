@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { groupPrsByHost, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex, useReviews } from '../../apps/desktop/src/state/useReviews.js';
+import { toast } from '../../apps/desktop/src/state/useToast';
 import type { PrFindingPayload } from '../../packages/shared/src/ipcContract.js';
 
 const pr = (o: Partial<any> = {}) => ({ host: 'github', repoKey: 'gh:o/r', repoLabel: 'r', number: 1,
@@ -98,5 +99,18 @@ describe('useReviews IPC wrappers', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => { await result.current.approvePr('github', 'gh:acme/w', 42); });
     expect((window as any).watchtower.invoke).toHaveBeenCalledWith('prs:approve', { host: 'github', repoKey: 'gh:acme/w', number: 42 });
+  });
+
+  it('surfaces per-repo list warnings as toasts', async () => {
+    (window as any).watchtower.invoke = vi.fn(async (kind: string) => {
+      if (kind === 'prs:list' || kind === 'prs:refresh') {
+        return { pullRequests: [], syncedAt: '2026-07-14T10:00:00Z', warnings: ['PPS: Azure DevOps 401'] };
+      }
+      if (kind === 'prReview:list') return { reviews: [] };
+      return {};
+    });
+    const spy = vi.spyOn(toast, 'showWarning');
+    renderHook(() => useReviews());
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('PPS: Azure DevOps 401'));
   });
 });

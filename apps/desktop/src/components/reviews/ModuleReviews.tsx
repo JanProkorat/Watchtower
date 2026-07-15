@@ -16,7 +16,7 @@ export function ModuleReviews(props: {
   onConsumeDeepLink?: () => void;
 } = {}): JSX.Element {
   const { deepLinkTarget, onConsumeDeepLink } = props;
-  const { pullRequests, syncedAt, loading, error, warnings, refresh, loadDiff, loadComments, mergePr,
+  const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
     review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments,
     fetchReviewState, approvePr } = useReviews();
   const { items: watchItems, unread, error: watchError, markSeen } = usePrWatch();
@@ -76,11 +76,6 @@ export function ModuleReviews(props: {
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
-      {warnings.length > 0 && (
-        <Alert severity="warning" sx={{ mb: 1.5 }}>
-          {warnings.map((w, i) => <div key={i}>{w}</div>)}
-        </Alert>
-      )}
       {watchError && <Alert severity="error" sx={{ mb: 1.5 }}>PR watch inbox failed to load: {watchError}</Alert>}
       {loading && pullRequests.length === 0 && <CircularProgress size={20} />}
       {!loading && pullRequests.length === 0 && !error && (
