@@ -1352,6 +1352,10 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       const p = req.payload as { host: PrHost; repoKey: string; number: number; devopsPats?: Record<string, string> };
       return reviewsSvc().approve(p.host, p.repoKey, p.number, p.devopsPats);
     }
+    case 'prs:close': {
+      const p = req.payload as { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> };
+      return reviewsSvc().close(p.host, p.repoKey, p.prNumber, p.devopsPats);
+    }
     case 'reviews:projectRepo':
       return reviewsSvc().projectRepo((req.payload as { projectId: number }).projectId);
 

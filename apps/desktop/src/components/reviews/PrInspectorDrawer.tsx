@@ -8,7 +8,7 @@ import { MergeButton } from './MergeButton.js';
 import { useToast } from '../../state/useToast.js';
 import type { PrReviewState } from '../../state/useReviews.js';
 
-export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments, mergePr, fetchReviewState, approvePr }: {
+export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments, mergePr, closePr, fetchReviewState, approvePr }: {
   pr: PullRequestPayload | null; onClose(): void;
   loadDiff(pr: PullRequestPayload): Promise<DiffFilePayload[]>;
   loadComments(pr: PullRequestPayload): Promise<PrCommentThreadPayload[]>;
@@ -19,6 +19,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   cancelReview(pr: PullRequestPayload): Promise<void>;
   postComments(reviewId: number, findingIndexes: number[]): Promise<{ posted: number; skipped: number; errors: string[] }>;
   mergePr(host: PullRequestPayload['host'], repoKey: string, prNumber: number, deleteBranch: boolean): Promise<void>;
+  closePr(host: PullRequestPayload['host'], repoKey: string, prNumber: number): Promise<void>;
   fetchReviewState(host: PullRequestPayload['host'], repoKey: string, number: number): Promise<PrReviewState>;
   approvePr(host: PullRequestPayload['host'], repoKey: string, number: number): Promise<void>;
 }): JSX.Element {
@@ -29,7 +30,17 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   const [reviewState, setReviewState] = useState<PrReviewState | null>(null);
   const [reviewStateLoading, setReviewStateLoading] = useState(false);
   const [approving, setApproving] = useState(false);
+  // Two-step confirm for the destructive close/abandon: first click arms,
+  // second executes; arming auto-reverts after 3s if not confirmed.
+  const [closeArmed, setCloseArmed] = useState(false);
+  const [closing, setClosing] = useState(false);
   const { showError } = useToast();
+
+  useEffect(() => {
+    if (!closeArmed) return;
+    const t = setTimeout(() => setCloseArmed(false), 3000);
+    return () => clearTimeout(t);
+  }, [closeArmed]);
 
   // A fast PR switch can let a slow fetch resolve into the newer PR's state (same
   // uncancelled-set race as loadDiff→setFiles below); acceptable and out of scope.
@@ -44,7 +55,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   useEffect(() => {
     if (!pr) return;
     setTab(0); setFiles([]); setThreads([]); setLoading(true);
-    setReviewState(null);
+    setReviewState(null); setCloseArmed(false);
     void Promise.all([
       loadDiff(pr).then(setFiles).catch(() => { /* surfaced via the global error toast */ }),
       // A comments-fetch failure must not blank the diff — degrade to 0 threads.
@@ -83,6 +94,23 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
     }
   };
 
+  const handleClose = async (): Promise<void> => {
+    if (!pr) return;
+    if (!closeArmed) { setCloseArmed(true); return; }
+    setClosing(true);
+    try {
+      await closePr(pr.host, pr.repoKey, pr.number);
+      // Success: the closed PR is evicted by closePr's refresh — close the
+      // drawer rather than leave it rendering the now-gone PR.
+      onClose();
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setClosing(false);
+      setCloseArmed(false);
+    }
+  };
+
   const handleApprove = async (): Promise<void> => {
     if (!pr) return;
     setApproving(true);
@@ -117,6 +145,14 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
               <Tab label={`Report${review?.status === 'done' ? ` (${review.findings.length})` : ''}`} sx={{ minHeight: 40 }} />
             </Tabs>
             {reviewStateLoading && !reviewState && <CircularProgress size={16} sx={{ mr: 1 }} />}
+            {/* Close-without-merge, author-only (closing someone else's PR is
+                rare and error-prone). Worded per host; two-step inline confirm. */}
+            {reviewState?.amIAuthor && (
+              <Button variant="outlined" size="small" color="error" disabled={closing}
+                onClick={() => void handleClose()} sx={{ mr: 1 }}>
+                {closeArmed ? 'Confirm close?' : pr.host === 'github' ? 'Close PR' : 'Abandon PR'}
+              </Button>
+            )}
             {/* Hidden on my own PRs — GitHub rejects self-approval and ADO's is
                 pointless. Shown for anyone else's PR regardless of my role. */}
             {reviewState && !reviewState.amIAuthor && (

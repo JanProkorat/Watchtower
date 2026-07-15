@@ -213,6 +213,39 @@ describe('ReviewsService', () => {
     expect(res).toEqual({ ok: true });
   });
 
+  it('close() delegates to closeGithubPr for github and returns {ok:true}', async () => {
+    const closeGithubPr = vi.fn(async () => {});
+    const svc = new ReviewsService({ ...deps(), closeGithubPr });
+    const res = await svc.close('github', 'gh:jan/watchtower', 1, undefined);
+    expect(closeGithubPr).toHaveBeenCalledWith('jan/watchtower', 1);
+    expect(res).toEqual({ ok: true });
+  });
+
+  it('close() delegates to abandonAzdoPr with the repo PAT (no user id needed)', async () => {
+    const abandonAzdoPr = vi.fn(async () => {});
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+      abandonAzdoPr,
+    });
+    const res = await svc.close('azdo', 'azdo:devops.skoda.vwgroup.com/technology', 7, { 'devops.skoda.vwgroup.com': 'pat-value' });
+    expect(abandonAzdoPr).toHaveBeenCalledWith(
+      'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop', 'technology', 7, 'pat-value',
+    );
+    expect(res).toEqual({ ok: true });
+  });
+
+  it('close() throws a clear error when the azdo PAT is missing', async () => {
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [{ id: 1, name: 'PPSToolshop', folder_path: '/tmp/pps' }],
+      gitRemote: async () => 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology',
+    });
+    await expect(svc.close('azdo', 'azdo:devops.skoda.vwgroup.com/technology', 7, {}))
+      .rejects.toThrow(/Missing DevOps PAT/);
+  });
+
   it('approve() throws a clear error when the azdo PAT is missing', async () => {
     const svc = new ReviewsService({
       ...deps(),

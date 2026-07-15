@@ -25,6 +25,7 @@ const baseProps = {
   cancelReview: vi.fn(async () => {}),
   postComments: vi.fn(async () => ({ posted: 0, skipped: 0, errors: [] })),
   mergePr: vi.fn(async () => {}),
+  closePr: vi.fn(async () => {}),
 };
 
 describe('PrInspectorDrawer approve/merge action row', () => {

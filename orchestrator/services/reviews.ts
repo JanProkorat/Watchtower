@@ -3,11 +3,11 @@ import type { SqliteLike } from '../db/migrations.js';
 import type { PrHost, PullRequestPayload, DiffFilePayload, PrCommentThreadPayload } from '@watchtower/shared/ipcContract.js';
 import type { GithubRepoConfig, AzdoRepoConfig, Exec } from './prProviders/types.js';
 import {
-  listGithubPrs, fetchGithubDiff, fetchGithubComments, parseGitRemoteNwo, githubReviewState, approveGithubPr,
+  listGithubPrs, fetchGithubDiff, fetchGithubComments, parseGitRemoteNwo, githubReviewState, approveGithubPr, closeGithubPr,
   type GithubReviewState,
 } from './prProviders/github.js';
 import {
-  listAzdoPrs, fetchAzdoDiff, fetchAzdoComments, fetchAzdoPrDetail, parseAzureRemote, fetchAzdoReviewState, approveAzdoPr,
+  listAzdoPrs, fetchAzdoDiff, fetchAzdoComments, fetchAzdoPrDetail, parseAzureRemote, fetchAzdoReviewState, approveAzdoPr, abandonAzdoPr,
   type AzdoReviewState,
 } from './prProviders/azureDevops.js';
 import { defaultExec } from './prProviders/exec.js';
@@ -28,6 +28,8 @@ export interface ReviewsDeps {
   approveGithubPr?: (nwo: string, prNumber: number) => Promise<void>;
   azdoReviewState?: (repo: AzdoRepoConfig, prNumber: number, pat: string, myId: string) => Promise<AzdoReviewState>;
   approveAzdoPr?: (apiBase: string, repo: string, prNumber: number, myId: string, pat: string) => Promise<void>;
+  closeGithubPr?: (nwo: string, prNumber: number) => Promise<void>;
+  abandonAzdoPr?: (apiBase: string, repo: string, prNumber: number, pat: string) => Promise<void>;
   resolveGithubLogin?: () => Promise<string>;
   resolveAzdoUser?: (apiBase: string, pat: string) => Promise<{ id: string; displayName: string }>;
 }
@@ -69,6 +71,8 @@ export class ReviewsService {
   private approveGithubPrFn: (nwo: string, prNumber: number) => Promise<void>;
   private azdoReviewStateFn: (repo: AzdoRepoConfig, prNumber: number, pat: string, myId: string) => Promise<AzdoReviewState>;
   private approveAzdoPrFn: (apiBase: string, repo: string, prNumber: number, myId: string, pat: string) => Promise<void>;
+  private closeGithubPrFn: (nwo: string, prNumber: number) => Promise<void>;
+  private abandonAzdoPrFn: (apiBase: string, repo: string, prNumber: number, pat: string) => Promise<void>;
   private resolveGithubLoginFn: () => Promise<string>;
   private resolveAzdoUserFn: (apiBase: string, pat: string) => Promise<{ id: string; displayName: string }>;
   /** Memoized per apiBase — `Task 2` (ADO list filter) reuses this cache via `azdoUser()`. */
@@ -85,6 +89,8 @@ export class ReviewsService {
     this.approveGithubPrFn = deps.approveGithubPr ?? ((nwo, n) => approveGithubPr(nwo, n));
     this.azdoReviewStateFn = deps.azdoReviewState ?? ((r, n, pat, myId) => fetchAzdoReviewState(r, n, pat, myId));
     this.approveAzdoPrFn = deps.approveAzdoPr ?? ((apiBase, repo, n, myId, pat) => approveAzdoPr(apiBase, repo, n, myId, pat));
+    this.closeGithubPrFn = deps.closeGithubPr ?? ((nwo, n) => closeGithubPr(nwo, n));
+    this.abandonAzdoPrFn = deps.abandonAzdoPr ?? ((apiBase, repo, n, pat) => abandonAzdoPr(apiBase, repo, n, pat));
     this.resolveGithubLoginFn = deps.resolveGithubLogin ?? (() => resolveGithubLogin());
     this.resolveAzdoUserFn = deps.resolveAzdoUser ?? ((apiBase, pat) => resolveAzdoUser(apiBase, pat));
   }
@@ -267,6 +273,25 @@ export class ReviewsService {
     if (!pat) throw new Error(`Missing DevOps PAT for ${repo.devopsHost}`);
     const user = await this.azdoUser(repo.apiBase, pat);
     await this.approveAzdoPrFn(repo.apiBase, repo.repo, prNumber, user.id, pat);
+    return { ok: true };
+  }
+
+  /** Closes a PR without merging (GitHub `gh pr close` / DevOps abandon). */
+  async close(
+    host: PrHost, repoKey: string, prNumber: number, devopsPats: Record<string, string> | undefined,
+  ): Promise<{ ok: true }> {
+    const { github, azdo } = await this.resolveRepos();
+    if (host === 'github') {
+      const repo = github.find((r) => r.repoKey === repoKey);
+      if (!repo) throw new Error(`Cannot resolve GitHub repo for ${repoKey}`);
+      await this.closeGithubPrFn(repo.nwo, prNumber);
+      return { ok: true };
+    }
+    const repo = azdo.find((r) => r.repoKey === repoKey);
+    if (!repo) throw new Error(`Cannot resolve DevOps repo for ${repoKey}`);
+    const pat = devopsPats?.[repo.devopsHost];
+    if (!pat) throw new Error(`Missing DevOps PAT for ${repo.devopsHost}`);
+    await this.abandonAzdoPrFn(repo.apiBase, repo.repo, prNumber, pat);
     return { ok: true };
   }
 

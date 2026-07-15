@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { parseGithubPrList, parseGitRemoteNwo, githubReviewState, approveGithubPr } from '../../orchestrator/services/prProviders/github.js';
+import { parseGithubPrList, parseGitRemoteNwo, githubReviewState, approveGithubPr, closeGithubPr } from '../../orchestrator/services/prProviders/github.js';
 
 const REPO = { host: 'github' as const, repoKey: 'gh:o/r', repoLabel: 'r', nwo: 'o/r', localClonePath: '/tmp/r' };
 const GH_JSON = JSON.stringify([
@@ -52,5 +52,13 @@ describe('approveGithubPr', () => {
     const exec = vi.fn(async () => '');
     await approveGithubPr('o/r', 165, exec);
     expect(exec).toHaveBeenCalledWith('gh', ['pr', 'review', '165', '--repo', 'o/r', '--approve']);
+  });
+});
+
+describe('closeGithubPr', () => {
+  it('runs gh pr close (keeps the branch)', async () => {
+    const exec = vi.fn(async () => '');
+    await closeGithubPr('o/r', 165, exec);
+    expect(exec).toHaveBeenCalledWith('gh', ['pr', 'close', '165', '--repo', 'o/r']);
   });
 });

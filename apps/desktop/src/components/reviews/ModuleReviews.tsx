@@ -16,7 +16,7 @@ export function ModuleReviews(props: {
   onConsumeDeepLink?: () => void;
 } = {}): JSX.Element {
   const { deepLinkTarget, onConsumeDeepLink } = props;
-  const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
+  const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr, closePr,
     review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments,
     fetchReviewState, approvePr } = useReviews();
   const { items: watchItems, unread, error: watchError, markSeen } = usePrWatch();
@@ -98,7 +98,7 @@ export function ModuleReviews(props: {
 
       <PrInspectorDrawer pr={open} onClose={() => setOpen(null)} loadDiff={loadDiff} loadComments={loadComments}
         review={review} reviewRunning={reviewRunning} openReviewFor={openReviewFor} runReview={runReview}
-        cancelReview={cancelReview} postComments={postComments} mergePr={mergePr}
+        cancelReview={cancelReview} postComments={postComments} mergePr={mergePr} closePr={closePr}
         fetchReviewState={fetchReviewState} approvePr={approvePr} />
     </Box>
   );

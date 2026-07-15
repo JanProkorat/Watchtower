@@ -89,6 +89,7 @@ export type IpcRequest =
   | { kind: 'prs:merge'; payload: { host: PrHost; repoKey: string; prNumber: number; deleteBranch: boolean; devopsPats?: Record<string, string> } }
   | { kind: 'prs:reviewState'; payload: { host: PrHost; repoKey: string; number: number; devopsPats?: Record<string, string> } }
   | { kind: 'prs:approve'; payload: { host: PrHost; repoKey: string; number: number; devopsPats?: Record<string, string> } }
+  | { kind: 'prs:close'; payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> } }
   // Renderer signals it has mounted and subscribed to the 'deep-link' channel,
   // so electron-main flushes any deep-link buffered during a cold-start window.
   | { kind: 'deepLink:ready'; payload: Record<string, never> }
@@ -720,6 +721,7 @@ export type IpcResponse =
   | { kind: 'prs:merge'; payload: { ok: true } }
   | { kind: 'prs:reviewState'; payload: { amIAuthor: boolean; approved: boolean; mergeable: boolean; mergeBlockedReason: string | null } }
   | { kind: 'prs:approve'; payload: { ok: true } }
+  | { kind: 'prs:close'; payload: { ok: true } }
   | { kind: 'deepLink:ready'; payload: { ok: true } }
   | { kind: 'reviews:projectRepo'; payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null } }
   | { kind: 'devops:setPat'; payload: { ok: true } }

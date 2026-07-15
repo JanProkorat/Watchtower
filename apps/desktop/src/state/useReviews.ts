@@ -106,6 +106,13 @@ export function useReviews() {
     await refresh();
   }, [refresh]);
 
+  // Close without merging (GitHub close / DevOps abandon). Refresh evicts the
+  // now-inactive PR from the list. electron-main injects devopsPats.
+  const closePr = useCallback(async (host: PrHost, repoKey: string, prNumber: number): Promise<void> => {
+    await invoke('prs:close', { host, repoKey, prNumber });
+    await refresh();
+  }, [refresh]);
+
   // Fresh (not watch-inbox-cached) approve/mergeable state for the drawer's action
   // row. electron-main injects any devopsPats needed for Azure DevOps — the
   // renderer never sends them.
@@ -260,7 +267,7 @@ export function useReviews() {
   }, [getReview]);
 
   return {
-    pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
+    pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr, closePr,
     fetchReviewState, approvePr,
     review, reviewRunning, openReviewFor, runReview, startReview, cancelReview, getReview, listReviews, latestReviewFor,
     reviewStateFor, postComments,

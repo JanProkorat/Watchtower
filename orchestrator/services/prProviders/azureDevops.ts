@@ -128,6 +128,27 @@ export async function approveAzdoPr(
   await put(url, pat, { vote: 10 });
 }
 
+export type HttpPatch = (url: string, pat: string, body: unknown) => Promise<void>;
+
+const defaultPatch: HttpPatch = async (url, pat, body) => {
+  const auth = Buffer.from(`:${pat}`).toString('base64');
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Azure DevOps ${res.status} abandoning PR: ${await res.text().catch(() => '')}`);
+};
+
+/** DevOps's "close without merging". Unlike completion (see `mergeAzdoPr`), an
+ *  abandon PATCH needs no fresh lastMergeSourceCommit — just the status flip. */
+export async function abandonAzdoPr(
+  apiBase: string, repo: string, prNumber: number, pat: string, patch: HttpPatch = defaultPatch,
+): Promise<void> {
+  const url = `${apiBase}/_apis/git/repositories/${repo}/pullRequests/${prNumber}?${API}`;
+  await patch(url, pat, { status: 'abandoned' });
+}
+
 export async function fetchAzdoComments(repo: AzdoRepoConfig, prNumber: number, pat: string, get: HttpGet = defaultGet): Promise<PrCommentThreadPayload[]> {
   const url = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}/threads?${API}`;
   const data = (await get(url, pat)) as { value?: Array<{

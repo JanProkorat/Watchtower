@@ -108,6 +108,16 @@ describe('useReviews IPC wrappers', () => {
     expect((window as any).watchtower.invoke).toHaveBeenCalledWith('prs:approve', { host: 'github', repoKey: 'gh:acme/w', number: 42 });
   });
 
+  it('closePr invokes prs:close then refreshes the list (evicting the closed PR)', async () => {
+    const { result } = renderHook(() => useReviews());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    (window as any).watchtower.invoke.mockClear();
+    await act(async () => { await result.current.closePr('github', 'gh:acme/w', 42); });
+    const kinds = (window as any).watchtower.invoke.mock.calls.map((c: unknown[]) => c[0]);
+    expect((window as any).watchtower.invoke).toHaveBeenCalledWith('prs:close', { host: 'github', repoKey: 'gh:acme/w', prNumber: 42 });
+    expect(kinds).toContain('prs:refresh');
+  });
+
   it('surfaces per-repo list warnings as toasts', async () => {
     (window as any).watchtower.invoke = vi.fn(async (kind: string) => {
       if (kind === 'prs:list' || kind === 'prs:refresh') {
