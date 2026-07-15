@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Chip,
   IconButton,
@@ -255,12 +254,6 @@ export function TimeOffTab() {
             contract.
           </Typography>
         </Box>
-
-        {state.error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {state.error}
-          </Alert>
-        )}
 
         <ThreeMonthCalendar
           startYear={windowStart.year}

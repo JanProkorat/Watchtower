@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Drawer, Box, Typography, Tabs, Tab, Alert, CircularProgress, Stack, Button } from '@mui/material';
+import { Drawer, Box, Typography, Tabs, Tab, CircularProgress, Stack, Button } from '@mui/material';
 import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrReviewPayload } from '@watchtower/shared/ipcContract.js';
 import { DiffView } from './DiffView.js';
 import { CommentThread } from './CommentThread.js';
@@ -26,7 +26,6 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   const [files, setFiles] = useState<DiffFilePayload[]>([]);
   const [threads, setThreads] = useState<PrCommentThreadPayload[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [reviewState, setReviewState] = useState<PrReviewState | null>(null);
   const [reviewStateLoading, setReviewStateLoading] = useState(false);
   const [approving, setApproving] = useState(false);
@@ -44,10 +43,10 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
 
   useEffect(() => {
     if (!pr) return;
-    setTab(0); setFiles([]); setThreads([]); setError(null); setLoading(true);
+    setTab(0); setFiles([]); setThreads([]); setLoading(true);
     setReviewState(null);
     void Promise.all([
-      loadDiff(pr).then(setFiles).catch((e) => setError(e instanceof Error ? e.message : String(e))),
+      loadDiff(pr).then(setFiles).catch(() => { /* surfaced via the global error toast */ }),
       // A comments-fetch failure must not blank the diff — degrade to 0 threads.
       loadComments(pr).then(setThreads).catch(() => setThreads([])),
     ]).finally(() => setLoading(false));
@@ -138,9 +137,8 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {tab === 0 && (
               <>
-                {error && <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>}
                 {loading && <Box sx={{ p: 2 }}><CircularProgress size={20} /></Box>}
-                {!loading && !error && <DiffView files={files} threads={threads} findings={review?.status === 'done' ? review.findings : []} />}
+                {!loading && <DiffView files={files} threads={threads} findings={review?.status === 'done' ? review.findings : []} />}
               </>
             )}
             {tab === 1 && (

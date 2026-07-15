@@ -95,7 +95,6 @@ export function ProjectsPage({
         onSelect={onSelectProject}
         onCreate={openCreate}
         loading={projectsState.loading}
-        error={projectsState.error}
       />
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {selectedProjectId !== null ? (

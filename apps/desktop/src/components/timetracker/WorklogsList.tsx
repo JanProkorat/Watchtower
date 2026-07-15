@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -175,12 +174,6 @@ export function WorklogsList({ projectId }: Props) {
       </Stack>
 
       <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 1.5 }}>
-        {state.error && (
-          <Alert severity="error" sx={{ mb: 1.5 }}>
-            {state.error}
-          </Alert>
-        )}
-
         {!state.loading && state.worklogs.length === 0 && (
           <Box sx={{ textAlign: 'center', color: 'text.secondary', mt: 6 }}>
             <Typography variant="body2" sx={{ mb: 1.5 }}>

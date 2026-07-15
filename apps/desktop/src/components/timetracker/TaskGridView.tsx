@@ -6,7 +6,6 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -520,12 +519,6 @@ export function TaskGridView({ projectId }: Props) {
       </Stack>
 
       <Box sx={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-        {grid.error && (
-          <Alert severity="error" sx={{ m: 2 }}>
-            {grid.error}
-          </Alert>
-        )}
-
         {!grid.loading && grid.data && grid.data.tasks.length === 0 && (
           <Box sx={{ textAlign: 'center', color: 'text.secondary', mt: 8, px: 2 }}>
             <Typography variant="body2">

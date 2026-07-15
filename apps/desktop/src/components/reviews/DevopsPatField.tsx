@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Box, Button, Chip, TextField, Typography } from '@mui/material';
+import { Box, Button, Chip, TextField, Typography } from '@mui/material';
 import { invoke } from '../../state/ipc';
 
 export function DevopsPatField({ projectId }: { projectId: number }): JSX.Element | null {
@@ -9,12 +9,10 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
   const [hasPat, setHasPat] = useState(false);
   const [pat, setPat] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setError(null);
     void (async () => {
       try {
         const info = await invoke('reviews:projectRepo', { projectId });
@@ -30,8 +28,8 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
         const { hasPat: has } = await invoke('devops:hasPat', { host: info.devopsHost });
         if (cancelled) return;
         setHasPat(has);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      } catch {
+        /* surfaced via the global error toast */
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -44,13 +42,12 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
   const save = async () => {
     if (!pat.trim()) return;
     setSaving(true);
-    setError(null);
     try {
       await invoke('devops:setPat', { host: devopsHost, pat: pat.trim() });
       setHasPat(true);
       setPat('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch {
+      /* surfaced via the global error toast */
     } finally {
       setSaving(false);
     }
@@ -61,7 +58,6 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
       <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
         AZURE DEVOPS
       </Typography>
-      {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
         <Typography sx={{ fontSize: 13, fontFamily: 'Menlo, monospace' }}>{repoLabel}</Typography>
         {hasPat && <Chip size="small" color="success" label="saved" />}

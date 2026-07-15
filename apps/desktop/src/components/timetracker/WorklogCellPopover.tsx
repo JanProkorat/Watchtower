@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   Box,
   Divider,
   IconButton,
@@ -76,10 +75,6 @@ export function WorklogCellPopover({
   const [editReported, setEditReported] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
-  // Surfaces a failed mutation (e.g. the worklog's task is Done, or the day
-  // became locked) inline instead of silently swallowing the rejection.
-  const [actionError, setActionError] = useState<string | null>(null);
-
   // Inline add state.
   const [isAdding, setIsAdding] = useState(false);
   const [addMinutes, setAddMinutes] = useState('');
@@ -96,7 +91,6 @@ export function WorklogCellPopover({
       setAddDescription('');
       setWorklogs([]);
       setRate(null);
-      setActionError(null);
     }
   }, [open]);
 
@@ -172,16 +166,14 @@ export function WorklogCellPopover({
     }
   };
 
-  // Runs a worklog mutation, surfacing any rejection (locked day, Done task)
-  // as an inline alert. Returns true on success so callers can clear edit
-  // state only when the write actually landed.
+  // Runs a worklog mutation (rejection, e.g. locked day or Done task, is
+  // surfaced via the global error toast). Returns true on success so callers
+  // can clear edit state only when the write actually landed.
   const runMutation = async (fn: () => Promise<void>): Promise<boolean> => {
-    setActionError(null);
     try {
       await fn();
       return true;
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
+    } catch {
       return false;
     }
   };
@@ -582,12 +574,6 @@ export function WorklogCellPopover({
               />
             </Stack>
           </>
-        )}
-
-        {actionError && (
-          <Alert severity="error" onClose={() => setActionError(null)} sx={{ fontSize: 12, py: 0 }}>
-            {actionError}
-          </Alert>
         )}
 
         {dayLocked && (

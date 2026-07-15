@@ -92,7 +92,6 @@ interface Props {
 export function BoardTab({ active }: Props) {
   const [projectsWithBoard, setProjectsWithBoard] = useState<ProjectViewPayload[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(() =>
     readStoredProjectId(),
   );
@@ -109,7 +108,6 @@ export function BoardTab({ active }: Props) {
     let cancelled = false;
     (async () => {
       setProjectsLoading(true);
-      setProjectsError(null);
       try {
         const res = await invoke('projects:list', { archived: false });
         if (cancelled) return;
@@ -117,10 +115,8 @@ export function BoardTab({ active }: Props) {
           (p) => p.jiraBoardUrl !== null && p.jiraBoardUrl.trim() !== '',
         );
         setProjectsWithBoard(withBoard);
-      } catch (err) {
-        if (!cancelled) {
-          setProjectsError(err instanceof Error ? err.message : String(err));
-        }
+      } catch {
+        /* surfaced via the global error toast */
       } finally {
         if (!cancelled) setProjectsLoading(false);
       }
@@ -212,7 +208,6 @@ export function BoardTab({ active }: Props) {
     return (
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, p: 2, gap: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>Board</Typography>
-        {projectsError && <Alert severity="error">{projectsError}</Alert>}
         <Alert severity="info">
           <strong>No Jira board configured.</strong>
           <Box sx={{ mt: 0.5 }}>

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -93,7 +92,6 @@ function draftOf(project: ProjectViewPayload | null): DraftState {
 export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
   const [draft, setDraft] = useState<DraftState>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Re-seed the form whenever the drawer is opened — guards against showing
   // stale state when the parent reuses the same drawer instance to edit a
@@ -101,7 +99,6 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
   useEffect(() => {
     if (open) {
       setDraft(draftOf(project));
-      setError(null);
       setSubmitting(false);
     }
   }, [open, project]);
@@ -113,12 +110,11 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
   const submit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
-    setError(null);
     try {
       await onSubmit(toInput(draft));
       onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch {
+      /* surfaced via the global error toast */
     } finally {
       setSubmitting(false);
     }
@@ -154,8 +150,6 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
         </Box>
 
         <Box sx={{ flex: 1, overflow: 'auto', px: 2.5, py: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          {error && <Alert severity="error">{error}</Alert>}
-
           <TextField
             label="Name"
             size="small"

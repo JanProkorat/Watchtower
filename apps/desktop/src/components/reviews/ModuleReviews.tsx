@@ -75,7 +75,6 @@ export function ModuleReviews(props: {
         <TextField size="small" placeholder="Search PRs…" value={query} onChange={(e) => setQuery(e.target.value)} sx={{ width: 220 }} />
       </Stack>
 
-      {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
       {watchError && <Alert severity="error" sx={{ mb: 1.5 }}>PR watch inbox failed to load: {watchError}</Alert>}
       {loading && pullRequests.length === 0 && <CircularProgress size={20} />}
       {!loading && pullRequests.length === 0 && !error && (

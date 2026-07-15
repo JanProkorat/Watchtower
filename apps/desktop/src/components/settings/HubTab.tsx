@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Box, Stack, Typography, TextField, Switch, FormControlLabel, Button, Alert,
+  Box, Stack, Typography, TextField, Switch, FormControlLabel, Button,
   MenuItem,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
@@ -46,8 +46,6 @@ export function HubTab() {
         <Typography variant="body2" color="text.secondary">
           APNs configuration for sending push notifications to iPad / iPhone via the messaging hub.
         </Typography>
-
-        {error && <Alert severity="error">{error}</Alert>}
 
         <FormControlLabel
           control={<Switch checked={value.enabled} onChange={(e) => patch({ enabled: e.target.checked })} />}

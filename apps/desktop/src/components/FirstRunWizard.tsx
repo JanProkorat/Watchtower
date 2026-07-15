@@ -32,7 +32,6 @@ export function FirstRunWizard({ open, onClose }: Props) {
   const [step, setStep] = useState<Step>('welcome');
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
   const [installing, setInstalling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [installResult, setInstallResult] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,7 +39,6 @@ export function FirstRunWizard({ open, onClose }: Props) {
     setStep('welcome');
     setPreview(null);
     setInstalling(false);
-    setError(null);
     setInstallResult(null);
   }, [open]);
 
@@ -48,12 +46,11 @@ export function FirstRunWizard({ open, onClose }: Props) {
     if (step !== 'hooks' || preview) return;
     void invoke('previewHookInstall', {})
       .then((p) => setPreview(p))
-      .catch((e: Error) => setError(e.message));
+      .catch(() => { /* surfaced via the global error toast */ });
   }, [step, preview]);
 
   const install = async () => {
     setInstalling(true);
-    setError(null);
     try {
       const res = await invoke('installHooks', {});
       setInstallResult(
@@ -62,8 +59,8 @@ export function FirstRunWizard({ open, onClose }: Props) {
           : 'Already installed.',
       );
       setStep('test');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch {
+      /* surfaced via the global error toast */
     } finally {
       setInstalling(false);
     }
@@ -106,11 +103,6 @@ export function FirstRunWizard({ open, onClose }: Props) {
         ))}
       </Box>
       <DialogContent>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
         {step === 'welcome' && (
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Typography>

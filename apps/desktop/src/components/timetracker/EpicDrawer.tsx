@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Drawer,
@@ -57,12 +56,10 @@ function draftOf(epic: EpicViewPayload | null): Draft {
 export function EpicDrawer({ open, epic, projectId, onClose, onSubmit, onDelete }: Props) {
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setDraft(draftOf(epic));
-      setError(null);
       setSubmitting(false);
     }
   }, [open, epic]);
@@ -73,7 +70,6 @@ export function EpicDrawer({ open, epic, projectId, onClose, onSubmit, onDelete 
   const submit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
-    setError(null);
     try {
       await onSubmit({
         projectId,
@@ -85,8 +81,8 @@ export function EpicDrawer({ open, epic, projectId, onClose, onSubmit, onDelete 
         githubIssueUrl: draft.githubIssueUrl.trim() ? draft.githubIssueUrl.trim() : null,
       });
       onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch {
+      /* surfaced via the global error toast */
     } finally {
       setSubmitting(false);
     }
@@ -125,8 +121,6 @@ export function EpicDrawer({ open, epic, projectId, onClose, onSubmit, onDelete 
             gap: 2.5,
           }}
         >
-          {error && <Alert severity="error">{error}</Alert>}
-
           <TextField
             label="Name"
             size="small"

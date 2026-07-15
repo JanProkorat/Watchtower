@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -189,11 +188,6 @@ export function RateHistorySection({ projectId }: Props) {
 
       <Collapse in={open} unmountOnExit>
         <Box sx={{ px: 2.5, pb: 2.5, pt: active ? 2 : 0 }}>
-          {state.error && (
-            <Alert severity="error" sx={{ mb: 1.5 }}>
-              {state.error}
-            </Alert>
-          )}
           {earliest && (
             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
               Earliest rate effective {formatDateCz(earliest.effectiveFrom)}. Worklogs before this

@@ -71,7 +71,6 @@ export function SettingsPanel() {
   const [sprintStartDate, setSprintStartDate] = useState<string>('2026-01-05');
   const [sprintLengthDays, setSprintLengthDays] = useState<string>('14');
   const [hookStatus, setHookStatus] = useState<string | null>(null);
-  const [hookError, setHookError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,7 +137,6 @@ export function SettingsPanel() {
   };
 
   const reinstallHooks = async () => {
-    setHookError(null);
     setHookStatus('Working…');
     try {
       const res = await invoke('installHooks', {});
@@ -147,22 +145,19 @@ export function SettingsPanel() {
           ? `Reinstalled${res.backedUp ? ` (backup: ${res.backedUp})` : ''}.`
           : 'Already installed — no change.',
       );
-    } catch (e) {
-      setHookError(e instanceof Error ? e.message : String(e));
+    } catch {
       setHookStatus(null);
     }
   };
 
   const uninstallHooks = async () => {
-    setHookError(null);
     setHookStatus('Working…');
     try {
       const res = await invoke('uninstallHooks', {});
       setHookStatus(
         res.changed ? 'Uninstalled — Watchtower entries removed.' : 'Nothing to uninstall.',
       );
-    } catch (e) {
-      setHookError(e instanceof Error ? e.message : String(e));
+    } catch {
       setHookStatus(null);
     }
   };
@@ -261,11 +256,6 @@ export function SettingsPanel() {
               {hookStatus}
             </Alert>
           )}
-          {hookError && (
-            <Alert severity="error" sx={{ mt: 1.5 }}>
-              {hookError}
-            </Alert>
-          )}
         </SettingRow>
 
         <Divider />
@@ -303,7 +293,6 @@ function WorklogLockSettings() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -329,7 +318,6 @@ function WorklogLockSettings() {
   const save = async () => {
     if (!valid) return;
     setBusy(true);
-    setError(null);
     try {
       // Empty string clears the setting — the WorklogsRepo treats anything
       // not matching YYYY-MM-DD as "no lock", and useWorklogLock matches.
@@ -343,8 +331,8 @@ function WorklogLockSettings() {
       window.dispatchEvent(new Event('worklog-lock-changed'));
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2500);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch {
+      /* surfaced via the global error toast */
     } finally {
       setBusy(false);
     }
@@ -380,11 +368,6 @@ function WorklogLockSettings() {
           </Button>
         </Stack>
       )}
-      {error && (
-        <Alert severity="error" sx={{ mt: 1.5 }}>
-          {error}
-        </Alert>
-      )}
       {savedFlash && (
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
           <CheckCircleIcon color="success" fontSize="small" />
@@ -406,7 +389,6 @@ function MeetingsDefaultTaskSettings() {
   const [lookingUp, setLookingUp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Create-task fallback (shown when lookup returns null).
   const [showCreate, setShowCreate] = useState(false);
@@ -414,7 +396,6 @@ function MeetingsDefaultTaskSettings() {
   const [newTitle, setNewTitle] = useState('');
   const [newEpicId, setNewEpicId] = useState<number | ''>('');
   const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
 
   // Initial load: read the setting, then resolve the saved task id into the
   // joined Project · Epic · Title chip + pre-fill the number TextField so the
@@ -438,8 +419,8 @@ function MeetingsDefaultTaskSettings() {
           setTaskNumber(r.task.number);
           setResolved(r.task);
         }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } catch {
+        /* surfaced via the global error toast */
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -454,7 +435,6 @@ function MeetingsDefaultTaskSettings() {
     setLookupError(null);
     setResolved(null);
     setShowCreate(false);
-    setCreateError(null);
     if (!trimmed) return;
     setLookingUp(true);
     try {
@@ -490,7 +470,6 @@ function MeetingsDefaultTaskSettings() {
 
   const persistTaskId = async (id: number) => {
     setBusy(true);
-    setError(null);
     try {
       await invoke('setSetting', {
         key: MEETINGS_DEFAULT_TASK_KEY,
@@ -499,8 +478,8 @@ function MeetingsDefaultTaskSettings() {
       setSavedTaskId(String(id));
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2500);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch {
+      /* surfaced via the global error toast */
     } finally {
       setBusy(false);
     }
@@ -514,7 +493,6 @@ function MeetingsDefaultTaskSettings() {
   const createAndSave = async () => {
     if (newEpicId === '' || !taskNumber.trim() || !newTitle.trim()) return;
     setCreating(true);
-    setCreateError(null);
     try {
       const created = await invoke('tasks:create', {
         epicId: newEpicId,
@@ -529,8 +507,8 @@ function MeetingsDefaultTaskSettings() {
       setShowCreate(false);
       setLookupError(null);
       await persistTaskId(created.task.id);
-    } catch (e) {
-      setCreateError(e instanceof Error ? e.message : String(e));
+    } catch {
+      /* surfaced via the global error toast */
     } finally {
       setCreating(false);
     }
@@ -608,11 +586,6 @@ function MeetingsDefaultTaskSettings() {
             </Typography>
           </Stack>
         )}
-        {error && (
-          <Alert severity="error" sx={{ mt: 1 }}>
-            {error}
-          </Alert>
-        )}
       </Box>
 
       {showCreate && (
@@ -667,11 +640,6 @@ function MeetingsDefaultTaskSettings() {
               {creating ? 'Creating…' : 'Create & save'}
             </Button>
           </Stack>
-          {createError && (
-            <Alert severity="error" sx={{ mt: 1 }}>
-              {createError}
-            </Alert>
-          )}
         </Box>
       )}
     </SettingRow>

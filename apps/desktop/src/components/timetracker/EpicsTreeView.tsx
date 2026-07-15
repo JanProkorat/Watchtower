@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { glassFill } from '../../theme/glass.js';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -176,12 +175,6 @@ export function EpicsTreeView({
           py: embedded ? 0 : 1.5,
         }}
       >
-        {state.error && (
-          <Alert severity="error" sx={{ mb: 1.5 }}>
-            {state.error}
-          </Alert>
-        )}
-
         {embedded && (
           <Button
             size="small"

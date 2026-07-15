@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   ButtonGroup,
@@ -265,16 +264,6 @@ export function ReportsTab() {
           </ToggleButtonGroup>
         </Stack>
       </Paper>
-
-      {state.errors.length > 0 && (
-        <Box sx={{ px: 2, pb: 1 }}>
-          <Alert severity="error">
-            {state.errors.length === 1
-              ? state.errors[0]
-              : `${state.errors.length} reports failed to load — see DevTools for details.`}
-          </Alert>
-        </Box>
-      )}
 
       <Box sx={{ px: 2, pb: 2 }}>
         <Grid container spacing={2}>

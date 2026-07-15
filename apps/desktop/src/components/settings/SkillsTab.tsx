@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Chip,
   IconButton,
@@ -117,11 +116,6 @@ export function SkillsTab() {
               <Skeleton variant="rounded" height={48} />
               <Skeleton variant="rounded" height={48} />
             </Stack>
-          )}
-          {state.error && (
-            <Alert severity="error" sx={{ m: 1.5 }}>
-              {state.error}
-            </Alert>
           )}
           {!state.loading && !state.error && filtered.length === 0 && (
             <Box sx={{ p: 3, color: 'text.disabled', textAlign: 'center', fontSize: 13 }}>

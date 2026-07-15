@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Chip,
   IconButton,
@@ -105,13 +104,6 @@ export function ProjectDetailPane({
           <Skeleton variant="rounded" height={64} />
           <Skeleton variant="rounded" height={64} />
         </Stack>
-      </Box>
-    );
-  }
-  if (state.error) {
-    return (
-      <Box sx={{ flex: 1, p: 3 }}>
-        <Alert severity="error">{state.error}</Alert>
       </Box>
     );
   }

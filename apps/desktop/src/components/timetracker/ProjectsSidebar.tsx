@@ -1,5 +1,4 @@
 import {
-  Alert,
   Box,
   Button,
   InputAdornment,
@@ -20,7 +19,6 @@ interface Props {
   onSelect(projectId: number): void;
   onCreate(): void;
   loading: boolean;
-  error: string | null;
 }
 
 function formatHours(minutes: number): string {
@@ -43,7 +41,6 @@ export function ProjectsSidebar({
   onSelect,
   onCreate,
   loading,
-  error,
 }: Props) {
   return (
     <Box
@@ -85,11 +82,6 @@ export function ProjectsSidebar({
       </Stack>
 
       <Box sx={{ flex: 1, overflowY: 'auto', px: 0.75, pb: 1 }}>
-        {error && (
-          <Alert severity="error" sx={{ mx: 0.75, mb: 1 }}>
-            {error}
-          </Alert>
-        )}
         {!loading && projects.length === 0 && (
           <Typography
             variant="caption"
