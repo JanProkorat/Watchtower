@@ -55,6 +55,10 @@ export interface ResolvedReviewTarget {
 export class ReviewsService {
   private cache: PullRequestPayload[] = [];
   private syncedAt: string | null = null;
+  /** Per-repo errors from the last refresh that did NOT abort the whole list
+   *  (e.g. one DevOps repo failed while GitHub repos succeeded). Surfaced to the
+   *  UI so a partial failure is visible instead of silently swallowed. */
+  private warnings: string[] = [];
   private listGithub: (r: GithubRepoConfig) => Promise<PullRequestPayload[]>;
   private listAzdo: (r: AzdoRepoConfig, pat: string, userId: string) => Promise<PullRequestPayload[]>;
   private azdoPrDetail: (r: AzdoRepoConfig, prNumber: number, pat: string) => Promise<{ lastMergeSourceCommitId: string }>;
@@ -122,7 +126,7 @@ export class ReviewsService {
     return { github, azdo };
   }
 
-  list() { return { pullRequests: this.cache, syncedAt: this.syncedAt }; }
+  list() { return { pullRequests: this.cache, syncedAt: this.syncedAt, warnings: this.warnings }; }
 
   async refresh(devopsPats: Record<string, string> | undefined) {
     const results: PullRequestPayload[] = [];
@@ -142,9 +146,13 @@ export class ReviewsService {
     }
     this.cache = results;
     this.syncedAt = isoNow();
+    // A total failure (nothing to show) is a hard error; a partial failure keeps
+    // the good results but exposes the rest as warnings rather than dropping them.
     if (results.length === 0 && errors.length > 0) {
+      this.warnings = [];
       throw new Error(`Načtení PR selhalo:\n${errors.join('\n')}`);
     }
+    this.warnings = errors;
     return this.list();
   }
 

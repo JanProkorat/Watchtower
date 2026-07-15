@@ -25,7 +25,7 @@ const deps = () => ({
 describe('ReviewsService', () => {
   it('list() is empty with null syncedAt before refresh', () => {
     const svc = new ReviewsService(deps());
-    expect(svc.list()).toEqual({ pullRequests: [], syncedAt: null });
+    expect(svc.list()).toEqual({ pullRequests: [], syncedAt: null, warnings: [] });
   });
   it('refresh() resolves GitHub repos from project remotes and caches', async () => {
     const svc = new ReviewsService(deps());
@@ -66,6 +66,26 @@ describe('ReviewsService', () => {
     });
     await expect(svc.refresh({ 'devops.skoda.vwgroup.com': 'pat-value' })).rejects.toThrow(/selhalo/);
     expect(listAzdo).not.toHaveBeenCalled();
+  });
+  it('refresh() returns github PRs AND surfaces an azdo failure as a warning (no longer swallowed)', async () => {
+    // Regression: previously an azdo error was silently dropped whenever github
+    // results were present (refresh only threw when results were empty), so a
+    // broken DevOps repo vanished with no user-visible signal.
+    const svc = new ReviewsService({
+      ...deps(),
+      projects: () => [
+        { id: 1, name: 'Watchtower', folder_path: '/tmp/wt' },
+        { id: 2, name: 'PPSToolshop', folder_path: '/tmp/pps' },
+      ],
+      gitRemote: async (cwd) => (cwd === '/tmp/pps'
+        ? 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop/_git/technology'
+        : 'git@github.com:jan/watchtower.git'),
+      resolveAzdoUser: async () => { throw new Error('Could not resolve Azure DevOps user'); },
+    });
+    const res = await svc.refresh({ 'devops.skoda.vwgroup.com': 'pat-value' });
+    expect(res.pullRequests).toHaveLength(1);
+    expect(res.pullRequests[0]!.host).toBe('github');
+    expect(res.warnings).toEqual(['PPSToolshop: Could not resolve Azure DevOps user']);
   });
   it('refresh() skips DevOps when no PAT for its host and reports only github', async () => {
     const svc = new ReviewsService({

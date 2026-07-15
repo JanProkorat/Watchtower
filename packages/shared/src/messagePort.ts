@@ -620,11 +620,11 @@ export type OrchResponse =
   | { kind: 'push:registerDevice'; payload: { ok: true } }
   | {
       kind: 'prs:list';
-      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null };
+      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null; warnings: string[] };
     }
   | {
       kind: 'prs:refresh';
-      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null };
+      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null; warnings: string[] };
     }
   | { kind: 'prs:diff'; payload: { files: import('./ipcContract.js').DiffFilePayload[] } }
   | { kind: 'prs:comments'; payload: { threads: import('./ipcContract.js').PrCommentThreadPayload[] } }

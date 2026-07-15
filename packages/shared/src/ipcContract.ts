@@ -713,8 +713,8 @@ export type IpcResponse =
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
   | { kind: 'push:registerDevice'; payload: { ok: true } }
-  | { kind: 'prs:list'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
-  | { kind: 'prs:refresh'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null } }
+  | { kind: 'prs:list'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null; warnings: string[] } }
+  | { kind: 'prs:refresh'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null; warnings: string[] } }
   | { kind: 'prs:diff'; payload: { files: DiffFilePayload[] } }
   | { kind: 'prs:comments'; payload: { threads: PrCommentThreadPayload[] } }
   | { kind: 'prs:merge'; payload: { ok: true } }

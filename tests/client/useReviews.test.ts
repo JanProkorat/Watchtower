@@ -74,7 +74,7 @@ describe('useReviews IPC wrappers', () => {
       invoke: vi.fn(async (kind: string) => {
         switch (kind) {
           case 'prs:list':
-          case 'prs:refresh': return { pullRequests: [], syncedAt: '2026-07-14T10:00:00Z' };
+          case 'prs:refresh': return { pullRequests: [], syncedAt: '2026-07-14T10:00:00Z', warnings: [] };
           case 'prReview:list': return { reviews: [] };
           case 'prs:reviewState': return { amIAuthor: false, approved: true, mergeable: true, mergeBlockedReason: null };
           case 'prs:approve': return { ok: true };
