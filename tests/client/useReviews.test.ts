@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { groupPrsByHost, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex, useReviews } from '../../apps/desktop/src/state/useReviews.js';
+import { groupPrsByProject, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex, useReviews } from '../../apps/desktop/src/state/useReviews.js';
 import { toast } from '../../apps/desktop/src/state/useToast';
 import type { PrFindingPayload } from '../../packages/shared/src/ipcContract.js';
 
@@ -14,9 +14,16 @@ const finding = (o: Partial<PrFindingPayload> = {}): PrFindingPayload => ({
 });
 
 describe('useReviews helpers', () => {
-  it('groups by host with labels, github first', () => {
-    const g = groupPrsByHost([pr(), pr({ host: 'azdo', repoKey: 'azdo:P/r' })]);
-    expect(g.map((x) => x.host)).toEqual(['github', 'azdo']);
+  it('groups by project (repoLabel), most-recently-active project first, Default bucket last', () => {
+    const g = groupPrsByProject([
+      pr({ number: 1, repoLabel: 'Spot', updatedAt: '2026-07-05T00:00:00Z' }),
+      pr({ number: 2, repoLabel: 'PPS', updatedAt: '2026-07-10T00:00:00Z' }),
+      pr({ number: 3, repoLabel: 'Spot', updatedAt: '2026-07-09T00:00:00Z' }),
+      pr({ number: 4, repoLabel: '', updatedAt: '2026-07-11T00:00:00Z' }), // no project → Default, forced last despite newest
+    ]);
+    expect(g.map((x) => x.label)).toEqual(['PPS', 'Spot', 'Default']);
+    // within a project, most-recent PR first
+    expect(g.find((x) => x.label === 'Spot')!.prs.map((p) => p.number)).toEqual([3, 1]);
   });
   it('sorts by updatedAt desc', () => {
     const s = sortByUpdatedDesc([pr({ updatedAt: '2026-07-01T00:00:00Z', number: 1 }), pr({ updatedAt: '2026-07-09T00:00:00Z', number: 2 })]);

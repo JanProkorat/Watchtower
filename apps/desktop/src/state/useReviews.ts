@@ -6,7 +6,6 @@ import { toast } from './useToast';
 export type PrReviewState = { amIAuthor: boolean; approved: boolean; mergeable: boolean; mergeBlockedReason: string | null };
 
 export type HostFilter = 'all' | 'github' | 'azdo';
-const HOST_LABEL: Record<PrHost, string> = { github: 'GitHub', azdo: 'Azure DevOps · Škoda' };
 
 const SEVERITY_ORDER: Record<PrFindingPayload['severity'], number> = { error: 0, warn: 1, info: 2 };
 
@@ -36,10 +35,24 @@ export function sortByUpdatedDesc(prs: PullRequestPayload[]): PullRequestPayload
   return [...prs].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 
-export function groupPrsByHost(prs: PullRequestPayload[]) {
-  const order: PrHost[] = ['github', 'azdo'];
-  return order.map((host) => ({ host, label: HOST_LABEL[host],
-    prs: sortByUpdatedDesc(prs.filter((p) => p.host === host)) })).filter((g) => g.prs.length > 0);
+// Group PRs by the Watchtower project they belong to. Every list PR carries its
+// project name in `repoLabel` (stamped by the Reviews service from the project
+// that owns the repo); a PR without one falls into the 'Default' bucket. Groups
+// are ordered most-recently-active first, with 'Default' pinned last.
+export function groupPrsByProject(prs: PullRequestPayload[]) {
+  const byProject = new Map<string, PullRequestPayload[]>();
+  for (const p of prs) {
+    const label = p.repoLabel?.trim() ? p.repoLabel : 'Default';
+    const list = byProject.get(label);
+    if (list) list.push(p); else byProject.set(label, [p]);
+  }
+  const groups = [...byProject.entries()].map(([label, list]) => ({ label, prs: sortByUpdatedDesc(list) }));
+  groups.sort((a, b) => {
+    if (a.label === 'Default') return 1;
+    if (b.label === 'Default') return -1;
+    return Date.parse(b.prs[0]!.updatedAt) - Date.parse(a.prs[0]!.updatedAt);
+  });
+  return groups;
 }
 
 export function applyPrFilter(prs: PullRequestPayload[], host: HostFilter, query: string): PullRequestPayload[] {
