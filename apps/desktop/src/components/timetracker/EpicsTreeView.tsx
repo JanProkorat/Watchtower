@@ -30,6 +30,7 @@ import { useEpicsAndTasks } from '../../state/useEpicsAndTasks.js';
 import { EpicDrawer } from './EpicDrawer.js';
 import { TaskDrawer } from './TaskDrawer.js';
 import { TaskDetailDrawer } from './TaskDetailDrawer.js';
+import { invoke } from '../../state/ipc';
 
 const PAGE_SIZE = 20;
 
@@ -658,7 +659,7 @@ function TaskRow({
     e.stopPropagation();
     e.preventDefault();
     if (onOpenExternal) onOpenExternal(externalUrl);
-    else void window.watchtower.invoke('openExternalUrl', { url: externalUrl });
+    else void invoke('openExternalUrl', { url: externalUrl });
   };
 
   return (

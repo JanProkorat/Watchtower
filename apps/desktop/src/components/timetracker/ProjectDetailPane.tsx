@@ -24,6 +24,7 @@ import { useContracts } from '../../state/useContracts.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { RateHistorySection } from './RateHistorySection.js';
 import { EpicsTreeView } from './EpicsTreeView.js';
+import { invoke } from '../../state/ipc';
 import type {
   ContractViewPayload,
   ProjectViewPayload,
@@ -145,7 +146,7 @@ export function ProjectDetailPane({
       return;
     }
     try {
-      await window.watchtower.invoke('projects:delete', { id: projectId });
+      await invoke('projects:delete', { id: projectId });
       onDeleted();
     } catch (err) {
       showError(toastMessage(err));
@@ -158,8 +159,7 @@ export function ProjectDetailPane({
 
   const openInVSCode = project.folderPath
     ? () => {
-        window.watchtower
-          .invoke('openInVSCode', { path: project.folderPath! })
+        invoke('openInVSCode', { path: project.folderPath! })
           .then((r) => {
             if (!r.ok) showError(r.error ?? 'Could not open in VS Code');
           })

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ProjectInputPayload, ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 export interface ProjectState {
   project: ProjectViewPayload | null;
@@ -24,7 +25,7 @@ export function useProject(projectId: number): ProjectState {
     setLoading(true);
     setError(null);
     try {
-      const res = await window.watchtower.invoke('projects:get', { id: projectId });
+      const res = await invoke('projects:get', { id: projectId });
       setProject(res.project);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -39,7 +40,7 @@ export function useProject(projectId: number): ProjectState {
 
   const update = useCallback(
     async (input: Partial<ProjectInputPayload>) => {
-      const res = await window.watchtower.invoke('projects:update', { id: projectId, input });
+      const res = await invoke('projects:update', { id: projectId, input });
       setProject(res.project);
       return res.project;
     },
@@ -48,7 +49,7 @@ export function useProject(projectId: number): ProjectState {
 
   const archive = useCallback(
     async (archived: boolean) => {
-      await window.watchtower.invoke('projects:archive', { id: projectId, archived });
+      await invoke('projects:archive', { id: projectId, archived });
       await refresh();
     },
     [projectId, refresh],

@@ -22,6 +22,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CloseIcon from '@mui/icons-material/Close';
 import { useBoard } from '../../state/useBoard.js';
 import { useToast } from '../../state/useToast.js';
+import { invoke } from '../../state/ipc';
 import { epicColours } from './boardChips.js';
 import type {
   BoardCardPayload,
@@ -110,7 +111,7 @@ export function BoardTab({ active }: Props) {
       setProjectsLoading(true);
       setProjectsError(null);
       try {
-        const res = await window.watchtower.invoke('projects:list', { archived: false });
+        const res = await invoke('projects:list', { archived: false });
         if (cancelled) return;
         const withBoard = res.projects.filter(
           (p) => p.jiraBoardUrl !== null && p.jiraBoardUrl.trim() !== '',
@@ -177,8 +178,7 @@ export function BoardTab({ active }: Props) {
   }, [snapshot]);
 
   const openInBrowser = (url: string) => {
-    void window.watchtower
-      .invoke('openExternalUrl', { url })
+    void invoke('openExternalUrl', { url })
       .catch((err: unknown) => showError(err instanceof Error ? err.message : String(err)));
   };
 

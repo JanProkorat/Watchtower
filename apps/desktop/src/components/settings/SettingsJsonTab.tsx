@@ -22,6 +22,7 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import { useClaudeSettings, type SettingsScope } from '../../state/useClaudeSettings.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { glassSurface } from '../../theme/glass.js';
+import { invoke } from '../../state/ipc';
 
 const PROJECT_PATH_STORAGE_KEY = 'watchtower.settings.json.projectPath';
 
@@ -92,7 +93,7 @@ export function SettingsJsonTab() {
   };
 
   const browseProject = async () => {
-    const res = await window.watchtower.invoke('chooseDirectory', {
+    const res = await invoke('chooseDirectory', {
       defaultPath: projectPath || undefined,
     });
     if (res.path) setProjectPath(res.path);

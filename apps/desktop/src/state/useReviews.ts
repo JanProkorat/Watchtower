@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrHost, PrReviewPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 export type PrReviewState = { amIAuthor: boolean; approved: boolean; mergeable: boolean; mergeBlockedReason: string | null };
 
@@ -68,7 +69,7 @@ export function useReviews() {
   const load = useCallback(async (kind: 'prs:list' | 'prs:refresh') => {
     setLoading(true); setError(null);
     try {
-      const res = await window.watchtower.invoke(kind, {});
+      const res = await invoke(kind, {});
       setPullRequests(res.pullRequests); setSyncedAt(res.syncedAt); setWarnings(res.warnings ?? []);
       return res;
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); return null; }
@@ -87,7 +88,7 @@ export function useReviews() {
   // Squash-merge a PR (Task 11's Merge button). electron-main injects any
   // devopsPats needed for Azure DevOps — the renderer never sends them.
   const mergePr = useCallback(async (host: PrHost, repoKey: string, prNumber: number, deleteBranch: boolean): Promise<void> => {
-    await window.watchtower.invoke('prs:merge', { host, repoKey, prNumber, deleteBranch });
+    await invoke('prs:merge', { host, repoKey, prNumber, deleteBranch });
     await refresh();
   }, [refresh]);
 
@@ -95,22 +96,22 @@ export function useReviews() {
   // row. electron-main injects any devopsPats needed for Azure DevOps — the
   // renderer never sends them.
   const fetchReviewState = useCallback(async (host: PrHost, repoKey: string, number: number): Promise<PrReviewState> => {
-    return window.watchtower.invoke('prs:reviewState', { host, repoKey, number });
+    return invoke('prs:reviewState', { host, repoKey, number });
   }, []);
 
   // Approve a PR (GitHub `gh pr review --approve` / ADO reviewer vote). The
   // renderer never sends devopsPats — electron-main injects them for this kind.
   const approvePr = useCallback(async (host: PrHost, repoKey: string, number: number): Promise<void> => {
-    await window.watchtower.invoke('prs:approve', { host, repoKey, number });
+    await invoke('prs:approve', { host, repoKey, number });
   }, []);
 
   const loadDiff = useCallback(async (pr: PullRequestPayload): Promise<DiffFilePayload[]> => {
-    const res = await window.watchtower.invoke('prs:diff', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
+    const res = await invoke('prs:diff', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
     return res.files;
   }, []);
 
   const loadComments = useCallback(async (pr: PullRequestPayload): Promise<PrCommentThreadPayload[]> => {
-    const res = await window.watchtower.invoke('prs:comments', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
+    const res = await invoke('prs:comments', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
     return res.threads;
   }, []);
 
@@ -125,17 +126,17 @@ export function useReviews() {
   const openReviewTokenRef = useRef(0);
 
   const startReview = useCallback(async (pr: PullRequestPayload): Promise<number> => {
-    const res = await window.watchtower.invoke('prReview:start', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
+    const res = await invoke('prReview:start', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
     return res.reviewId;
   }, []);
 
   const getReview = useCallback(async (reviewId: number): Promise<PrReviewPayload | null> => {
-    const res = await window.watchtower.invoke('prReview:get', { reviewId });
+    const res = await invoke('prReview:get', { reviewId });
     return res.review;
   }, []);
 
   const listReviews = useCallback(async (repoKey?: string): Promise<PrReviewPayload[]> => {
-    const res = await window.watchtower.invoke('prReview:list', { repoKey });
+    const res = await invoke('prReview:list', { repoKey });
     return res.reviews;
   }, []);
 
@@ -149,7 +150,7 @@ export function useReviews() {
   const cancelReview = useCallback(async (pr: PullRequestPayload): Promise<void> => {
     const found = await latestReviewFor(pr);
     if (!found || found.status !== 'running') return;
-    await window.watchtower.invoke('prReview:cancel', { reviewId: found.id });
+    await invoke('prReview:cancel', { reviewId: found.id });
   }, [latestReviewFor]);
 
   // Post the selected findings (by original index) as comments on the PR. The
@@ -157,7 +158,7 @@ export function useReviews() {
   // The reload of `review` (with `posted` flags flipped) happens via the already-
   // subscribed prReviewDone push, not here.
   const postComments = useCallback(async (reviewId: number, findingIndexes: number[]): Promise<{ posted: number; skipped: number; errors: string[] }> => {
-    return window.watchtower.invoke('prReview:postComments', { reviewId, findingIndexes });
+    return invoke('prReview:postComments', { reviewId, findingIndexes });
   }, []);
 
   // ─── Review state for the PR list (grey/amber/green/red dot + finding count) ───

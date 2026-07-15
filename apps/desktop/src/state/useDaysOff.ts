@@ -4,6 +4,7 @@ import type {
   DayOffViewPayload,
   PublicHolidayPayload,
 } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 export interface DaysOffState {
   days: DayOffViewPayload[];
@@ -35,10 +36,10 @@ export function useDaysOff(focusYear: number): DaysOffState {
     setError(null);
     try {
       const [allDays, prevY, thisY, nextY] = await Promise.all([
-        window.watchtower.invoke('daysOff:list', {}),
-        window.watchtower.invoke('holidays:list', { year: focusYear - 1 }),
-        window.watchtower.invoke('holidays:list', { year: focusYear }),
-        window.watchtower.invoke('holidays:list', { year: focusYear + 1 }),
+        invoke('daysOff:list', {}),
+        invoke('holidays:list', { year: focusYear - 1 }),
+        invoke('holidays:list', { year: focusYear }),
+        invoke('holidays:list', { year: focusYear + 1 }),
       ]);
       setDays(allDays.daysOff);
       setHolidays([...prevY.holidays, ...thisY.holidays, ...nextY.holidays]);
@@ -55,7 +56,7 @@ export function useDaysOff(focusYear: number): DaysOffState {
 
   const upsert = useCallback(
     async (input: DayOffInputPayload) => {
-      const res = await window.watchtower.invoke('daysOff:upsert', input);
+      const res = await invoke('daysOff:upsert', input);
       await refresh();
       return res.dayOff;
     },
@@ -64,7 +65,7 @@ export function useDaysOff(focusYear: number): DaysOffState {
 
   const remove = useCallback(
     async (date: string) => {
-      await window.watchtower.invoke('daysOff:delete', { date });
+      await invoke('daysOff:delete', { date });
       await refresh();
     },
     [refresh],

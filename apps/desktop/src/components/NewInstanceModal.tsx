@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { invoke } from '../state/ipc';
 import {
   Box,
   Button,
@@ -62,7 +63,7 @@ export function NewInstanceModal({ open, defaultCwd, onClose, onSpawn }: Props) 
   }, [open, defaultCwd]);
 
   const browse = async () => {
-    const res = await window.watchtower.invoke('chooseDirectory', {
+    const res = await invoke('chooseDirectory', {
       defaultPath: cwd || defaultCwd || '~/Projects',
     });
     if (res.path) setCwd(res.path);

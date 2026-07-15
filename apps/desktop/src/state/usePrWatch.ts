@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { PrWatchInboxItem, PrHost } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 export function usePrWatch(): {
   items: PrWatchInboxItem[]; unread: number; error: string | null;
@@ -15,7 +16,7 @@ export function usePrWatch(): {
   // a permanently-zero unread badge; surface it via the hook's `error` field.
   const refresh = useCallback(async () => {
     try {
-      const res = await window.watchtower.invoke('prWatch:list', {});
+      const res = await invoke('prWatch:list', {});
       setItems(res.items);
       setUnread(res.unread);
       setError(null);
@@ -25,7 +26,7 @@ export function usePrWatch(): {
   }, []);
 
   const markSeen = useCallback(async (host: PrHost, repoKey: string, prNumber: number) => {
-    await window.watchtower.invoke('prWatch:markSeen', { host, repoKey, prNumber });
+    await invoke('prWatch:markSeen', { host, repoKey, prNumber });
     await refresh();
   }, [refresh]);
 

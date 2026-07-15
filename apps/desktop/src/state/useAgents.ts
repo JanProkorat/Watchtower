@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AgentRowPayload } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 interface State {
   loading: boolean;
@@ -13,7 +14,7 @@ export function useAgents(): State & { refresh(): Promise<void> } {
   const refresh = useCallback(async () => {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const res = await window.watchtower.invoke('agents:list', {});
+      const res = await invoke('agents:list', {});
       setState({ loading: false, agents: res.agents, error: null });
     } catch (err) {
       setState((s) => ({

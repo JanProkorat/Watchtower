@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Box, Button, Chip, TextField, Typography } from '@mui/material';
+import { invoke } from '../../state/ipc';
 
 export function DevopsPatField({ projectId }: { projectId: number }): JSX.Element | null {
   const [loading, setLoading] = useState(true);
@@ -16,7 +17,7 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
     setError(null);
     void (async () => {
       try {
-        const info = await window.watchtower.invoke('reviews:projectRepo', { projectId });
+        const info = await invoke('reviews:projectRepo', { projectId });
         if (cancelled) return;
         if (info.host !== 'azdo' || !info.devopsHost) {
           setDevopsHost(null);
@@ -26,7 +27,7 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
         }
         setDevopsHost(info.devopsHost);
         setRepoLabel(info.repoLabel);
-        const { hasPat: has } = await window.watchtower.invoke('devops:hasPat', { host: info.devopsHost });
+        const { hasPat: has } = await invoke('devops:hasPat', { host: info.devopsHost });
         if (cancelled) return;
         setHasPat(has);
       } catch (err) {
@@ -45,7 +46,7 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
     setSaving(true);
     setError(null);
     try {
-      await window.watchtower.invoke('devops:setPat', { host: devopsHost, pat: pat.trim() });
+      await invoke('devops:setPat', { host: devopsHost, pat: pat.trim() });
       setHasPat(true);
       setPat('');
     } catch (err) {

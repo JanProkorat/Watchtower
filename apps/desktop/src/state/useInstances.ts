@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { invoke } from './ipc';
 
 export interface InstanceView {
   id: string;
@@ -61,7 +62,7 @@ export function useInstances(): {
   }, [instances, activeId]);
 
   const refresh = useCallback(async () => {
-    const res = await window.watchtower.invoke('listInstances', {});
+    const res = await invoke('listInstances', {});
     setInstances(res.instances);
     setLoaded(true);
   }, []);
@@ -82,7 +83,7 @@ export function useInstances(): {
 
   const spawn = useCallback(
     async (cwd: string, args?: string[], kind: 'claude' | 'shell' = 'claude') => {
-      const res = await window.watchtower.invoke('spawnInstance', { cwd, args, instanceKind: kind });
+      const res = await invoke('spawnInstance', { cwd, args, instanceKind: kind });
       if (res.instanceId) {
         // Refresh the instance list BEFORE activating the new tab — otherwise
         // MUI's Tabs validator runs against stale children and warns:
@@ -97,7 +98,7 @@ export function useInstances(): {
 
   const kill = useCallback(
     async (instanceId: string) => {
-      await window.watchtower.invoke('killInstance', { instanceId });
+      await invoke('killInstance', { instanceId });
       await refresh();
     },
     [refresh],
@@ -105,7 +106,7 @@ export function useInstances(): {
 
   const setTask = useCallback(
     async (instanceId: string, taskId: number | null) => {
-      await window.watchtower.invoke('instances:setTask', { instanceId, taskId });
+      await invoke('instances:setTask', { instanceId, taskId });
       // The orchestrator pushes stateChanged which triggers refresh via the
       // existing listener above. Awaiting the invoke is sufficient.
     },
@@ -114,7 +115,7 @@ export function useInstances(): {
 
   const remove = useCallback(
     async (instanceId: string) => {
-      await window.watchtower.invoke('removeInstance', { instanceId });
+      await invoke('removeInstance', { instanceId });
       setActiveId((curr) => (curr === instanceId ? null : curr));
       await refresh();
     },
@@ -139,7 +140,7 @@ export function useInstances(): {
       }
       return reordered;
     });
-    await window.watchtower.invoke('reorderInstances', { orderedIds });
+    await invoke('reorderInstances', { orderedIds });
   }, []);
 
   return { instances, activeId, loaded, setActive: setActiveId, spawn, kill, setTask, remove, reorder, refresh };

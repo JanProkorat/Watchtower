@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { invoke } from '../state/ipc';
 import {
   Alert,
   Box,
@@ -45,8 +46,7 @@ export function FirstRunWizard({ open, onClose }: Props) {
 
   useEffect(() => {
     if (step !== 'hooks' || preview) return;
-    void window.watchtower
-      .invoke('previewHookInstall', {})
+    void invoke('previewHookInstall', {})
       .then((p) => setPreview(p))
       .catch((e: Error) => setError(e.message));
   }, [step, preview]);
@@ -55,7 +55,7 @@ export function FirstRunWizard({ open, onClose }: Props) {
     setInstalling(true);
     setError(null);
     try {
-      const res = await window.watchtower.invoke('installHooks', {});
+      const res = await invoke('installHooks', {});
       setInstallResult(
         res.changed
           ? `Installed (backup at ${res.backedUp ?? '— no existing file'}).`
@@ -71,7 +71,7 @@ export function FirstRunWizard({ open, onClose }: Props) {
 
   const finish = async () => {
     try {
-      await window.watchtower.invoke('setSetting', {
+      await invoke('setSetting', {
         key: 'first_run_completed_at',
         value: String(Date.now()),
       });
@@ -193,7 +193,7 @@ export function FirstRunWizard({ open, onClose }: Props) {
             <Typography>Try a test notification to verify macOS permissions.</Typography>
             <Button
               variant="outlined"
-              onClick={() => void window.watchtower.invoke('sendTestNotification', {})}
+              onClick={() => void invoke('sendTestNotification', {})}
               sx={{ alignSelf: 'flex-start' }}
             >
               Send test notification

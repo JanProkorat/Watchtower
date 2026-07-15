@@ -7,6 +7,7 @@ import type {
   RateChangeMarkerPayload,
   TrendDatumPayload,
 } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 export type Granularity = 'day' | 'week' | 'month';
 
@@ -59,20 +60,20 @@ export function useReports(
     const [trendRes, byProjRes, earningsRes, heatmapRes, contractsRes, rateRes] =
       await Promise.all([
         safe('trend', () =>
-          window.watchtower.invoke('reports:trend', { from, to, granularity, projectId: pid }),
+          invoke('reports:trend', { from, to, granularity, projectId: pid }),
         ),
         safe('byProject', () =>
-          window.watchtower.invoke('reports:byProject', { from, to, projectId: pid }),
+          invoke('reports:byProject', { from, to, projectId: pid }),
         ),
         safe('earnings', () =>
-          window.watchtower.invoke('reports:earnings', { from, to, projectId: pid }),
+          invoke('reports:earnings', { from, to, projectId: pid }),
         ),
         safe('heatmap', () =>
-          window.watchtower.invoke('reports:heatmap', { from, to, projectId: pid }),
+          invoke('reports:heatmap', { from, to, projectId: pid }),
         ),
-        safe('contracts', () => window.watchtower.invoke('reports:contracts', { projectId: pid })),
+        safe('contracts', () => invoke('reports:contracts', { projectId: pid })),
         safe('rateChanges', () =>
-          window.watchtower.invoke('reports:rateChanges', { from, to, projectId: pid }),
+          invoke('reports:rateChanges', { from, to, projectId: pid }),
         ),
       ]);
     if (trendRes) setTrend(trendRes.trend);

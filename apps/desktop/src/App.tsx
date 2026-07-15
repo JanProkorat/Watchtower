@@ -28,6 +28,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import 'dayjs/locale/cs';
 import { darkTheme, lightTheme } from './theme.js';
 import { ambientBackground } from './theme/glass.js';
+import { invoke } from './state/ipc';
 import { useThemeMode } from './state/useThemeMode.js';
 import { useActiveModule } from './state/useActiveModule.js';
 import { ToastProvider } from './state/useToast.js';
@@ -231,7 +232,7 @@ export function App() {
   useEffect(() => {
     if (!loaded) return;
     let cancelled = false;
-    void window.watchtower.invoke('getSetting', { key: 'first_run_completed_at' }).then((r) => {
+    void invoke('getSetting', { key: 'first_run_completed_at' }).then((r) => {
       if (!cancelled && !r.value) setWizardOpen(true);
     });
     return () => {
@@ -262,7 +263,7 @@ export function App() {
       setActiveModule('reviews');
       setDeepLinkTarget({ host: d.host, repoKey: d.repoKey, prNumber: d.prNumber });
     });
-    void window.watchtower.invoke('deepLink:ready', {}).catch(() => {});
+    void invoke('deepLink:ready', {}).catch(() => {});
     return off;
   }, [setActiveModule]);
 
@@ -564,7 +565,7 @@ export function App() {
                               : false;
                             handleRemove(id, isLive);
                           }}
-                          onRestartColumn={(id) => void window.watchtower.invoke('restartInstance', { instanceId: id })}
+                          onRestartColumn={(id) => void invoke('restartInstance', { instanceId: id })}
                           onHideSession={handleHideSession}
                           onUnhideSession={unhideInstance}
                           onSetTask={(instanceId, taskId) => void setTask(instanceId, taskId)}

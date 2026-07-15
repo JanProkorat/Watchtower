@@ -17,6 +17,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import CloseIcon from '@mui/icons-material/Close';
 import { CZ_DATE_FORMAT } from '../../util/format.js';
 import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
+import { invoke } from '../../state/ipc';
 import type {
   ProjectViewPayload,
   TaskViewPayload,
@@ -146,8 +147,7 @@ export function WorklogDrawer({
         ? draftOf(worklog)
         : emptyDraft(initialProjectId ?? null, initialTaskId ?? null, initialWorkDate ?? null),
     );
-    void window.watchtower
-      .invoke('projects:list', { archived: false })
+    void invoke('projects:list', { archived: false })
       .then((r) => setProjects(r.projects))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, [open, worklog, initialProjectId, initialTaskId, initialWorkDate]);
@@ -158,8 +158,7 @@ export function WorklogDrawer({
       setTasks([]);
       return;
     }
-    void window.watchtower
-      .invoke('tasks:listForProject', { projectId: draft.projectId })
+    void invoke('tasks:listForProject', { projectId: draft.projectId })
       .then((r) => setTasks(r.tasks))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, [open, draft.projectId]);

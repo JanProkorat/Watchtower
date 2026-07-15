@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ClaudeSettingsReadPayload } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 export type SettingsScope = 'global' | 'project';
 
@@ -65,7 +66,7 @@ export function useClaudeSettings(scope: SettingsScope, projectPath?: string): U
     }
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const res = (await window.watchtower.invoke('claudeSettings:read', {
+      const res = (await invoke('claudeSettings:read', {
         scope,
         projectPath,
       })) as ClaudeSettingsReadPayload;
@@ -103,7 +104,7 @@ export function useClaudeSettings(scope: SettingsScope, projectPath?: string): U
   }, []);
 
   const save = useCallback(async (): Promise<{ backupPath?: string }> => {
-    const res = await window.watchtower.invoke('claudeSettings:write', {
+    const res = await invoke('claudeSettings:write', {
       scope,
       projectPath,
       content: state.draft,

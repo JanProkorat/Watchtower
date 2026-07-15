@@ -29,6 +29,7 @@ import {
   parseMinutes,
 } from '../../util/format.js';
 import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
+import { invoke } from '../../state/ipc';
 import type {
   ContractViewPayload,
   WorklogViewPayload,
@@ -105,7 +106,7 @@ export function WorklogCellPopover({
     let cancelled = false;
     void (async () => {
       try {
-        const res = await window.watchtower.invoke('worklogs:list', {
+        const res = await invoke('worklogs:list', {
           taskId,
           from: ymd,
           to: ymd,
@@ -118,7 +119,7 @@ export function WorklogCellPopover({
     if (projectId != null) {
       void (async () => {
         try {
-          const res = await window.watchtower.invoke('contracts:listForProject', {
+          const res = await invoke('contracts:listForProject', {
             projectId,
           });
           if (cancelled) return;
@@ -160,7 +161,7 @@ export function WorklogCellPopover({
   const reload = async () => {
     if (taskId == null) return;
     try {
-      const res = await window.watchtower.invoke('worklogs:list', {
+      const res = await invoke('worklogs:list', {
         taskId,
         from: ymd,
         to: ymd,
@@ -208,7 +209,7 @@ export function WorklogCellPopover({
       reportedMinutes = parsed;
     }
     const ok = await runMutation(async () => {
-      await window.watchtower.invoke('worklogs:update', {
+      await invoke('worklogs:update', {
         id: editId,
         input: {
           workDate: editDate.format('YYYY-MM-DD'),
@@ -227,7 +228,7 @@ export function WorklogCellPopover({
   const toggleJiraUploaded = async (entry: WorklogViewPayload) => {
     if (dayLocked) return;
     const ok = await runMutation(async () => {
-      await window.watchtower.invoke('worklogs:update', {
+      await invoke('worklogs:update', {
         id: entry.id,
         input: { jiraUploaded: !entry.jiraUploaded },
       });
@@ -240,7 +241,7 @@ export function WorklogCellPopover({
   const deleteEntry = async (entry: WorklogViewPayload) => {
     if (dayLocked) return;
     const ok = await runMutation(async () => {
-      await window.watchtower.invoke('worklogs:delete', { id: entry.id });
+      await invoke('worklogs:delete', { id: entry.id });
     });
     if (!ok) return;
     await reload();
@@ -269,7 +270,7 @@ export function WorklogCellPopover({
   const commitAdd = async () => {
     if (!addValid || taskId == null) return;
     const ok = await runMutation(async () => {
-      await window.watchtower.invoke('worklogs:create', {
+      await invoke('worklogs:create', {
         taskId,
         workDate: ymd,
         minutes: addMinutesParsed,

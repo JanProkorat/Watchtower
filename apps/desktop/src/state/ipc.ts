@@ -17,6 +17,23 @@ const SILENT_KINDS = new Set<string>([
 ]);
 
 /**
+ * Loose implementation — deliberately non-generic so the body doesn't fight the
+ * correlated discriminated-union typing. The typed signature is applied via the
+ * cast on `invoke` below.
+ */
+async function invokeImpl(kind: string, payload: unknown, opts?: { silent?: boolean }): Promise<unknown> {
+  const raw = window.watchtower.invoke as (kind: string, payload: unknown) => Promise<unknown>;
+  try {
+    return await raw(kind, payload);
+  } catch (err) {
+    if (!opts?.silent && !SILENT_KINDS.has(kind)) {
+      toast.showError(toastMessage(err));
+    }
+    throw err;
+  }
+}
+
+/**
  * The single choke point for renderer → main IPC. Mirrors
  * `WatchtowerBridge.invoke` exactly (so every call site keeps its typed payload
  * and response), but on failure raises a global error toast and re-throws — so
@@ -24,15 +41,8 @@ const SILENT_KINDS = new Set<string>([
  * `{ silent: true }` to suppress the toast for a call whose failure the caller
  * handles gracefully.
  */
-export function invoke<T extends IpcRequest['kind']>(
+export const invoke = invokeImpl as unknown as <T extends IpcRequest['kind']>(
   kind: T,
   payload: Extract<IpcRequest, { kind: T }>['payload'],
   opts?: { silent?: boolean },
-): Promise<Extract<IpcResponse, { kind: T }>['payload']> {
-  return window.watchtower.invoke(kind, payload).catch((err: unknown) => {
-    if (!opts?.silent && !SILENT_KINDS.has(kind)) {
-      toast.showError(toastMessage(err));
-    }
-    throw err;
-  });
-}
+) => Promise<Extract<IpcResponse, { kind: T }>['payload']>;

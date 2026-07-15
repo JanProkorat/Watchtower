@@ -23,6 +23,7 @@ import { CZ_DATE_FORMAT } from '../../util/format.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
 import { WorklogDrawer } from './WorklogDrawer.js';
+import { invoke } from '../../state/ipc';
 import type { ProjectViewPayload, WorklogViewPayload } from '@watchtower/shared/ipcContract.js';
 
 interface Props {
@@ -85,8 +86,7 @@ export function WorklogsList({ projectId }: Props) {
   // Load active projects once for the project filter dropdown (list mode only).
   useEffect(() => {
     if (projectId !== undefined) return;
-    void window.watchtower
-      .invoke('projects:list', { archived: false })
+    void invoke('projects:list', { archived: false })
       .then((r) => setProjects(r.projects));
   }, [projectId]);
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DEFAULT_HUB_CONFIG, type HubConfig } from '@watchtower/shared/hubConfig.js';
+import { invoke } from './ipc';
 
 export interface HubConfigState {
   config: HubConfig;
@@ -18,7 +19,7 @@ export function useHubConfig(): HubConfigState {
     setLoading(true);
     setError(null);
     try {
-      const res = await window.watchtower.invoke('hub:getConfig', {});
+      const res = await invoke('hub:getConfig', {});
       setConfig(res.config);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -29,7 +30,7 @@ export function useHubConfig(): HubConfigState {
 
   const save = useCallback(
     async (next: HubConfig) => {
-      await window.watchtower.invoke('hub:setConfig', { config: next });
+      await invoke('hub:setConfig', { config: next });
       await refresh();
     },
     [refresh],

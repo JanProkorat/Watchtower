@@ -16,6 +16,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import RemoveIcon from '@mui/icons-material/Close';
 import type { ProjectInputPayload, ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 import { DevopsPatField } from '../reviews/DevopsPatField.js';
+import { invoke } from '../../state/ipc';
 
 const COLOR_PALETTE = [
   '#7aa7ff',
@@ -124,7 +125,7 @@ export function ProjectDrawer({ open, project, onClose, onSubmit }: Props) {
   };
 
   const pickFolder = async () => {
-    const res = await window.watchtower.invoke('chooseDirectory', {
+    const res = await invoke('chooseDirectory', {
       defaultPath: draft.folderPath || undefined,
     });
     if (res.path) setDraft({ ...draft, folderPath: res.path });

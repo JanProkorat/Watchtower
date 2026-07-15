@@ -20,6 +20,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
 import { CZ_DATE_FORMAT } from '../util/format.js';
 import { WORKLOG_LOCK_SETTING_KEY } from '../util/lockSetting.js';
+import { invoke } from '../state/ipc';
 import type {
   EpicWithProjectPayload,
   TaskByNumberPayload,
@@ -75,10 +76,10 @@ export function SettingsPanel() {
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      window.watchtower.invoke('getSetting', { key: 'quiet_timer_ms' }),
-      window.watchtower.invoke('getSetting', { key: 'default_cwd' }),
-      window.watchtower.invoke('getSetting', { key: 'dashboard.sprint.startDate' }),
-      window.watchtower.invoke('getSetting', { key: 'dashboard.sprint.lengthDays' }),
+      invoke('getSetting', { key: 'quiet_timer_ms' }),
+      invoke('getSetting', { key: 'default_cwd' }),
+      invoke('getSetting', { key: 'dashboard.sprint.startDate' }),
+      invoke('getSetting', { key: 'dashboard.sprint.lengthDays' }),
     ]).then(([q, c, sd, sl]) => {
       if (cancelled) return;
       const next: Saved = {
@@ -99,7 +100,7 @@ export function SettingsPanel() {
   }, []);
 
   const persist = async (key: string, value: string) => {
-    await window.watchtower.invoke('setSetting', { key, value });
+    await invoke('setSetting', { key, value });
   };
 
   const onQuietBlur = async () => {
@@ -140,7 +141,7 @@ export function SettingsPanel() {
     setHookError(null);
     setHookStatus('Working…');
     try {
-      const res = await window.watchtower.invoke('installHooks', {});
+      const res = await invoke('installHooks', {});
       setHookStatus(
         res.changed
           ? `Reinstalled${res.backedUp ? ` (backup: ${res.backedUp})` : ''}.`
@@ -156,7 +157,7 @@ export function SettingsPanel() {
     setHookError(null);
     setHookStatus('Working…');
     try {
-      const res = await window.watchtower.invoke('uninstallHooks', {});
+      const res = await invoke('uninstallHooks', {});
       setHookStatus(
         res.changed ? 'Uninstalled — Watchtower entries removed.' : 'Nothing to uninstall.',
       );
@@ -167,7 +168,7 @@ export function SettingsPanel() {
   };
 
   const sendTest = async () => {
-    await window.watchtower.invoke('sendTestNotification', {});
+    await invoke('sendTestNotification', {});
   };
 
   return (
@@ -281,7 +282,7 @@ export function SettingsPanel() {
               variant="text"
               size="small"
               onClick={() =>
-                void window.watchtower.invoke('setSetting', {
+                void invoke('setSetting', {
                   key: 'first_run_completed_at',
                   value: '',
                 })
@@ -306,8 +307,7 @@ function WorklogLockSettings() {
 
   useEffect(() => {
     let cancelled = false;
-    void window.watchtower
-      .invoke('getSetting', { key: WORKLOG_LOCK_SETTING_KEY })
+    void invoke('getSetting', { key: WORKLOG_LOCK_SETTING_KEY })
       .then((r) => {
         if (cancelled) return;
         const v = r.value?.trim() || null;
@@ -333,7 +333,7 @@ function WorklogLockSettings() {
     try {
       // Empty string clears the setting — the WorklogsRepo treats anything
       // not matching YYYY-MM-DD as "no lock", and useWorklogLock matches.
-      await window.watchtower.invoke('setSetting', {
+      await invoke('setSetting', {
         key: WORKLOG_LOCK_SETTING_KEY,
         value: nextValue ?? '',
       });
@@ -423,7 +423,7 @@ function MeetingsDefaultTaskSettings() {
     let cancelled = false;
     (async () => {
       try {
-        const s = await window.watchtower.invoke('getSetting', {
+        const s = await invoke('getSetting', {
           key: MEETINGS_DEFAULT_TASK_KEY,
         });
         if (cancelled) return;
@@ -432,7 +432,7 @@ function MeetingsDefaultTaskSettings() {
         if (!v) return;
         const id = Number(v);
         if (!Number.isFinite(id)) return;
-        const r = await window.watchtower.invoke('tasks:findById', { id });
+        const r = await invoke('tasks:findById', { id });
         if (cancelled) return;
         if (r.task) {
           setTaskNumber(r.task.number);
@@ -458,7 +458,7 @@ function MeetingsDefaultTaskSettings() {
     if (!trimmed) return;
     setLookingUp(true);
     try {
-      const r = await window.watchtower.invoke('tasks:findByNumber', { number: trimmed });
+      const r = await invoke('tasks:findByNumber', { number: trimmed });
       if (r.task) {
         setResolved(r.task);
       } else {
@@ -467,7 +467,7 @@ function MeetingsDefaultTaskSettings() {
         setShowCreate(true);
         // Lazy-load epics for the picker.
         if (allEpics.length === 0) {
-          const ep = await window.watchtower.invoke('epics:listAll', {});
+          const ep = await invoke('epics:listAll', {});
           setAllEpics(ep.epics);
         }
       }
@@ -492,7 +492,7 @@ function MeetingsDefaultTaskSettings() {
     setBusy(true);
     setError(null);
     try {
-      await window.watchtower.invoke('setSetting', {
+      await invoke('setSetting', {
         key: MEETINGS_DEFAULT_TASK_KEY,
         value: String(id),
       });
@@ -516,13 +516,13 @@ function MeetingsDefaultTaskSettings() {
     setCreating(true);
     setCreateError(null);
     try {
-      const created = await window.watchtower.invoke('tasks:create', {
+      const created = await invoke('tasks:create', {
         epicId: newEpicId,
         number: taskNumber.trim(),
         title: newTitle.trim(),
       });
       // Pull the joined view so the chip displays correctly.
-      const r = await window.watchtower.invoke('tasks:findByNumber', {
+      const r = await invoke('tasks:findByNumber', {
         number: created.task.number,
       });
       if (r.task) setResolved(r.task);

@@ -4,6 +4,7 @@ import type {
   WorklogListFilterPayload,
   WorklogViewPayload,
 } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 function asLockedError(
   p: unknown,
@@ -92,7 +93,7 @@ export function useWorklogs(initial: InitialFilter = {}): WorklogsState {
     setLoading(true);
     setError(null);
     try {
-      const res = await window.watchtower.invoke('worklogs:list', ipcFilter);
+      const res = await invoke('worklogs:list', ipcFilter);
       setWorklogs(res.worklogs);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -107,7 +108,7 @@ export function useWorklogs(initial: InitialFilter = {}): WorklogsState {
 
   const create = useCallback(
     async (input: WorklogInputPayload) => {
-      const res = await window.watchtower.invoke('worklogs:create', input);
+      const res = await invoke('worklogs:create', input);
       const locked = asLockedError(res);
       if (locked) throw new Error(locked.message);
       await refresh();
@@ -118,7 +119,7 @@ export function useWorklogs(initial: InitialFilter = {}): WorklogsState {
 
   const update = useCallback(
     async (id: number, input: Partial<WorklogInputPayload>) => {
-      const res = await window.watchtower.invoke('worklogs:update', { id, input });
+      const res = await invoke('worklogs:update', { id, input });
       const locked = asLockedError(res);
       if (locked) throw new Error(locked.message);
       await refresh();
@@ -129,7 +130,7 @@ export function useWorklogs(initial: InitialFilter = {}): WorklogsState {
 
   const remove = useCallback(
     async (id: number) => {
-      const res = await window.watchtower.invoke('worklogs:delete', { id });
+      const res = await invoke('worklogs:delete', { id });
       const locked = asLockedError(res);
       if (locked) throw new Error(locked.message);
       await refresh();

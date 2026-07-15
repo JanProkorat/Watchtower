@@ -24,6 +24,7 @@ import { useToast, toastMessage } from '../../state/useToast.js';
 import { ContractDrawer } from './ContractDrawer.js';
 import { formatDateAbbrCz, formatDateCz } from '../../util/format.js';
 import type { ContractViewPayload, DayOffViewPayload } from '@watchtower/shared/ipcContract.js';
+import { invoke } from '../../state/ipc';
 
 interface Props {
   projectId: number;
@@ -118,8 +119,7 @@ export function RateHistorySection({ projectId }: Props) {
     }
     let cancelled = false;
     const today = new Date().toISOString().slice(0, 10);
-    void window.watchtower
-      .invoke('daysOff:listInRange', { from: today, to: active.endDate })
+    void invoke('daysOff:listInRange', { from: today, to: active.endDate })
       .then((res) => {
         if (!cancelled) setBookedDaysOff(res.daysOff);
       })

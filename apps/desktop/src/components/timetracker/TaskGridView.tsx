@@ -39,6 +39,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import dayjs, { type Dayjs } from 'dayjs';
 import 'dayjs/locale/cs';
 import { useToast, toastMessage } from '../../state/useToast.js';
+import { invoke } from '../../state/ipc';
 import { formatDateLongCz } from '../../util/format.js';
 import { useTaskGrid } from '../../state/useTaskGrid.js';
 import { TaskDetailDrawer } from './TaskDetailDrawer.js';
@@ -187,7 +188,7 @@ export function TaskGridView({ projectId }: Props) {
   // can populate its project dropdown.
   const initialProjectSelectionDoneRef = useRef(false);
   useEffect(() => {
-    void window.watchtower.invoke('projects:list', { archived: false }).then((r) => {
+    void invoke('projects:list', { archived: false }).then((r) => {
       setProjects(r.projects);
       if (projectId === undefined && !initialProjectSelectionDoneRef.current) {
         initialProjectSelectionDoneRef.current = true;
@@ -281,7 +282,7 @@ export function TaskGridView({ projectId }: Props) {
     // shape, not the joined grid row. Project name/color/epic name are
     // already on the grid payload so they don't need a round-trip.
     try {
-      const tasksRes = await window.watchtower.invoke('tasks:listForEpic', {
+      const tasksRes = await invoke('tasks:listForEpic', {
         epicId: gridTask.epicId,
       });
       const fullTask = tasksRes.tasks.find((t) => t.id === gridTask.taskId) ?? null;
@@ -572,7 +573,7 @@ export function TaskGridView({ projectId }: Props) {
         }}
         onUpdate={async (input) => {
           if (!taskDetailTask) return;
-          const res = await window.watchtower.invoke('tasks:update', {
+          const res = await invoke('tasks:update', {
             id: taskDetailTask.id,
             input,
           });
@@ -583,7 +584,7 @@ export function TaskGridView({ projectId }: Props) {
         }}
         onDelete={async () => {
           if (!taskDetailTask) return;
-          await window.watchtower.invoke('tasks:delete', { id: taskDetailTask.id });
+          await invoke('tasks:delete', { id: taskDetailTask.id });
           setTaskDetailTask(null);
           setTaskDetailContext(null);
           await grid.refresh();
@@ -602,18 +603,18 @@ export function TaskGridView({ projectId }: Props) {
         onClose={() => setWorklogDrawerOpen(false)}
         onSubmit={async (input) => {
           const res = worklogDrawerEditing
-            ? await window.watchtower.invoke('worklogs:update', {
+            ? await invoke('worklogs:update', {
                 id: worklogDrawerEditing.id,
                 input,
               })
-            : await window.watchtower.invoke('worklogs:create', input);
+            : await invoke('worklogs:create', input);
           throwIfLockedResponse(res);
           await grid.refresh();
         }}
         onDelete={
           worklogDrawerEditing
             ? async () => {
-                const res = await window.watchtower.invoke('worklogs:delete', {
+                const res = await invoke('worklogs:delete', {
                   id: worklogDrawerEditing.id,
                 });
                 throwIfLockedResponse(res);

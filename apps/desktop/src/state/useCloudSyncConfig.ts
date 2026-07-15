@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { invoke } from './ipc';
 
 export interface CloudSyncState {
   enabled: boolean;
@@ -22,7 +23,7 @@ export function useCloudSyncConfig(): CloudSyncState {
     setLoading(true);
     setError(null);
     try {
-      const res = await window.watchtower.invoke('cloudSync:getConfig', {});
+      const res = await invoke('cloudSync:getConfig', {});
       setEnabled(res.enabled);
       setAvailable(res.available);
     } catch (err) {
@@ -36,7 +37,7 @@ export function useCloudSyncConfig(): CloudSyncState {
     async (next: { enabled: boolean }) => {
       setError(null);
       try {
-        const res = await window.watchtower.invoke('cloudSync:setConfig', next);
+        const res = await invoke('cloudSync:setConfig', next);
         setNeedsRestart(res.needsRestart);
         await refresh();
       } catch (err) {
