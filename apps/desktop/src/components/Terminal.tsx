@@ -5,6 +5,7 @@ import '@xterm/xterm/css/xterm.css';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useSlotForInstance } from './instances/SlotRegistry.js';
 import { signalTerminalInteraction } from './instances/terminalInteraction.js';
+import { invoke } from '../state/ipc';
 
 interface Props {
   instanceId: string;
@@ -32,7 +33,7 @@ export function Terminal({ instanceId, status }: Props) {
 
   const clearAttentionOnInteraction = () =>
     signalTerminalInteraction(instanceId, statusRef.current, (id) =>
-      void window.watchtower.invoke('focusChanged', { instanceId: id }),
+      void invoke('focusChanged', { instanceId: id }),
     );
 
   useEffect(() => {
@@ -79,15 +80,15 @@ export function Terminal({ instanceId, status }: Props) {
       term.write(p.chunk);
     });
     const inputDisp = term.onData((data) => {
-      void window.watchtower.invoke('ptyWrite', { instanceId, data });
+      void invoke('ptyWrite', { instanceId, data });
       clearAttentionOnInteraction();
     });
-    void window.watchtower.invoke('ptyResize', {
+    void invoke('ptyResize', {
       instanceId,
       cols: term.cols,
       rows: term.rows,
     });
-    void window.watchtower.invoke('terminalFocus', { instanceId });
+    void invoke('terminalFocus', { instanceId });
 
     const host = hostRef.current;
     const onHostMouseDown = () => clearAttentionOnInteraction();
@@ -118,13 +119,13 @@ export function Terminal({ instanceId, status }: Props) {
           try {
             fit?.fit();
             if (term) {
-              void window.watchtower.invoke('ptyResize', {
+              void invoke('ptyResize', {
                 instanceId,
                 cols: term.cols,
                 rows: term.rows,
               });
               term.focus();
-              void window.watchtower.invoke('terminalFocus', { instanceId });
+              void invoke('terminalFocus', { instanceId });
             }
           } catch {
             /* hidden */
@@ -144,7 +145,7 @@ export function Terminal({ instanceId, status }: Props) {
         fit.fit();
         const term = termRef.current;
         if (term) {
-          void window.watchtower.invoke('ptyResize', {
+          void invoke('ptyResize', {
             instanceId,
             cols: term.cols,
             rows: term.rows,

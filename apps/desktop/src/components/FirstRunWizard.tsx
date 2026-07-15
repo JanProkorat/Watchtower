@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { invoke } from '../state/ipc';
 import {
   Alert,
   Box,
@@ -31,7 +32,6 @@ export function FirstRunWizard({ open, onClose }: Props) {
   const [step, setStep] = useState<Step>('welcome');
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
   const [installing, setInstalling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [installResult, setInstallResult] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,31 +39,28 @@ export function FirstRunWizard({ open, onClose }: Props) {
     setStep('welcome');
     setPreview(null);
     setInstalling(false);
-    setError(null);
     setInstallResult(null);
   }, [open]);
 
   useEffect(() => {
     if (step !== 'hooks' || preview) return;
-    void window.watchtower
-      .invoke('previewHookInstall', {})
+    void invoke('previewHookInstall', {})
       .then((p) => setPreview(p))
-      .catch((e: Error) => setError(e.message));
+      .catch(() => { /* surfaced via the global error toast */ });
   }, [step, preview]);
 
   const install = async () => {
     setInstalling(true);
-    setError(null);
     try {
-      const res = await window.watchtower.invoke('installHooks', {});
+      const res = await invoke('installHooks', {});
       setInstallResult(
         res.changed
           ? `Installed (backup at ${res.backedUp ?? '— no existing file'}).`
           : 'Already installed.',
       );
       setStep('test');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch {
+      /* surfaced via the global error toast */
     } finally {
       setInstalling(false);
     }
@@ -71,7 +68,7 @@ export function FirstRunWizard({ open, onClose }: Props) {
 
   const finish = async () => {
     try {
-      await window.watchtower.invoke('setSetting', {
+      await invoke('setSetting', {
         key: 'first_run_completed_at',
         value: String(Date.now()),
       });
@@ -106,11 +103,6 @@ export function FirstRunWizard({ open, onClose }: Props) {
         ))}
       </Box>
       <DialogContent>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
         {step === 'welcome' && (
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Typography>
@@ -193,7 +185,7 @@ export function FirstRunWizard({ open, onClose }: Props) {
             <Typography>Try a test notification to verify macOS permissions.</Typography>
             <Button
               variant="outlined"
-              onClick={() => void window.watchtower.invoke('sendTestNotification', {})}
+              onClick={() => void invoke('sendTestNotification', {})}
               sx={{ alignSelf: 'flex-start' }}
             >
               Send test notification

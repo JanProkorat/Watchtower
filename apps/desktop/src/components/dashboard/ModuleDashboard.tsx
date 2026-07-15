@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Box, Skeleton, Stack } from '@mui/material';
+import { Box, Skeleton, Stack } from '@mui/material';
 import dayjs from 'dayjs';
 import { useDashboardOverview } from '../../state/useDashboardOverview.js';
 import { useProjects } from '../../state/useProjects.js';
@@ -128,18 +128,6 @@ export function ModuleDashboard({
         onProjectsChange={setProjectIds}
         todayDate={today}
       />
-
-      {projectsState.error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          Failed to load projects: {projectsState.error}
-        </Alert>
-      )}
-
-      {overview.error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {overview.error}
-        </Alert>
-      )}
 
       <Stack spacing={2}>
         <TokenUsageCard usage={tokenUsage} />

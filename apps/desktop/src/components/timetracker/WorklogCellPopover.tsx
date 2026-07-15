@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   Box,
   Divider,
   IconButton,
@@ -29,6 +28,7 @@ import {
   parseMinutes,
 } from '../../util/format.js';
 import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
+import { invoke } from '../../state/ipc';
 import type {
   ContractViewPayload,
   WorklogViewPayload,
@@ -75,10 +75,6 @@ export function WorklogCellPopover({
   const [editReported, setEditReported] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
-  // Surfaces a failed mutation (e.g. the worklog's task is Done, or the day
-  // became locked) inline instead of silently swallowing the rejection.
-  const [actionError, setActionError] = useState<string | null>(null);
-
   // Inline add state.
   const [isAdding, setIsAdding] = useState(false);
   const [addMinutes, setAddMinutes] = useState('');
@@ -95,7 +91,6 @@ export function WorklogCellPopover({
       setAddDescription('');
       setWorklogs([]);
       setRate(null);
-      setActionError(null);
     }
   }, [open]);
 
@@ -105,7 +100,7 @@ export function WorklogCellPopover({
     let cancelled = false;
     void (async () => {
       try {
-        const res = await window.watchtower.invoke('worklogs:list', {
+        const res = await invoke('worklogs:list', {
           taskId,
           from: ymd,
           to: ymd,
@@ -118,7 +113,7 @@ export function WorklogCellPopover({
     if (projectId != null) {
       void (async () => {
         try {
-          const res = await window.watchtower.invoke('contracts:listForProject', {
+          const res = await invoke('contracts:listForProject', {
             projectId,
           });
           if (cancelled) return;
@@ -160,7 +155,7 @@ export function WorklogCellPopover({
   const reload = async () => {
     if (taskId == null) return;
     try {
-      const res = await window.watchtower.invoke('worklogs:list', {
+      const res = await invoke('worklogs:list', {
         taskId,
         from: ymd,
         to: ymd,
@@ -171,16 +166,14 @@ export function WorklogCellPopover({
     }
   };
 
-  // Runs a worklog mutation, surfacing any rejection (locked day, Done task)
-  // as an inline alert. Returns true on success so callers can clear edit
-  // state only when the write actually landed.
+  // Runs a worklog mutation (rejection, e.g. locked day or Done task, is
+  // surfaced via the global error toast). Returns true on success so callers
+  // can clear edit state only when the write actually landed.
   const runMutation = async (fn: () => Promise<void>): Promise<boolean> => {
-    setActionError(null);
     try {
       await fn();
       return true;
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
+    } catch {
       return false;
     }
   };
@@ -208,7 +201,7 @@ export function WorklogCellPopover({
       reportedMinutes = parsed;
     }
     const ok = await runMutation(async () => {
-      await window.watchtower.invoke('worklogs:update', {
+      await invoke('worklogs:update', {
         id: editId,
         input: {
           workDate: editDate.format('YYYY-MM-DD'),
@@ -227,7 +220,7 @@ export function WorklogCellPopover({
   const toggleJiraUploaded = async (entry: WorklogViewPayload) => {
     if (dayLocked) return;
     const ok = await runMutation(async () => {
-      await window.watchtower.invoke('worklogs:update', {
+      await invoke('worklogs:update', {
         id: entry.id,
         input: { jiraUploaded: !entry.jiraUploaded },
       });
@@ -240,7 +233,7 @@ export function WorklogCellPopover({
   const deleteEntry = async (entry: WorklogViewPayload) => {
     if (dayLocked) return;
     const ok = await runMutation(async () => {
-      await window.watchtower.invoke('worklogs:delete', { id: entry.id });
+      await invoke('worklogs:delete', { id: entry.id });
     });
     if (!ok) return;
     await reload();
@@ -269,7 +262,7 @@ export function WorklogCellPopover({
   const commitAdd = async () => {
     if (!addValid || taskId == null) return;
     const ok = await runMutation(async () => {
-      await window.watchtower.invoke('worklogs:create', {
+      await invoke('worklogs:create', {
         taskId,
         workDate: ymd,
         minutes: addMinutesParsed,
@@ -581,12 +574,6 @@ export function WorklogCellPopover({
               />
             </Stack>
           </>
-        )}
-
-        {actionError && (
-          <Alert severity="error" onClose={() => setActionError(null)} sx={{ fontSize: 12, py: 0 }}>
-            {actionError}
-          </Alert>
         )}
 
         {dayLocked && (

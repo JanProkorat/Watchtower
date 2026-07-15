@@ -17,6 +17,7 @@ import {
   findLeafById,
 } from '@watchtower/shared/workspaceTreeOps.js';
 import { newNodeId } from '@watchtower/shared/newNodeId.js';
+import { invoke } from './ipc';
 
 const PERSIST_DEBOUNCE_MS = 500;
 
@@ -142,7 +143,7 @@ export async function hydrate(): Promise<PersistedLayout> {
 
 async function readSetting<T>(key: string): Promise<T | null> {
   try {
-    const r = await window.watchtower.invoke('getSetting', { key });
+    const r = await invoke('getSetting', { key });
     if (!r.value) return null;
     return JSON.parse(r.value) as T;
   } catch {
@@ -152,19 +153,19 @@ async function readSetting<T>(key: string): Promise<T | null> {
 
 export async function persist(layout: PersistedLayout): Promise<void> {
   await Promise.all([
-    window.watchtower.invoke('setSetting', {
+    invoke('setSetting', {
       key: SETTINGS_KEYS.workspaceTree,
       value: JSON.stringify(layout.root),
     }),
-    window.watchtower.invoke('setSetting', {
+    invoke('setSetting', {
       key: SETTINGS_KEYS.focusedLeafId,
       value: JSON.stringify(layout.focusedLeafId),
     }),
-    window.watchtower.invoke('setSetting', {
+    invoke('setSetting', {
       key: SETTINGS_KEYS.tabFocus,
       value: JSON.stringify(layout.tabFocus),
     }),
-    window.watchtower.invoke('setSetting', {
+    invoke('setSetting', {
       key: SETTINGS_KEYS.tabStripOrder,
       value: JSON.stringify(layout.tabStripOrder),
     }),

@@ -22,6 +22,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CloseIcon from '@mui/icons-material/Close';
 import { useBoard } from '../../state/useBoard.js';
 import { useToast } from '../../state/useToast.js';
+import { invoke } from '../../state/ipc';
 import { epicColours } from './boardChips.js';
 import type {
   BoardCardPayload,
@@ -91,7 +92,6 @@ interface Props {
 export function BoardTab({ active }: Props) {
   const [projectsWithBoard, setProjectsWithBoard] = useState<ProjectViewPayload[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(() =>
     readStoredProjectId(),
   );
@@ -108,18 +108,15 @@ export function BoardTab({ active }: Props) {
     let cancelled = false;
     (async () => {
       setProjectsLoading(true);
-      setProjectsError(null);
       try {
-        const res = await window.watchtower.invoke('projects:list', { archived: false });
+        const res = await invoke('projects:list', { archived: false });
         if (cancelled) return;
         const withBoard = res.projects.filter(
           (p) => p.jiraBoardUrl !== null && p.jiraBoardUrl.trim() !== '',
         );
         setProjectsWithBoard(withBoard);
-      } catch (err) {
-        if (!cancelled) {
-          setProjectsError(err instanceof Error ? err.message : String(err));
-        }
+      } catch {
+        /* surfaced via the global error toast */
       } finally {
         if (!cancelled) setProjectsLoading(false);
       }
@@ -177,8 +174,7 @@ export function BoardTab({ active }: Props) {
   }, [snapshot]);
 
   const openInBrowser = (url: string) => {
-    void window.watchtower
-      .invoke('openExternalUrl', { url })
+    void invoke('openExternalUrl', { url })
       .catch((err: unknown) => showError(err instanceof Error ? err.message : String(err)));
   };
 
@@ -212,7 +208,6 @@ export function BoardTab({ active }: Props) {
     return (
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, p: 2, gap: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>Board</Typography>
-        {projectsError && <Alert severity="error">{projectsError}</Alert>}
         <Alert severity="info">
           <strong>No Jira board configured.</strong>
           <Box sx={{ mt: 0.5 }}>

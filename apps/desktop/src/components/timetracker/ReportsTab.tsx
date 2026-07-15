@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   ButtonGroup,
@@ -17,6 +16,7 @@ import {
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useReports, type Granularity } from '../../state/useReports.js';
+import { invoke } from '../../state/ipc';
 import { CZ_DATE_FORMAT } from '../../util/format.js';
 import type { ProjectViewPayload } from '@watchtower/shared/ipcContract.js';
 import ChartCard from './charts/ChartCard.js';
@@ -100,7 +100,7 @@ export function ReportsTab() {
   // manual changes stick.
   const initialProjectSelectionDoneRef = useRef(false);
   useEffect(() => {
-    void window.watchtower.invoke('projects:list', { archived: false }).then((r) => {
+    void invoke('projects:list', { archived: false }).then((r) => {
       setProjects(r.projects);
       if (!initialProjectSelectionDoneRef.current) {
         initialProjectSelectionDoneRef.current = true;
@@ -264,16 +264,6 @@ export function ReportsTab() {
           </ToggleButtonGroup>
         </Stack>
       </Paper>
-
-      {state.errors.length > 0 && (
-        <Box sx={{ px: 2, pb: 1 }}>
-          <Alert severity="error">
-            {state.errors.length === 1
-              ? state.errors[0]
-              : `${state.errors.length} reports failed to load — see DevTools for details.`}
-          </Alert>
-        </Box>
-      )}
 
       <Box sx={{ px: 2, pb: 2 }}>
         <Grid container spacing={2}>

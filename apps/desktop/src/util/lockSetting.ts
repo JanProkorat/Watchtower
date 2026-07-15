@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { invoke } from '../state/ipc';
 
 /** Settings key holding the inclusive worklog-lock date (ISO YYYY-MM-DD). */
 export const WORKLOG_LOCK_SETTING_KEY = 'worklogs.locked_through';
@@ -21,8 +22,7 @@ export function useWorklogLock(): string | null {
     let cancelled = false;
 
     const load = () => {
-      void window.watchtower
-        .invoke('getSetting', { key: WORKLOG_LOCK_SETTING_KEY })
+      void invoke('getSetting', { key: WORKLOG_LOCK_SETTING_KEY })
         .then((r) => {
           if (cancelled) return;
           const v = r.value?.trim();

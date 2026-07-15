@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { groupPrsByHost, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex, useReviews } from '../../apps/desktop/src/state/useReviews.js';
+import { groupPrsByProject, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex, useReviews } from '../../apps/desktop/src/state/useReviews.js';
+import { toast } from '../../apps/desktop/src/state/useToast';
 import type { PrFindingPayload } from '../../packages/shared/src/ipcContract.js';
 
 const pr = (o: Partial<any> = {}) => ({ host: 'github', repoKey: 'gh:o/r', repoLabel: 'r', number: 1,
@@ -13,9 +14,16 @@ const finding = (o: Partial<PrFindingPayload> = {}): PrFindingPayload => ({
 });
 
 describe('useReviews helpers', () => {
-  it('groups by host with labels, github first', () => {
-    const g = groupPrsByHost([pr(), pr({ host: 'azdo', repoKey: 'azdo:P/r' })]);
-    expect(g.map((x) => x.host)).toEqual(['github', 'azdo']);
+  it('groups by project (repoLabel), most-recently-active project first, Default bucket last', () => {
+    const g = groupPrsByProject([
+      pr({ number: 1, repoLabel: 'Spot', updatedAt: '2026-07-05T00:00:00Z' }),
+      pr({ number: 2, repoLabel: 'PPS', updatedAt: '2026-07-10T00:00:00Z' }),
+      pr({ number: 3, repoLabel: 'Spot', updatedAt: '2026-07-09T00:00:00Z' }),
+      pr({ number: 4, repoLabel: '', updatedAt: '2026-07-11T00:00:00Z' }), // no project → Default, forced last despite newest
+    ]);
+    expect(g.map((x) => x.label)).toEqual(['PPS', 'Spot', 'Default']);
+    // within a project, most-recent PR first
+    expect(g.find((x) => x.label === 'Spot')!.prs.map((p) => p.number)).toEqual([3, 1]);
   });
   it('sorts by updatedAt desc', () => {
     const s = sortByUpdatedDesc([pr({ updatedAt: '2026-07-01T00:00:00Z', number: 1 }), pr({ updatedAt: '2026-07-09T00:00:00Z', number: 2 })]);
@@ -74,7 +82,7 @@ describe('useReviews IPC wrappers', () => {
       invoke: vi.fn(async (kind: string) => {
         switch (kind) {
           case 'prs:list':
-          case 'prs:refresh': return { pullRequests: [], syncedAt: '2026-07-14T10:00:00Z' };
+          case 'prs:refresh': return { pullRequests: [], syncedAt: '2026-07-14T10:00:00Z', warnings: [] };
           case 'prReview:list': return { reviews: [] };
           case 'prs:reviewState': return { amIAuthor: false, approved: true, mergeable: true, mergeBlockedReason: null };
           case 'prs:approve': return { ok: true };
@@ -98,5 +106,28 @@ describe('useReviews IPC wrappers', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => { await result.current.approvePr('github', 'gh:acme/w', 42); });
     expect((window as any).watchtower.invoke).toHaveBeenCalledWith('prs:approve', { host: 'github', repoKey: 'gh:acme/w', number: 42 });
+  });
+
+  it('closePr invokes prs:close then refreshes the list (evicting the closed PR)', async () => {
+    const { result } = renderHook(() => useReviews());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    (window as any).watchtower.invoke.mockClear();
+    await act(async () => { await result.current.closePr('github', 'gh:acme/w', 42); });
+    const kinds = (window as any).watchtower.invoke.mock.calls.map((c: unknown[]) => c[0]);
+    expect((window as any).watchtower.invoke).toHaveBeenCalledWith('prs:close', { host: 'github', repoKey: 'gh:acme/w', prNumber: 42 });
+    expect(kinds).toContain('prs:refresh');
+  });
+
+  it('surfaces per-repo list warnings as toasts', async () => {
+    (window as any).watchtower.invoke = vi.fn(async (kind: string) => {
+      if (kind === 'prs:list' || kind === 'prs:refresh') {
+        return { pullRequests: [], syncedAt: '2026-07-14T10:00:00Z', warnings: ['PPS: Azure DevOps 401'] };
+      }
+      if (kind === 'prReview:list') return { reviews: [] };
+      return {};
+    });
+    const spy = vi.spyOn(toast, 'showWarning');
+    renderHook(() => useReviews());
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('PPS: Azure DevOps 401'));
   });
 });

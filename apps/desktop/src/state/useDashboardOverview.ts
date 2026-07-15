@@ -3,6 +3,7 @@ import type {
   DashboardOverviewRequestPayload,
   DashboardOverviewResponsePayload,
 } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 export interface DashboardOverviewState {
   data: DashboardOverviewResponsePayload | null;
@@ -35,7 +36,7 @@ export function useDashboardOverview(
     try {
       const ids = projectIdsKey === '' ? [] : projectIdsKey.split(',').map(Number);
       const payload: DashboardOverviewRequestPayload = { projectIds: ids, sprintAnchor, todayDate };
-      const res = await window.watchtower.invoke('dashboard:overview', payload);
+      const res = await invoke('dashboard:overview', payload);
       setData(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

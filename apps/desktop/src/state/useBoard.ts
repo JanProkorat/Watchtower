@@ -4,6 +4,7 @@ import type {
   BoardSnapshotPayload,
   BoardSyncResultPayload,
 } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 /** Auto-sync threshold: refetch on mount if local snapshot is older than this. */
 const STALE_MS = 5 * 60 * 1000;
@@ -68,8 +69,8 @@ export function useBoard(active: boolean, projectId: number | null): UseBoard {
     if (projectId === null) return;
     setState((s) => ({ ...s, syncing: true, syncError: null }));
     try {
-      const { snapshot, result } = await window.watchtower.invoke('board:sync', { projectId });
-      const auth = await window.watchtower.invoke('board:authPing', {});
+      const { snapshot, result } = await invoke('board:sync', { projectId });
+      const auth = await invoke('board:authPing', {});
       setState((s) => ({
         ...s,
         snapshot,
@@ -90,7 +91,7 @@ export function useBoard(active: boolean, projectId: number | null): UseBoard {
   const signInAndSync = useCallback(async () => {
     setState((s) => ({ ...s, syncing: true, syncError: null }));
     try {
-      const r = await window.watchtower.invoke('board:signIn', {});
+      const r = await invoke('board:signIn', {});
       if (!r.ok) {
         setState((s) => ({ ...s, syncing: false, syncError: r.error ?? 'Sign-in failed' }));
         return;
@@ -117,8 +118,8 @@ export function useBoard(active: boolean, projectId: number | null): UseBoard {
     setState((s) => ({ ...s, loading: true }));
     (async () => {
       const [snapshot, auth] = await Promise.all([
-        window.watchtower.invoke('board:get', { projectId }),
-        window.watchtower.invoke('board:authPing', {}),
+        invoke('board:get', { projectId }),
+        invoke('board:authPing', {}),
       ]);
       if (cancelled) return;
       setState((s) => ({ ...s, snapshot, auth, loading: false }));
@@ -156,7 +157,7 @@ export function useBoard(active: boolean, projectId: number | null): UseBoard {
         return { ...s, snapshot: { ...s.snapshot, cards: filtered } };
       });
       try {
-        const { snapshot } = await window.watchtower.invoke('board:remove', {
+        const { snapshot } = await invoke('board:remove', {
           taskId,
           projectId,
         });

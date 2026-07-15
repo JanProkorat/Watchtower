@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import type { PersistedLayout, TabRecord } from '@watchtower/shared/layout.js';
 import { findLeafById } from '@watchtower/shared/workspaceTreeOps.js';
+import { invoke } from './ipc';
 
 export function useFocusedInstance(
   layout: PersistedLayout,
@@ -12,7 +13,7 @@ export function useFocusedInstance(
   );
 
   useEffect(() => {
-    void window.watchtower.invoke('focusChanged', { instanceId: focusedInstanceId });
+    void invoke('focusChanged', { instanceId: focusedInstanceId });
   }, [focusedInstanceId]);
 
   return focusedInstanceId;

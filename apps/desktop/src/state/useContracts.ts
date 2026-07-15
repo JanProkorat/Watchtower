@@ -3,6 +3,7 @@ import type {
   ContractInputPayload,
   ContractViewPayload,
 } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 export interface OverlapErrorInfo {
   conflictingId: number;
@@ -46,7 +47,7 @@ export function useContracts(projectId: number): ContractsState {
     setLoading(true);
     setError(null);
     try {
-      const res = await window.watchtower.invoke('contracts:listForProject', { projectId });
+      const res = await invoke('contracts:listForProject', { projectId });
       setContracts(res.contracts);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -61,7 +62,7 @@ export function useContracts(projectId: number): ContractsState {
 
   const create = useCallback(
     async (input: ContractInputPayload) => {
-      const res = await window.watchtower.invoke('contracts:create', input);
+      const res = await invoke('contracts:create', input);
       if (isOverlap(res)) {
         return {
           conflictingId: res.conflictingId,
@@ -79,7 +80,7 @@ export function useContracts(projectId: number): ContractsState {
 
   const update = useCallback(
     async (id: number, input: Partial<ContractInputPayload>) => {
-      const res = await window.watchtower.invoke('contracts:update', { id, input });
+      const res = await invoke('contracts:update', { id, input });
       if (isOverlap(res)) {
         return {
           conflictingId: res.conflictingId,
@@ -97,7 +98,7 @@ export function useContracts(projectId: number): ContractsState {
 
   const remove = useCallback(
     async (id: number) => {
-      await window.watchtower.invoke('contracts:delete', { id });
+      await invoke('contracts:delete', { id });
       await refresh();
     },
     [refresh],

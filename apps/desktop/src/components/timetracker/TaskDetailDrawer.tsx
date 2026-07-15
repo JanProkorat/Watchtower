@@ -45,6 +45,7 @@ import {
   formatMinutes,
   parseMinutes,
 } from '../../util/format.js';
+import { invoke } from '../../state/ipc';
 
 interface Props {
   open: boolean;
@@ -96,7 +97,7 @@ export function TaskDetailDrawer({
     setLoading(true);
     setError(null);
     try {
-      const res = await window.watchtower.invoke('worklogs:list', { taskId: task.id });
+      const res = await invoke('worklogs:list', { taskId: task.id });
       const sorted = [...res.worklogs].sort((a, b) =>
         a.workDate < b.workDate ? 1 : a.workDate > b.workDate ? -1 : b.id - a.id,
       );
@@ -130,7 +131,7 @@ export function TaskDetailDrawer({
     if (!externalUrl) return;
     e.preventDefault();
     if (onOpenExternal) onOpenExternal(externalUrl);
-    else void window.watchtower.invoke('openExternalUrl', { url: externalUrl });
+    else void invoke('openExternalUrl', { url: externalUrl });
   };
 
   const handleAddWorklog = async (values: {
@@ -148,7 +149,7 @@ export function TaskDetailDrawer({
         reportedMinutes: values.reported_minutes,
         description: values.description,
       };
-      const res = await window.watchtower.invoke('worklogs:create', input);
+      const res = await invoke('worklogs:create', input);
       if ('lockedThrough' in res) {
         setError(`Worklog window is locked through ${res.lockedThrough}.`);
         return;
@@ -166,7 +167,7 @@ export function TaskDetailDrawer({
   ) => {
     setError(null);
     try {
-      const res = await window.watchtower.invoke('worklogs:update', { id, input: values });
+      const res = await invoke('worklogs:update', { id, input: values });
       if ('lockedThrough' in res) {
         setError(`Worklog window is locked through ${res.lockedThrough}.`);
         return;
@@ -184,7 +185,7 @@ export function TaskDetailDrawer({
     }
     setError(null);
     try {
-      const res = await window.watchtower.invoke('worklogs:delete', { id: w.id });
+      const res = await invoke('worklogs:delete', { id: w.id });
       if ('lockedThrough' in res) {
         setError(`Worklog window is locked through ${res.lockedThrough}.`);
         return;

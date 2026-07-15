@@ -70,12 +70,10 @@ export function TaskDrawer({
 }: Props) {
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(defaultEpicId));
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setDraft(draftOf(task, defaultEpicId));
-      setError(null);
       setSubmitting(false);
     }
   }, [open, task, defaultEpicId]);
@@ -92,7 +90,6 @@ export function TaskDrawer({
   const submit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
-    setError(null);
     try {
       const estimateHoursNum = Number(draft.estimateHours);
       const estimatedMinutes =
@@ -108,8 +105,8 @@ export function TaskDrawer({
         estimatedMinutes,
       });
       onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch {
+      /* surfaced via the global error toast */
     } finally {
       setSubmitting(false);
     }
@@ -148,7 +145,6 @@ export function TaskDrawer({
             gap: 2.5,
           }}
         >
-          {error && <Alert severity="error">{error}</Alert>}
           {taskDone && (
             <Alert severity="info">
               This task is marked Done and is locked. Move it back via Jira to edit it.

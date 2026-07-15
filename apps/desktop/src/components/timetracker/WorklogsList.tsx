@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -23,6 +22,7 @@ import { CZ_DATE_FORMAT } from '../../util/format.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { isLocked, useWorklogLock } from '../../util/lockSetting.js';
 import { WorklogDrawer } from './WorklogDrawer.js';
+import { invoke } from '../../state/ipc';
 import type { ProjectViewPayload, WorklogViewPayload } from '@watchtower/shared/ipcContract.js';
 
 interface Props {
@@ -85,8 +85,7 @@ export function WorklogsList({ projectId }: Props) {
   // Load active projects once for the project filter dropdown (list mode only).
   useEffect(() => {
     if (projectId !== undefined) return;
-    void window.watchtower
-      .invoke('projects:list', { archived: false })
+    void invoke('projects:list', { archived: false })
       .then((r) => setProjects(r.projects));
   }, [projectId]);
 
@@ -175,12 +174,6 @@ export function WorklogsList({ projectId }: Props) {
       </Stack>
 
       <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 1.5 }}>
-        {state.error && (
-          <Alert severity="error" sx={{ mb: 1.5 }}>
-            {state.error}
-          </Alert>
-        )}
-
         {!state.loading && state.worklogs.length === 0 && (
           <Box sx={{ textAlign: 'center', color: 'text.secondary', mt: 6 }}>
             <Typography variant="body2" sx={{ mb: 1.5 }}>

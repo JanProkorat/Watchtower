@@ -29,7 +29,7 @@ beforeEach(() => {
     invoke: vi.fn(async (kind: string) => {
       switch (kind) {
         case 'prs:list':
-        case 'prs:refresh': return { pullRequests: [pr], syncedAt: '2026-07-12T10:00:00Z' };
+        case 'prs:refresh': return { pullRequests: [pr], syncedAt: '2026-07-12T10:00:00Z', warnings: [] };
         case 'prWatch:list': return { items: [inboxItem], unread: 1 };
         case 'prWatch:markSeen': return { ok: true };
         case 'prs:diff': return { files: [] };

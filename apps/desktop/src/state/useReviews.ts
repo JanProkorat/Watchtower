@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrHost, PrReviewPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
+import { toast } from './useToast';
 
 export type PrReviewState = { amIAuthor: boolean; approved: boolean; mergeable: boolean; mergeBlockedReason: string | null };
 
 export type HostFilter = 'all' | 'github' | 'azdo';
-const HOST_LABEL: Record<PrHost, string> = { github: 'GitHub', azdo: 'Azure DevOps · Škoda' };
 
 const SEVERITY_ORDER: Record<PrFindingPayload['severity'], number> = { error: 0, warn: 1, info: 2 };
 
@@ -34,10 +35,24 @@ export function sortByUpdatedDesc(prs: PullRequestPayload[]): PullRequestPayload
   return [...prs].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 
-export function groupPrsByHost(prs: PullRequestPayload[]) {
-  const order: PrHost[] = ['github', 'azdo'];
-  return order.map((host) => ({ host, label: HOST_LABEL[host],
-    prs: sortByUpdatedDesc(prs.filter((p) => p.host === host)) })).filter((g) => g.prs.length > 0);
+// Group PRs by the Watchtower project they belong to. Every list PR carries its
+// project name in `repoLabel` (stamped by the Reviews service from the project
+// that owns the repo); a PR without one falls into the 'Default' bucket. Groups
+// are ordered most-recently-active first, with 'Default' pinned last.
+export function groupPrsByProject(prs: PullRequestPayload[]) {
+  const byProject = new Map<string, PullRequestPayload[]>();
+  for (const p of prs) {
+    const label = p.repoLabel?.trim() ? p.repoLabel : 'Default';
+    const list = byProject.get(label);
+    if (list) list.push(p); else byProject.set(label, [p]);
+  }
+  const groups = [...byProject.entries()].map(([label, list]) => ({ label, prs: sortByUpdatedDesc(list) }));
+  groups.sort((a, b) => {
+    if (a.label === 'Default') return 1;
+    if (b.label === 'Default') return -1;
+    return Date.parse(b.prs[0]!.updatedAt) - Date.parse(a.prs[0]!.updatedAt);
+  });
+  return groups;
 }
 
 export function applyPrFilter(prs: PullRequestPayload[], host: HostFilter, query: string): PullRequestPayload[] {
@@ -65,8 +80,11 @@ export function useReviews() {
   const load = useCallback(async (kind: 'prs:list' | 'prs:refresh') => {
     setLoading(true); setError(null);
     try {
-      const res = await window.watchtower.invoke(kind, {});
+      const res = await invoke(kind, {});
       setPullRequests(res.pullRequests); setSyncedAt(res.syncedAt);
+      // Per-repo failures that didn't abort the whole list (e.g. one DevOps repo
+      // failed while GitHub loaded) surface as non-blocking warning toasts.
+      for (const w of res.warnings ?? []) toast.showWarning(w);
       return res;
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); return null; }
     finally { setLoading(false); }
@@ -84,7 +102,14 @@ export function useReviews() {
   // Squash-merge a PR (Task 11's Merge button). electron-main injects any
   // devopsPats needed for Azure DevOps — the renderer never sends them.
   const mergePr = useCallback(async (host: PrHost, repoKey: string, prNumber: number, deleteBranch: boolean): Promise<void> => {
-    await window.watchtower.invoke('prs:merge', { host, repoKey, prNumber, deleteBranch });
+    await invoke('prs:merge', { host, repoKey, prNumber, deleteBranch });
+    await refresh();
+  }, [refresh]);
+
+  // Close without merging (GitHub close / DevOps abandon). Refresh evicts the
+  // now-inactive PR from the list. electron-main injects devopsPats.
+  const closePr = useCallback(async (host: PrHost, repoKey: string, prNumber: number): Promise<void> => {
+    await invoke('prs:close', { host, repoKey, prNumber });
     await refresh();
   }, [refresh]);
 
@@ -92,22 +117,22 @@ export function useReviews() {
   // row. electron-main injects any devopsPats needed for Azure DevOps — the
   // renderer never sends them.
   const fetchReviewState = useCallback(async (host: PrHost, repoKey: string, number: number): Promise<PrReviewState> => {
-    return window.watchtower.invoke('prs:reviewState', { host, repoKey, number });
+    return invoke('prs:reviewState', { host, repoKey, number });
   }, []);
 
   // Approve a PR (GitHub `gh pr review --approve` / ADO reviewer vote). The
   // renderer never sends devopsPats — electron-main injects them for this kind.
   const approvePr = useCallback(async (host: PrHost, repoKey: string, number: number): Promise<void> => {
-    await window.watchtower.invoke('prs:approve', { host, repoKey, number });
+    await invoke('prs:approve', { host, repoKey, number });
   }, []);
 
   const loadDiff = useCallback(async (pr: PullRequestPayload): Promise<DiffFilePayload[]> => {
-    const res = await window.watchtower.invoke('prs:diff', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
+    const res = await invoke('prs:diff', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
     return res.files;
   }, []);
 
   const loadComments = useCallback(async (pr: PullRequestPayload): Promise<PrCommentThreadPayload[]> => {
-    const res = await window.watchtower.invoke('prs:comments', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
+    const res = await invoke('prs:comments', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
     return res.threads;
   }, []);
 
@@ -122,17 +147,17 @@ export function useReviews() {
   const openReviewTokenRef = useRef(0);
 
   const startReview = useCallback(async (pr: PullRequestPayload): Promise<number> => {
-    const res = await window.watchtower.invoke('prReview:start', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
+    const res = await invoke('prReview:start', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
     return res.reviewId;
   }, []);
 
   const getReview = useCallback(async (reviewId: number): Promise<PrReviewPayload | null> => {
-    const res = await window.watchtower.invoke('prReview:get', { reviewId });
+    const res = await invoke('prReview:get', { reviewId });
     return res.review;
   }, []);
 
   const listReviews = useCallback(async (repoKey?: string): Promise<PrReviewPayload[]> => {
-    const res = await window.watchtower.invoke('prReview:list', { repoKey });
+    const res = await invoke('prReview:list', { repoKey });
     return res.reviews;
   }, []);
 
@@ -146,7 +171,7 @@ export function useReviews() {
   const cancelReview = useCallback(async (pr: PullRequestPayload): Promise<void> => {
     const found = await latestReviewFor(pr);
     if (!found || found.status !== 'running') return;
-    await window.watchtower.invoke('prReview:cancel', { reviewId: found.id });
+    await invoke('prReview:cancel', { reviewId: found.id });
   }, [latestReviewFor]);
 
   // Post the selected findings (by original index) as comments on the PR. The
@@ -154,7 +179,7 @@ export function useReviews() {
   // The reload of `review` (with `posted` flags flipped) happens via the already-
   // subscribed prReviewDone push, not here.
   const postComments = useCallback(async (reviewId: number, findingIndexes: number[]): Promise<{ posted: number; skipped: number; errors: string[] }> => {
-    return window.watchtower.invoke('prReview:postComments', { reviewId, findingIndexes });
+    return invoke('prReview:postComments', { reviewId, findingIndexes });
   }, []);
 
   // ─── Review state for the PR list (grey/amber/green/red dot + finding count) ───
@@ -242,7 +267,7 @@ export function useReviews() {
   }, [getReview]);
 
   return {
-    pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr,
+    pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr, closePr,
     fetchReviewState, approvePr,
     review, reviewRunning, openReviewFor, runReview, startReview, cancelReview, getReview, listReviews, latestReviewFor,
     reviewStateFor, postComments,

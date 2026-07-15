@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { invoke } from '../../state/ipc';
 import {
   Autocomplete,
   Button,
@@ -69,7 +70,7 @@ export function InstanceTaskPickerDialog({
     if (!open) return;
     void (async () => {
       try {
-        const res = await window.watchtower.invoke('projects:list', { archived: false });
+        const res = await invoke('projects:list', { archived: false });
         setProjects(res.projects);
         // Preselect by best folderPath match.
         const preselect = bestProjectId(res.projects, instanceCwd);
@@ -90,8 +91,8 @@ export function InstanceTaskPickerDialog({
     void (async () => {
       try {
         const [epicsRes, tasksRes] = await Promise.all([
-          window.watchtower.invoke('epics:list', { projectId: selectedProjectId }),
-          window.watchtower.invoke('tasks:listForProject', { projectId: selectedProjectId }),
+          invoke('epics:list', { projectId: selectedProjectId }),
+          invoke('tasks:listForProject', { projectId: selectedProjectId }),
         ]);
         setEpics(epicsRes.epics);
         setTasks(tasksRes.tasks);

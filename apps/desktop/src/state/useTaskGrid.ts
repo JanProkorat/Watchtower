@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { TaskGridResponsePayload } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 export interface TaskGridState {
   data: TaskGridResponsePayload | null;
@@ -27,7 +28,7 @@ export function useTaskGrid(
     try {
       const ids = projectIdsKey === '' ? [] : projectIdsKey.split(',').map(Number);
       const payload = ids.length > 0 ? { year, month, projectIds: ids } : { year, month };
-      const res = await window.watchtower.invoke('taskGrid:get', payload);
+      const res = await invoke('taskGrid:get', payload);
       setData(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
+import { invoke } from './ipc';
 
 export interface TokenUsageState {
   data: TokenUsagePayload | null;
@@ -23,7 +24,7 @@ export function useTokenUsage(): TokenUsageState {
     setLoading(true);
     setError(null);
     try {
-      const res = await window.watchtower.invoke('tokens:usage', {});
+      const res = await invoke('tokens:usage', {});
       setData(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

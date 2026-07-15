@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SETTINGS_KEYS } from '@watchtower/shared/layout.js';
+import { invoke } from './ipc';
 
 const PERSIST_DEBOUNCE_MS = 300;
 
@@ -18,8 +19,7 @@ export function useHiddenInstances(): UseHiddenInstancesResult {
 
   useEffect(() => {
     let cancelled = false;
-    void window.watchtower
-      .invoke('getSetting', { key: SETTINGS_KEYS.hiddenInstanceIds })
+    void invoke('getSetting', { key: SETTINGS_KEYS.hiddenInstanceIds })
       .then((r) => {
         if (cancelled) return;
         try {
@@ -41,7 +41,7 @@ export function useHiddenInstances(): UseHiddenInstancesResult {
     if (!loaded) return;
     if (persistTimer.current) clearTimeout(persistTimer.current);
     persistTimer.current = setTimeout(() => {
-      void window.watchtower.invoke('setSetting', {
+      void invoke('setSetting', {
         key: SETTINGS_KEYS.hiddenInstanceIds,
         value: JSON.stringify([...hidden]),
       });

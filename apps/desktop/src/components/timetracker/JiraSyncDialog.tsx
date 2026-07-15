@@ -42,6 +42,7 @@ import type {
   ProjectViewPayload,
 } from '@watchtower/shared/ipcContract.js';
 import { CZ_DATE_FORMAT, formatDateShortCz } from '../../util/format.js';
+import { invoke } from '../../state/ipc';
 
 const ALL_PROJECTS = 'all' as const;
 type ProjectChoice = number | typeof ALL_PROJECTS;
@@ -156,7 +157,7 @@ export function JiraSyncDialog({
     setResult(null);
     setStatusMessage('Building preview…');
     try {
-      const data = await window.watchtower.invoke('jira:syncPreview', requestBody);
+      const data = await invoke('jira:syncPreview', requestBody);
       if (data.error) {
         setError(data.error);
         setPreview(null);
@@ -181,7 +182,7 @@ export function JiraSyncDialog({
       'Syncing to Jira… if a browser window opens, complete the SSO login. Do not close this dialog.',
     );
     try {
-      const data = await window.watchtower.invoke('jira:sync', requestBody);
+      const data = await invoke('jira:sync', requestBody);
       if (data.error) {
         setError(data.error);
         setResult(null);

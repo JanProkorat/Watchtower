@@ -78,3 +78,9 @@ export async function githubReviewState(
 export async function approveGithubPr(nwo: string, prNumber: number, exec: Exec = defaultExec): Promise<void> {
   await exec('gh', ['pr', 'review', String(prNumber), '--repo', nwo, '--approve']);
 }
+
+/** Closes a PR without merging. Deliberately keeps the source branch — deleting
+ *  it is a separate decision the merge flow already owns. */
+export async function closeGithubPr(nwo: string, prNumber: number, exec: Exec = defaultExec): Promise<void> {
+  await exec('gh', ['pr', 'close', String(prNumber), '--repo', nwo]);
+}

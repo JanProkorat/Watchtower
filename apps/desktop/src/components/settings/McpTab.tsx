@@ -24,6 +24,7 @@ import RestoreIcon from '@mui/icons-material/Restore';
 import { useClaudeSettings, type SettingsScope } from '../../state/useClaudeSettings.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 import { glassFill, glassSurface } from '../../theme/glass.js';
+import { invoke } from '../../state/ipc';
 
 const PROJECT_PATH_STORAGE_KEY = 'watchtower.settings.json.projectPath';
 
@@ -283,7 +284,7 @@ export function McpTab() {
   };
 
   const browseProject = async () => {
-    const res = await window.watchtower.invoke('chooseDirectory', {
+    const res = await invoke('chooseDirectory', {
       defaultPath: projectPath || undefined,
     });
     if (res.path) setProjectPath(res.path);

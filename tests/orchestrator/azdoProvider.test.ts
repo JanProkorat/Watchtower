@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { parseAzdoPrList, listAzdoPrs, fetchAzdoReviewState, approveAzdoPr } from '../../orchestrator/services/prProviders/azureDevops.js';
+import { parseAzdoPrList, listAzdoPrs, fetchAzdoReviewState, approveAzdoPr, abandonAzdoPr } from '../../orchestrator/services/prProviders/azureDevops.js';
 
 const REPO = { host: 'azdo' as const, repoKey: 'azdo:devops.skoda.vwgroup.com/technology', repoLabel: 'PPS / technology',
   devopsHost: 'devops.skoda.vwgroup.com', apiBase: 'https://devops.skoda.vwgroup.com/projects/EOM-7/PPSToolshop',
@@ -75,6 +75,18 @@ describe('approveAzdoPr', () => {
       'https://host/org/_apis/git/repositories/repo/pullRequests/4821/reviewers/me-guid?api-version=7.1',
       'pat-value',
       { vote: 10 },
+    );
+  });
+});
+
+describe('abandonAzdoPr', () => {
+  it('PATCHes the PR to status:abandoned', async () => {
+    const patch = vi.fn(async () => {});
+    await abandonAzdoPr('https://host/org', 'repo', 4821, 'pat-value', patch);
+    expect(patch).toHaveBeenCalledWith(
+      'https://host/org/_apis/git/repositories/repo/pullRequests/4821?api-version=7.1',
+      'pat-value',
+      { status: 'abandoned' },
     );
   });
 });

@@ -129,6 +129,16 @@ export type OrchRequest =
         devopsPats?: Record<string, string>;
       };
     }
+  | {
+      id: string;
+      kind: 'prs:close';
+      payload: {
+        host: import('./ipcContract.js').PrHost;
+        repoKey: string;
+        prNumber: number;
+        devopsPats?: Record<string, string>;
+      };
+    }
   | { id: string; kind: 'reviews:projectRepo'; payload: { projectId: number } }
   | {
       id: string;
@@ -620,11 +630,11 @@ export type OrchResponse =
   | { kind: 'push:registerDevice'; payload: { ok: true } }
   | {
       kind: 'prs:list';
-      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null };
+      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null; warnings: string[] };
     }
   | {
       kind: 'prs:refresh';
-      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null };
+      payload: { pullRequests: import('./ipcContract.js').PullRequestPayload[]; syncedAt: string | null; warnings: string[] };
     }
   | { kind: 'prs:diff'; payload: { files: import('./ipcContract.js').DiffFilePayload[] } }
   | { kind: 'prs:comments'; payload: { threads: import('./ipcContract.js').PrCommentThreadPayload[] } }
@@ -634,6 +644,7 @@ export type OrchResponse =
       payload: { amIAuthor: boolean; approved: boolean; mergeable: boolean; mergeBlockedReason: string | null };
     }
   | { kind: 'prs:approve'; payload: { ok: true } }
+  | { kind: 'prs:close'; payload: { ok: true } }
   | {
       kind: 'reviews:projectRepo';
       payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null };

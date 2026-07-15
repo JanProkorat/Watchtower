@@ -30,8 +30,6 @@ export function CloudSyncTab(): JSX.Element {
         into this build; enabling starts the sync on the next launch.
       </Typography>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
       {!loading && !available && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           This build has no hub configured, so cloud sync can't run. Rebuild with a Supabase URL to

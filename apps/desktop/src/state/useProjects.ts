@@ -5,6 +5,7 @@ import type {
   ProjectViewPayload,
 } from '@watchtower/shared/ipcContract.js';
 import { broadcastProjectsChanged, subscribeProjects } from './projectsBus.js';
+import { invoke } from './ipc';
 
 export type ProjectKind = 'work' | 'time_off';
 export type ArchiveFilter = 'active' | 'archived';
@@ -67,7 +68,7 @@ export function useProjects(): ProjectsState {
     setLoading(true);
     setError(null);
     try {
-      const res = await window.watchtower.invoke('projects:list', ipcFilter);
+      const res = await invoke('projects:list', ipcFilter);
       setProjects(res.projects);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -98,7 +99,7 @@ export function useProjects(): ProjectsState {
 
   const create = useCallback(
     async (input: ProjectInputPayload) => {
-      const res = await window.watchtower.invoke('projects:create', input);
+      const res = await invoke('projects:create', input);
       await refresh();
       broadcastProjectsChanged(listenerRef.current);
       return res.project;
@@ -108,7 +109,7 @@ export function useProjects(): ProjectsState {
 
   const update = useCallback(
     async (id: number, input: Partial<ProjectInputPayload>) => {
-      const res = await window.watchtower.invoke('projects:update', { id, input });
+      const res = await invoke('projects:update', { id, input });
       await refresh();
       broadcastProjectsChanged(listenerRef.current);
       return res.project;
@@ -118,7 +119,7 @@ export function useProjects(): ProjectsState {
 
   const archiveOp = useCallback(
     async (id: number, archived: boolean) => {
-      await window.watchtower.invoke('projects:archive', { id, archived });
+      await invoke('projects:archive', { id, archived });
       await refresh();
       broadcastProjectsChanged(listenerRef.current);
     },
@@ -127,7 +128,7 @@ export function useProjects(): ProjectsState {
 
   const remove = useCallback(
     async (id: number) => {
-      await window.watchtower.invoke('projects:delete', { id });
+      await invoke('projects:delete', { id });
       await refresh();
       broadcastProjectsChanged(listenerRef.current);
     },

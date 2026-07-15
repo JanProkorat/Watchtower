@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ThemeMode } from '../theme.js';
+import { invoke } from './ipc';
 
 const STORAGE_KEY = 'watchtower:theme-mode';
 
@@ -28,7 +29,7 @@ export function useThemeMode(): { mode: ThemeMode; toggle: () => void } {
     // Sync the OS vibrancy material with the in-app palette. The Electron main
     // process sets nativeTheme.themeSource, which drives the under-window
     // vibrancy material. Fire-and-forget: errors are non-fatal.
-    window.watchtower.invoke('appearance:set', { mode }).catch(() => {
+    invoke('appearance:set', { mode }).catch(() => {
       // Best-effort — the window still functions without the OS sync.
     });
   }, [mode]);

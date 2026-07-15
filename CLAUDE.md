@@ -141,14 +141,26 @@ modes. The xterm Terminal pane stays dark in both — conventional.
 
 ## Surfacing IPC errors
 
-- Read paths set their hook's `error` field and render an inline
-  `<Alert severity="error">`. Pattern: see `useProjects` + `ProjectsList`.
-- Drawer mutations use their own `error` state surfaced inside the drawer.
-- Fire-and-forget mutations (archive, delete, snooze, VS Code launch,
-  time-off toggle) use the global toast: `const { showError } = useToast();`.
-  Pattern: see Phase 22 in `ProjectsList` / `TimeOffTab` / `ContractsTab`.
-- **No silent `void state.foo()`.** Either `.catch(err => showError(...))`
-  or hoist to a drawer that surfaces its own error.
+**All renderer IPC goes through `invoke()` in `state/ipc.ts`, not
+`window.watchtower.invoke` directly.** On rejection it raises a global error
+toast and re-throws, so *every* failed IPC surfaces app-wide with no extra
+code. `contextBridge` freezes the preload bridge, so this is a helper call
+sites import — not a monkey-patch.
+
+- **Default: do nothing.** A failed `invoke()` already toasts. Local `try/catch`
+  is only for control flow (keep a drawer open, stop a spinner) — don't add an
+  inline `<Alert>` for the IPC error; it double-surfaces with the toast.
+- **Opt-out of the toast** for background/poll/probe calls via `SILENT_KINDS`
+  in `state/ipc.ts` (e.g. `prWatch:list`, `tokens:usage`), or per-call with
+  `invoke(kind, payload, { silent: true })` when the caller handles the failure.
+- **Structured `warnings`** on a list payload → `toast.showWarning(...)` per
+  entry (pattern: `useReviews`).
+- **Keep an inline `<Alert>` only** when the message is NOT an `invoke`
+  rejection: a resolved-payload business error (`res.error` / `res.lockedThrough`
+  — the call succeeded), a `SILENT_KIND`'s sole surface (`TokenUsageCard`,
+  PR-watch inbox), form validation, or a JSON-parse error.
+- Toasts are FIFO-queued and expose `showError/showWarning/showSuccess/showInfo`
+  via `useToast()` (React) or the module-level `toast` bridge (non-React).
 
 ## Things to NOT do
 

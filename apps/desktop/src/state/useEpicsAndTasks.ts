@@ -5,6 +5,7 @@ import type {
   TaskInputPayload,
   TaskViewPayload,
 } from '@watchtower/shared/ipcContract.js';
+import { invoke } from './ipc';
 
 export interface EpicsAndTasksState {
   epics: EpicViewPayload[];
@@ -37,8 +38,8 @@ export function useEpicsAndTasks(projectId: number): EpicsAndTasksState {
     setError(null);
     try {
       const [epicsRes, tasksRes] = await Promise.all([
-        window.watchtower.invoke('epics:list', { projectId }),
-        window.watchtower.invoke('tasks:listForProject', { projectId }),
+        invoke('epics:list', { projectId }),
+        invoke('tasks:listForProject', { projectId }),
       ]);
       setEpics(epicsRes.epics);
       setTasks(tasksRes.tasks);
@@ -65,7 +66,7 @@ export function useEpicsAndTasks(projectId: number): EpicsAndTasksState {
 
   const createEpic = useCallback(
     async (input: Omit<EpicInputPayload, 'projectId'>) => {
-      const res = await window.watchtower.invoke('epics:create', { projectId, ...input });
+      const res = await invoke('epics:create', { projectId, ...input });
       await refresh();
       return res.epic;
     },
@@ -74,7 +75,7 @@ export function useEpicsAndTasks(projectId: number): EpicsAndTasksState {
 
   const updateEpic = useCallback(
     async (id: number, input: Partial<EpicInputPayload>) => {
-      const res = await window.watchtower.invoke('epics:update', { id, input });
+      const res = await invoke('epics:update', { id, input });
       await refresh();
       return res.epic;
     },
@@ -83,7 +84,7 @@ export function useEpicsAndTasks(projectId: number): EpicsAndTasksState {
 
   const deleteEpic = useCallback(
     async (id: number) => {
-      await window.watchtower.invoke('epics:delete', { id });
+      await invoke('epics:delete', { id });
       await refresh();
     },
     [refresh],
@@ -91,7 +92,7 @@ export function useEpicsAndTasks(projectId: number): EpicsAndTasksState {
 
   const reorderEpics = useCallback(
     async (orderedIds: number[]) => {
-      await window.watchtower.invoke('epics:reorder', { projectId, orderedIds });
+      await invoke('epics:reorder', { projectId, orderedIds });
       await refresh();
     },
     [projectId, refresh],
@@ -99,7 +100,7 @@ export function useEpicsAndTasks(projectId: number): EpicsAndTasksState {
 
   const createTask = useCallback(
     async (input: TaskInputPayload) => {
-      const res = await window.watchtower.invoke('tasks:create', input);
+      const res = await invoke('tasks:create', input);
       await refresh();
       return res.task;
     },
@@ -108,7 +109,7 @@ export function useEpicsAndTasks(projectId: number): EpicsAndTasksState {
 
   const updateTask = useCallback(
     async (id: number, input: Partial<TaskInputPayload>) => {
-      const res = await window.watchtower.invoke('tasks:update', { id, input });
+      const res = await invoke('tasks:update', { id, input });
       await refresh();
       return res.task;
     },
@@ -117,7 +118,7 @@ export function useEpicsAndTasks(projectId: number): EpicsAndTasksState {
 
   const deleteTask = useCallback(
     async (id: number) => {
-      await window.watchtower.invoke('tasks:delete', { id });
+      await invoke('tasks:delete', { id });
       await refresh();
     },
     [refresh],

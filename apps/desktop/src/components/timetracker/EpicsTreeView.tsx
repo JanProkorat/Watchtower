@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { glassFill } from '../../theme/glass.js';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -30,6 +29,7 @@ import { useEpicsAndTasks } from '../../state/useEpicsAndTasks.js';
 import { EpicDrawer } from './EpicDrawer.js';
 import { TaskDrawer } from './TaskDrawer.js';
 import { TaskDetailDrawer } from './TaskDetailDrawer.js';
+import { invoke } from '../../state/ipc';
 
 const PAGE_SIZE = 20;
 
@@ -175,12 +175,6 @@ export function EpicsTreeView({
           py: embedded ? 0 : 1.5,
         }}
       >
-        {state.error && (
-          <Alert severity="error" sx={{ mb: 1.5 }}>
-            {state.error}
-          </Alert>
-        )}
-
         {embedded && (
           <Button
             size="small"
@@ -658,7 +652,7 @@ function TaskRow({
     e.stopPropagation();
     e.preventDefault();
     if (onOpenExternal) onOpenExternal(externalUrl);
-    else void window.watchtower.invoke('openExternalUrl', { url: externalUrl });
+    else void invoke('openExternalUrl', { url: externalUrl });
   };
 
   return (
