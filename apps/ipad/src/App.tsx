@@ -446,6 +446,9 @@ export function Shell({ connection, onConnectionChange }: ShellProps) {
       action: (reconnecting || cannotConnect) ? (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={retryConnect} style={toastRetryBtn}>Zkusit znovu</button>
+          {/* Recovery from a stale saved host: jump to the pre-filled connection
+              editor instead of the old dead-end (reinstall). See #161. */}
+          <button onClick={() => setActiveModule('settings')} style={toastRetryBtn}>Upravit připojení</button>
           {connection.mac && <WakeButton connection={connection} />}
         </div>
       ) : undefined,
@@ -502,6 +505,7 @@ export function Shell({ connection, onConnectionChange }: ShellProps) {
           ) : (
             <RemoteMacView
               connection={connection}
+              onEditConnection={() => setActiveModule('settings')}
             />
           )}
         </Suspense>

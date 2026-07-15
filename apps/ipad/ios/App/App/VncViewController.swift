@@ -152,6 +152,7 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
     /// Disconnect the VNC session, dismiss the VC, and notify JS via onClosed.
     /// Used by both the back button and a host-initiated disconnect().
     func teardownAndDismiss() {
+        stopMomentum()
         connection?.disconnect()
         connection = nil
         dismiss(animated: true) { [weak self] in self?.onClosed?() }
@@ -183,6 +184,7 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
     }
 
     @objc private func handleTap(_ gr: UITapGestureRecognizer) {
+        stopMomentum() // a tap halts a coasting flick, like iOS
         guard let conn = connection, let (x, y) = framebufferPoint(from: gr.location(in: imageView)) else { return }
         conn.mouseButtonDown(.left, x: x, y: y)
         conn.mouseButtonUp(.left, x: x, y: y)
@@ -192,6 +194,7 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
         guard let conn = connection, let (x, y) = framebufferPoint(from: gr.location(in: imageView)) else { return }
         switch gr.state {
         case .began:
+            stopMomentum() // a new drag halts a coasting flick
             conn.mouseButtonDown(.left, x: x, y: y); pointerDown = true
         case .changed:
             // RoyalVNCKit exposes an explicit pointer-move: keep the (already
@@ -206,31 +209,82 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
     // Finger/scroll travel (points) per discrete wheel click. Smaller = more
     // sensitive (more clicks per drag).
     private let wheelStepPx: CGFloat = 3
-    // Unconsumed scroll distance carried between pan callbacks (no motion lost).
+    // Unconsumed scroll distance carried between callbacks (no motion lost).
+    // Shared by live dragging and the momentum coast so they're continuous.
     private var scrollAccumulator: CGFloat = 0
 
     @objc private func handleScroll(_ gr: UIPanGestureRecognizer) {
         guard let conn = connection, let (x, y) = framebufferPoint(from: gr.location(in: imageView)) else { return }
         switch gr.state {
         case .began:
+            stopMomentum() // a fresh scroll cancels any coasting flick (iOS behaviour)
             scrollAccumulator = 0
         case .changed:
-            // Accumulate the incremental delta since the last callback, emit as
-            // many wheel clicks as fit, and keep the sub-step remainder so fast
-            // swipes scroll proportionally instead of losing motion (RoyalVNCKit
-            // mouseWheel loops `steps` discrete clicks). Natural-scroll direction:
-            // drag down (dy>0) = content down = wheel up.
+            // Accumulate the incremental delta since the last callback and emit as
+            // many wheel clicks as fit, keeping the sub-step remainder so fast
+            // swipes scroll proportionally instead of losing motion. Natural-scroll
+            // direction: drag down (dy>0) = content down = wheel up.
             scrollAccumulator += gr.translation(in: imageView).y
             gr.setTranslation(.zero, in: imageView)
-            let raw = Int(scrollAccumulator / wheelStepPx)
-            guard raw != 0 else { return }
-            scrollAccumulator -= CGFloat(raw) * wheelStepPx
-            let wheel: VNCMouseWheel = raw > 0 ? .up : .down
-            let steps = min(abs(raw), 12) // cap a single fling burst
-            conn.mouseWheel(wheel, x: x, y: y, steps: UInt32(steps))
+            flushWheel(at: x, y, on: conn)
+        case .ended:
+            // Hand off to an inertial coast so a flick keeps scrolling and decays,
+            // like iOS — RFB has no momentum, so we emulate it (see #160).
+            startMomentum(velocity: gr.velocity(in: imageView).y, at: (x, y))
+        case .cancelled, .failed:
+            stopMomentum()
         default:
             break
         }
+    }
+
+    /// Convert the accumulated point-travel into discrete RFB wheel clicks at
+    /// (x, y), keeping the sub-step remainder in `scrollAccumulator`. Shared by
+    /// the live drag and the momentum coast (RoyalVNCKit loops `steps` clicks).
+    private func flushWheel(at x: UInt16, _ y: UInt16, on conn: VNCConnection) {
+        let raw = Int(scrollAccumulator / wheelStepPx)
+        guard raw != 0 else { return }
+        scrollAccumulator -= CGFloat(raw) * wheelStepPx
+        let wheel: VNCMouseWheel = raw > 0 ? .up : .down
+        let steps = min(abs(raw), 12) // cap a single burst
+        conn.mouseWheel(wheel, x: x, y: y, steps: UInt32(steps))
+    }
+
+    // --- Inertial (momentum) scroll -----------------------------------------
+    // RFB has no pixel/momentum scroll, so a flick is emulated: capture the pan
+    // velocity at release and emit a decaying train of wheel clicks on a display
+    // link until it dies out. Any new touch cancels the coast.
+    private var momentumLink: CADisplayLink?
+    private var momentumVelocity: CGFloat = 0          // points/sec (imageView space)
+    private var momentumAnchor: (UInt16, UInt16)?      // framebuffer point to scroll at
+    private let momentumMinStart: CGFloat = 120        // below this a release doesn't coast
+    private let momentumMinStop: CGFloat = 16          // coast ends once velocity decays past this
+    private let momentumDecayPerSec: Double = 0.05     // fraction of velocity retained after 1s
+
+    private func startMomentum(velocity: CGFloat, at anchor: (UInt16, UInt16)) {
+        stopMomentum()
+        guard abs(velocity) >= momentumMinStart else { return }
+        momentumVelocity = velocity
+        momentumAnchor = anchor
+        let link = CADisplayLink(target: self, selector: #selector(momentumTick(_:)))
+        link.add(to: .main, forMode: .common)
+        momentumLink = link
+    }
+
+    private func stopMomentum() {
+        momentumLink?.invalidate()
+        momentumLink = nil
+        momentumVelocity = 0
+        momentumAnchor = nil
+    }
+
+    @objc private func momentumTick(_ link: CADisplayLink) {
+        guard let conn = connection, let (x, y) = momentumAnchor else { stopMomentum(); return }
+        let dt = link.targetTimestamp - link.timestamp        // seconds to the next frame
+        scrollAccumulator += momentumVelocity * CGFloat(dt)    // this frame's travel
+        flushWheel(at: x, y, on: conn)
+        momentumVelocity *= CGFloat(pow(momentumDecayPerSec, dt)) // frame-rate-independent decay
+        if abs(momentumVelocity) < momentumMinStop { stopMomentum() }
     }
 
     @objc private func handleLongPress(_ gr: UILongPressGestureRecognizer) {
