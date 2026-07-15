@@ -8,7 +8,10 @@ interface ProjectDonutProps {
   onOpenProject(id: number): void;
 }
 
-const FALLBACK = ['#A78BFA', '#22D3EE', '#fbbf24', '#f87171', '#34d399', '#f472b6', '#60a5fa', '#a3e635'];
+// First four come from the shared ocean tokens (single source of truth, so they
+// can't drift — the leading slot was a stale pre-ocean purple #A78BFA). The tail
+// has no token equivalents and stays as literals.
+const FALLBACK = [C.violet, C.cyan, C.amber, C.red, '#34d399', '#f472b6', '#60a5fa', '#a3e635'];
 
 export function ProjectDonut({ slices, onOpenProject }: ProjectDonutProps): JSX.Element {
   if (slices.length === 0) {
