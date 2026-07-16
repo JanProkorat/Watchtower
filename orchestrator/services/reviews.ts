@@ -144,7 +144,7 @@ export class ReviewsService {
     }
     for (const r of azdo) {
       const pat = devopsPats?.[r.devopsHost];
-      if (!pat) { errors.push(`${r.repoLabel}: chybí PAT`); continue; }
+      if (!pat) { errors.push(`${r.repoLabel}: Azure DevOps PAT not set or unreadable — re-enter it in Reviews settings`); continue; }
       try {
         const user = await this.azdoUser(r.apiBase, pat);
         results.push(...(await this.listAzdo(r, pat, user.id)));
@@ -156,7 +156,7 @@ export class ReviewsService {
     // the good results but exposes the rest as warnings rather than dropping them.
     if (results.length === 0 && errors.length > 0) {
       this.warnings = [];
-      throw new Error(`Načtení PR selhalo:\n${errors.join('\n')}`);
+      throw new Error(`Failed to load PRs:\n${errors.join('\n')}`);
     }
     this.warnings = errors;
     return this.list();

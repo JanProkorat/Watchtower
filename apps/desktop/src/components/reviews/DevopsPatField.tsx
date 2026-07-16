@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Box, Button, Chip, TextField, Typography } from '@mui/material';
 import { invoke } from '../../state/ipc';
+import { patFieldView, type PatFieldStatus } from './patFieldView';
 
 export function DevopsPatField({ projectId }: { projectId: number }): JSX.Element | null {
   const [loading, setLoading] = useState(true);
   const [devopsHost, setDevopsHost] = useState<string | null>(null);
   const [repoLabel, setRepoLabel] = useState<string | null>(null);
-  const [hasPat, setHasPat] = useState(false);
+  const [status, setStatus] = useState<PatFieldStatus>('none');
   const [pat, setPat] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -25,9 +26,9 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
         }
         setDevopsHost(info.devopsHost);
         setRepoLabel(info.repoLabel);
-        const { hasPat: has } = await invoke('devops:hasPat', { host: info.devopsHost });
+        const { hasPat: has, unreadable } = await invoke('devops:hasPat', { host: info.devopsHost });
         if (cancelled) return;
-        setHasPat(has);
+        setStatus(unreadable ? 'unreadable' : has ? 'saved' : 'none');
       } catch {
         /* surfaced via the global error toast */
       } finally {
@@ -39,12 +40,14 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
 
   if (loading || devopsHost === null) return null;
 
+  const view = patFieldView(status);
+
   const save = async () => {
     if (!pat.trim()) return;
     setSaving(true);
     try {
       await invoke('devops:setPat', { host: devopsHost, pat: pat.trim() });
-      setHasPat(true);
+      setStatus('saved');
       setPat('');
     } catch {
       /* surfaced via the global error toast */
@@ -60,7 +63,7 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
         <Typography sx={{ fontSize: 13, fontFamily: 'Menlo, monospace' }}>{repoLabel}</Typography>
-        {hasPat && <Chip size="small" color="success" label="saved" />}
+        {view.chip && <Chip size="small" color={view.chip.color} label={view.chip.label} />}
       </Box>
       <Box sx={{ display: 'flex', gap: 1 }}>
         <TextField
@@ -68,7 +71,7 @@ export function DevopsPatField({ projectId }: { projectId: number }): JSX.Elemen
           type="password"
           value={pat}
           onChange={(e) => setPat(e.target.value)}
-          placeholder={hasPat ? '•••••• (saved, leave unchanged)' : 'enter PAT'}
+          placeholder={view.placeholder}
           fullWidth
           sx={{ '& input': { fontFamily: 'Menlo, monospace', fontSize: 12 } }}
         />

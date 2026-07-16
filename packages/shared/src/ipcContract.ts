@@ -725,7 +725,10 @@ export type IpcResponse =
   | { kind: 'deepLink:ready'; payload: { ok: true } }
   | { kind: 'reviews:projectRepo'; payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null } }
   | { kind: 'devops:setPat'; payload: { ok: true } }
-  | { kind: 'devops:hasPat'; payload: { hasPat: boolean } }
+  // `unreadable` is true when a PAT blob is stored for the host but can't be
+  // decrypted (keychain key rotated after an unsigned-app rebuild) — the UI
+  // prompts to re-enter rather than showing the misleading "not set" state.
+  | { kind: 'devops:hasPat'; payload: { hasPat: boolean; unreadable: boolean } }
   | { kind: 'prWatch:setPats'; payload: { ok: true } }
   | { kind: 'prWatch:list'; payload: { items: PrWatchInboxItem[]; unread: number } }
   | { kind: 'prWatch:markSeen'; payload: { ok: true } }

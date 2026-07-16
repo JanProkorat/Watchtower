@@ -1,21 +1,25 @@
-// electron-builder `afterPack` hook — ad-hoc sign the packaged macOS bundle.
+// electron-builder `afterPack` hook — code-sign the packaged macOS bundle.
 //
-// build.mac.identity is null, so electron-builder skips code signing entirely.
-// On Apple Silicon the linker still injects a bare ad-hoc signature on the
-// Mach-O, but the bundle is left with no `_CodeSignature/CodeResources` seal.
-// That makes the signature structurally invalid (`codesign --verify` fails with
-// "code has no resources but signature indicates they must be present"), and
-// macOS refuses to Spotlight-index an app bundle whose signature won't
-// validate — so Watchtower never shows up in Spotlight search.
+// build.mac.identity is null, so electron-builder skips its own signing step
+// (afterSign never fires). We sign here instead, for two reasons:
 //
-// Re-signing the whole bundle ad-hoc (`codesign -s -`, inside-out via --deep)
-// gives it a valid seal. Ad-hoc is NOT notarized — Gatekeeper still warns on
-// first open — but it is enough for Spotlight to index the app. afterPack runs
-// after the .app is assembled and before the DMG is built, so the DMG picks up
-// the signed bundle. (afterSign would never fire here: with identity:null
-// electron-builder skips its signing step altogether.)
+// 1. Spotlight: on Apple Silicon the linker injects a bare ad-hoc signature on
+//    the Mach-O but leaves the bundle with no `_CodeSignature/CodeResources`
+//    seal, so `codesign --verify` fails and macOS refuses to Spotlight-index
+//    the app. Re-signing the whole bundle applies a valid seal.
+//
+// 2. safeStorage PAT persistence: Electron's safeStorage stores the Azure
+//    DevOps PAT under an OS-Keychain key whose access ACL is bound to the app's
+//    code-signing designated requirement. An *ad-hoc* signature has no cert, so
+//    its requirement is the per-build cdhash — every release looked like a new
+//    app and lost the PAT (→ ADO 401 after each update). Signing with a real,
+//    reused certificate (Apple Development is enough) gives a stable requirement
+//    so the PAT survives across rebuilds. We auto-discover an identity and fall
+//    back to ad-hoc only when none exists (e.g. CI), preserving the Spotlight
+//    fix there.
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { pickSigningIdentity } from './signingIdentity.mjs';
 
 export default async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return;
@@ -23,11 +27,24 @@ export default async function afterPack(context) {
   const appName = `${context.packager.appInfo.productFilename}.app`;
   const appPath = path.join(context.appOutDir, appName);
 
-  execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], {
-    stdio: 'inherit',
-  });
+  let findIdentityOutput = '';
+  try {
+    findIdentityOutput = execFileSync('security', ['find-identity', '-v', '-p', 'codesigning'], {
+      encoding: 'utf8',
+    });
+  } catch {
+    /* no keychain / no identities — falls through to ad-hoc */
+  }
+  const identity = pickSigningIdentity({ env: process.env, findIdentityOutput });
+  const signArg = identity ?? '-';
+
+  execFileSync('codesign', ['--force', '--deep', '--sign', signArg, appPath], { stdio: 'inherit' });
   // Fail the build loudly if the seal didn't take — a silently-broken signature
   // would just reproduce the original Spotlight bug.
   execFileSync('codesign', ['--verify', '--verbose=2', appPath], { stdio: 'inherit' });
-  console.log(`[adhoc-sign] valid ad-hoc signature applied to ${appPath}`);
+  console.log(
+    identity
+      ? `[sign] signed ${appName} with identity ${identity} (stable requirement — safeStorage PAT persists across builds)`
+      : `[sign] no signing identity found — applied ad-hoc signature to ${appName} (PAT will not persist across builds; install a Developer ID / Apple Development cert to fix)`,
+  );
 }
