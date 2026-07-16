@@ -1443,7 +1443,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
             } else if (azdoRepo) {
               const pat = p.devopsPats?.[azdoRepo.devopsHost];
               if (!pat) {
-                errors.push(`${f.file}:${f.line}: chybí PAT`);
+                errors.push(`${f.file}:${f.line}: Azure DevOps PAT not set or unreadable — re-enter it in Reviews settings`);
                 continue;
               }
               await postAzdoComment(azdoRepo.apiBase, azdoRepo.repo, row.pr_number, { ...f, file }, pat);

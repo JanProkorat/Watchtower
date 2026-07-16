@@ -7,7 +7,7 @@ import { getMainWindow, createMainWindow } from './window.js';
 import { getOrchestrator } from './orchestratorHost.js';
 import { fireMacNotification, fireTestNotification } from './notifications.js';
 import { runBoardSignIn } from './boardSignIn.js';
-import { setPat, hasPat, getPats } from './devopsPat.js';
+import { setPat, patStatus, getPats } from './devopsPat.js';
 import { getCloudSyncConfig, setCloudSyncConfig } from './cloudSync.js';
 
 type DeepLinkPayload = Extract<IpcPush, { kind: 'deep-link' }>['payload'];
@@ -168,7 +168,8 @@ export function registerIpc(): void {
       }
 
       if (kind === 'devops:hasPat') {
-        return { hasPat: await hasPat((payload as { host: string }).host) };
+        const status = await patStatus((payload as { host: string }).host);
+        return { hasPat: status === 'saved', unreadable: status === 'unreadable' };
       }
 
       if (kind === 'cloudSync:getConfig') {

@@ -64,7 +64,7 @@ describe('ReviewsService', () => {
       resolveAzdoUser,
       listAzdo,
     });
-    await expect(svc.refresh({ 'devops.skoda.vwgroup.com': 'pat-value' })).rejects.toThrow(/selhalo/);
+    await expect(svc.refresh({ 'devops.skoda.vwgroup.com': 'pat-value' })).rejects.toThrow(/Failed to load PRs/);
     expect(listAzdo).not.toHaveBeenCalled();
   });
   it('refresh() returns github PRs AND surfaces an azdo failure as a warning (no longer swallowed)', async () => {
@@ -100,6 +100,7 @@ describe('ReviewsService', () => {
     });
     const res = await svc.refresh(undefined);
     expect(res.pullRequests.every((p) => p.host === 'github')).toBe(true);
+    expect(res.warnings).toContain('PPSToolshop: Azure DevOps PAT not set or unreadable — re-enter it in Reviews settings');
   });
   it('azdoMergeTarget() resolves apiBase/repo/devopsHost + a fresh source commit', async () => {
     const azdoPrDetail = vi.fn(async () => ({ lastMergeSourceCommitId: 'sha-fresh' }));
@@ -135,7 +136,7 @@ describe('ReviewsService', () => {
       ...deps(),
       listGithub: async () => { throw new Error('gh: command not found'); },
     });
-    await expect(svc.refresh(undefined)).rejects.toThrow(/selhalo/);
+    await expect(svc.refresh(undefined)).rejects.toThrow(/Failed to load PRs/);
   });
 
   it('reviewState() resolves the GitHub login then delegates to githubReviewState', async () => {
