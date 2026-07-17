@@ -58,6 +58,7 @@ import {
   ensureHooksInstalled,
   uninstallHooks,
 } from './hookInstaller.js';
+import { captureStatus, enableCapture, disableCapture } from './services/statuslineCapture.js';
 import { readSettings, writeSettings } from './services/claudeSettings.js';
 import { listSkills } from './services/claudeSkills.js';
 import { listAgents } from './services/claudeAgents.js';
@@ -237,6 +238,19 @@ function resolveHelperPath(): string {
     if (existsSync(packaged)) return packaged;
   }
   return path.join(__dirname, '..', '..', 'dist-helper', 'watchtower-hook.mjs');
+}
+
+function resolveStatuslineHelperPath(): string {
+  if (process.env.WATCHTOWER_HELPER_DIR) {
+    return path.join(process.env.WATCHTOWER_HELPER_DIR, 'watchtower-statusline.mjs');
+  }
+  // process.resourcesPath is set in packaged Electron builds but not typed in @types/node.
+  const resPath = (process as unknown as { resourcesPath?: string }).resourcesPath;
+  if (resPath) {
+    const packaged = path.join(resPath, 'app.asar.unpacked', 'dist-helper', 'watchtower-statusline.mjs');
+    if (existsSync(packaged)) return packaged;
+  }
+  return path.join(__dirname, '..', '..', 'dist-helper', 'watchtower-statusline.mjs');
 }
 
 function notifySync(): void {
@@ -1348,6 +1362,16 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'rateLimits:usage':
       return latestRateLimits as RateLimitsPayload;
+
+    case 'statuslineCapture:status':
+      return captureStatus(userSettingsPath(), resolveStatuslineHelperPath());
+
+    case 'statuslineCapture:set': {
+      const helper = resolveStatuslineHelperPath();
+      const p = userSettingsPath();
+      const kv = new SettingsRepo(handle!.db);
+      return req.payload.enabled ? enableCapture(p, helper, kv) : disableCapture(p, helper, kv);
+    }
 
     case 'push:registerDevice':
       new PushDevicesRepo(handle!.db).register(
