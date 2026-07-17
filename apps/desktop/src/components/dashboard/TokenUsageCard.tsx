@@ -7,21 +7,10 @@ import {
   formatRemaining,
   formatTokenCount,
 } from '@watchtower/shared/tokenUsageFormat.js';
+import { severityColor } from '../usage/severityColor.js';
 
 export interface TokenUsageCardProps {
   usage: TokenUsageState;
-}
-
-/** Bar/accent color from ccusage status, falling back to % thresholds. */
-function severityColor(status: string | null, pct: number | null): string {
-  if (status === 'exceeds') return 'error.main';
-  if (status === 'warning') return 'warning.main';
-  if (status === 'ok') return 'success.main';
-  if (pct != null) {
-    if (pct >= 90) return 'error.main';
-    if (pct >= 75) return 'warning.main';
-  }
-  return 'primary.main';
 }
 
 function Title() {

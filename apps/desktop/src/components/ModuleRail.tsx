@@ -32,6 +32,7 @@ import type { ThemeMode } from '../theme.js';
 import type { ListTab } from '../util/timetrackerUrl.js';
 import type { SettingsTab } from '../util/settingsUrl.js';
 import { glassFloating, accentWash, accentRing, accentIconColor } from '../theme/glass.js';
+import { SidebarUsage } from './SidebarUsage.js';
 
 export type ModuleId = 'dashboard' | 'instances' | 'billing' | 'reviews' | 'settings';
 
@@ -506,6 +507,8 @@ export function ModuleRail({
       })}
 
       <Box sx={{ flex: 1 }} />
+
+      <SidebarUsage collapsed={!expanded} />
 
       {!expanded && (
         <Tooltip

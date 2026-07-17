@@ -11,6 +11,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
@@ -21,6 +22,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { CZ_DATE_FORMAT } from '../util/format.js';
 import { WORKLOG_LOCK_SETTING_KEY } from '../util/lockSetting.js';
 import { invoke } from '../state/ipc';
+import { useStatuslineCapture } from '../state/useStatuslineCapture';
 import type {
   EpicWithProjectPayload,
   TaskByNumberPayload,
@@ -60,6 +62,7 @@ function SettingRow({
 
 export function SettingsPanel() {
   const theme = useTheme();
+  const capture = useStatuslineCapture();
   const [saved, setSaved] = useState<Saved>({
     quietMs: '90000',
     defaultCwd: '~/Projects',
@@ -256,6 +259,20 @@ export function SettingsPanel() {
               {hookStatus}
             </Alert>
           )}
+        </SettingRow>
+
+        <Divider />
+
+        <SettingRow
+          label="Capture usage from statusline"
+          description="Wrap the Claude Code statusLine command so Watchtower can show Session + Week usage bars. Reversible; backs up settings.json."
+        >
+          <Switch
+            checked={capture.enabled}
+            disabled={capture.loading || (!capture.available && !capture.enabled)}
+            onChange={(e) => void capture.save(e.target.checked)}
+            size="small"
+          />
         </SettingRow>
 
         <Divider />

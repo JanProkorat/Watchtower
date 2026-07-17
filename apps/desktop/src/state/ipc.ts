@@ -12,6 +12,7 @@ import { toast, toastMessage } from './useToast';
 const SILENT_KINDS = new Set<string>([
   'prWatch:list',   // periodic PR-watch inbox poll (usePrWatch surfaces its own error state)
   'tokens:usage',   // token-usage poll (shells out to ccusage; transient failures are normal)
+  'rateLimits:usage', // statusline-capture snapshot poll; card surfaces its own empty state
   'board:authPing', // board auth probe — expected to fail when not signed in
   'ping',           // health probe
 ]);

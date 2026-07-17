@@ -58,6 +58,7 @@ import {
   ensureHooksInstalled,
   uninstallHooks,
 } from './hookInstaller.js';
+import { captureStatus, enableCapture, disableCapture } from './services/statuslineCapture.js';
 import { readSettings, writeSettings } from './services/claudeSettings.js';
 import { listSkills } from './services/claudeSkills.js';
 import { listAgents } from './services/claudeAgents.js';
@@ -77,6 +78,9 @@ import { PrWatchStateRepo } from './db/repositories/prWatchState.js';
 import { buildInbox, markPrSeen } from './services/prWatch/inbox.js';
 import type { WatchedPr, WatchEvent } from './services/prWatch/types.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
+import type { RateLimitsPayload, RateLimitsSnapshot } from '@watchtower/shared/rateLimitsFormat.js';
+import { extractRateLimits } from '@watchtower/shared/rateLimitsFormat.js';
+import type { SqliteLike } from './db/migrations.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
 import type { PrHost, PrReviewPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
@@ -173,6 +177,41 @@ function startTokenUsagePolling(): void {
   timer.unref?.();
 }
 
+// Latest rate-limits snapshot captured from the statusline helper's POST
+// (see onStatusline below). Persisted to `settings` so a cold start shows
+// last-known usage until the next statusline render arrives.
+const RATE_LIMITS_SETTING_KEY = 'rate_limits_snapshot';
+const RATE_LIMITS_PUSH_MIN_MS = 5_000;
+let latestRateLimits: RateLimitsSnapshot | null = null;
+let lastRateLimitsPushAt = 0;
+
+/** Load the persisted snapshot at boot so cold start shows last-known usage. */
+function loadPersistedRateLimits(db: SqliteLike): void {
+  try {
+    const raw = new SettingsRepo(db).getString(RATE_LIMITS_SETTING_KEY, '');
+    if (raw) latestRateLimits = JSON.parse(raw) as RateLimitsSnapshot;
+  } catch {
+    /* ignore corrupt/absent snapshot */
+  }
+}
+
+/** Handle a statusline POST: extract, persist, and throttle-push a snapshot. */
+function onStatuslineBody(db: SqliteLike, body: unknown, now: number): void {
+  const snap = extractRateLimits(body, now);
+  if (!snap) return; // no rate_limits in this render — nothing to store
+  latestRateLimits = snap;
+  try {
+    new SettingsRepo(db).set(RATE_LIMITS_SETTING_KEY, JSON.stringify(snap));
+  } catch (err) {
+    console.error('[rateLimits] persist failed:', err);
+  }
+  // Throttle the push: statuslines render every few seconds.
+  if (now - lastRateLimitsPushAt >= RATE_LIMITS_PUSH_MIN_MS) {
+    lastRateLimitsPushAt = now;
+    emitPush({ kind: 'rateLimitsUsage', payload: snap });
+  }
+}
+
 function supportDir(): string {
   // WATCHTOWER_SUPPORT_DIR lets a dev run point at an isolated copy of the
   // app-support dir (data.db, hook-token, listener.json) so it never touches
@@ -199,6 +238,19 @@ function resolveHelperPath(): string {
     if (existsSync(packaged)) return packaged;
   }
   return path.join(__dirname, '..', '..', 'dist-helper', 'watchtower-hook.mjs');
+}
+
+function resolveStatuslineHelperPath(): string {
+  if (process.env.WATCHTOWER_HELPER_DIR) {
+    return path.join(process.env.WATCHTOWER_HELPER_DIR, 'watchtower-statusline.mjs');
+  }
+  // process.resourcesPath is set in packaged Electron builds but not typed in @types/node.
+  const resPath = (process as unknown as { resourcesPath?: string }).resourcesPath;
+  if (resPath) {
+    const packaged = path.join(resPath, 'app.asar.unpacked', 'dist-helper', 'watchtower-statusline.mjs');
+    if (existsSync(packaged)) return packaged;
+  }
+  return path.join(__dirname, '..', '..', 'dist-helper', 'watchtower-statusline.mjs');
 }
 
 function notifySync(): void {
@@ -1308,6 +1360,19 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       // don't have one yet (first call before the poll timer has fired).
       return latestTokenUsage ?? (await refreshTokenUsage());
 
+    case 'rateLimits:usage':
+      return latestRateLimits as RateLimitsPayload;
+
+    case 'statuslineCapture:status':
+      return captureStatus(userSettingsPath(), resolveStatuslineHelperPath());
+
+    case 'statuslineCapture:set': {
+      const helper = resolveStatuslineHelperPath();
+      const p = userSettingsPath();
+      const kv = new SettingsRepo(handle!.db);
+      return req.payload.enabled ? enableCapture(p, helper, kv) : disableCapture(p, helper, kv);
+    }
+
     case 'push:registerDevice':
       new PushDevicesRepo(handle!.db).register(
         req.payload.token, req.payload.platform, Date.now(), req.payload.bundleId,
@@ -1588,6 +1653,9 @@ function respawnIncompleteRowsOnBoot(): void {
         // the state machine.
         if (eventName === 'SessionEnd') autoTimeLogger().onSessionEnd(row);
       },
+      onStatusline: (body) => {
+        if (handle) onStatuslineBody(handle.db, body, Date.now());
+      },
     });
     // Register the WS bridge's broadcast as the secondary push sink so every
     // emitPush reaches remote (browser) clients as well as the Electron renderer.
@@ -1686,6 +1754,9 @@ function respawnIncompleteRowsOnBoot(): void {
     // Begin polling ccusage for the 5h-block token usage and pushing it to the
     // renderer dashboard + tray.
     startTokenUsagePolling();
+    // Load the last statusline-captured rate-limits snapshot so the sidebar
+    // shows last-known usage immediately, before the next statusline render.
+    loadPersistedRateLimits(handle.db);
     // Begin the cross-repo PR watch (adaptive poll, notify + pr_watch_state).
     startPrWatch();
     void statusOf; // referenced for future use; quiet TS unused warning

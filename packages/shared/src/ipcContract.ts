@@ -79,6 +79,9 @@ export type IpcRequest =
   | { kind: 'board:signIn'; payload: Record<string, never> }
   | { kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { kind: 'tokens:usage'; payload: Record<string, never> }
+  | { kind: 'rateLimits:usage'; payload: Record<string, never> }
+  | { kind: 'statuslineCapture:status'; payload: Record<string, never> }
+  | { kind: 'statuslineCapture:set'; payload: { enabled: boolean } }
   | { kind: 'openExternalUrl'; payload: { url: string } }
   | { kind: 'terminalFocus'; payload: { instanceId: string } }
   | { kind: 'push:registerDevice'; payload: { token: string; platform: string; bundleId?: string } }
@@ -711,6 +714,9 @@ export type IpcResponse =
   | { kind: 'board:signIn'; payload: { ok: boolean; error?: string } }
   | { kind: 'board:remove'; payload: { snapshot: BoardSnapshotPayload } }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
+  | { kind: 'rateLimits:usage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
+  | { kind: 'statuslineCapture:status'; payload: { enabled: boolean; available: boolean } }
+  | { kind: 'statuslineCapture:set'; payload: { ok: boolean; changed: boolean; backupPath: string | null; error?: string } }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
   | { kind: 'push:registerDevice'; payload: { ok: true } }
@@ -909,6 +915,7 @@ export type IpcPush =
   | { kind: 'activateInstance'; payload: { instanceId: string } }
   | { kind: 'triggerNewInstance'; payload: Record<string, never> }
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
+  | { kind: 'rateLimitsUsage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | {
       kind: 'orchestratorCrashed';
       payload: { code: number | null; restarting: boolean };
