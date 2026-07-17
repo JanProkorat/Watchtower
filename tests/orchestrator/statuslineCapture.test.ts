@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, closeSync, openSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { enableCapture, disableCapture, captureStatus } from '../../orchestrator/services/statuslineCapture.js';
@@ -73,5 +73,17 @@ describe('statusline capture wrap/restore', () => {
     expect(captureStatus(settingsPath, HELPER).enabled).toBe(false);
     enableCapture(settingsPath, HELPER, kv);
     expect(captureStatus(settingsPath, HELPER).enabled).toBe(true);
+  });
+
+  it('captureStatus reports available: false when the helper file does not exist', () => {
+    writeFileSync(settingsPath, JSON.stringify({}));
+    expect(captureStatus(settingsPath, HELPER).available).toBe(false);
+  });
+
+  it('captureStatus reports available: true when the helper file exists', () => {
+    writeFileSync(settingsPath, JSON.stringify({}));
+    const helperPath = path.join(tmp, 'watchtower-statusline.mjs');
+    closeSync(openSync(helperPath, 'w'));
+    expect(captureStatus(settingsPath, helperPath).available).toBe(true);
   });
 });

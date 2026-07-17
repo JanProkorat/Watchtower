@@ -62,7 +62,10 @@ export function captureStatus(
   helperPath: string,
 ): { enabled: boolean; available: boolean } {
   const parsed = parseGlobal(settingsPath);
-  return { enabled: isWrapped(parsed.statusLine?.command, helperPath), available: true };
+  return {
+    enabled: isWrapped(parsed.statusLine?.command, helperPath),
+    available: existsSync(helperPath),
+  };
 }
 
 export function enableCapture(settingsPath: string, helperPath: string, kv: KvLike): CaptureResult {
