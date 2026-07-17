@@ -52,7 +52,7 @@ describe('ModuleReviews merge button', () => {
   beforeEach(() => mountWatchtower([]));
 
   it('renders the Merge button fed from prs:reviewState, even when the PR is not in the watch inbox', async () => {
-    render(<ToastProvider><ModuleReviews /></ToastProvider>);
+    render(<ToastProvider><ModuleReviews watchItems={[]} markSeen={vi.fn(async () => {})} /></ToastProvider>);
     // Wait for the PR row to load, then open its drawer.
     const title = await screen.findByText('Add sprockets');
     fireEvent.click(title);
@@ -66,19 +66,18 @@ describe('ModuleReviews merge button', () => {
 
 // Regression guard for the #181 repoKey namespace mismatch. Merge no longer
 // joins prs:list ↔ prWatch:list, but the markSeen path in ModuleReviews still
-// matches an opened PR against the watch inbox by exact repoKey equality
-// (ModuleReviews.tsx:50). If the two sources ever diverge again ('acme/w' vs
-// 'gh:acme/w') the join is null and markSeen never fires — this asserts the
-// canonical gh:-prefixed key flows through on a real producer path.
+// matches an opened PR against the injected watch inbox by exact repoKey
+// equality. If the two sources ever diverge again ('acme/w' vs 'gh:acme/w')
+// the join is null and markSeen never fires — this asserts the canonical
+// gh:-prefixed key flows through on a real producer path (prs:list) to markSeen.
 describe('ModuleReviews markSeen repoKey-format join', () => {
   beforeEach(() => mountWatchtower([inboxItem]));
 
-  it('fires prWatch:markSeen with the canonical gh: repoKey when opening a watched PR', async () => {
-    render(<ToastProvider><ModuleReviews /></ToastProvider>);
+  it('fires markSeen with the canonical gh: repoKey when opening a watched PR', async () => {
+    const markSeen = vi.fn(async () => {});
+    render(<ToastProvider><ModuleReviews watchItems={[inboxItem] as any} markSeen={markSeen} /></ToastProvider>);
     const title = await screen.findByText('Add sprockets');
     fireEvent.click(title);
-    await waitFor(() => expect((window as any).watchtower.invoke).toHaveBeenCalledWith(
-      'prWatch:markSeen', { host: 'github', repoKey: REPO_KEY, prNumber: 42 },
-    ));
+    await waitFor(() => expect(markSeen).toHaveBeenCalledWith('github', REPO_KEY, 42));
   });
 });

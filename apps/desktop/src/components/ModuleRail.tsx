@@ -1,5 +1,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { Box, ButtonBase, IconButton, Tooltip, Typography } from '@mui/material';
+import { Badge, Box, ButtonBase, IconButton, Tooltip, Typography } from '@mui/material';
+import type { PrWatchInboxItem } from '@watchtower/shared/ipcContract.js';
+import { PrNotificationsButton } from './reviews/PrNotificationsButton.js';
 import { useTheme } from '@mui/material/styles';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import TerminalIcon from '@mui/icons-material/Terminal';
@@ -127,6 +129,11 @@ interface Props {
   onSelectSettingsTab(tab: SettingsTab): void;
   mode: ThemeMode;
   onToggleMode(): void;
+  /** Unread PR-watch notifications — surfaced on the Reviews rail item. */
+  reviewsUnread: number;
+  reviewsNotifications: PrWatchInboxItem[];
+  onOpenNotification(item: PrWatchInboxItem): void;
+  onMarkAllNotificationsSeen(): void;
 }
 
 /**
@@ -151,6 +158,10 @@ export function ModuleRail({
   onSelectSettingsTab,
   mode,
   onToggleMode,
+  reviewsUnread,
+  reviewsNotifications,
+  onOpenNotification,
+  onMarkAllNotificationsSeen,
 }: Props) {
   const theme = useTheme();
   // Active nav item styling — derived from the theme accent (see glass.ts), so
@@ -399,10 +410,22 @@ export function ModuleRail({
           </IconButton>
         ) : null;
 
+        // Reviews rail item carries the unread PR-notifications control: a bell
+        // + popover when expanded, and a count badge on the icon when collapsed.
+        const reviewsBell = item.id === 'reviews' && expanded ? (
+          <PrNotificationsButton
+            items={reviewsNotifications}
+            unread={reviewsUnread}
+            onOpen={onOpenNotification}
+            onMarkAllSeen={onMarkAllNotificationsSeen}
+          />
+        ) : null;
+
         const parentRow = expanded ? (
           <Box key={item.id} sx={{ display: 'flex', alignItems: 'center' }}>
             <Box sx={{ flex: 1, display: 'flex' }}>{row}</Box>
             {chevron}
+            {reviewsBell}
           </Box>
         ) : (
           <Tooltip
@@ -410,7 +433,11 @@ export function ModuleRail({
             title={item.enabled ? item.label : `${item.label} (coming soon)`}
             placement="right"
           >
-            <span style={{ display: 'flex', justifyContent: 'center' }}>{row}</span>
+            <span style={{ display: 'flex', justifyContent: 'center' }}>
+              {item.id === 'reviews' && reviewsUnread > 0 ? (
+                <Badge color="error" badgeContent={reviewsUnread} overlap="circular">{row}</Badge>
+              ) : row}
+            </span>
           </Tooltip>
         );
 

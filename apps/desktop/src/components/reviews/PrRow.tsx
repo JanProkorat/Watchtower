@@ -55,9 +55,11 @@ const GHOST_BTN_SX: SxProps<Theme> = {
   ':hover': { borderColor: 'text.disabled', backgroundColor: 'action.hover' },
 };
 
-export function PrRow({ pr, nowMs, onOpen, reviewState = null, onReview }: {
+export function PrRow({ pr, nowMs, onOpen, reviewState = null, onReview, unread = false }: {
   pr: PullRequestPayload; nowMs: number; onOpen(pr: PullRequestPayload): void; reviewState?: ReviewState;
   onReview?(pr: PullRequestPayload): void; onCancel?(pr: PullRequestPayload): void;
+  /** PR has an unread PR-watch notification — shows a dot on the host chip. */
+  unread?: boolean;
 }): JSX.Element {
   const num = pr.host === 'github' ? `#${pr.number}` : `!${pr.number}`;
   const display = reviewStateDisplay(reviewState);
@@ -66,9 +68,19 @@ export function PrRow({ pr, nowMs, onOpen, reviewState = null, onReview }: {
       sx={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1fr) auto auto', gap: 1.5, alignItems: 'center',
         px: 1.25, py: 1, borderRadius: 1, cursor: 'pointer',
         '&:hover': { backgroundColor: 'action.hover' } }}>
-      <Chip size="small" label={pr.host === 'github' ? 'GH' : 'AZ'}
-        sx={{ fontWeight: 700, fontSize: 10, bgcolor: pr.host === 'github' ? 'action.selected' : 'primary.main',
-          color: pr.host === 'github' ? 'text.primary' : 'primary.contrastText' }} />
+      {/* Host chip with an unread dot manually overlaid on its upper-right edge.
+          Manual (not MUI Badge) so the red dot sits directly ON the rounded pill
+          — Badge's fixed translate floats it past the pill's curve. */}
+      <Box sx={{ position: 'relative', display: 'inline-flex', justifySelf: 'start' }}>
+        <Chip size="small" label={pr.host === 'github' ? 'GH' : 'AZ'}
+          sx={{ fontWeight: 700, fontSize: 10, bgcolor: pr.host === 'github' ? 'action.selected' : 'primary.main',
+            color: pr.host === 'github' ? 'text.primary' : 'primary.contrastText' }} />
+        {unread && (
+          <Box aria-label="unread notification"
+            sx={{ position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: '50%',
+              bgcolor: 'error.main', pointerEvents: 'none' }} />
+        )}
+      </Box>
       <Box sx={{ minWidth: 0 }}>
         <Typography noWrap sx={{ fontSize: 13 }}>
           <Box component="span" sx={{ color: 'text.secondary', mr: 0.75, fontVariantNumeric: 'tabular-nums' }}>{num}</Box>

@@ -65,7 +65,8 @@ import { selectGlobalTab } from './layout/selectGlobalTab.js';
 import { DASHBOARD_TAB_ID, type TabId } from '@watchtower/shared/layout.js';
 import { useTimeTrackerView } from './state/useTimeTrackerView.js';
 import { useSettingsView } from './state/useSettingsView.js';
-import type { WatchtowerBridge, PrHost } from '@watchtower/shared/ipcContract.js';
+import { usePrWatch } from './state/usePrWatch.js';
+import type { WatchtowerBridge, PrHost, PrWatchInboxItem } from '@watchtower/shared/ipcContract.js';
 
 declare global {
   interface Window {
@@ -255,7 +256,7 @@ export function App() {
   // switch to the reviews module first, then hand the target PR down. Signal
   // main we're ready so it flushes any deep-link buffered during cold start.
   const [deepLinkTarget, setDeepLinkTarget] = useState<
-    { host: PrHost; repoKey: string; prNumber: number } | null
+    { host: PrHost; repoKey: string; prNumber: number; focus?: 'comments' } | null
   >(null);
   useEffect(() => {
     const off = window.watchtower.on('deep-link', (d) => {
@@ -266,6 +267,23 @@ export function App() {
     void invoke('deepLink:ready', {}).catch(() => {});
     return off;
   }, [setActiveModule]);
+
+  // PR-watch inbox lives at App level so the ModuleRail's notification bell and
+  // ModuleReviews (row badges + open-mark-seen) share one source — marking a
+  // notification seen from the rail also clears the matching row badge.
+  const prWatch = usePrWatch();
+  // Clicking a notification: go to Reviews, open the PR straight to the Comments
+  // tab (highlighting the newest thread), and clear its unread flag.
+  const openNotification = (it: PrWatchInboxItem): void => {
+    setActiveModule('reviews');
+    setDeepLinkTarget({ host: it.host, repoKey: it.repoKey, prNumber: it.prNumber, focus: 'comments' });
+    void prWatch.markSeen(it.host, it.repoKey, it.prNumber).catch(() => { /* invoke() toasts on failure */ });
+  };
+  const markAllNotificationsSeen = (): void => {
+    for (const it of prWatch.items.filter((i) => i.unread)) {
+      void prWatch.markSeen(it.host, it.repoKey, it.prNumber).catch(() => { /* invoke() toasts on failure */ });
+    }
+  };
 
   const [orchDown, setOrchDown] = useState<null | { code: number | null; restarting: boolean }>(
     null,
@@ -452,6 +470,10 @@ export function App() {
                 }}
                 mode={mode}
                 onToggleMode={toggleThemeMode}
+                reviewsUnread={prWatch.unread}
+                reviewsNotifications={prWatch.items}
+                onOpenNotification={openNotification}
+                onMarkAllNotificationsSeen={markAllNotificationsSeen}
               />
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 {/* Instance tab bar — visible on every module so you can jump back
@@ -532,6 +554,9 @@ export function App() {
                   <ModuleReviews
                     deepLinkTarget={deepLinkTarget}
                     onConsumeDeepLink={() => setDeepLinkTarget(null)}
+                    watchItems={prWatch.items}
+                    markSeen={prWatch.markSeen}
+                    watchError={prWatch.error}
                   />
                 )}
                 {activeModule === 'billing' && (
