@@ -197,11 +197,18 @@ private struct PaneSplitView: View {
             let gapTotal = Double(paneGap) * Double(Swift.max(0, children.count - 1))
             let avail = Swift.max(0, total - gapTotal)
             let sum = sizes.reduce(0, +) == 0 ? 1 : sizes.reduce(0, +)
+            // spacing: 0 — each PaneDivider already occupies its own paneGap
+            // of length (see below), so stack spacing on top of that would
+            // double-count the gap at every boundary: avail already reserves
+            // exactly one gap per boundary (`total - paneGap*(n-1)`), and
+            // adding stack spacing there would make the rendered geometry
+            // overflow its container and drift from computePaneRects (the
+            // source of truth for the keyboard-nav rect map).
             Group {
                 if dir == .row {
-                    HStack(spacing: paneGap) { renderChildren(avail: avail, sum: sum) }
+                    HStack(spacing: 0) { renderChildren(avail: avail, sum: sum) }
                 } else {
-                    VStack(spacing: paneGap) { renderChildren(avail: avail, sum: sum) }
+                    VStack(spacing: 0) { renderChildren(avail: avail, sum: sum) }
                 }
             }
         }
