@@ -66,10 +66,16 @@ export function NoteEditor({
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bodyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset local editing state whenever a different note is selected.
+  // Reset local editing state whenever a different note is selected (including
+  // becoming null, e.g. after the note was deleted). Also cancel any pending
+  // debounce timer scheduled for the previous note — otherwise it fires ~400ms
+  // later and calls onChange/update() for a note that's no longer selected
+  // (deleted, or superseded by a newly-selected note).
   useEffect(() => {
     setTitle(note?.title ?? '');
     setBody(note?.body ?? '');
+    if (titleTimer.current) clearTimeout(titleTimer.current);
+    if (bodyTimer.current) clearTimeout(bodyTimer.current);
   }, [note?.id]);
 
   useEffect(() => () => {
