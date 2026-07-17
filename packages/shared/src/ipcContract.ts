@@ -30,6 +30,10 @@ export type IpcRequest =
   | { kind: 'projects:update'; payload: { id: number; input: Partial<ProjectInputPayload> } }
   | { kind: 'projects:archive'; payload: { id: number; archived: boolean } }
   | { kind: 'projects:delete'; payload: { id: number } }
+  | { kind: 'notes:list'; payload: NoteListFilterPayload }
+  | { kind: 'notes:create'; payload: NoteInputPayload }
+  | { kind: 'notes:update'; payload: { id: number; input: Partial<NoteInputPayload> } }
+  | { kind: 'notes:delete'; payload: { id: number } }
   | { kind: 'epics:list'; payload: { projectId: number } }
   | { kind: 'epics:listAll'; payload: Record<string, never> }
   | { kind: 'epics:create'; payload: EpicInputPayload }
@@ -532,6 +536,44 @@ export interface ProjectViewPayload {
   totalMinutes: number;
 }
 
+export type NotePriority = 'none' | 'low' | 'med' | 'high';
+export type NoteDone = null | 0 | 1;
+
+export interface NoteListFilterPayload {
+  scope?: 'all' | 'global' | 'project';
+  projectId?: number;
+  search?: string;
+  openTodosOnly?: boolean;
+  dueSoon?: boolean;
+  includeCompleted?: boolean;
+}
+
+export interface NoteInputPayload {
+  title?: string;
+  body?: string;
+  done?: NoteDone;
+  dueDate?: string | null;
+  priority?: NotePriority;
+  pinned?: boolean;
+  projectId?: number | null;
+}
+
+export interface NoteViewPayload {
+  id: number;
+  title: string;
+  body: string;
+  done: NoteDone;
+  doneAt: string | null;
+  dueDate: string | null;
+  priority: NotePriority;
+  pinned: boolean;
+  projectId: number | null;
+  projectName: string | null;
+  projectColor: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Reviews (PR listing + diff) ───
 export type PrHost = 'github' | 'azdo';
 
@@ -662,6 +704,10 @@ export type IpcResponse =
   | { kind: 'projects:update'; payload: { project: ProjectViewPayload } }
   | { kind: 'projects:archive'; payload: { ok: true } }
   | { kind: 'projects:delete'; payload: { ok: true } }
+  | { kind: 'notes:list'; payload: { notes: NoteViewPayload[] } }
+  | { kind: 'notes:create'; payload: { note: NoteViewPayload } }
+  | { kind: 'notes:update'; payload: { note: NoteViewPayload } }
+  | { kind: 'notes:delete'; payload: { ok: true } }
   | { kind: 'epics:list'; payload: { epics: EpicViewPayload[] } }
   | { kind: 'epics:listAll'; payload: { epics: EpicWithProjectPayload[] } }
   | { kind: 'epics:create'; payload: { epic: EpicViewPayload } }
