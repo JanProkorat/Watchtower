@@ -1,0 +1,30 @@
+name: Watchtower
+options:
+  bundleIdPrefix: cz.greencode.watchtower
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  WatchtowerCore:
+    path: ../../swift/WatchtowerCore
+targets:
+  Watchtower:
+    type: application
+    platform: iOS
+    sources:
+      - Watchtower
+    dependencies:
+      - package: WatchtowerCore
+        product: WatchtowerCore
+      - package: WatchtowerCore
+        product: WatchtowerBridge
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cz.greencode.watchtower.ipados
+        INFOPLIST_FILE: Watchtower/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        MARKETING_VERSION: "0.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "2"
+    configFiles:
+      Debug: Watchtower/Secrets.xcconfig
+      Release: Watchtower/Secrets.xcconfig
