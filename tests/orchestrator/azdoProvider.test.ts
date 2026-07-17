@@ -19,6 +19,15 @@ describe('azdo provider', () => {
     });
     expect(prs[0].url).toContain('/pullrequest/4821');
   });
+
+  it('prefers createdBy.displayName for the author, falling back to uniqueName', () => {
+    const withName = { value: [{ pullRequestId: 1, title: 't', createdBy: { displayName: 'Martin Král', uniqueName: 'm.kral@skoda' },
+      sourceRefName: 'refs/heads/a', targetRefName: 'refs/heads/main', creationDate: '2026-07-10T09:00:00Z' }] };
+    expect(parseAzdoPrList(withName, REPO)[0]!.author).toBe('Martin Král');
+    const noName = { value: [{ pullRequestId: 2, title: 't', createdBy: { uniqueName: 'm.kral@skoda' },
+      sourceRefName: 'refs/heads/a', targetRefName: 'refs/heads/main', creationDate: '2026-07-10T09:00:00Z' }] };
+    expect(parseAzdoPrList(noName, REPO)[0]!.author).toBe('m.kral@skoda');
+  });
 });
 
 describe('listAzdoPrs', () => {

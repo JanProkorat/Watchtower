@@ -19,6 +19,15 @@ describe('github provider', () => {
     const prs = parseGithubPrList(GH_JSON, { ...REPO, localClonePath: null });
     expect(prs[0].reviewable).toBe(false);
   });
+  it('prefers author.name, falling back to login when name is empty or absent', () => {
+    const withName = JSON.stringify([{ number: 1, title: 't', author: { login: 'jan', name: 'Jan Prokorát' },
+      headRefName: 'b', baseRefName: 'main', updatedAt: '', url: '' }]);
+    expect(parseGithubPrList(withName, REPO)[0]!.author).toBe('Jan Prokorát');
+    // gh returns name:'' (not null) for accounts with no display name — must fall back.
+    const emptyName = JSON.stringify([{ number: 2, title: 't', author: { login: 'jan', name: '' },
+      headRefName: 'b', baseRefName: 'main', updatedAt: '', url: '' }]);
+    expect(parseGithubPrList(emptyName, REPO)[0]!.author).toBe('jan');
+  });
   it('parses ssh and https remotes to nwo', () => {
     expect(parseGitRemoteNwo('git@github.com:o/r.git')).toBe('o/r');
     expect(parseGitRemoteNwo('https://github.com/o/r.git')).toBe('o/r');

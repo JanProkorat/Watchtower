@@ -28,7 +28,9 @@ export function parseAzdoPrList(json: unknown, repo: AzdoRepoConfig): PullReques
     const id = r.pullRequestId as number;
     return {
       host: 'azdo', repoKey: repo.repoKey, repoLabel: repo.repoLabel, number: id,
-      title: (r.title as string) ?? '', author: ((r.createdBy as { uniqueName?: string })?.uniqueName) ?? 'unknown',
+      title: (r.title as string) ?? '',
+      // Prefer the human display name; uniqueName is the domain login (e.g. `dmz\...`).
+      author: (() => { const by = r.createdBy as { displayName?: string; uniqueName?: string } | undefined; return by?.displayName || by?.uniqueName || 'unknown'; })(),
       sourceBranch: stripRef((r.sourceRefName as string) ?? ''), targetBranch: stripRef((r.targetRefName as string) ?? ''),
       url: `${repo.apiBase}/_git/${repo.repo}/pullrequest/${id}`,
       updatedAt: (r.creationDate as string) ?? '', reviewable: repo.localClonePath != null,
