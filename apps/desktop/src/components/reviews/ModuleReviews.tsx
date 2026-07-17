@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box, Typography, Alert, Chip, TextField, Button, Stack, CircularProgress, Badge } from '@mui/material';
+import { Box, Typography, Alert, Chip, TextField, Button, Stack, CircularProgress } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useReviews, applyPrFilter, groupPrsByProject, type HostFilter } from '../../state/useReviews.js';
 import { usePrWatch } from '../../state/usePrWatch.js';
-import type { PullRequestPayload, PrHost } from '@watchtower/shared/ipcContract.js';
+import type { PullRequestPayload, PrHost, PrWatchInboxItem } from '@watchtower/shared/ipcContract.js';
 import { PrRow } from './PrRow.js';
+import { PrNotificationsButton } from './PrNotificationsButton.js';
 import { PrInspectorDrawer } from './PrInspectorDrawer.js';
 import { glassSurface } from '../../theme/glass.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
@@ -52,16 +53,30 @@ export function ModuleReviews(props: {
     }
   };
 
+  // Open a PR from the notifications popover. If the PR is in the loaded list,
+  // openPr handles the drawer + mark-seen; otherwise (not fetched / filtered
+  // out) still clear its unread flag so the count stays honest.
+  const openFromNotification = (it: PrWatchInboxItem) => {
+    const pr = pullRequests.find((p) => p.host === it.host && p.repoKey === it.repoKey && p.number === it.prNumber);
+    if (pr) { openPr(pr); return; }
+    void markSeen(it.host, it.repoKey, it.prNumber).catch((e) => showError(toastMessage(e)));
+  };
+
+  const markAllSeen = () => {
+    for (const it of watchItems.filter((w) => w.unread)) {
+      void markSeen(it.host, it.repoKey, it.prNumber).catch((e) => showError(toastMessage(e)));
+    }
+  };
+
   return (
     <Box sx={{ p: 2, height: '100%', overflow: 'auto' }}>
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
-        <Badge badgeContent={unread} color="error">
-          <Typography variant="h5">Reviews</Typography>
-        </Badge>
+        <Typography variant="h5">Reviews</Typography>
         <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
           {pullRequests.length} open{syncedAt ? ` · synced ${new Date(syncedAt).toLocaleTimeString('cs-CZ')}` : ''}
         </Typography>
         <Box sx={{ flex: 1 }} />
+        <PrNotificationsButton items={watchItems} unread={unread} onOpen={openFromNotification} onMarkAllSeen={markAllSeen} />
         <Button size="small" variant="outlined" disabled={loading} onClick={() => void refresh()}>↻ Refresh</Button>
       </Stack>
 
