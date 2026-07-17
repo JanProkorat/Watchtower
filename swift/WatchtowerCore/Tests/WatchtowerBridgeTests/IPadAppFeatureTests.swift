@@ -94,4 +94,23 @@ final class IPadAppFeatureTests: XCTestCase {
         await store.finish()
         XCTAssertTrue(signedOut.value)
     }
+
+    func testInstancesActionRoutesIntoChild() async {
+        let store = TestStore(initialState: IPadAppFeature.State()) {
+            IPadAppFeature()
+        }
+        await store.send(.instances(.instanceSelected("a"))) {
+            $0.instances.selectedInstanceId = "a"
+            $0.instances.acked = ["a"]
+        }
+    }
+
+    func testOpenRemoteForAuthSelectsRemoteModule() async {
+        let store = TestStore(initialState: IPadAppFeature.State()) {
+            IPadAppFeature()
+        }
+        await store.send(.openRemoteForAuth) {
+            $0.selectedModule = .remote
+        }
+    }
 }

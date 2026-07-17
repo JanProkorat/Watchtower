@@ -40,6 +40,7 @@ public struct IPadAppFeature {
         public var authPresent = false
         public var connection = ConnectionFeature.State()
         public var auth = AuthFeature.State()
+        public var instances = InstancesFeature.State()
 
         public init() {}
     }
@@ -53,6 +54,10 @@ public struct IPadAppFeature {
         case signOutTapped
         case connection(ConnectionFeature.Action)
         case auth(AuthFeature.Action)
+        case instances(InstancesFeature.Action)
+        /// Fired by the Instances module's authBlock banner ("Open Remote Mac") —
+        /// jumps to the Remote Mac module so the user can complete the Claude login.
+        case openRemoteForAuth
     }
 
     private enum CancelID { case status, auth, probe }
@@ -69,6 +74,9 @@ public struct IPadAppFeature {
         }
         Scope(state: \.auth, action: \.auth) {
             AuthFeature()
+        }
+        Scope(state: \.instances, action: \.instances) {
+            InstancesFeature()
         }
         Reduce { state, action in
             switch action {
@@ -124,7 +132,11 @@ public struct IPadAppFeature {
             case .signOutTapped:
                 return .run { _ in await supabase.signOut() }
 
-            case .connection, .auth:
+            case .openRemoteForAuth:
+                state.selectedModule = .remote
+                return .none
+
+            case .connection, .auth, .instances:
                 return .none
             }
         }

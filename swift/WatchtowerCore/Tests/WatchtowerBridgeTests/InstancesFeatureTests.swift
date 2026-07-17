@@ -46,4 +46,26 @@ final class InstancesFeatureTests: XCTestCase {
         await store.send(.authBlockChanged(instanceId: "a", blocked: true)) { $0.blocked = ["a"] }
         await store.send(.authBlockChanged(instanceId: "a", blocked: false)) { $0.blocked = [] }
     }
+
+    func testSpawnRequestedSeedsModalWithCurrentProjectsAndInstances() async {
+        let projects = [ProjectSummary(id: 1, name: "X", folderPath: "/x")]
+        let instances = [Instance(id: "a", cwd: "/x", status: "idle", lastActivityAt: 0, kind: "claude", taskId: nil)]
+        let store = TestStore(
+            initialState: InstancesFeature.State(instances: instances, projects: projects)
+        ) { InstancesFeature() }
+        await store.send(.spawnRequested) {
+            $0.spawn = SpawnFeature.State(projects: projects, instances: instances)
+        }
+    }
+
+    func testSpawnedInstanceIsSelectedAckedAndModalDismissed() async {
+        var initial = InstancesFeature.State()
+        initial.spawn = SpawnFeature.State()
+        let store = TestStore(initialState: initial) { InstancesFeature() }
+        await store.send(.spawn(.presented(.spawned("i9")))) {
+            $0.selectedInstanceId = "i9"
+            $0.acked = ["i9"]
+            $0.spawn = nil
+        }
+    }
 }

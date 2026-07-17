@@ -15,6 +15,7 @@ public struct InstancesFeature {
         /// Instance ids currently blocked on a Claude auth prompt.
         public var blocked: Set<String> = []
         public var selectedInstanceId: String? = nil
+        @Presents public var spawn: SpawnFeature.State?
 
         public var groups: [ProjectGroup] { groupInstancesByProject(instances, projects: projects) }
         public var attentionIds: Set<String> { acknowledgedNeedingAttention(instances: instances, acked: acked) }
@@ -42,6 +43,9 @@ public struct InstancesFeature {
         case stateChangedTick
         case instanceSelected(String)
         case authBlockChanged(instanceId: String, blocked: Bool)
+        /// The "+ New" toolbar action — seeds and presents the spawn/restart modal.
+        case spawnRequested
+        case spawn(PresentationAction<SpawnFeature.Action>)
     }
 
     private enum CancelID { case state, auth }
@@ -124,7 +128,23 @@ public struct InstancesFeature {
             case let .authBlockChanged(instanceId, blocked):
                 state.blocked = applyAuthBlock(state.blocked, instanceId: instanceId, blocked: blocked)
                 return .none
+
+            case .spawnRequested:
+                state.spawn = SpawnFeature.State(projects: state.projects, instances: state.instances)
+                return .none
+
+            case let .spawn(.presented(.spawned(id))):
+                state.selectedInstanceId = id
+                state.acked.insert(id)
+                state.spawn = nil
+                return .none
+
+            case .spawn:
+                return .none
             }
+        }
+        .ifLet(\.$spawn, action: \.spawn) {
+            SpawnFeature()
         }
     }
 }
