@@ -5,17 +5,19 @@ import { getCursor, setCursor } from './cursor.js';
 import { markWorklogsForRebill } from '../db/rebill.js';
 
 // Parent-before-child so a child's FK target exists locally when it lands.
-const PULL_ORDER = ['projects', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'];
+const PULL_ORDER = ['projects', 'notes', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'];
 
-function fkSource(table: SyncTable): { col: string; parentTable: string; localCol: string } | null {
+function fkSource(table: SyncTable): { col: string; parentTable: string; localCol: string; nullable: boolean } | null {
   switch (table.name) {
-    case 'epics': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id' };
-    case 'tasks': return { col: 'epic_sync_id', parentTable: 'epics', localCol: 'epic_id' };
-    case 'contracts': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id' };
-    case 'worklogs': return { col: 'task_sync_id', parentTable: 'tasks', localCol: 'task_id' };
+    case 'epics': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id', nullable: false };
+    case 'tasks': return { col: 'epic_sync_id', parentTable: 'epics', localCol: 'epic_id', nullable: false };
+    case 'contracts': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id', nullable: false };
+    case 'worklogs': return { col: 'task_sync_id', parentTable: 'tasks', localCol: 'task_id', nullable: false };
+    case 'notes': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id', nullable: true };
     default: return null;
   }
 }
+export const fkSourceForTest = fkSource;
 
 export async function pullTable(
   db: SqliteLike,
@@ -32,7 +34,8 @@ export async function pullTable(
   let joinSql = '';
   if (fk) {
     pgCols.push(`parent.sync_id AS ${fk.col}`);
-    joinSql = ` JOIN ${fk.parentTable} parent ON parent.id = t.${fk.localCol}`;
+    const joinKind = fk.nullable ? 'LEFT JOIN' : 'JOIN';
+    joinSql = ` ${joinKind} ${fk.parentTable} parent ON parent.id = t.${fk.localCol}`;
   }
   const { rows } = await store.query<Record<string, unknown>>(
     `SELECT ${pgCols.join(', ')} FROM ${table.pgTable} t${joinSql} WHERE t.updated_at > $1 ORDER BY t.updated_at ASC`,
@@ -53,10 +56,14 @@ export async function pullTable(
     let localFkId: number | null = null;
     if (fk) {
       const parentSyncId = remote[fk.col];
-      if (parentSyncId == null) continue;
-      const prow = db.prepare(`SELECT id FROM ${fk.parentTable} WHERE sync_id = ?`).get(parentSyncId) as { id: number } | undefined;
-      if (!prow) continue;
-      localFkId = prow.id;
+      if (parentSyncId == null) {
+        if (!fk.nullable) continue;   // required FK missing → wait for parent
+        localFkId = null;             // nullable FK (Global note) → keep, id null
+      } else {
+        const prow = db.prepare(`SELECT id FROM ${fk.parentTable} WHERE sync_id = ?`).get(parentSyncId) as { id: number } | undefined;
+        if (!prow) continue;          // parent not landed yet → next cycle
+        localFkId = prow.id;
+      }
     }
 
     const existing = db.prepare(`SELECT ${table.keyCol} AS k, updated_at FROM ${table.name} WHERE sync_id = ?`).get(syncId) as

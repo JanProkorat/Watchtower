@@ -91,6 +91,23 @@ export const SYNCED_TABLES: SyncTable[] = [
     ],
   },
   {
+    name: 'notes', pgTable: 'notes', keyCol: 'id',
+    columns: [
+      { name: 'sync_id', kind: 'text' },
+      { name: 'title', kind: 'text' },
+      { name: 'body', kind: 'text' },
+      { name: 'done', kind: 'int' },
+      { name: 'done_at', kind: 'ts' },
+      { name: 'due_date', kind: 'date' },
+      { name: 'priority', kind: 'text' },
+      { name: 'pinned', kind: 'bool' },
+      { name: 'project_sync_id', kind: 'text' }, // resolved nullable FK → projects.sync_id
+      { name: 'created_at', kind: 'ts' },
+      { name: 'updated_at', kind: 'ts' },
+      { name: 'deleted_at', kind: 'ts' },
+    ],
+  },
+  {
     name: 'epics', pgTable: 'epics', keyCol: 'id',
     columns: [
       { name: 'sync_id', kind: 'text' },
