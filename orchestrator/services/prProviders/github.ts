@@ -19,12 +19,13 @@ export function parseGitRemoteNwo(remoteUrl: string): string | null {
 
 export function parseGithubPrList(json: string, repo: GithubRepoConfig): PullRequestPayload[] {
   const rows = JSON.parse(json) as Array<{
-    number: number; title: string; author: { login: string } | null;
+    number: number; title: string; author: { login: string; name?: string } | null;
     headRefName: string; baseRefName: string; updatedAt: string; url: string;
   }>;
   return rows.map((r) => ({
     host: 'github', repoKey: repo.repoKey, repoLabel: repo.repoLabel,
-    number: r.number, title: r.title, author: r.author?.login ?? 'unknown',
+    // Prefer the human name; gh returns name:'' (not null) for accounts with none, so `||` not `??`.
+    number: r.number, title: r.title, author: r.author?.name || r.author?.login || 'unknown',
     sourceBranch: r.headRefName, targetBranch: r.baseRefName,
     url: r.url, updatedAt: r.updatedAt, reviewable: repo.localClonePath != null,
   }));
