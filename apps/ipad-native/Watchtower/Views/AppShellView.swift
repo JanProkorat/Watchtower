@@ -25,7 +25,10 @@ struct AppShellView: View {
                     ?? "Waiting for the Mac…"
             )
         case .instances:
-            PlaceholderView(title: "Instances", subtitle: "Terminals arrive in Phase 2")
+            InstancesView(
+                store: store.scope(state: \.instances, action: \.instances),
+                onOpenRemote: { store.send(.openRemoteForAuth) }
+            )
         case .remote:
             PlaceholderView(title: "Remote Mac", subtitle: "VNC + Wake arrive in Phase 4")
         case .billing:

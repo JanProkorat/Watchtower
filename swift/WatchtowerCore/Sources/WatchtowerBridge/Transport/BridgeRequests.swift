@@ -47,7 +47,9 @@ public struct ListInstancesRequest: BridgeRequest {
     }
 }
 
-/// Push kinds the iPad subscribes to. Later phases add ptyData + authBlock.
+/// Push kinds the iPad subscribes to.
 public enum BridgePush {
     public static let stateChanged = "stateChanged"
+    public static let ptyData = "ptyData"
+    public static let authBlock = "authBlock"
 }

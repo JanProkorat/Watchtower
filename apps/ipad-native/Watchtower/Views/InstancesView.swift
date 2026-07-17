@@ -1,0 +1,140 @@
+import SwiftUI
+import ComposableArchitecture
+import WatchtowerCore
+import WatchtowerBridge
+
+/// Instances module: a project-grouped horizontal tab strip (amber dot for
+/// instances needing attention), the terminal pane for the selected
+/// instance, a spawn/restart modal, native remove confirmation, and a global
+/// authBlock banner. Port of client/src/components/instances/*, TCA-shaped.
+struct InstancesView: View {
+    @Bindable var store: StoreOf<InstancesFeature>
+    /// Reaches up to `IPadAppFeature.openRemoteForAuth` — the authBlock
+    /// banner's only way to switch modules, since `InstancesFeature` doesn't
+    /// know about its parent's `Module` enum.
+    let onOpenRemote: () -> Void
+
+    @Dependency(\.bridge) private var bridge
+    @State private var showRemoveConfirm = false
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                if !store.blocked.isEmpty {
+                    authBanner
+                }
+                tabStrip
+                Divider().overlay(Color.white.opacity(0.08))
+                detail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .background(Palette.baseBg.ignoresSafeArea())
+            .navigationTitle("Instances")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    if store.selectedInstanceId != nil {
+                        Button("Remove", role: .destructive) {
+                            showRemoveConfirm = true
+                        }
+                    }
+                    Button {
+                        store.send(.spawnRequested)
+                    } label: {
+                        Label("New", systemImage: "plus")
+                    }
+                }
+            }
+            .confirmationDialog(
+                "Remove this instance?",
+                isPresented: $showRemoveConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Remove", role: .destructive) {
+                    removeSelected()
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+        }
+        .sheet(item: $store.scope(state: \.spawn, action: \.spawn)) { spawnStore in
+            SpawnModalView(store: spawnStore)
+        }
+        .onAppear { store.send(.onAppear) }
+    }
+
+    private func removeSelected() {
+        guard let id = store.selectedInstanceId else { return }
+        // Fire-and-forget: the resulting `stateChanged` push refreshes the list.
+        Task { _ = try? await bridge.invoke(RemoveInstanceRequest(instanceId: id)) }
+    }
+
+    private var authBanner: some View {
+        HStack {
+            Text("Mac is waiting for a login")
+                .font(.callout.weight(.medium))
+                .foregroundStyle(Palette.textPrimary)
+            Spacer()
+            Button("Open Remote Mac", action: onOpenRemote)
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.orange.opacity(0.18))
+    }
+
+    private var tabStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(store.groups) { group in
+                    groupTab(group)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+    }
+
+    private func groupTab(_ group: ProjectGroup) -> some View {
+        let selected = group.instanceIds.contains(store.selectedInstanceId ?? "")
+        let needsAttention = group.instanceIds.contains { store.attentionIds.contains($0) }
+        return Button {
+            guard let firstId = group.instanceIds.first else { return }
+            let activeId = group.instanceIds.first { $0 == store.selectedInstanceId } ?? firstId
+            store.send(.instanceSelected(activeId))
+        } label: {
+            HStack(spacing: 6) {
+                if needsAttention {
+                    Circle().fill(Palette.chartAmber).frame(width: 8, height: 8)
+                }
+                Text(group.label)
+                    .font(.system(size: 14, weight: .medium))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(selected ? Color.white.opacity(0.1) : .clear)
+            )
+            .foregroundStyle(selected ? Palette.accent : Palette.textMuted)
+        }
+        .buttonStyle(.plain)
+        .disabled(group.instanceIds.isEmpty)
+    }
+
+    @ViewBuilder private var detail: some View {
+        // A dangling `selectedInstanceId` (its instance was removed/restarted
+        // away) must not force-unwrap into a dead terminal — fall back to the
+        // empty state instead.
+        if let id = store.selectedInstanceId, store.instances.contains(where: { $0.id == id }) {
+            RemoteTerminalView(instanceId: id)
+                .id(id)
+        } else {
+            VStack(spacing: 8) {
+                Text("Select or spawn an instance")
+                    .font(.title3)
+                    .foregroundStyle(Palette.textMuted)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
