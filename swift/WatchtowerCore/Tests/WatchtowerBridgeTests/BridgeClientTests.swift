@@ -2,9 +2,6 @@ import XCTest
 import ComposableArchitecture
 @testable import WatchtowerBridge
 
-// TODO(Task 7): replace with BridgePush.stateChanged
-let BridgePushKindStateChanged = "stateChanged"
-
 // If TestClock is not visible via ComposableArchitecture in this toolchain,
 // add `.product(name: "Clocks", package: "swift-clocks")` to the
 // WatchtowerBridgeTests target (swift-clocks is already in the resolved graph
@@ -190,7 +187,7 @@ final class BridgeClientTests: XCTestCase {
         rig.latest?.open()
 
         let received = LockIsolated<[Data]>([])
-        let stream = await client.pushes(BridgePushKindStateChanged)
+        let stream = await client.pushes(BridgePush.stateChanged)
         let collector = Task { for await p in stream { received.withValue { $0.append(p) } } }
         defer { collector.cancel() }
         // Give the subscription a beat to register before pushing.
