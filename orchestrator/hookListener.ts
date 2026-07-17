@@ -15,6 +15,7 @@ export interface HookListenerOptions {
   token: string;
   portRange: [number, number];
   onEvent: (event: string, body: unknown, instanceId: string) => Promise<void>;
+  onStatusline?: (body: unknown, instanceId: string) => Promise<void> | void;
 }
 
 export interface HookListenerHandle {
@@ -46,6 +47,20 @@ export async function startHookListener(opts: HookListenerOptions): Promise<Hook
       return;
     }
     await opts.onEvent(event, req.body, instanceId);
+    await reply.code(204).send();
+  });
+
+  app.post('/statusline', async (req, reply) => {
+    if (req.headers.authorization !== `Bearer ${opts.token}`) {
+      await reply.code(401).send({ error: 'unauthorized' });
+      return;
+    }
+    // Statusline captures need no instance id — unlike /hooks, do not 400 when
+    // it's absent (the statusline helper may run before an instance is tagged).
+    const instanceId = String(req.headers['x-watchtower-instance'] ?? '');
+    if (opts.onStatusline) {
+      await opts.onStatusline(req.body, instanceId);
+    }
     await reply.code(204).send();
   });
 

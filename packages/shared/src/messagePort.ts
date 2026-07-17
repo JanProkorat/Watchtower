@@ -74,6 +74,7 @@ export type OrchRequest =
   | { id: string; kind: 'board:sync'; payload: { projectId: number } }
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
+  | { id: string; kind: 'rateLimits:usage'; payload: Record<string, never> }
   | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } }
   | { id: string; kind: 'push:registerDevice'; payload: { token: string; platform: string; bundleId?: string } }
   | { id: string; kind: 'prs:list'; payload: Record<string, never> }
@@ -626,6 +627,7 @@ export type OrchResponse =
       payload: { snapshot: import('./ipcContract.js').BoardSnapshotPayload };
     }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
+  | { kind: 'rateLimits:usage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | { kind: 'terminalFocus'; payload: { ok: true } }
   | { kind: 'push:registerDevice'; payload: { ok: true } }
   | {
@@ -681,6 +683,7 @@ export type OrchPush =
   | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
   | { kind: 'badge'; payload: { count: number } }
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
+  | { kind: 'rateLimitsUsage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
   | { kind: 'prReviewDone'; payload: { reviewId: number } }
   | { kind: 'prWatchEvent'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } };

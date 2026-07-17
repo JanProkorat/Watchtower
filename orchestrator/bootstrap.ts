@@ -32,6 +32,7 @@ export interface BootstrapOptions {
   /** Override for tests — defaults to a real better-sqlite3 opened from supportDir/data.db. */
   dbFactory?: (dbPath: string) => DbHandle;
   onHookEvent?: (event: string, body: unknown, instanceId: string) => Promise<void>;
+  onStatusline?: (body: unknown, instanceId: string) => Promise<void> | void;
   /**
    * Override TimeTracker migration behaviour. Pass `{ skip: true }` to bypass
    * entirely (tests do this unless explicitly exercising the migration path).
@@ -184,6 +185,7 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
         await opts.onHookEvent(event, body, instanceId);
       }
     },
+    onStatusline: opts.onStatusline,
   });
 
   writeListenerSidecar(path.join(opts.supportDir, 'listener.json'), {
