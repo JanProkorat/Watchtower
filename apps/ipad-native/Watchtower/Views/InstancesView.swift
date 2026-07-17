@@ -145,6 +145,9 @@ struct InstancesView: View {
                 onResize: { splitId, sizes in
                     store.send(.paneResized(splitId: splitId, sizes: sizes))
                 },
+                onResizeCommitted: {
+                    store.send(.paneResizeCommitted)
+                },
                 onFocus: { leafId in
                     store.send(.paneFocused(leafId: leafId))
                 }

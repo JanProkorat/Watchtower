@@ -28,7 +28,11 @@ struct WorkspacePaneView: View {
     let groupInstanceIds: [String]
     let onSplit: (NodeId, SplitDir, InsertPosition, String) -> Void
     let onClose: (NodeId) -> Void
+    /// Live divider-drag feedback — fires every frame; mutate-only on the
+    /// reducer side (see `onResizeCommitted`).
     let onResize: (NodeId, [Double]) -> Void
+    /// Divider-drag end — persists the layout once, instead of every frame.
+    let onResizeCommitted: () -> Void
     let onFocus: (NodeId) -> Void
 
     @State private var pendingSplit: PendingPaneSplit?
@@ -46,6 +50,7 @@ struct WorkspacePaneView: View {
                     },
                     onClose: onClose,
                     onResize: onResize,
+                    onResizeCommitted: onResizeCommitted,
                     onFocus: onFocus
                 )
 
@@ -151,6 +156,7 @@ private struct PaneNodeView: View {
     let onSplitRequested: (NodeId, SplitDir, InsertPosition) -> Void
     let onClose: (NodeId) -> Void
     let onResize: (NodeId, [Double]) -> Void
+    let onResizeCommitted: () -> Void
     let onFocus: (NodeId) -> Void
 
     var body: some View {
@@ -174,6 +180,7 @@ private struct PaneNodeView: View {
                 onSplitRequested: onSplitRequested,
                 onClose: onClose,
                 onResize: onResize,
+                onResizeCommitted: onResizeCommitted,
                 onFocus: onFocus
             )
         }
@@ -189,6 +196,7 @@ private struct PaneSplitView: View {
     let onSplitRequested: (NodeId, SplitDir, InsertPosition) -> Void
     let onClose: (NodeId) -> Void
     let onResize: (NodeId, [Double]) -> Void
+    let onResizeCommitted: () -> Void
     let onFocus: (NodeId) -> Void
 
     var body: some View {
@@ -225,6 +233,7 @@ private struct PaneSplitView: View {
                 onSplitRequested: onSplitRequested,
                 onClose: onClose,
                 onResize: onResize,
+                onResizeCommitted: onResizeCommitted,
                 onFocus: onFocus
             )
             .frame(width: dir == .row ? length : nil, height: dir == .col ? length : nil)
@@ -235,7 +244,15 @@ private struct PaneSplitView: View {
             // write) — guarding on sizes.count (not just children.count)
             // keeps this safe even if the two ever drift.
             if index < children.count - 1 && index < sizes.count - 1 {
-                PaneDivider(dir: dir, splitId: splitId, index: index, sizes: sizes, avail: avail, onResize: onResize)
+                PaneDivider(
+                    dir: dir,
+                    splitId: splitId,
+                    index: index,
+                    sizes: sizes,
+                    avail: avail,
+                    onResize: onResize,
+                    onResizeCommitted: onResizeCommitted
+                )
             }
         }
     }
@@ -246,6 +263,11 @@ private struct PaneSplitView: View {
 /// clamps and redistributes it between the two flanking panes only. `sizes`
 /// at drag-start is captured once (not re-read live) so the delta is always
 /// relative to where the drag began, not to the just-applied resize.
+///
+/// `onResize` (mutate-only) fires on every `.onChanged` frame for live
+/// visual feedback; `onResizeCommitted` (persist-only, no payload) fires
+/// once on `.onEnded` — this is what keeps a full JSONEncoder +
+/// UserDefaults.set off the per-frame drag path.
 private struct PaneDivider: View {
     let dir: SplitDir
     let splitId: NodeId
@@ -253,6 +275,7 @@ private struct PaneDivider: View {
     let sizes: [Double]
     let avail: Double
     let onResize: (NodeId, [Double]) -> Void
+    let onResizeCommitted: () -> Void
 
     @State private var dragStartSizes: [Double]?
 
@@ -273,7 +296,10 @@ private struct PaneDivider: View {
                         let deltaPercent = avail > 0 ? Double(delta) / avail * sum : 0
                         onResize(splitId, sizesAfterDrag(base, dividerIndex: index, deltaPercent: deltaPercent))
                     }
-                    .onEnded { _ in dragStartSizes = nil }
+                    .onEnded { _ in
+                        dragStartSizes = nil
+                        onResizeCommitted()
+                    }
             )
     }
 }

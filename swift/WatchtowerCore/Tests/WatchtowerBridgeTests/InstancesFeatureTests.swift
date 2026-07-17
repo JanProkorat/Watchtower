@@ -265,7 +265,12 @@ final class InstancesFeatureTests: XCTestCase {
         XCTAssertEqual(saveCalls.value.count, 1)
     }
 
-    func testPaneResizedUpdatesSplitSizesAndPersists() async {
+    /// `paneResized` fires on every `DragGesture.onChanged` frame — it must
+    /// mutate the in-memory layout for live visual feedback WITHOUT
+    /// persisting (a full JSONEncoder + synchronous UserDefaults.set per
+    /// frame is visible jank). Persistence is `paneResizeCommitted`'s job,
+    /// fired once on drag-end (see the next test).
+    func testPaneResizedUpdatesSplitSizesWithoutPersisting() async {
         let saveCalls = LockIsolated<[WorkspaceState]>([])
         var initial = InstancesFeature.State()
         initial.activeGroupId = "__other__"
@@ -277,7 +282,27 @@ final class InstancesFeatureTests: XCTestCase {
         await store.send(.paneResized(splitId: "d-root", sizes: [70, 30])) {
             $0.layouts["__other__"] = expected
         }
+        XCTAssertEqual(saveCalls.value.count, 0)
+    }
+
+    /// Drag-end: persists whatever `paneResized` frames already landed in
+    /// state, with no tree mutation of its own.
+    func testPaneResizeCommittedPersists() async {
+        let saveCalls = LockIsolated<[WorkspaceState]>([])
+        var initial = InstancesFeature.State()
+        initial.activeGroupId = "__other__"
+        let resized = resizeSplitSizes(
+            tiledDefaultLayout(instanceIds: ["a", "b"], focusedInstanceId: "a"),
+            splitId: "d-root",
+            sizes: [70, 30]
+        )
+        initial.layouts = ["__other__": resized]
+        let store = TestStore(initialState: initial) { InstancesFeature() } withDependencies: {
+            $0.workspaceLayoutStore.save = { layouts in saveCalls.withValue { $0.append(layouts) } }
+        }
+        await store.send(.paneResizeCommitted)
         XCTAssertEqual(saveCalls.value.count, 1)
+        XCTAssertEqual(saveCalls.value.first, initial.layouts)
     }
 
     func testPaneReplacedSwapsInstanceInLeafAndMirrorsSelection() async {

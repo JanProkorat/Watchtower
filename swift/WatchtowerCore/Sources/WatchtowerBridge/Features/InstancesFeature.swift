@@ -70,7 +70,16 @@ public struct InstancesFeature {
         case layoutsLoaded(WorkspaceState)
         case paneSplit(leafId: NodeId, dir: SplitDir, position: InsertPosition, instanceId: String)
         case paneClosed(leafId: NodeId)
+        /// Live divider-drag feedback: mutates the in-memory layout ONLY, no
+        /// persistence — `DragGesture.onChanged` fires every frame, and a
+        /// full `JSONEncoder` + synchronous `UserDefaults.set` per frame is
+        /// visible jank. See `paneResizeCommitted` for the persisted half.
         case paneResized(splitId: NodeId, sizes: [Double])
+        /// Divider-drag end: persists whatever `paneResized` frames already
+        /// landed in `state.layouts`. No tree mutation of its own — losing
+        /// an unreleased drag on a mid-drag crash is acceptable (resize is
+        /// ephemeral until released).
+        case paneResizeCommitted
         case paneFocused(leafId: NodeId)
         case paneReplaced(leafId: NodeId, instanceId: String)
     }
@@ -207,10 +216,10 @@ public struct InstancesFeature {
                 return Self.refreshEffect(bridge: bridge)
 
             case let .groupActivated(groupId):
-            Self.seedActiveGroupIfNeeded(&state, workspaceLayoutStore: workspaceLayoutStore, forcedGroupId: groupId)
-            return .none
+                Self.seedActiveGroupIfNeeded(&state, workspaceLayoutStore: workspaceLayoutStore, forcedGroupId: groupId)
+                return .none
 
-        case let .instanceSelected(id):
+            case let .instanceSelected(id):
                 // Selecting from the tab strip also focuses that instance's
                 // pane in the active group's layout (if it's mounted there).
                 state.acked.insert(id)
@@ -276,6 +285,13 @@ public struct InstancesFeature {
             case let .paneResized(splitId, sizes):
                 guard let groupId = state.activeGroupId, let current = state.layouts[groupId] else { return .none }
                 state.layouts[groupId] = resizeSplitSizes(current, splitId: splitId, sizes: sizes)
+                return .none
+
+            case .paneResizeCommitted:
+                // Same synchronous save every other pane mutation uses —
+                // `workspaceLayoutStore.save` is a plain UserDefaults write,
+                // not worth an `.run` effect. Just no longer called per drag
+                // frame from `.paneResized` above.
                 workspaceLayoutStore.save(state.layouts)
                 return .none
 
