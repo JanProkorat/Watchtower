@@ -108,6 +108,38 @@ final class InstancesFeatureTests: XCTestCase {
         XCTAssertEqual(saveCalls.value.count, 1)
     }
 
+    /// Group-tab tap: `groupActivated` must switch `activeGroupId` to the
+    /// tapped group (not just default when nil), seed a fresh tiled layout
+    /// for it since none exists yet, and mirror `selectedInstanceId` from
+    /// that freshly-seeded layout's focus — same seed-or-restore semantics
+    /// `seedActiveGroupIfNeeded` already applies to `instancesLoaded` /
+    /// `layoutsLoaded`, just forced to a specific target group.
+    func testGroupActivatedSwitchesActiveGroupAndSeeds() async {
+        let saveCalls = LockIsolated<[WorkspaceState]>([])
+        var initial = InstancesFeature.State(
+            instances: [
+                Instance(id: "a", cwd: "/x", status: "idle", lastActivityAt: 0, kind: "claude", taskId: nil),
+                Instance(id: "b", cwd: "/y", status: "idle", lastActivityAt: 0, kind: "claude", taskId: nil),
+            ],
+            projects: [
+                ProjectSummary(id: 1, name: "X", folderPath: "/x"),
+                ProjectSummary(id: 2, name: "Y", folderPath: "/y"),
+            ]
+        )
+        initial.activeGroupId = "1"
+        initial.layouts = ["1": defaultTabLayout(instanceId: "a")]
+        initial.selectedInstanceId = "a"
+        let store = TestStore(initialState: initial) { InstancesFeature() } withDependencies: {
+            $0.workspaceLayoutStore.save = { layouts in saveCalls.withValue { $0.append(layouts) } }
+        }
+        await store.send(.groupActivated(groupId: "2")) {
+            $0.activeGroupId = "2"
+            $0.layouts["2"] = defaultTabLayout(instanceId: "b")
+            $0.selectedInstanceId = "b"
+        }
+        XCTAssertEqual(saveCalls.value.count, 1) // fresh seed for group "2" persists
+    }
+
     func testAuthBlockFolds() async {
         let store = TestStore(initialState: InstancesFeature.State()) { InstancesFeature() }
         await store.send(.authBlockChanged(instanceId: "a", blocked: true)) { $0.blocked = ["a"] }

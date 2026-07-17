@@ -55,6 +55,12 @@ public struct InstancesFeature {
         case instancesLoaded([Instance])
         case projectsLoaded([ProjectSummary])
         case stateChangedTick
+        /// Group-tab tap: switch the active project-group tab. Seeds a fresh
+        /// tiled layout if this group has never had one, or restores its
+        /// persisted layout (mirroring `selectedInstanceId` either way) —
+        /// same semantics as `seedActiveGroupIfNeeded`'s first-shown seeding,
+        /// but forcing the target group instead of only defaulting when nil.
+        case groupActivated(groupId: String)
         case instanceSelected(String)
         case authBlockChanged(instanceId: String, blocked: Bool)
         /// The "+ New" toolbar action — seeds and presents the spawn/restart modal.
@@ -103,18 +109,28 @@ public struct InstancesFeature {
     }
 
     /// First-shown seeding (port of App.tsx's `ensureTab`): default the active
-    /// tab to the first group. If that group already has a layout — either
-    /// restored from `workspaceLayoutStore` or seeded by an earlier call —
-    /// just mirror `selectedInstanceId` from it (this is the persisted-restore
-    /// path: relaunching with saved split panes must land on the previously
-    /// focused instance, not `nil`, without waiting for a manual pane tap).
-    /// Otherwise tile all the group's live instances via `tiledDefaultLayout`
-    /// and persist. Idempotent: safe to call from both `instancesLoaded` and
-    /// `layoutsLoaded` regardless of which arrives first.
-    private static func seedActiveGroupIfNeeded(_ state: inout State, workspaceLayoutStore: WorkspaceLayoutStore) {
+    /// tab to the first group (or, when `forcedGroupId` is supplied — the
+    /// `groupActivated` group-tab-tap path — switch to that group instead of
+    /// only defaulting when nil). If the target group already has a layout —
+    /// either restored from `workspaceLayoutStore` or seeded by an earlier
+    /// call — just mirror `selectedInstanceId` from it (this is the
+    /// persisted-restore path: relaunching with saved split panes, or
+    /// switching back to a previously-visited tab, must land on the
+    /// previously focused instance, not `nil`, without waiting for a manual
+    /// pane tap). Otherwise tile all the group's live instances via
+    /// `tiledDefaultLayout` and persist. Idempotent: safe to call from
+    /// `instancesLoaded`, `layoutsLoaded`, and `groupActivated` regardless of
+    /// call order.
+    private static func seedActiveGroupIfNeeded(
+        _ state: inout State,
+        workspaceLayoutStore: WorkspaceLayoutStore,
+        forcedGroupId: String? = nil
+    ) {
         let groups = state.groups
         guard !groups.isEmpty else { return }
-        if state.activeGroupId == nil {
+        if let forcedGroupId {
+            state.activeGroupId = forcedGroupId
+        } else if state.activeGroupId == nil {
             state.activeGroupId = groups[0].id
         }
         guard let groupId = state.activeGroupId else { return }
@@ -190,7 +206,11 @@ public struct InstancesFeature {
             case .stateChangedTick:
                 return Self.refreshEffect(bridge: bridge)
 
-            case let .instanceSelected(id):
+            case let .groupActivated(groupId):
+            Self.seedActiveGroupIfNeeded(&state, workspaceLayoutStore: workspaceLayoutStore, forcedGroupId: groupId)
+            return .none
+
+        case let .instanceSelected(id):
                 // Selecting from the tab strip also focuses that instance's
                 // pane in the active group's layout (if it's mounted there).
                 state.acked.insert(id)
