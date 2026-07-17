@@ -28,7 +28,6 @@ struct InstancesView: View {
                 detail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .background(Palette.baseBg.ignoresSafeArea())
             .navigationTitle("Instances")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -79,7 +78,7 @@ struct InstancesView: View {
                 .foregroundStyle(colors.accent)
             Spacer()
             Button("Open Remote Mac", action: onOpenRemote)
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.borderedProminent)
                 .tint(colors.accent)
         }
         .padding(.horizontal, 16)
