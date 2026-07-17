@@ -70,6 +70,7 @@ final class ConnectionFeatureTests: XCTestCase {
     func testEditingClearsDidSaveAndError() async {
         var state = ConnectionFeature.State()
         state.didSave = true
+        state.errorMessage = "Host is required"
         let store = TestStore(initialState: state) {
             ConnectionFeature()
         }
@@ -78,6 +79,7 @@ final class ConnectionFeatureTests: XCTestCase {
         await store.send(.binding(.set(\.form, edited))) {
             $0.form = edited
             $0.didSave = false
+            $0.errorMessage = nil
         }
     }
 }

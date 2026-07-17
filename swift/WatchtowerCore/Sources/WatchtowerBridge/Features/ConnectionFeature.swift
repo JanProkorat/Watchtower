@@ -37,6 +37,7 @@ public struct ConnectionFeature {
             switch action {
             case .binding:
                 state.didSave = false
+                state.errorMessage = nil
                 return .none
 
             case .onAppear:
