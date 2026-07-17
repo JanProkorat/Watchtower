@@ -7,17 +7,20 @@ struct RailView: View {
     let store: StoreOf<IPadAppFeature>
 
     var body: some View {
-        VStack(spacing: 6) {
-            ForEach(IPadAppFeature.Module.allCases, id: \.self) { module in
-                railButton(module)
+        GlassEffectContainer(spacing: 10) {
+            VStack(spacing: 6) {
+                ForEach(IPadAppFeature.Module.allCases, id: \.self) { module in
+                    railButton(module)
+                }
+                Spacer()
+                StatusPill(status: store.connStatus)
+                    .padding(.bottom, 16)
             }
-            Spacer()
-            StatusPill(status: store.connStatus)
-                .padding(.bottom, 16)
+            .padding(.top, 24)
         }
-        .padding(.top, 24)
         .frame(width: 88)
-        .background(Color.white.opacity(0.03))
+        .padding(.leading, 12)
+        .padding(.vertical, 16)
     }
 
     private func railButton(_ module: IPadAppFeature.Module) -> some View {
@@ -35,10 +38,7 @@ struct RailView: View {
             }
             .foregroundStyle(selected ? Palette.accent : Palette.textMuted)
             .frame(width: 72, height: 56)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(selected ? Color.white.opacity(0.08) : .clear)
-            )
+            .floatingGlass(cornerRadius: 14, tint: selected ? Palette.accentWash : nil)
         }
         .buttonStyle(.plain)
     }
@@ -47,11 +47,11 @@ struct RailView: View {
 struct StatusPill: View {
     let status: ConnStatus
 
-    private var color: Color {
+    private var connState: Palette.ConnState {
         switch status {
-        case .connected: return .green
-        case .connecting: return .yellow
-        case .disconnected: return .red
+        case .connected: return .connected
+        case .connecting: return .connecting
+        case .disconnected: return .disconnected
         }
     }
 
@@ -64,9 +64,16 @@ struct StatusPill: View {
     }
 
     var body: some View {
+        let colors = Palette.status(connState)
         VStack(spacing: 4) {
-            Circle().fill(color).frame(width: 8, height: 8)
+            Circle()
+                .fill(colors.accent)
+                .frame(width: 8, height: 8)
+                .shadow(color: colors.accent, radius: 6)
             Text(label).font(.system(size: 9)).foregroundStyle(Palette.textDim)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .floatingGlass(cornerRadius: 999, tint: colors.fill)
     }
 }

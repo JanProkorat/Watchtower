@@ -54,7 +54,8 @@ struct ConnectionSectionView: View {
             }
             HStack(spacing: 12) {
                 Button("Save & connect") { store.send(.saveTapped) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.glassProminent)
+                    .tint(Palette.accent)
                 if store.didSave {
                     Text("Saved").font(.callout).foregroundStyle(.green)
                 }
@@ -62,6 +63,8 @@ struct ConnectionSectionView: View {
                 StatusPill(status: store.status)
             }
         }
+        .padding(20)
+        .contentCard()
         .onAppear { store.send(.onAppear) }
     }
 
@@ -87,12 +90,14 @@ struct AccountSectionView: View {
                     Text("Signed in").foregroundStyle(Palette.textMuted)
                     Spacer()
                     Button("Sign out") { store.send(.signOutTapped) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.glass)
                 }
             } else {
                 AuthFormView(store: store.scope(state: \.auth, action: \.auth))
             }
         }
+        .padding(20)
+        .contentCard()
     }
 }
 
@@ -120,7 +125,8 @@ struct AuthFormView: View {
                     Text("Sign in")
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
+            .tint(Palette.accent)
             .disabled(store.isSubmitting)
         }
     }

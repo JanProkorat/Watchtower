@@ -2,7 +2,7 @@ name: Watchtower
 options:
   bundleIdPrefix: cz.greencode.watchtower
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "26.0"
 packages:
   WatchtowerCore:
     path: ../../swift/WatchtowerCore

@@ -28,7 +28,6 @@ struct InstancesView: View {
                 detail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .background(Palette.baseBg.ignoresSafeArea())
             .navigationTitle("Instances")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -37,12 +36,15 @@ struct InstancesView: View {
                         Button("Remove", role: .destructive) {
                             showRemoveConfirm = true
                         }
+                        .buttonStyle(.glass)
                     }
                     Button {
                         store.send(.spawnRequested)
                     } label: {
                         Label("New", systemImage: "plus")
                     }
+                    .buttonStyle(.glassProminent)
+                    .tint(Palette.accent)
                 }
             }
             .confirmationDialog(
@@ -69,24 +71,30 @@ struct InstancesView: View {
     }
 
     private var authBanner: some View {
-        HStack {
+        let colors = Palette.status(.authBlock)
+        return HStack {
             Text("Mac is waiting for a login")
                 .font(.callout.weight(.medium))
-                .foregroundStyle(Palette.textPrimary)
+                .foregroundStyle(colors.accent)
             Spacer()
             Button("Open Remote Mac", action: onOpenRemote)
                 .buttonStyle(.borderedProminent)
+                .tint(colors.accent)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Color.orange.opacity(0.18))
+        .floatingGlass(cornerRadius: 14, tint: colors.fill)
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
     }
 
     private var tabStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(store.groups) { group in
-                    groupTab(group)
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    ForEach(store.groups) { group in
+                        groupTab(group)
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -111,11 +119,8 @@ struct InstancesView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(selected ? Color.white.opacity(0.1) : .clear)
-            )
             .foregroundStyle(selected ? Palette.accent : Palette.textMuted)
+            .floatingGlass(cornerRadius: 12, tint: selected ? Palette.accentWash : nil)
         }
         .buttonStyle(.plain)
         .disabled(group.instanceIds.isEmpty)

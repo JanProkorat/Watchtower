@@ -85,9 +85,12 @@ struct SpawnModalView: View {
                             Spacer()
                         }
                     }
+                    .buttonStyle(.glassProminent)
+                    .tint(Palette.accent)
                     .disabled(store.isSubmitting)
                 }
             }
+            .scrollContentBackground(.hidden)
             .navigationTitle("New instance")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -96,6 +99,7 @@ struct SpawnModalView: View {
                         store.send(.dismissed)
                         dismiss()
                     }
+                    .buttonStyle(.glass)
                 }
             }
         }

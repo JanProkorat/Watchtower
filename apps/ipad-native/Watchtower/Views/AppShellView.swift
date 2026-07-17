@@ -7,13 +7,15 @@ struct AppShellView: View {
     @Bindable var store: StoreOf<IPadAppFeature>
 
     var body: some View {
-        HStack(spacing: 0) {
-            RailView(store: store)
-            Divider().overlay(Color.white.opacity(0.08))
-            detail
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack {
+            AmbientBackground()
+            HStack(spacing: 0) {
+                RailView(store: store)
+                Divider().overlay(Color.white.opacity(0.08))
+                detail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
-        .background(Palette.baseBg.ignoresSafeArea())
     }
 
     @ViewBuilder private var detail: some View {
