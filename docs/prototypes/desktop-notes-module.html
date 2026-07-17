@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Watchtower — Notes module prototype</title>
+<!--
+  Watchtower macOS desktop app — Notes / Todo module prototype.
+  Unified item model: every entry is a note that can also be a todo (done = null|0|1).
+  Notes are Global (no project) or linked to a Billing/TimeTracker project.
+  Two-pane layout (Bear/Apple-Notes style): filterable list + markdown editor.
+  Ocean-blue glass language matching apps/desktop/src/theme.ts (post-palette-switch):
+  primary #38bdf8, secondary #22d3ee, bg rgb(18,20,28), text #e5e7eb/#9aa3b2.
+  Self-contained static mockup; presentation only. Mock data + light JS for feel.
+-->
+<style>
+  :root{
+    --sky:#38bdf8; --cyan:#22d3ee; --sky-wash:rgba(56,189,248,.16); --sky-ring:rgba(56,189,248,.45);
+    --green:#22c55e; --amber:#f59e0b; --red:#ef4444;
+    --ui:system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+    --doc-text:#e5e7eb; --doc-muted:#9aa3b2; --doc-dim:#5a6072;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#06070b;color:var(--doc-text);font-family:var(--ui);
+    padding:28px clamp(14px,4vw,56px) 60px;line-height:1.45}
+  h1{font-size:23px;font-weight:700;margin:0 0 4px;letter-spacing:.2px}
+  .lede{color:var(--doc-muted);font-size:13.5px;max-width:900px;margin:0 0 22px}
+  .lede b{color:var(--sky)}
+
+  /* desktop wallpaper stage so vibrancy can bleed */
+  .stage{position:relative;border-radius:18px;padding:24px;overflow:hidden;
+    background:
+      radial-gradient(60% 80% at 12% 8%,#1e5f8f 0,transparent 55%),
+      radial-gradient(70% 90% at 92% 14%,#0f766e 0,transparent 55%),
+      radial-gradient(80% 90% at 72% 100%,#155e8a 0,transparent 55%),
+      linear-gradient(135deg,#0c2b45,#093243 60%,#0a3f4a)}
+
+  /* the macOS app window */
+  .win{position:relative;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;
+    height:min(78vh,720px);min-height:560px;
+    background:rgba(20,22,30,.72);backdrop-filter:blur(40px) saturate(1.5) brightness(1.04);
+    -webkit-backdrop-filter:blur(40px) saturate(1.5) brightness(1.04);
+    box-shadow:0 30px 70px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.08)}
+
+  /* top drag strip + traffic lights */
+  .wbar{display:flex;align-items:center;gap:12px;height:34px;padding:0 13px;flex-shrink:0}
+  .lights{display:flex;gap:8px}
+  .lights i{width:12px;height:12px;border-radius:50%;display:block}
+  .lights .r{background:#ff5f57}.lights .y{background:#febc2e}.lights .g{background:#28c840}
+
+  .body{display:flex;flex:1;min-height:0}
+
+  /* ===== left module rail (context) ===== */
+  .rail{width:196px;flex-shrink:0;padding:0 8px 10px;display:flex;flex-direction:column;gap:3px;
+    border-right:1px solid rgba(255,255,255,.06)}
+  .brand{display:flex;align-items:center;gap:10px;height:46px;padding:0 8px;margin-bottom:6px;
+    border-bottom:1px solid rgba(255,255,255,.07)}
+  .brand svg{width:24px;height:24px}
+  .brand span{font-size:14px;font-weight:600}
+  .nav{display:flex;align-items:center;gap:11px;height:38px;padding:0 10px;border-radius:9px;
+    color:var(--doc-muted);font-size:13px;font-weight:500;cursor:default}
+  .nav svg{width:18px;height:18px;opacity:.9}
+  .nav:hover{background:rgba(255,255,255,.06);color:#e5e7eb}
+  .nav.on{background:var(--sky-wash);color:#eaf6fd;font-weight:600;box-shadow:inset 0 0 0 1px var(--sky-ring)}
+  .nav.on svg{color:var(--sky)}
+  .nav .badge{margin-left:auto;font-size:10.5px;font-weight:700;min-width:18px;height:18px;padding:0 5px;
+    border-radius:9px;background:var(--sky);color:#04222f;display:flex;align-items:center;justify-content:center}
+
+  /* ===== notes list column ===== */
+  .list{width:308px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;
+    border-right:1px solid rgba(255,255,255,.07)}
+  .list-hd{padding:12px 12px 8px;display:flex;flex-direction:column;gap:9px}
+  .list-title{display:flex;align-items:center;gap:8px}
+  .list-title h2{font-size:16px;font-weight:650;margin:0;flex:1}
+  .newbtn{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#04222f;
+    background:linear-gradient(135deg,#38bdf8,#22d3ee);border:none;border-radius:8px;padding:6px 11px;cursor:pointer}
+  .search{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.07);border-radius:8px;
+    padding:7px 10px;border:1px solid rgba(255,255,255,.08)}
+  .search svg{width:14px;height:14px;color:var(--doc-dim)}
+  .search input{background:none;border:none;outline:none;color:#e5e7eb;font-size:12.5px;width:100%;font-family:var(--ui)}
+  .search input::placeholder{color:var(--doc-dim)}
+
+  /* scope selector */
+  .scopes{display:flex;gap:5px}
+  .scope{flex:1;text-align:center;font-size:11.5px;font-weight:600;color:var(--doc-muted);
+    padding:5px 6px;border-radius:7px;background:rgba(255,255,255,.05);cursor:pointer;
+    border:1px solid transparent;white-space:nowrap}
+  .scope:hover{color:#e5e7eb}
+  .scope.on{background:var(--sky-wash);color:#eaf6fd;border-color:var(--sky-ring)}
+  .quickfilters{display:flex;gap:6px;flex-wrap:wrap}
+  .qf{font-size:11px;color:var(--doc-muted);padding:4px 9px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:5px}
+  .qf:hover{color:#e5e7eb}
+  .qf.on{background:rgba(34,197,94,.16);color:#bbf7d0;border-color:rgba(34,197,94,.4)}
+
+  .scroll{overflow-y:auto;flex:1;padding:4px 8px 12px}
+  .scroll::-webkit-scrollbar{width:8px}
+  .scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
+
+  .grouphd{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--doc-dim);
+    font-weight:700;padding:12px 8px 5px;display:flex;align-items:center;gap:6px}
+  .grouphd .chev{transition:transform .15s}
+
+  /* a note row in the list */
+  .row{display:flex;gap:9px;padding:9px 9px;border-radius:9px;cursor:pointer;position:relative;
+    border:1px solid transparent}
+  .row:hover{background:rgba(255,255,255,.05)}
+  .row.sel{background:var(--sky-wash);border-color:var(--sky-ring)}
+  .row.done .rtitle{text-decoration:line-through;color:var(--doc-dim)}
+  .row.done .rprev{color:var(--doc-dim)}
+  .check{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--doc-dim);flex-shrink:0;margin-top:1px;
+    cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .check.on{background:var(--green);border-color:var(--green)}
+  .check.on svg{width:12px;height:12px;color:#04220f}
+  .check.hidden{visibility:hidden}
+  .rmain{flex:1;min-width:0}
+  .rtitle{font-size:13px;font-weight:600;color:#e9edf2;display:flex;align-items:center;gap:6px}
+  .rtitle .pin{color:var(--amber);flex-shrink:0}
+  .rtitle .pin svg{width:12px;height:12px;display:block}
+  .prio{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .prio.high{background:var(--red)}.prio.med{background:var(--amber)}.prio.low{background:#64748b}
+  .rprev{font-size:11.5px;color:var(--doc-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap}
+  .rmeta{display:flex;align-items:center;gap:7px;margin-top:6px;flex-wrap:wrap}
+  .tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;display:flex;align-items:center;gap:5px}
+  .tag .dot{width:7px;height:7px;border-radius:50%}
+  .tag.global{background:rgba(255,255,255,.07);color:var(--doc-muted)}
+  .due{font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--doc-muted);
+    display:flex;align-items:center;gap:4px}
+  .due svg{width:10px;height:10px}
+  .due.over{background:rgba(239,68,68,.16);color:#fca5a5}
+  .due.soon{background:rgba(245,158,11,.16);color:#fcd34d}
+
+  /* ===== editor pane ===== */
+  .editor{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+  .ed-toolbar{display:flex;align-items:center;gap:9px;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.07);flex-wrap:wrap}
+  .tbtn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--doc-muted);
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:8px;padding:6px 11px;cursor:pointer}
+  .tbtn:hover{color:#e5e7eb;background:rgba(255,255,255,.1)}
+  .tbtn svg{width:14px;height:14px}
+  .tbtn.active{background:var(--sky-wash);color:#eaf6fd;border-color:var(--sky-ring)}
+  .tbtn.pin.active{background:rgba(245,158,11,.16);color:#fcd34d;border-color:rgba(245,158,11,.4)}
+  .tbtn.danger:hover{background:rgba(239,68,68,.16);color:#fca5a5;border-color:rgba(239,68,68,.4)}
+  .spacer{flex:1}
+
+  .ed-scroll{overflow-y:auto;flex:1;padding:22px 30px}
+  .ed-title{display:flex;align-items:flex-start;gap:12px;margin-bottom:6px}
+  .ed-title .bigcheck{width:24px;height:24px;border-radius:7px;border:2px solid var(--doc-dim);flex-shrink:0;margin-top:5px;
+    cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .ed-title .bigcheck.on{background:var(--green);border-color:var(--green)}
+  .ed-title .bigcheck.on svg{width:15px;height:15px;color:#04220f}
+  .ed-title h1{font-size:24px;font-weight:700;margin:0;line-height:1.25;flex:1;color:#f2f4f7}
+  .ed-title h1.done{text-decoration:line-through;color:var(--doc-dim)}
+  .ed-sub{display:flex;align-items:center;gap:10px;color:var(--doc-dim);font-size:11.5px;margin:0 0 20px 0}
+  .ed-sub .sep{opacity:.4}
+  .sync{display:flex;align-items:center;gap:5px;color:#7dd3fc}
+  .sync svg{width:12px;height:12px}
+
+  /* rendered markdown */
+  .md{font-size:14px;line-height:1.65;color:#d6dbe2;max-width:660px}
+  .md h3{font-size:15px;color:#f2f4f7;margin:22px 0 8px;font-weight:650}
+  .md p{margin:0 0 12px}
+  .md ul{margin:0 0 12px;padding-left:22px}
+  .md li{margin:3px 0}
+  .md code{font-family:var(--mono);font-size:12.5px;background:rgba(255,255,255,.08);padding:1px 6px;border-radius:5px;color:#7dd3fc}
+  .md pre{background:rgba(13,15,21,.7);border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:13px 15px;
+    overflow-x:auto;margin:0 0 14px}
+  .md pre code{background:none;padding:0;color:#cbd5e1;display:block;line-height:1.55}
+  .md a{color:var(--sky);text-decoration:none;border-bottom:1px solid rgba(56,189,248,.35)}
+  .md .cbox{display:flex;gap:9px;align-items:flex-start;margin:5px 0}
+  .md .cbx{width:16px;height:16px;border:1.5px solid var(--doc-dim);border-radius:4px;flex-shrink:0;margin-top:2px;
+    display:flex;align-items:center;justify-content:center}
+  .md .cbx.on{background:var(--sky);border-color:var(--sky)}
+  .md .cbx.on svg{width:11px;height:11px;color:#04222f}
+  .md .cbx.on + span{color:var(--doc-dim);text-decoration:line-through}
+  .md blockquote{border-left:3px solid var(--sky-ring);margin:0 0 12px;padding:2px 0 2px 14px;color:var(--doc-muted)}
+
+  .cap{font-size:12px;color:var(--doc-muted);margin:16px 2px 4px;display:flex;gap:8px;align-items:baseline}
+  .cap b{color:#e5e7eb}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--doc-muted);margin:10px 2px 0}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .legend .prio{position:static}
+</style>
+</head>
+<body>
+  <h1>Watchtower — Notes module</h1>
+  <p class="lede">
+    A unified <b>notes &amp; todos</b> module. Every entry is a note that can become a todo
+    (a tri-state <code style="font-family:var(--mono);font-size:12px">done = null · 0 · 1</code>).
+    Notes are <b>Global</b> (🌐) or linked to a <b>project</b>, wearing that project's color.
+    Two-pane layout: a filterable list + a markdown editor. Ocean-blue glass, matching the live theme.
+    Click rows, checkboxes, scopes, and toolbar toggles — it's lightly interactive.
+  </p>
+
+  <div class="stage">
+    <div class="win">
+      <div class="wbar">
+        <div class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+      </div>
+      <div class="body">
+
+        <!-- module rail (context) -->
+        <nav class="rail">
+          <div class="brand">
+            <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <polygon points="512,152 664,240 664,416 512,504 360,416 360,240" fill="#4dd0e1"/>
+              <polygon points="320,496 472,584 472,760 320,848 168,760 168,584" fill="#1abc9c"/>
+              <polygon points="704,496 856,584 856,760 704,848 552,760 552,584" fill="#2980b9"/>
+            </svg>
+            <span>Watchtower</span>
+          </div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>Instances</div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Billing</div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>Reviews</div>
+          <div class="nav on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Notes<span class="badge">5</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</div>
+        </nav>
+
+        <!-- notes list -->
+        <div class="list">
+          <div class="list-hd">
+            <div class="list-title">
+              <h2>Notes</h2>
+              <button class="newbtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New</button>
+            </div>
+            <div class="search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input placeholder="Search notes…" />
+            </div>
+            <div class="scopes">
+              <div class="scope on">All</div>
+              <div class="scope">🌐 Global</div>
+              <div class="scope">Projects ▾</div>
+            </div>
+            <div class="quickfilters">
+              <div class="qf on"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Open todos</div>
+              <div class="qf">Due soon</div>
+              <div class="qf">Has project</div>
+            </div>
+          </div>
+
+          <div class="scroll" id="rows">
+            <!-- rows injected by JS -->
+          </div>
+        </div>
+
+        <!-- editor -->
+        <div class="editor">
+          <div class="ed-toolbar">
+            <div class="tbtn" id="t-todo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Todo</div>
+            <div class="tbtn"><span class="prio high" style="position:static"></span>&nbsp;Priority: High ▾</div>
+            <div class="tbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Due Jul 19</div>
+            <div class="tbtn"><span class="tag" style="padding:0"><span class="dot" style="background:#38bdf8"></span></span>Watchtower ▾</div>
+            <div class="spacer"></div>
+            <div class="tbtn pin active" id="t-pin"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16 3l5 5-4 1-3 3 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 3-3z"/></svg>Pinned</div>
+            <div class="tbtn danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
+          </div>
+          <div class="ed-scroll">
+            <div class="ed-title">
+              <div class="bigcheck" id="bigcheck"></div>
+              <h1 id="ed-title-txt">Ship Notes module v1</h1>
+            </div>
+            <div class="ed-sub">
+              <span class="tag" style="background:rgba(56,189,248,.14);color:#7dd3fc"><span class="dot" style="background:#38bdf8"></span>Watchtower</span>
+              <span class="sep">·</span>
+              <span>Updated 12 min ago</span>
+              <span class="sep">·</span>
+              <span class="sync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c2.5-2.3 4-5.6 4-9s-1.5-6.7-4-9m0 18c-2.5-2.3-4-5.6-4-9s1.5-6.7 4-9"/></svg>Synced</span>
+            </div>
+
+            <div class="md">
+              <p>Unified item model + two-pane UI. Track the remaining work before cutting the release.</p>
+              <div class="cbox"><span class="cbx on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><span>Migration v24 — <code>notes</code> table + sync columns</span></div>
+              <div class="cbox"><span class="cbx on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><span><code>NotesRepo</code> + <code>notes:*</code> IPC arms</span></div>
+              <div class="cbox"><span class="cbx"></span><span><code>useNotes</code> hook + <code>notesBus</code></span></div>
+              <div class="cbox"><span class="cbx"></span><span>Register in <code>SYNCED_TABLES</code> + Postgres schema</span></div>
+              <h3>Notes</h3>
+              <p>Body supports <b>markdown</b>: <code>inline code</code>, links like <a href="#">the design doc</a>, lists, and fenced blocks:</p>
+              <pre><code>done ∈ { null → plain note
+         0   → open todo
+         1   → completed }</code></pre>
+              <blockquote>iPad UI to display synced notes is a follow-up — this module ships the desktop UI + the synced data plane.</blockquote>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><span class="prio high"></span>High priority</span>
+    <span><span class="prio med"></span>Medium</span>
+    <span><span class="prio low"></span>Low</span>
+    <span><span class="due over" style="padding:1px 6px">◷ overdue</span></span>
+    <span><span class="due soon" style="padding:1px 6px">◷ due soon</span></span>
+    <span>🌐 = Global note (no project)</span>
+  </div>
+  <p class="cap"><b>Sort order:</b> pinned → priority (high→low) → due date (overdue first) → recently updated. Completed todos sink to a collapsible group.</p>
+
+<script>
+  // Mock data — the unified item. done: null = plain note, 0 = open todo, 1 = done.
+  const projects = {
+    wt:  { name:'Watchtower', color:'#38bdf8' },
+    pps: { name:'PPS / Škoda', color:'#22c55e' },
+    tt:  { name:'TimeTracker', color:'#a78bfa' },
+  };
+  const notes = [
+    { id:1, title:'Ship Notes module v1', prev:'Unified item model + two-pane UI. Track remaining work…',
+      done:0, prio:'high', pinned:true, proj:'wt', due:'Jul 19', dueState:'soon', sel:true },
+    { id:2, title:'Idea: dashboard "due today" widget', prev:'Surface open todos with a due date on the Dashboard overview.',
+      done:null, prio:'low', pinned:true, proj:null, due:null },
+    { id:3, title:'Fix ADO PAT cache-invalidation', prev:'Newly-saved PAT only works after restart — invalidate the cached client.',
+      done:0, prio:'high', pinned:false, proj:'pps', due:'Jul 16', dueState:'over' },
+    { id:4, title:'Reply to Honza re: capacity planning', prev:'Draft the response about the pooled-contract dedup change.',
+      done:0, prio:'med', pinned:false, proj:null, due:'Jul 22', dueState:null },
+    { id:5, title:'Reading list — Electron perf', prev:'utilityProcess memory tuning, backpressure on the pty stream, v8 snapshots…',
+      done:null, prio:'none', pinned:false, proj:'wt', due:null },
+    { id:6, title:'Retire legacy source=claude auto-logger', prev:'Double-bills once the WT project auto_track toggle is on.',
+      done:1, prio:'med', pinned:false, proj:'wt', due:null },
+    { id:7, title:'Book flights for the offsite', prev:'Compare Wed vs Thu departure; expense after.',
+      done:1, prio:'none', pinned:false, proj:null, due:null },
+  ];
+
+  const rowsEl = document.getElementById('rows');
+  const chk = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+  const pinSvg = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16 3l5 5-4 1-3 3 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 3-3z"/></svg>';
+  const clock = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>';
+
+  function projTag(p){
+    if(!p) return '<span class="tag global">🌐 Global</span>';
+    const pr = projects[p];
+    return `<span class="tag" style="background:${pr.color}22;color:${pr.color}"><span class="dot" style="background:${pr.color}"></span>${pr.name}</span>`;
+  }
+  function rowHtml(n){
+    const checkbox = n.done===null
+      ? '<div class="check hidden"></div>'
+      : `<div class="check ${n.done? 'on':''}" data-toggle="${n.id}">${n.done?chk:''}</div>`;
+    const prio = (n.prio && n.prio!=='none') ? `<span class="prio ${n.prio}"></span>` : '';
+    const pin = n.pinned ? `<span class="pin">${pinSvg}</span>` : '';
+    const due = n.due ? `<span class="due ${n.dueState||''}">${clock}${n.due}</span>` : '';
+    return `<div class="row ${n.sel?'sel':''} ${n.done===1?'done':''}" data-sel="${n.id}">
+      ${checkbox}
+      <div class="rmain">
+        <div class="rtitle">${prio}<span>${n.title}</span>${pin}</div>
+        <div class="rprev">${n.prev}</div>
+        <div class="rmeta">${projTag(n.proj)}${due}</div>
+      </div>
+    </div>`;
+  }
+  function render(){
+    const open = notes.filter(n=>n.done!==1);
+    const done = notes.filter(n=>n.done===1);
+    let html = open.map(rowHtml).join('');
+    if(done.length){
+      html += `<div class="grouphd"><span class="chev">▾</span>Completed · ${done.length}</div>`;
+      html += done.map(rowHtml).join('');
+    }
+    rowsEl.innerHTML = html;
+    bind();
+  }
+  function bind(){
+    rowsEl.querySelectorAll('[data-toggle]').forEach(el=>{
+      el.addEventListener('click', e=>{
+        e.stopPropagation();
+        const n = notes.find(x=>x.id==el.dataset.toggle);
+        n.done = n.done? 0 : 1;
+        render();
+      });
+    });
+    rowsEl.querySelectorAll('[data-sel]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        notes.forEach(x=>x.sel=false);
+        const n = notes.find(x=>x.id==el.dataset.sel);
+        n.sel = true;
+        document.getElementById('ed-title-txt').textContent = n.title;
+        render();
+      });
+    });
+  }
+  render();
+
+  // scope + quickfilter + toolbar toggles (cosmetic)
+  document.querySelectorAll('.scope').forEach(s=>s.addEventListener('click',()=>{
+    document.querySelectorAll('.scope').forEach(x=>x.classList.remove('on')); s.classList.add('on');
+  }));
+  document.querySelectorAll('.qf').forEach(s=>s.addEventListener('click',()=>s.classList.toggle('on')));
+  document.getElementById('t-pin').addEventListener('click',e=>e.currentTarget.classList.toggle('active'));
+  const bc = document.getElementById('bigcheck');
+  bc.addEventListener('click',()=>{
+    bc.classList.toggle('on');
+    bc.innerHTML = bc.classList.contains('on') ? chk : '';
+    document.getElementById('ed-title-txt').classList.toggle('done', bc.classList.contains('on'));
+  });
+</script>
+</body>
+</html>
