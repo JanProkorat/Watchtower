@@ -45,4 +45,19 @@ describe('SidebarUsage', () => {
     expect(screen.queryByText(/week/i)).toBeNull();
     expect(screen.getByText(/55\s*%/)).toBeInTheDocument();
   });
+
+  it('collapsed: shows S/W tags and hides the full labels and percentages', () => {
+    rl.value = { session: { usedPercent: 42, resetsAt: 0 }, week: { usedPercent: 71, resetsAt: 0 }, capturedAt: Date.now() };
+    tu.value = { data: null };
+    renderIt(true);
+    // Mini-bar tags stand in for the labels.
+    expect(screen.getByText('S')).toBeInTheDocument();
+    expect(screen.getByText('W')).toBeInTheDocument();
+    // Full labels and the inline % are suppressed in the collapsed rail (detail
+    // lives in the hover tooltip, which is not rendered until hover).
+    expect(screen.queryByText(/session/i)).toBeNull();
+    expect(screen.queryByText(/week/i)).toBeNull();
+    expect(screen.queryByText(/42\s*%/)).toBeNull();
+    expect(screen.queryByText(/71\s*%/)).toBeNull();
+  });
 });

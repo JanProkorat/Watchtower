@@ -1,7 +1,7 @@
 import { Box, Divider, LinearProgress, Tooltip, Typography } from '@mui/material';
-import { useRateLimits } from '../state/useRateLimits';
-import { useTokenUsage } from '../state/useTokenUsage';
-import { severityColor } from './usage/severityColor';
+import { useRateLimits } from '../state/useRateLimits.js';
+import { useTokenUsage } from '../state/useTokenUsage.js';
+import { severityColor } from './usage/severityColor.js';
 
 // Plain rounded-percent label — NOT the shared `formatPercent` (which renders a
 // Czech decimal comma, e.g. "42,0 %"). This sidebar sliver wants a compact
