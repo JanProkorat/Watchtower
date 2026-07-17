@@ -86,4 +86,31 @@ describe('statusline capture wrap/restore', () => {
     closeSync(openSync(helperPath, 'w'));
     expect(captureStatus(settingsPath, helperPath).available).toBe(true);
   });
+
+  it('detects a wrap made under a DIFFERENT absolute helper path but the same filename (cross-build regression)', () => {
+    // A wrap created by e.g. a worktree build (different absolute path) must still
+    // be recognized — and thus disable-able — by a packaged build calling with its
+    // own resolveStatuslineHelperPath() result.
+    const otherBuildHelper = '/Users/jan/other-worktree/dist-helper/watchtower-statusline.mjs';
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({ statusLine: { type: 'command', command: `node "${otherBuildHelper}" ccline.sh` } }),
+    );
+    expect(captureStatus(settingsPath, HELPER).enabled).toBe(true);
+
+    const r = disableCapture(settingsPath, HELPER, kv);
+    expect(r.ok).toBe(true);
+    expect(r.changed).toBe(true);
+  });
+
+  it('enable preserves pre-existing statusLine sibling keys (e.g. padding)', () => {
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({ statusLine: { type: 'command', command: 'ccline.sh', padding: 0 } }),
+    );
+    enableCapture(settingsPath, HELPER, kv);
+    const statusLine = read().statusLine;
+    expect(statusLine.padding).toBe(0);
+    expect(statusLine.command).toBe(`node "${HELPER}" ccline.sh`);
+  });
 });

@@ -18,7 +18,7 @@ export interface CaptureResult {
 }
 
 interface ParsedSettings {
-  statusLine?: { type?: string; command?: string } | undefined;
+  statusLine?: { type?: string; command?: string; [k: string]: unknown } | undefined;
   [k: string]: unknown;
 }
 
@@ -41,8 +41,15 @@ function wrappedCommand(helperPath: string, inner: string): string {
   return `node "${helperPath}" ${inner}`;
 }
 
-function isWrapped(command: string | undefined, helperPath: string): boolean {
-  return typeof command === 'string' && command.includes(helperPath);
+// Detect by helper FILENAME, not the full absolute path: resolveStatuslineHelperPath()
+// returns a different absolute path per build (dev/worktree vs packaged), so a wrap
+// made under one build must still be recognized (and disable-able) under another —
+// e.g. after the worktree that created the wrap is deleted. `helperPath` itself is
+// still used for `available` (existsSync), which is correctly build-specific.
+const HELPER_FILENAME = 'watchtower-statusline.mjs';
+
+function isWrapped(command: string | undefined): boolean {
+  return typeof command === 'string' && command.includes(HELPER_FILENAME);
 }
 
 // Reuse claudeSettings.writeSettings via 'project' scope pointed at the file's
@@ -63,7 +70,7 @@ export function captureStatus(
 ): { enabled: boolean; available: boolean } {
   const parsed = parseGlobal(settingsPath);
   return {
-    enabled: isWrapped(parsed.statusLine?.command, helperPath),
+    enabled: isWrapped(parsed.statusLine?.command),
     available: existsSync(helperPath),
   };
 }
@@ -71,23 +78,23 @@ export function captureStatus(
 export function enableCapture(settingsPath: string, helperPath: string, kv: KvLike): CaptureResult {
   const parsed = parseGlobal(settingsPath);
   const current = parsed.statusLine?.command ?? '';
-  if (isWrapped(current, helperPath)) {
+  if (isWrapped(current)) {
     return { ok: true, changed: false, backupPath: null };
   }
   kv.set(INNER_KEY, current);
-  parsed.statusLine = { type: 'command', command: wrappedCommand(helperPath, current) };
+  parsed.statusLine = { ...parsed.statusLine, type: 'command', command: wrappedCommand(helperPath, current) };
   const res = writeGlobal(settingsPath, parsed);
   return { ok: res.ok, changed: res.ok, backupPath: res.backupPath ?? null, error: res.error };
 }
 
 export function disableCapture(settingsPath: string, helperPath: string, kv: KvLike): CaptureResult {
   const parsed = parseGlobal(settingsPath);
-  if (!isWrapped(parsed.statusLine?.command, helperPath)) {
+  if (!isWrapped(parsed.statusLine?.command)) {
     return { ok: true, changed: false, backupPath: null };
   }
   const inner = kv.getString(INNER_KEY, '');
   if (inner.trim()) {
-    parsed.statusLine = { type: 'command', command: inner };
+    parsed.statusLine = { ...parsed.statusLine, type: 'command', command: inner };
   } else {
     delete parsed.statusLine;
   }

@@ -269,7 +269,7 @@ export function SettingsPanel() {
         >
           <Switch
             checked={capture.enabled}
-            disabled={capture.loading || !capture.available}
+            disabled={capture.loading || (!capture.available && !capture.enabled)}
             onChange={(e) => void capture.save(e.target.checked)}
             size="small"
           />
