@@ -16,3 +16,16 @@ await build({
 });
 
 console.log('built dist-helper/watchtower-hook.mjs');
+
+await build({
+  entryPoints: [path.join(__dirname, 'watchtower-statusline.ts')],
+  bundle: true,
+  platform: 'node',
+  target: 'node22',
+  format: 'esm',
+  outfile: path.join(__dirname, '..', 'dist-helper', 'watchtower-statusline.mjs'),
+  banner: { js: '#!/usr/bin/env node' },
+  minify: false,
+});
+
+console.log('built dist-helper/watchtower-statusline.mjs');
