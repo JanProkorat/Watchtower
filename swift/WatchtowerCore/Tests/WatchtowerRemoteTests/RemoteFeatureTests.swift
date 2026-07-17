@@ -1,0 +1,81 @@
+import XCTest
+import ComposableArchitecture
+import WatchtowerBridge
+@testable import WatchtowerRemote
+
+@MainActor
+final class RemoteFeatureTests: XCTestCase {
+    private nonisolated func conn() -> Connection {
+        Connection(host: "mac.ts.net", port: 7445, token: "t",
+                   mac: "01:23:45:67:89:AB", lanIp: "192.168.1.9", wanHost: nil, wanPort: nil)
+    }
+
+    func testOnAppearLoadsHostAndCreds() async {
+        let store = TestStore(initialState: RemoteFeature.State()) {
+            RemoteFeature()
+        } withDependencies: {
+            $0.connectionStore.load = { self.conn() }
+            $0.vncCredentialsStore.load = { VncCredentials(username: "jan", password: "pw") }
+        }
+        await store.send(.onAppear) {
+            $0.host = "mac.ts.net"
+            $0.credentials = VncCredentials(username: "jan", password: "pw")
+            $0.status = .connecting
+        }
+    }
+
+    func testWakeTappedSendsToEachTarget() async {
+        let sends = LockIsolated<[(host: String, port: Int, bytes: Int)]>([])
+        let store = TestStore(initialState: RemoteFeature.State(host: "mac.ts.net")) {
+            RemoteFeature()
+        } withDependencies: {
+            $0.connectionStore.load = { self.conn() }
+            $0.wakeOnLanClient.send = { packet, host, port in
+                sends.withValue { $0.append((host, port, packet.count)) }
+            }
+        }
+        await store.send(.wakeTapped) { $0.waking = true }
+        await store.receive(\.wakeFinished) { $0.waking = false }
+        XCTAssertEqual(sends.value.count, 1)
+        XCTAssertEqual(sends.value.first?.host, "192.168.1.9")
+        XCTAssertEqual(sends.value.first?.port, 9)
+        XCTAssertEqual(sends.value.first?.bytes, 102)
+    }
+
+    func testAuthFailedClearsPasswordAndOpensForm() async {
+        let store = TestStore(
+            initialState: RemoteFeature.State(
+                host: "mac.ts.net",
+                credentials: VncCredentials(username: "jan", password: "pw"),
+                status: .connecting
+            )
+        ) {
+            RemoteFeature()
+        }
+        await store.send(.vncAuthFailed) {
+            $0.status = .disconnected
+            $0.credentials.password = ""
+            $0.credentialFormOpen = true
+            $0.authFailed = true
+        }
+    }
+
+    func testSubmitCredentialsSavesAndReconnects() async {
+        let saved = LockIsolated<VncCredentials?>(nil)
+        let store = TestStore(
+            initialState: RemoteFeature.State(host: "mac.ts.net", credentialFormOpen: true, authFailed: true)
+        ) {
+            RemoteFeature()
+        } withDependencies: {
+            $0.vncCredentialsStore.save = { saved.setValue($0) }
+        }
+        await store.send(.credentialsUsernameChanged("jan")) { $0.credentials.username = "jan" }
+        await store.send(.credentialsPasswordChanged("newpw")) { $0.credentials.password = "newpw" }
+        await store.send(.submitCredentials) {
+            $0.credentialFormOpen = false
+            $0.authFailed = false
+            $0.status = .connecting
+        }
+        XCTAssertEqual(saved.value, VncCredentials(username: "jan", password: "newpw"))
+    }
+}
