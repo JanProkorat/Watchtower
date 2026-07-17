@@ -46,4 +46,34 @@ public enum Palette {
     public static let chartViolet = Color(hex: "#38bdf8")
     public static let chartCyan = Color(hex: "#22d3ee")
     public static let chartAmber = Color(hex: "#fbbf24")
+
+    // MARK: - Liquid Glass tokens (iPad native design pass)
+
+    public static let textSecondary = Color(hex: "#c2c9d8")
+    public static let accentHover = Color(hex: "#7dd3fc")
+    public static let accentWash = Color(hex: "#38bdf8").opacity(0.20)
+    public static let contentFill = Color(hex: "#0e0f17").opacity(0.62)
+    public static let hairline = Color.white.opacity(0.10)
+    public static let ambientSky = Color(hex: "#38bdf8").opacity(0.30)
+    public static let ambientCyan = Color(hex: "#22d3ee").opacity(0.20)
+    public static let ambientOcean = Color(hex: "#0284c7").opacity(0.24)
+
+    /// Connection state used to color status pills/badges across the app.
+    public enum ConnState {
+        case connected, connecting, disconnected, authBlock
+    }
+
+    /// Fill + accent color pair for a given connection state.
+    public static func status(_ s: ConnState) -> (fill: Color, accent: Color) {
+        switch s {
+        case .connected:
+            return (Color(hex: "#1a5a42").opacity(0.34), Color(hex: "#34d399"))
+        case .connecting:
+            return (Color(hex: "#14345c").opacity(0.45), Color(hex: "#60a5fa"))
+        case .disconnected:
+            return (Color(hex: "#6e1818").opacity(0.40), Color(hex: "#f87171"))
+        case .authBlock:
+            return (Color(hex: "#785208").opacity(0.40), Color(hex: "#f5a524"))
+        }
+    }
 }
