@@ -137,6 +137,27 @@ CREATE TABLE IF NOT EXISTS days_off (
 );
 `;
 
+// notes: unified note/todo. project_id is NULLABLE — a Global note has no
+// project. First synced table with a nullable parent FK (design note in
+// orchestrator/sync/push.ts + pull.ts fkSource: LEFT JOIN + null-safe resolve).
+const NOTES = `
+CREATE TABLE IF NOT EXISTS notes (
+  id             SERIAL PRIMARY KEY,
+  sync_id        TEXT NOT NULL UNIQUE,
+  title          TEXT NOT NULL DEFAULT '',
+  body           TEXT NOT NULL DEFAULT '',
+  done           INTEGER,
+  done_at        TIMESTAMPTZ,
+  due_date       DATE,
+  priority       TEXT NOT NULL DEFAULT 'none',
+  pinned         BOOLEAN NOT NULL DEFAULT false,
+  project_id     INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_at     TIMESTAMPTZ
+);
+`;
+
 const SYNC_CONFLICTS = `
 CREATE TABLE IF NOT EXISTS sync_conflicts (
   id            SERIAL PRIMARY KEY,
@@ -352,6 +373,24 @@ END $$;`,
       `ALTER TABLE push_devices
          ADD COLUMN IF NOT EXISTS bundle_id TEXT NOT NULL
          DEFAULT 'cz.greencode.watchtower.ipad'`,
+    ],
+  },
+  {
+    version: 14,
+    up: [
+      NOTES,
+      // RLS: authenticated clients may read; writes are Mac-only (service role).
+      // Mirrors the read_authenticated pattern from v4 (projects/epics/…):
+      // idempotent + role-guarded so plain Postgres (local dev / test harness,
+      // no Supabase-built-in `authenticated` role) still applies cleanly — RLS
+      // is enabled unconditionally, the policy is skipped where the role is absent.
+      `ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS read_authenticated ON notes;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE POLICY read_authenticated ON notes FOR SELECT TO authenticated USING (true);
+  END IF;
+END $$;`,
     ],
   },
 ];

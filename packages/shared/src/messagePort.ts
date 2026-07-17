@@ -27,6 +27,10 @@ export type OrchRequest =
   | { id: string; kind: 'projects:update'; payload: { id: number; input: Partial<OrchProjectInput> } }
   | { id: string; kind: 'projects:archive'; payload: { id: number; archived: boolean } }
   | { id: string; kind: 'projects:delete'; payload: { id: number } }
+  | { id: string; kind: 'notes:list'; payload: OrchNoteListFilter }
+  | { id: string; kind: 'notes:create'; payload: OrchNoteInput }
+  | { id: string; kind: 'notes:update'; payload: { id: number; input: Partial<OrchNoteInput> } }
+  | { id: string; kind: 'notes:delete'; payload: { id: number } }
   | { id: string; kind: 'epics:list'; payload: { projectId: number } }
   | { id: string; kind: 'epics:listAll'; payload: Record<string, never> }
   | { id: string; kind: 'epics:create'; payload: OrchEpicInput }
@@ -525,6 +529,27 @@ export interface OrchProjectView {
   totalMinutes: number;
 }
 
+export type OrchNotePriority = 'none' | 'low' | 'med' | 'high';
+export type OrchNoteDone = null | 0 | 1;
+export interface OrchNoteListFilter {
+  scope?: 'all' | 'global' | 'project';
+  projectId?: number;
+  search?: string;
+  openTodosOnly?: boolean;
+  dueSoon?: boolean;
+  includeCompleted?: boolean;
+}
+export interface OrchNoteInput {
+  title?: string; body?: string; done?: OrchNoteDone; dueDate?: string | null;
+  priority?: OrchNotePriority; pinned?: boolean; projectId?: number | null;
+}
+export interface OrchNoteView {
+  id: number; title: string; body: string; done: OrchNoteDone; doneAt: string | null;
+  dueDate: string | null; priority: OrchNotePriority; pinned: boolean;
+  projectId: number | null; projectName: string | null; projectColor: string | null;
+  createdAt: string; updatedAt: string;
+}
+
 export type OrchResponse =
   | { kind: 'ping'; payload: { now: number; orch: number } }
   | { kind: 'spawnInstance'; payload: { instanceId: string | null; error?: string } }
@@ -573,6 +598,10 @@ export type OrchResponse =
   | { kind: 'projects:update'; payload: { project: OrchProjectView } }
   | { kind: 'projects:archive'; payload: { ok: true } }
   | { kind: 'projects:delete'; payload: { ok: true } }
+  | { kind: 'notes:list'; payload: { notes: OrchNoteView[] } }
+  | { kind: 'notes:create'; payload: { note: OrchNoteView } }
+  | { kind: 'notes:update'; payload: { note: OrchNoteView } }
+  | { kind: 'notes:delete'; payload: { ok: true } }
   | { kind: 'epics:list'; payload: { epics: OrchEpicView[] } }
   | { kind: 'epics:listAll'; payload: { epics: OrchEpicWithProject[] } }
   | { kind: 'epics:create'; payload: { epic: OrchEpicView } }

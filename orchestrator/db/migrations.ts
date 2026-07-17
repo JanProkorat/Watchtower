@@ -473,6 +473,35 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       );
     },
   },
+  {
+    version: 24,
+    up: (db) => {
+      // Notes module: a unified note/todo. done is tri-state — NULL (plain
+      // note), 0 (open todo), 1 (completed todo). project_id is NULLABLE:
+      // NULL = a Global note. Synced table → carries the sync_id/updated_at/
+      // deleted_at triad. Constant literal defaults only (node:sqlite vs
+      // better-sqlite3 ADD COLUMN divergence does not apply to CREATE TABLE,
+      // but keep defaults constant for consistency).
+      db.exec(`CREATE TABLE IF NOT EXISTS notes (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        title       TEXT    NOT NULL DEFAULT '',
+        body        TEXT    NOT NULL DEFAULT '',
+        done        INTEGER,
+        done_at     TEXT,
+        due_date    TEXT,
+        priority    TEXT    NOT NULL DEFAULT 'none',
+        pinned      INTEGER NOT NULL DEFAULT 0,
+        project_id  INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        created_at  TEXT    NOT NULL DEFAULT '1970-01-01T00:00:00.000Z',
+        sync_id     TEXT,
+        updated_at  TEXT    NOT NULL DEFAULT '1970-01-01T00:00:00.000Z',
+        deleted_at  TEXT
+      )`);
+      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_sync_id ON notes(sync_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_notes_project ON notes(project_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_notes_sort ON notes(pinned, due_date)`);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

@@ -3,9 +3,8 @@ import { PG_MIGRATIONS } from '../../orchestrator/db/pg/schema';
 
 describe('pg migration v12', () => {
   const v12 = PG_MIGRATIONS.find(m => m.version === 12);
-  it('exists and is the latest version', () => {
+  it('exists', () => {
     expect(v12).toBeDefined();
-    expect(Math.max(...PG_MIGRATIONS.map(m => m.version))).toBe(13);
   });
   it('creates attention_messages idempotently with RLS', () => {
     const sql = v12!.up.join('\n');
@@ -24,8 +23,8 @@ describe('pg migration v12', () => {
 
 describe('pg migration v13', () => {
   const versions = PG_MIGRATIONS.map(m => m.version);
-  it('is the latest version', () => {
-    expect(Math.max(...versions)).toBe(13);
+  it('is at least version 13', () => {
+    expect(Math.max(...versions)).toBeGreaterThanOrEqual(13);
   });
   it('adds bundle_id to push_devices', () => {
     const v13 = PG_MIGRATIONS.find((m) => m.version === 13)!;

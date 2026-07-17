@@ -38,9 +38,9 @@ describe('value transforms', () => {
     expect(deterministicSyncId('projects', 7)).not.toBe(deterministicSyncId('projects', 8));
   });
 
-  it('SYNCED_TABLES covers the 6 tables with sync_id/updated_at/deleted_at', () => {
+  it('SYNCED_TABLES covers the 7 tables with sync_id/updated_at/deleted_at', () => {
     expect(SYNCED_TABLES.map((t) => t.name).sort()).toEqual(
-      ['contracts', 'days_off', 'epics', 'projects', 'tasks', 'worklogs'],
+      ['contracts', 'days_off', 'epics', 'notes', 'projects', 'tasks', 'worklogs'],
     );
     for (const t of SYNCED_TABLES) {
       const cols = t.columns.map((c) => c.name);

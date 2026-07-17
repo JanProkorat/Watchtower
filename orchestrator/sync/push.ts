@@ -3,17 +3,19 @@ import type { PgStore } from '../db/pg/pool.js';
 import { SYNCED_TABLES, DERIVERS, toPgValue, type SyncTable } from './schema.js';
 import { getCursor, setCursor } from './cursor.js';
 
-const PUSH_ORDER = ['projects', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'];
+const PUSH_ORDER = ['projects', 'notes', 'epics', 'tasks', 'worklogs', 'contracts', 'days_off'];
 
-function fkSource(table: SyncTable): { col: string; parentTable: string; localCol: string } | null {
+function fkSource(table: SyncTable): { col: string; parentTable: string; localCol: string; nullable: boolean } | null {
   switch (table.name) {
-    case 'epics': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id' };
-    case 'tasks': return { col: 'epic_sync_id', parentTable: 'epics', localCol: 'epic_id' };
-    case 'contracts': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id' };
-    case 'worklogs': return { col: 'task_sync_id', parentTable: 'tasks', localCol: 'task_id' };
+    case 'epics': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id', nullable: false };
+    case 'tasks': return { col: 'epic_sync_id', parentTable: 'epics', localCol: 'epic_id', nullable: false };
+    case 'contracts': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id', nullable: false };
+    case 'worklogs': return { col: 'task_sync_id', parentTable: 'tasks', localCol: 'task_id', nullable: false };
+    case 'notes': return { col: 'project_sync_id', parentTable: 'projects', localCol: 'project_id', nullable: true };
     default: return null;
   }
 }
+export const fkSourceForTest = fkSource;
 
 /** Push local rows changed since the push cursor into Postgres (LWW upsert). */
 export async function pushTable(db: SqliteLike, store: PgStore, table: SyncTable): Promise<number> {
@@ -33,7 +35,8 @@ export async function pushTable(db: SqliteLike, store: PgStore, table: SyncTable
   let joinSql = '';
   if (fk) {
     selectCols.push(`parent.sync_id AS ${fk.col}`);
-    joinSql = ` JOIN ${fk.parentTable} parent ON parent.id = t.${fk.localCol}`;
+    const joinKind = fk.nullable ? 'LEFT JOIN' : 'JOIN';
+    joinSql = ` ${joinKind} ${fk.parentTable} parent ON parent.id = t.${fk.localCol}`;
   }
   const rows = db
     .prepare(`SELECT ${selectCols.join(', ')} FROM ${table.name} t${joinSql} WHERE t.updated_at > ? ORDER BY t.updated_at ASC`)
@@ -78,7 +81,7 @@ async function upsertRow(
   store: PgStore,
   table: SyncTable,
   row: Record<string, unknown>,
-  fk: { col: string; parentTable: string; localCol: string } | null,
+  fk: { col: string; parentTable: string; localCol: string; nullable: boolean } | null,
 ): Promise<void> {
   const insertCols: string[] = [];
   const insertExprs: string[] = [];

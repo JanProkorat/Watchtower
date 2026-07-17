@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import type { ModuleId } from '../components/ModuleRail.js';
 
 const STORAGE_KEY = 'watchtower.activeModule';
-const VALID: ReadonlySet<ModuleId> = new Set(['dashboard', 'instances', 'billing', 'reviews', 'settings']);
+const VALID: ReadonlySet<ModuleId> = new Set(['dashboard', 'instances', 'billing', 'reviews', 'notes', 'settings']);
 
 export const DEFAULT_ACTIVE_MODULE: ModuleId = 'dashboard';
 

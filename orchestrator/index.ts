@@ -17,6 +17,7 @@ import {
   type ProjectListFilter,
   type ProjectRow,
 } from './db/repositories/projects.js';
+import { NotesRepo, type NoteInput, type NoteListFilter, type NoteRow } from './db/repositories/notes.js';
 import { EpicsRepo, type EpicInput } from './db/repositories/epics.js';
 import { TasksRepo, type TaskInput } from './db/repositories/tasks.js';
 import {
@@ -83,7 +84,7 @@ import { extractRateLimits } from '@watchtower/shared/rateLimitsFormat.js';
 import type { SqliteLike } from './db/migrations.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
-import type { PrHost, PrReviewPayload, PrFindingPayload } from '@watchtower/shared/ipcContract.js';
+import type { PrHost, PrReviewPayload, PrFindingPayload, NoteViewPayload } from '@watchtower/shared/ipcContract.js';
 import { buildPtySpawnConfig, planBootAction } from './shellPolicy.js';
 import type { InstanceKind } from './shellPolicy.js';
 import { PtySizeOwnership } from './ptySizeOwnership.js';
@@ -263,6 +264,10 @@ function repo(): InstancesRepo {
 
 function projectsRepo(): ProjectsRepo {
   return new ProjectsRepo(handle!.db);
+}
+
+function notesRepo(): NotesRepo {
+  return new NotesRepo(handle!.db);
 }
 
 let _reviews: ReviewsService | null = null;
@@ -590,6 +595,15 @@ function projectViewOf(row: ProjectRow): ProjectRow {
   // exists so we can refactor the wire format separately from the repo without
   // touching every call site. (Phase 22 may rename `kind`/`is_billable`.)
   return row;
+}
+
+function noteViewOf(r: NoteRow): NoteViewPayload {
+  return {
+    id: r.id, title: r.title, body: r.body, done: r.done, doneAt: r.doneAt,
+    dueDate: r.dueDate, priority: r.priority, pinned: r.pinned,
+    projectId: r.projectId, projectName: r.projectName, projectColor: r.projectColor,
+    createdAt: r.createdAt, updatedAt: r.updatedAt,
+  };
 }
 
 function statusOf(id: string): InstanceStatus {
@@ -988,6 +1002,26 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'projects:delete': {
       projectsRepo().delete(req.payload.id);
+      notifySync();
+      return { ok: true };
+    }
+
+    case 'notes:list': {
+      const rows = notesRepo().list(req.payload as NoteListFilter);
+      return { notes: rows.map(noteViewOf) };
+    }
+    case 'notes:create': {
+      const row = notesRepo().create(req.payload as NoteInput);
+      notifySync();
+      return { note: noteViewOf(row) };
+    }
+    case 'notes:update': {
+      const row = notesRepo().update(req.payload.id, req.payload.input as Partial<NoteInput>);
+      notifySync();
+      return { note: noteViewOf(row) };
+    }
+    case 'notes:delete': {
+      notesRepo().delete(req.payload.id);
       notifySync();
       return { ok: true };
     }

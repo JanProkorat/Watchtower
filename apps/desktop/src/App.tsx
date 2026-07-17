@@ -48,6 +48,7 @@ import { ModuleSettings } from './components/settings/ModuleSettings.js';
 import { ModuleTimeTracker } from './components/timetracker/ModuleTimeTracker.js';
 import { ModuleDashboard } from './components/dashboard/ModuleDashboard.js';
 import { ModuleReviews } from './components/reviews/ModuleReviews.js';
+import { ModuleNotes } from './components/notes/ModuleNotes.js';
 import { SlotRegistryProvider } from './components/instances/SlotRegistry.js';
 import { TerminalPool } from './components/instances/TerminalPool.js';
 import { WorkspaceRoot } from './components/instances/WorkspaceRoot.js';
@@ -567,6 +568,7 @@ export function App() {
                     onOpenTerminalForCwd={spawnTerminalForCwd}
                   />
                 )}
+                {activeModule === 'notes' && <ModuleNotes projects={projects} />}
                 <Box
                   sx={{
                     display: activeModule === 'instances' ? 'flex' : 'none',
