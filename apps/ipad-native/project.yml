@@ -6,6 +6,9 @@ options:
 packages:
   WatchtowerCore:
     path: ../../swift/WatchtowerCore
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    from: "1.14.0"
 targets:
   Watchtower:
     type: application
@@ -17,6 +20,8 @@ targets:
         product: WatchtowerCore
       - package: WatchtowerCore
         product: WatchtowerBridge
+      - package: SwiftTerm
+        product: SwiftTerm
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.greencode.watchtower.ipados
