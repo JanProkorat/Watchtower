@@ -20,6 +20,7 @@ public actor TerminalSession {
     private var ptyTask: Task<Void, Never>?
     private var statusTask: Task<Void, Never>?
     private var wasConnected = true // first .connected after start shouldn't double-attach
+    private var attachGeneration = 0
 
     public init(bridge: BridgeClient, instanceId: String) {
         self.bridge = bridge
@@ -65,12 +66,18 @@ public actor TerminalSession {
     /// Subscribe-before-fetch is guaranteed because ptyTask started before this
     /// call; here we set not-live, run the snapshot, then drain + go live.
     private func attach() async {
+        attachGeneration += 1
+        let gen = attachGeneration
         live = false
         buffer.removeAll()
         guard let res = try? await bridge.invoke(TerminalAttachRequest(instanceId: instanceId)) else {
             // Attach failed (e.g. dropped mid-flight); a later .connected retries.
             return
         }
+        // A newer attach (triggered by a reconnect that raced this one across the
+        // await above) already went live — don't clobber it with a stale
+        // clear/replay of our own now-outdated snapshot.
+        guard gen == attachGeneration else { return }
         sink?.clear()
         if !res.data.isEmpty { sink?.write(res.data) }
         for chunk in buffer { sink?.write(chunk) }
