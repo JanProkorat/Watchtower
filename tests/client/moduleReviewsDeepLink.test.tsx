@@ -47,11 +47,15 @@ beforeEach(() => {
 describe('ModuleReviews deep-link target', () => {
   it('auto-opens the target PR, marks it seen, and consumes the target once', async () => {
     const onConsume = vi.fn();
+    // The inbox is now injected by App; ModuleReviews calls the markSeen prop.
+    const markSeen = vi.fn(async () => {});
     render(
       <ToastProvider>
         <ModuleReviews
           deepLinkTarget={{ host: 'github', repoKey: REPO_KEY, prNumber: 42 }}
           onConsumeDeepLink={onConsume}
+          watchItems={[inboxItem] as any}
+          markSeen={markSeen}
         />
       </ToastProvider>,
     );
@@ -59,10 +63,8 @@ describe('ModuleReviews deep-link target', () => {
     // regardless of role now; it's enabled here only because the prs:reviewState
     // mock returns approved + mergeable.
     await waitFor(() => expect(screen.getByRole('button', { name: /^Merge$/ })).toBeInTheDocument());
-    // The PR was marked seen and the target consumed exactly once.
-    expect((window as any).watchtower.invoke).toHaveBeenCalledWith(
-      'prWatch:markSeen', { host: 'github', repoKey: REPO_KEY, prNumber: 42 },
-    );
+    // The PR was marked seen (canonical gh: repoKey) and the target consumed once.
+    expect(markSeen).toHaveBeenCalledWith('github', REPO_KEY, 42);
     expect(onConsume).toHaveBeenCalledTimes(1);
   });
 });

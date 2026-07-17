@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import { Drawer, Box, Typography, Tabs, Tab, CircularProgress, Stack, Button } from '@mui/material';
 import type { PullRequestPayload, DiffFilePayload, PrCommentThreadPayload, PrReviewPayload } from '@watchtower/shared/ipcContract.js';
 import { DiffView } from './DiffView.js';
-import { CommentThread } from './CommentThread.js';
+import { CommentThread, newestThreadId } from './CommentThread.js';
 import { ReviewReport } from './ReviewReport.js';
 import { MergeButton } from './MergeButton.js';
 import { useToast } from '../../state/useToast.js';
 import type { PrReviewState } from '../../state/useReviews.js';
 
-export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments, mergePr, closePr, fetchReviewState, approvePr }: {
+export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments, mergePr, closePr, fetchReviewState, approvePr, focusComments = false }: {
   pr: PullRequestPayload | null; onClose(): void;
+  /** Opened from a notification — jump to the Comments tab and highlight the newest thread. */
+  focusComments?: boolean;
   loadDiff(pr: PullRequestPayload): Promise<DiffFilePayload[]>;
   loadComments(pr: PullRequestPayload): Promise<PrCommentThreadPayload[]>;
   review: PrReviewPayload | null;
@@ -54,7 +56,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
 
   useEffect(() => {
     if (!pr) return;
-    setTab(0); setFiles([]); setThreads([]); setLoading(true);
+    setTab(focusComments ? 1 : 0); setFiles([]); setThreads([]); setLoading(true);
     setReviewState(null); setCloseArmed(false);
     void Promise.all([
       loadDiff(pr).then(setFiles).catch(() => { /* surfaced via the global error toast */ }),
@@ -69,7 +71,7 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
     // above so a failure here can't blank the diff (or vice versa).
     loadReviewState(pr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pr, loadDiff, loadComments, openReviewFor]);
+  }, [pr, loadDiff, loadComments, openReviewFor, focusComments]);
 
   const handleRun = (): void => {
     if (!pr) return;
@@ -186,6 +188,8 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
                 {!loading && threads.length > 0 && (() => {
                   const general = threads.filter((t) => t.file == null);
                   const anchored = threads.filter((t) => t.file != null);
+                  // Highlight the newest thread only when opened from a notification.
+                  const highlightId = focusComments ? newestThreadId(threads) : null;
                   return (
                     <Stack spacing={1}>
                       {general.length > 0 && (
@@ -193,10 +197,10 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
                           <Typography sx={{ fontSize: 10, letterSpacing: '.07em', textTransform: 'uppercase', color: 'text.secondary' }}>
                             General
                           </Typography>
-                          {general.map((t) => <CommentThread key={t.id} thread={t} />)}
+                          {general.map((t) => <CommentThread key={t.id} thread={t} highlight={t.id === highlightId} />)}
                         </>
                       )}
-                      {anchored.map((t) => <CommentThread key={t.id} thread={t} />)}
+                      {anchored.map((t) => <CommentThread key={t.id} thread={t} highlight={t.id === highlightId} />)}
                     </Stack>
                   );
                 })()}
