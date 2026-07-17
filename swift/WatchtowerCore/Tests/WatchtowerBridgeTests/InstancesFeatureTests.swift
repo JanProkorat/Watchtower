@@ -59,6 +59,32 @@ final class InstancesFeatureTests: XCTestCase {
         XCTAssertEqual(saveCalls.value.count, 1)
     }
 
+    /// Regression: relaunching with a persisted multi-pane layout must land
+    /// `selectedInstanceId` on the previously-focused instance right away —
+    /// not `nil` until the user taps a pane. Covers the restore branch of
+    /// `seedActiveGroupIfNeeded` (layout already present — no fresh seed).
+    func testLayoutsLoadedRestoresSelectedInstanceIdFromPersistedFocus() async {
+        let saveCalls = LockIsolated<[WorkspaceState]>([])
+        let initial = InstancesFeature.State(
+            instances: [
+                Instance(id: "a", cwd: "/x", status: "idle", lastActivityAt: 0, kind: "claude", taskId: nil),
+                Instance(id: "b", cwd: "/x", status: "idle", lastActivityAt: 0, kind: "claude", taskId: nil),
+            ]
+        )
+        let persisted: WorkspaceState = ["__other__": tiledDefaultLayout(instanceIds: ["a", "b"], focusedInstanceId: "b")]
+        let store = TestStore(initialState: initial) { InstancesFeature() } withDependencies: {
+            $0.workspaceLayoutStore.save = { layouts in saveCalls.withValue { $0.append(layouts) } }
+        }
+        await store.send(.layoutsLoaded(persisted)) {
+            $0.layouts = persisted
+            $0.activeGroupId = "__other__"
+            $0.selectedInstanceId = "b" // restored from persisted focusedLeafId "d-b", not nil
+        }
+        // The layout already existed (restored, not freshly seeded) — no
+        // extra save should fire.
+        XCTAssertEqual(saveCalls.value.count, 0)
+    }
+
     func testInstanceSelectedAcksAndFocusesLeafInActiveGroupLayout() async {
         let saveCalls = LockIsolated<[WorkspaceState]>([])
         var initial = InstancesFeature.State(

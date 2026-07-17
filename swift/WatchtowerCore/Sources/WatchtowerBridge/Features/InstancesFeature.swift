@@ -103,20 +103,26 @@ public struct InstancesFeature {
     }
 
     /// First-shown seeding (port of App.tsx's `ensureTab`): default the active
-    /// tab to the first group, and — if that group has no persisted layout
-    /// yet — tile all its live instances via `tiledDefaultLayout`. Idempotent:
-    /// a no-op once both `activeGroupId` and the group's layout are set, so
-    /// it's safe to call from both `instancesLoaded` and `layoutsLoaded`
-    /// regardless of which arrives first.
+    /// tab to the first group. If that group already has a layout — either
+    /// restored from `workspaceLayoutStore` or seeded by an earlier call —
+    /// just mirror `selectedInstanceId` from it (this is the persisted-restore
+    /// path: relaunching with saved split panes must land on the previously
+    /// focused instance, not `nil`, without waiting for a manual pane tap).
+    /// Otherwise tile all the group's live instances via `tiledDefaultLayout`
+    /// and persist. Idempotent: safe to call from both `instancesLoaded` and
+    /// `layoutsLoaded` regardless of which arrives first.
     private static func seedActiveGroupIfNeeded(_ state: inout State, workspaceLayoutStore: WorkspaceLayoutStore) {
         let groups = state.groups
         guard !groups.isEmpty else { return }
         if state.activeGroupId == nil {
             state.activeGroupId = groups[0].id
         }
-        guard let groupId = state.activeGroupId,
-              state.layouts[groupId] == nil,
-              let group = groups.first(where: { $0.id == groupId }),
+        guard let groupId = state.activeGroupId else { return }
+        if state.layouts[groupId] != nil {
+            mirrorFocus(&state, groupId: groupId)
+            return
+        }
+        guard let group = groups.first(where: { $0.id == groupId }),
               let seed = group.instanceIds.first
         else { return }
         state.layouts[groupId] = tiledDefaultLayout(instanceIds: group.instanceIds, focusedInstanceId: seed)
