@@ -80,6 +80,10 @@ export function runInner(innerCmd: string, stdin: string): Promise<{ stdout: str
     child.stdout.on('data', (c) => (stdout += c));
     child.on('error', () => resolve({ stdout: '', code: 0 }));
     child.on('close', (code) => resolve({ stdout, code: code ?? 0 }));
+    // Guard: an inner command that ignores/closes stdin early (e.g. reads no
+    // input) can make this write emit EPIPE. Uncaught, that throws and kills
+    // the helper — which violates "never break the statusline".
+    child.stdin.on('error', () => {});
     child.stdin.end(stdin);
   });
 }
@@ -112,8 +116,10 @@ async function main(): Promise<void> {
   const post = cfg ? postStatusline(body, cfg) : Promise.resolve();
   const [{ stdout, code }] = await Promise.all([runInner(innerCmd, body), post]);
 
-  process.stdout.write(stdout);
-  process.exit(code);
+  // Flush stdout before exiting: process.stdout.write() to a pipe is
+  // non-blocking, so an immediate process.exit() can clip output that
+  // hasn't drained yet. Exit only once the write's callback confirms flush.
+  process.stdout.write(stdout, () => process.exit(code));
 }
 
 // Only run main() when executed directly, not when imported by tests.

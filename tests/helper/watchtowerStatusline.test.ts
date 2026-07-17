@@ -51,4 +51,14 @@ describe('runInner', () => {
     expect(stdout).toBe('');
     expect(code).toBe(0);
   });
+
+  it('does not throw when the inner command exits without reading stdin (EPIPE)', async () => {
+    // `true` never reads stdin and exits immediately. Writing a payload
+    // larger than the pipe buffer after it exits triggers EPIPE on the
+    // write end — this must resolve, not throw/crash the helper.
+    const bigStdin = '{"padding":"' + 'x'.repeat(200_000) + '"}';
+    await expect(runInner('true', bigStdin)).resolves.toEqual(
+      expect.objectContaining({ code: 0 }),
+    );
+  });
 });
