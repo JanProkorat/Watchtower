@@ -1,5 +1,5 @@
 {
-  "originHash" : "29d657af4e3f937224a1288fe9b96927d1b8fdd4195c632587b7fcc0fe9ce460",
+  "originHash" : "8d4de32334425f684c8038f45f2f2933bdf2cc62d28cd3ab89603b6ef920e1a9",
   "pins" : [
     {
       "identity" : "combine-schedulers",
@@ -11,12 +11,47 @@
       }
     },
     {
+      "identity" : "cryptoswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/royalapplications/CryptoSwift.git",
+      "state" : {
+        "branch" : "foundationessentials",
+        "revision" : "a59b4d91ebb22011656c830f874fe7152e183a57"
+      }
+    },
+    {
+      "identity" : "cstb",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/troughton/Cstb",
+      "state" : {
+        "revision" : "a47f4ecf3a139ac2f53ed27a984853c9f98097f1",
+        "version" : "1.0.6"
+      }
+    },
+    {
+      "identity" : "royalvnc",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/royalapplications/royalvnc",
+      "state" : {
+        "revision" : "337197afdb32020d3dfdb7d058989115b740cdc4"
+      }
+    },
+    {
       "identity" : "supabase-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/supabase/supabase-swift",
       "state" : {
         "revision" : "27f31bfb7be836a33c89f6636ef69a2cfff9a3fd",
         "version" : "2.51.0"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser",
+      "state" : {
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
       }
     },
     {
@@ -152,6 +187,15 @@
       "state" : {
         "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
         "version" : "603.0.2"
+      }
+    },
+    {
+      "identity" : "swiftterm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/migueldeicaza/SwiftTerm",
+      "state" : {
+        "revision" : "849e8a4f3d6f79ddee07152400137f1370c32621",
+        "version" : "1.14.0"
       }
     },
     {
