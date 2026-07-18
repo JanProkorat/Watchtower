@@ -19,6 +19,7 @@ final class RemoteFeatureTests: XCTestCase {
         }
         await store.send(.onAppear) {
             $0.host = "mac.ts.net"
+            $0.hasMac = true
             $0.credentials = VncCredentials(username: "jan", password: "pw")
             $0.status = .connecting
         }
@@ -33,9 +34,41 @@ final class RemoteFeatureTests: XCTestCase {
         }
         await store.send(.onAppear) {
             $0.host = "mac.ts.net"
+            $0.hasMac = true
             // No stored creds: a connect attempt would be doomed, so the form
             // opens instead of status flipping to .connecting.
             $0.credentialFormOpen = true
+        }
+    }
+
+    func testOnAppearSetsHasMac() async {
+        // Connection with a configured MAC: hasMac becomes true.
+        let store = TestStore(initialState: RemoteFeature.State()) {
+            RemoteFeature()
+        } withDependencies: {
+            $0.connectionStore.load = { self.conn() }
+            $0.vncCredentialsStore.load = { VncCredentials(username: "jan", password: "pw") }
+        }
+        await store.send(.onAppear) {
+            $0.host = "mac.ts.net"
+            $0.hasMac = true
+            $0.credentials = VncCredentials(username: "jan", password: "pw")
+            $0.status = .connecting
+        }
+
+        // Connection with no MAC configured: hasMac stays false.
+        let noMacConn = Connection(host: "mac.ts.net", port: 7445, token: "t",
+                                    mac: nil, lanIp: nil, wanHost: nil, wanPort: nil)
+        let store2 = TestStore(initialState: RemoteFeature.State()) {
+            RemoteFeature()
+        } withDependencies: {
+            $0.connectionStore.load = { noMacConn }
+            $0.vncCredentialsStore.load = { VncCredentials(username: "jan", password: "pw") }
+        }
+        await store2.send(.onAppear) {
+            $0.host = "mac.ts.net"
+            $0.credentials = VncCredentials(username: "jan", password: "pw")
+            $0.status = .connecting
         }
     }
 

@@ -108,7 +108,6 @@ struct RemoteView: View {
                     .font(.callout)
                     .foregroundStyle(Palette.textMuted)
                 HStack(spacing: 12) {
-                    wakeButton
                     Button("Retry") { store.send(.retryTapped) }
                         .buttonStyle(.glass)
                     Button("Change login") { store.send(.changeLoginTapped) }
@@ -130,7 +129,12 @@ struct RemoteView: View {
             Text("Remote Mac").font(.title2.bold()).foregroundStyle(Palette.textPrimary)
             Spacer()
             statusLabel
-            wakeButton
+            // Port of RemoteMacView.tsx:165 (`{connection.mac && <WakeButton/>}`):
+            // no configured MAC means a wake attempt is a guaranteed no-op
+            // (wakeTapped silently guards on it), so hide the button entirely.
+            if store.hasMac {
+                wakeButton
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)

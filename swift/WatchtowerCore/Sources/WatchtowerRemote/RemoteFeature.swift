@@ -25,6 +25,10 @@ public struct RemoteFeature {
         /// change (alongside `credentials`) even when creds didn't change,
         /// so a plain retry rebuilds the VC and reconnects.
         public var reconnectToken: Int = 0
+        /// Whether the saved connection has a configured MAC address — gates
+        /// the Wake Mac button (`RemoteMacView.tsx:165`,
+        /// `{connection.mac && <WakeButton/>}`). Set from `onAppear`.
+        public var hasMac: Bool = false
 
         public init(
             host: String = "",
@@ -33,7 +37,8 @@ public struct RemoteFeature {
             credentialFormOpen: Bool = false,
             authFailed: Bool = false,
             waking: Bool = false,
-            reconnectToken: Int = 0
+            reconnectToken: Int = 0,
+            hasMac: Bool = false
         ) {
             self.host = host
             self.credentials = credentials
@@ -42,6 +47,7 @@ public struct RemoteFeature {
             self.authFailed = authFailed
             self.waking = waking
             self.reconnectToken = reconnectToken
+            self.hasMac = hasMac
         }
     }
 
@@ -69,7 +75,9 @@ public struct RemoteFeature {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                if let c = connectionStore.load() { state.host = c.host }
+                let connection = connectionStore.load()
+                if let connection { state.host = connection.host }
+                state.hasMac = !(connection?.mac?.isEmpty ?? true)
                 let creds = vncCredentialsStore.load()
                 if let creds {
                     state.credentials = creds

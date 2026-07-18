@@ -9,7 +9,7 @@ public struct WakeOnLanClient: Sendable {
     public var send: @Sendable (_ packet: [UInt8], _ host: String, _ port: Int) async throws -> Void
 }
 
-public enum WakeOnLanError: Error { case invalidPort, connectionFailed(String), timeout }
+public enum WakeOnLanError: Error, Sendable, Equatable { case invalidPort, connectionFailed(String), timeout }
 
 extension WakeOnLanClient: DependencyKey {
     public static let liveValue = WakeOnLanClient(

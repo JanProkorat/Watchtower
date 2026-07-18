@@ -365,7 +365,12 @@ final class VncViewController: UIViewController, VNCConnectionDelegate {
             case .connected:
                 self.onState?(.connected); self.statusLabel.isHidden = true
             case .disconnecting:
-                self.onState?(.connecting); self.statusLabel.text = "Disconnecting…"; self.statusLabel.isHidden = false
+                // .disconnected (not .connecting): RemoteView is status-driven,
+                // so mapping this transient to .connecting would briefly
+                // re-show the VC's "Connecting…" state before flipping to the
+                // disconnected overlay on a live drop. Going straight to
+                // .disconnected sends the transient directly to the overlay.
+                self.onState?(.disconnected); self.statusLabel.text = "Disconnecting…"; self.statusLabel.isHidden = false
             case .disconnected:
                 // RoyalVNCKit has no dedicated auth-failed delegate hook; a
                 // rejected credential surfaces as a VNCError.authentication on
