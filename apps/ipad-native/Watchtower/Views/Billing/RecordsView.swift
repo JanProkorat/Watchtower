@@ -9,10 +9,9 @@ import WatchtowerBridge
 /// section content uses the iPad design system (`contentCard()`, not
 /// `GlassCard`/`.ultraThinMaterial`).
 ///
-/// This pass (Phase 5 Task 6) wires List/Grid/Tasks fully; Time off and
-/// Board render a temporary placeholder until Task 7 replaces them with the
-/// real views — no reducer change needed, `records.section` already covers
-/// all five cases.
+/// Phase 5 Task 6 wired List/Grid/Tasks; Task 7 wires Time off (3-month
+/// strip) and Board (read-only) — no reducer change needed, `records.section`
+/// already covers all five cases.
 struct RecordsView: View {
     let store: StoreOf<IPadAppFeature>
 
@@ -66,21 +65,10 @@ private struct RecordsSwitcherView: View {
         case .tasks:
             TaskListView(billing: billing, records: records)
         case .timeOff:
-            placeholder("Time off — Task 7")
+            TimeOffView(billing: billing, records: records)
         case .board:
-            placeholder("Board — Task 7")
+            BoardView(records: records, billing: billing)
         }
-    }
-
-    private func placeholder(_ text: String) -> some View {
-        VStack {
-            Spacer()
-            Text(text)
-                .font(.subheadline)
-                .foregroundStyle(Palette.textMuted)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Segmented control
