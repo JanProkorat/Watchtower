@@ -2,9 +2,14 @@ import SwiftUI
 import ComposableArchitecture
 import WatchtowerCore
 import WatchtowerBridge
+import WatchtowerRemote
 
 struct AppShellView: View {
     @Bindable var store: StoreOf<IPadAppFeature>
+    // Standalone store — RemoteFeature is deliberately NOT composed into
+    // IPadAppFeature (see RemoteFeature's doc comment); the shell owns and
+    // drives it directly.
+    @State private var remoteStore = Store(initialState: RemoteFeature.State()) { RemoteFeature() }
 
     var body: some View {
         ZStack {
@@ -32,7 +37,7 @@ struct AppShellView: View {
                 onOpenRemote: { store.send(.openRemoteForAuth) }
             )
         case .remote:
-            PlaceholderView(title: "Remote Mac", subtitle: "VNC + Wake arrive in Phase 4")
+            RemoteView(store: remoteStore)
         case .billing:
             PlaceholderView(title: "Billing", subtitle: "Billing arrives in Phase 5")
         case .settings:

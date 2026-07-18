@@ -111,6 +111,10 @@ public struct RemoteFeature {
                 return .none
 
             case .submitCredentials:
+                // Port of the TS `submitCreds` early-return: an empty username or
+                // password is never persisted to the Keychain — leave the form open.
+                let trimmedUsername = state.credentials.username.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedUsername.isEmpty, !state.credentials.password.isEmpty else { return .none }
                 vncCredentialsStore.save(state.credentials)
                 state.credentialFormOpen = false
                 state.authFailed = false

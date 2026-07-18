@@ -78,4 +78,38 @@ final class RemoteFeatureTests: XCTestCase {
         }
         XCTAssertEqual(saved.value, VncCredentials(username: "jan", password: "newpw"))
     }
+
+    func testSubmitCredentialsIgnoresEmpty() async {
+        let saved = LockIsolated<VncCredentials?>(nil)
+
+        // Whitespace-only username, non-empty password: no-op, form stays open.
+        let store = TestStore(
+            initialState: RemoteFeature.State(
+                host: "mac.ts.net",
+                credentials: VncCredentials(username: "   ", password: "pw"),
+                credentialFormOpen: true
+            )
+        ) {
+            RemoteFeature()
+        } withDependencies: {
+            $0.vncCredentialsStore.save = { saved.setValue($0) }
+        }
+        await store.send(.submitCredentials)
+        XCTAssertNil(saved.value)
+
+        // Empty password, non-empty username: also a no-op.
+        let store2 = TestStore(
+            initialState: RemoteFeature.State(
+                host: "mac.ts.net",
+                credentials: VncCredentials(username: "jan", password: ""),
+                credentialFormOpen: true
+            )
+        ) {
+            RemoteFeature()
+        } withDependencies: {
+            $0.vncCredentialsStore.save = { saved.setValue($0) }
+        }
+        await store2.send(.submitCredentials)
+        XCTAssertNil(saved.value)
+    }
 }

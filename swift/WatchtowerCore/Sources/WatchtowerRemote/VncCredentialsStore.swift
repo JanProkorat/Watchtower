@@ -5,7 +5,7 @@ import ComposableArchitecture
 /// macOS Screen Sharing account short-username + login password (RFB type-30 auth),
 /// distinct from Connection.token. Port of apps/ipad/src/state/vncCreds.ts, upgraded
 /// from plaintext Preferences to the Keychain.
-public struct VncCredentials: Codable, Equatable, Sendable {
+public struct VncCredentials: Codable, Equatable, Hashable, Sendable {
     public var username: String
     public var password: String
     public init(username: String, password: String) {
