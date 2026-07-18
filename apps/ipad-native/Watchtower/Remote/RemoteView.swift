@@ -16,23 +16,19 @@ struct RemoteView: View {
         ZStack {
             Palette.baseBg.ignoresSafeArea()
 
-            if !store.host.isEmpty && !store.credentialFormOpen {
-                VncControllerRepresentable(store: store)
-                    .id(store.credentials) // resubmitted creds rebuild + reconnect
-                    .ignoresSafeArea()
+            if store.host.isEmpty {
+                emptyState
+            } else if store.credentialFormOpen {
+                credentialForm
+            } else if store.status == .disconnected {
+                disconnectedOverlay
             } else {
-                emptyOrForm
+                VncControllerRepresentable(store: store)
+                    .id(ReconnectID(credentials: store.credentials, token: store.reconnectToken))
+                    .ignoresSafeArea()
             }
         }
         .onAppear { store.send(.onAppear) }
-    }
-
-    @ViewBuilder private var emptyOrForm: some View {
-        if store.host.isEmpty {
-            emptyState
-        } else {
-            credentialForm
-        }
     }
 
     private var emptyState: some View {
@@ -83,12 +79,40 @@ struct RemoteView: View {
                     .textFieldStyle(.roundedBorder)
                 }
 
-                HStack {
-                    Button("Submit") { store.send(.submitCredentials) }
-                        .buttonStyle(.glassProminent)
-                        .tint(Palette.accent)
-                    Spacer()
-                    statusLabel
+                Button("Submit") { store.send(.submitCredentials) }
+                    .buttonStyle(.glassProminent)
+                    .tint(Palette.accent)
+            }
+            .padding(20)
+            .contentCard()
+            .frame(maxWidth: 420)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(32)
+        .safeAreaInset(edge: .top) { wakeBar }
+    }
+
+    /// Shown when the Mac is unreachable (asleep, off-network, or Screen
+    /// Sharing off) — a non-auth disconnect. This is the scenario the
+    /// Wake-on-LAN feature exists for, so Wake/Retry/Change-login must all
+    /// stay reachable here rather than being hidden behind the full-bleed VNC
+    /// representable (which would otherwise keep rendering with no way out).
+    /// Port of RemoteMacView.tsx:157-165.
+    private var disconnectedOverlay: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            VStack(spacing: 16) {
+                Text("Mac disconnected").font(.headline).foregroundStyle(Palette.textPrimary)
+                Text("Check that the Mac is awake and Screen Sharing is on.")
+                    .font(.callout)
+                    .foregroundStyle(Palette.textMuted)
+                HStack(spacing: 12) {
+                    wakeButton
+                    Button("Retry") { store.send(.retryTapped) }
+                        .buttonStyle(.glass)
+                    Button("Change login") { store.send(.changeLoginTapped) }
+                        .buttonStyle(.glass)
                 }
             }
             .padding(20)
@@ -154,11 +178,20 @@ struct RemoteView: View {
     }
 }
 
+/// Identity for `VncControllerRepresentable`'s `.id(...)` re-key: changes on
+/// a creds resubmit (`credentials` differs) OR a plain retry
+/// (`.retryTapped` bumps `token` with `credentials` unchanged) — either one
+/// must force SwiftUI to tear down the old VC and build a fresh one.
+private struct ReconnectID: Hashable {
+    let credentials: VncCredentials
+    let token: Int
+}
+
 /// UIKit bridge for the full-screen VNC session. Mirrors
 /// `RemoteTerminalView`/`TerminalController`: `makeUIViewController` wires the
 /// VC's lifecycle callbacks into `store.send`, and
 /// `dismantleUIViewController` tears the connection down when SwiftUI removes
-/// the view (host/creds change re-key this via `.id(store.credentials)`).
+/// the view (host/creds/retry changes re-key this via `.id(ReconnectID(...))`).
 private struct VncControllerRepresentable: UIViewControllerRepresentable {
     let store: StoreOf<RemoteFeature>
 

@@ -24,6 +24,44 @@ final class RemoteFeatureTests: XCTestCase {
         }
     }
 
+    func testOnAppearOpensFormWhenNoCreds() async {
+        let store = TestStore(initialState: RemoteFeature.State()) {
+            RemoteFeature()
+        } withDependencies: {
+            $0.connectionStore.load = { self.conn() }
+            $0.vncCredentialsStore.load = { nil }
+        }
+        await store.send(.onAppear) {
+            $0.host = "mac.ts.net"
+            // No stored creds: a connect attempt would be doomed, so the form
+            // opens instead of status flipping to .connecting.
+            $0.credentialFormOpen = true
+        }
+    }
+
+    func testRetryTappedBumpsTokenAndConnecting() async {
+        let store = TestStore(
+            initialState: RemoteFeature.State(host: "mac.ts.net", status: .disconnected, reconnectToken: 2)
+        ) {
+            RemoteFeature()
+        }
+        await store.send(.retryTapped) {
+            $0.status = .connecting
+            $0.reconnectToken = 3
+        }
+    }
+
+    func testChangeLoginOpensForm() async {
+        let store = TestStore(
+            initialState: RemoteFeature.State(host: "mac.ts.net", status: .disconnected)
+        ) {
+            RemoteFeature()
+        }
+        await store.send(.changeLoginTapped) {
+            $0.credentialFormOpen = true
+        }
+    }
+
     func testWakeTappedSendsToEachTarget() async {
         let sends = LockIsolated<[(host: String, port: Int, bytes: Int)]>([])
         let store = TestStore(initialState: RemoteFeature.State(host: "mac.ts.net")) {

@@ -21,6 +21,10 @@ public struct RemoteFeature {
         public var credentialFormOpen = false
         public var authFailed = false
         public var waking = false
+        /// Bumped by `.retryTapped` to force `RemoteView`'s VC-identity to
+        /// change (alongside `credentials`) even when creds didn't change,
+        /// so a plain retry rebuilds the VC and reconnects.
+        public var reconnectToken: Int = 0
 
         public init(
             host: String = "",
@@ -28,7 +32,8 @@ public struct RemoteFeature {
             status: VncStatus = .idle,
             credentialFormOpen: Bool = false,
             authFailed: Bool = false,
-            waking: Bool = false
+            waking: Bool = false,
+            reconnectToken: Int = 0
         ) {
             self.host = host
             self.credentials = credentials
@@ -36,6 +41,7 @@ public struct RemoteFeature {
             self.credentialFormOpen = credentialFormOpen
             self.authFailed = authFailed
             self.waking = waking
+            self.reconnectToken = reconnectToken
         }
     }
 
@@ -43,6 +49,8 @@ public struct RemoteFeature {
         case onAppear
         case wakeTapped
         case wakeFinished
+        case retryTapped
+        case changeLoginTapped
         case vncStateChanged(VncStatus)
         case vncAuthFailed
         case vncClosed
@@ -62,8 +70,29 @@ public struct RemoteFeature {
             switch action {
             case .onAppear:
                 if let c = connectionStore.load() { state.host = c.host }
-                if let creds = vncCredentialsStore.load() { state.credentials = creds }
+                let creds = vncCredentialsStore.load()
+                if let creds {
+                    state.credentials = creds
+                }
+                // Port of RemoteMacView.tsx:98 (`if (!creds || loginOpen)`):
+                // no stored creds (or an empty username/password) means a
+                // VNC connect attempt is doomed, so open the form instead of
+                // flipping to .connecting.
+                let hasUsableCreds = !(creds?.username.isEmpty ?? true) && !(creds?.password.isEmpty ?? true)
+                if hasUsableCreds {
+                    state.status = .connecting
+                } else {
+                    state.credentialFormOpen = true
+                }
+                return .none
+
+            case .retryTapped:
                 state.status = .connecting
+                state.reconnectToken += 1
+                return .none
+
+            case .changeLoginTapped:
+                state.credentialFormOpen = true
                 return .none
 
             case .wakeTapped:
