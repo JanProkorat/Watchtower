@@ -41,6 +41,11 @@ public struct IPadAppFeature {
         public var connection = ConnectionFeature.State()
         public var auth = AuthFeature.State()
         public var instances = InstancesFeature.State()
+        public var billing = BillingFeature.State()
+        public var dashboard = DashboardFeature.State()
+        public var earnings = EarningsFeature.State()
+        public var reports = ReportsFeature.State()
+        public var records = RecordsFeature.State()
 
         public init() {}
     }
@@ -55,6 +60,11 @@ public struct IPadAppFeature {
         case connection(ConnectionFeature.Action)
         case auth(AuthFeature.Action)
         case instances(InstancesFeature.Action)
+        case billing(BillingFeature.Action)
+        case dashboard(DashboardFeature.Action)
+        case earnings(EarningsFeature.Action)
+        case reports(ReportsFeature.Action)
+        case records(RecordsFeature.Action)
         /// Fired by the Instances module's authBlock banner ("Open Remote Mac") —
         /// jumps to the Remote Mac module so the user can complete the Claude login.
         case openRemoteForAuth
@@ -69,15 +79,6 @@ public struct IPadAppFeature {
     public init() {}
 
     public var body: some ReducerOf<Self> {
-        Scope(state: \.connection, action: \.connection) {
-            ConnectionFeature()
-        }
-        Scope(state: \.auth, action: \.auth) {
-            AuthFeature()
-        }
-        Scope(state: \.instances, action: \.instances) {
-            InstancesFeature()
-        }
         Reduce { state, action in
             switch action {
             case .onAppear:
@@ -102,7 +103,18 @@ public struct IPadAppFeature {
                             await send(.authEvent(present))
                         }
                     }
-                    .cancellable(id: CancelID.auth, cancelInFlight: true)
+                    .cancellable(id: CancelID.auth, cancelInFlight: true),
+                    // Billing/dashboard reducers load unconditionally, unlike the
+                    // iPhone AppFeature — the iPad shell isn't auth-gated (only
+                    // billing self-gates writes via `canEdit`). `earliest` isn't
+                    // known yet (it derives from the billing dataset, which
+                    // hasn't loaded), so seed Reports with nil here; the
+                    // `.billing` case below re-seeds it once a dataset first
+                    // arrives (cache-load or network fetch).
+                    .send(.billing(.onAppear)),
+                    .send(.earnings(.onAppear)),
+                    .send(.reports(.onAppear(earliest: nil))),
+                    .send(.records(.onAppear))
                 )
 
             case let .moduleSelected(module):
@@ -136,9 +148,58 @@ public struct IPadAppFeature {
                 state.selectedModule = .remote
                 return .none
 
+            case let .billing(billingAction):
+                // Re-seed the Reports "all"-preset lower bound the first time
+                // a billing dataset lands (cache-load or network fetch) —
+                // mirrors AppFeature's `.billing` case. This `Reduce` runs
+                // BEFORE the `Scope(\.billing)` below, so `state.billing.dataset`
+                // here still reflects the pre-mutation value: nil ⇒ first arrival.
+                guard state.billing.dataset == nil else { return .none }
+                let newDataset: BillingDataset?
+                switch billingAction {
+                case let .cacheLoaded(dataset):
+                    newDataset = dataset
+                case let .fetchResponse(.success(dataset)):
+                    newDataset = dataset
+                case let .refreshResponse(.success(dataset)):
+                    newDataset = dataset
+                default:
+                    newDataset = nil
+                }
+                guard let newDataset else { return .none }
+                let earliest = newDataset.worklogs.map(\.workDate).min()
+                return .send(.reports(.onAppear(earliest: earliest)))
+
+            case .dashboard, .earnings, .reports, .records:
+                return .none
+
             case .connection, .auth, .instances:
                 return .none
             }
+        }
+        Scope(state: \.connection, action: \.connection) {
+            ConnectionFeature()
+        }
+        Scope(state: \.auth, action: \.auth) {
+            AuthFeature()
+        }
+        Scope(state: \.instances, action: \.instances) {
+            InstancesFeature()
+        }
+        Scope(state: \.billing, action: \.billing) {
+            BillingFeature()
+        }
+        Scope(state: \.dashboard, action: \.dashboard) {
+            DashboardFeature()
+        }
+        Scope(state: \.earnings, action: \.earnings) {
+            EarningsFeature()
+        }
+        Scope(state: \.reports, action: \.reports) {
+            ReportsFeature()
+        }
+        Scope(state: \.records, action: \.records) {
+            RecordsFeature()
         }
     }
 }
