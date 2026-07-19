@@ -26,11 +26,7 @@ struct AppShellView: View {
     @ViewBuilder private var detail: some View {
         switch store.selectedModule {
         case .dashboard:
-            PlaceholderView(
-                title: "Dashboard",
-                subtitle: store.instancesOnline.map { "\($0) instance(s) online" }
-                    ?? "Waiting for the Mac…"
-            )
+            DashboardView(store: store)
         case .instances:
             InstancesView(
                 store: store.scope(state: \.instances, action: \.instances),
@@ -39,7 +35,7 @@ struct AppShellView: View {
         case .remote:
             RemoteView(store: remoteStore)
         case .billing:
-            PlaceholderView(title: "Billing", subtitle: "Billing arrives in Phase 5")
+            BillingView(store: store)
         case .settings:
             SettingsView(store: store)
         }
