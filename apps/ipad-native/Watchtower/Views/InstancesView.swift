@@ -3,10 +3,12 @@ import ComposableArchitecture
 import WatchtowerCore
 import WatchtowerBridge
 
-/// Instances module: a project-grouped horizontal tab strip (amber dot for
-/// instances needing attention), the terminal pane for the selected
-/// instance, a spawn/restart modal, native remove confirmation, and a global
-/// authBlock banner. Port of client/src/components/instances/*, TCA-shaped.
+/// Instances module: ONLY the centered project-grouped tab strip + the tiled
+/// terminal workspace, plus the global authBlock banner — no nav chrome.
+/// Matches the original apps/ipad `InstancesModule` (App.tsx ~78-285) exactly:
+/// no title, no toolbar, no global Remove button. Removal is per-pane (see
+/// `WorkspacePaneView`'s `onKill`), not a screen-level action. Port of
+/// client/src/components/instances/*, TCA-shaped.
 struct InstancesView: View {
     @Bindable var store: StoreOf<InstancesFeature>
     /// Reaches up to `IPadAppFeature.openRemoteForAuth` — the authBlock
@@ -15,48 +17,15 @@ struct InstancesView: View {
     let onOpenRemote: () -> Void
 
     @Dependency(\.bridge) private var bridge
-    @State private var showRemoveConfirm = false
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                if !store.blocked.isEmpty {
-                    authBanner
-                }
-                tabStrip
-                Divider().overlay(Color.white.opacity(0.08))
-                detail
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 0) {
+            if !store.blocked.isEmpty {
+                authBanner
             }
-            .navigationTitle("Instances")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    if store.selectedInstanceId != nil {
-                        Button("Remove", role: .destructive) {
-                            showRemoveConfirm = true
-                        }
-                        .buttonStyle(.glass)
-                    }
-                    Button {
-                        store.send(.spawnRequested)
-                    } label: {
-                        Label("New", systemImage: "plus")
-                    }
-                    .buttonStyle(.glassProminent)
-                    .tint(Palette.accent)
-                }
-            }
-            .confirmationDialog(
-                "Remove this instance?",
-                isPresented: $showRemoveConfirm,
-                titleVisibility: .visible
-            ) {
-                Button("Remove", role: .destructive) {
-                    removeSelected()
-                }
-                Button("Cancel", role: .cancel) {}
-            }
+            tabStrip
+            detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .sheet(item: $store.scope(state: \.spawn, action: \.spawn)) { spawnStore in
             SpawnModalView(store: spawnStore)
@@ -64,10 +33,15 @@ struct InstancesView: View {
         .onAppear { store.send(.onAppear) }
     }
 
-    private func removeSelected() {
-        guard let id = store.selectedInstanceId else { return }
-        // Fire-and-forget: the resulting `stateChanged` push refreshes the list.
-        Task { _ = try? await bridge.invoke(RemoveInstanceRequest(instanceId: id)) }
+    /// Per-pane "kill" (terminate the Mac-side session): fire-and-forget
+    /// `removeInstance` — the resulting `stateChanged` push refreshes the
+    /// list — then drop the pane from the active tab's layout so it doesn't
+    /// linger on a dead instance. Port of App.tsx's `WorkspacePane` `onKill`
+    /// prop; wired here (not in the reducer) exactly like the old toolbar
+    /// Remove button was, since `InstancesFeature` has no kill action.
+    private func killInstance(leafId: NodeId, instanceId: String) {
+        Task { _ = try? await bridge.invoke(RemoveInstanceRequest(instanceId: instanceId)) }
+        store.send(.paneClosed(leafId: leafId))
     }
 
     private var authBanner: some View {
@@ -100,12 +74,31 @@ struct InstancesView: View {
                     ForEach(store.groups) { group in
                         groupTab(group)
                     }
+                    newInstanceChip
                 }
             }
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.horizontal, 16)
         }
         .frame(height: 38)
+    }
+
+    // Port of TabStrip.tsx's new-instance chip — small glass "+" pill right
+    // after the tabs, opens the spawn/restart modal. Replaces the old
+    // toolbar-level "New" button (dropped along with the rest of the nav
+    // chrome).
+    private var newInstanceChip: some View {
+        Button {
+            store.send(.spawnRequested)
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 13, weight: .semibold))
+                .frame(height: 26)
+                .padding(.horizontal, 10)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Palette.textSecondary)
+        .floatingGlass(cornerRadius: 10)
     }
 
     // Port of TabStrip.tsx's `GroupTab` — three-state status dot (amber glow
@@ -154,6 +147,9 @@ struct InstancesView: View {
                 },
                 onClose: { leafId in
                     store.send(.paneClosed(leafId: leafId))
+                },
+                onKill: { leafId, instanceId in
+                    killInstance(leafId: leafId, instanceId: instanceId)
                 },
                 onResize: { splitId, sizes in
                     store.send(.paneResized(splitId: splitId, sizes: sizes))
