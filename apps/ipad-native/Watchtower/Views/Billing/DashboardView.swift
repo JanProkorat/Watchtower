@@ -3,19 +3,18 @@ import ComposableArchitecture
 import WatchtowerCore
 import WatchtowerBridge
 
-/// iPad port of the iPhone `DashboardView` (in turn ported from
-/// `packages/module-timetracker/src/billing/DashboardView.tsx`). Read-only —
-/// reads the shared `BillingFeature` dataset and reuses the exact same
-/// pure-function projections the iPhone view calls (`dashboardKpis`,
-/// `contractBurn`, `topProjects`, `activityHeatmap`), including the
-/// `contractGroupId` dedupe for pooled contracts.
+/// iPad port of `packages/module-timetracker/src/billing/DashboardView.tsx`
+/// (the ORIGINAL Capacitor design, not iphone-native). Read-only — reads the
+/// shared `BillingFeature` dataset and reuses the exact same pure-function
+/// projections the web view calls (`dashboardKpis`, `contractBurn`,
+/// `topProjects`, `activityHeatmap`), including the `contractGroupId`
+/// dedupe for pooled contracts.
 ///
-/// The only thing that changes for iPad is the LAYOUT: instead of the
-/// iPhone's single stacked column, the four sections (Worked, Active
-/// contracts, Top projects, Activity) sit as peer tiles in a responsive
-/// `LazyVGrid`, each wrapped in the iPad design system's `contentCard()`
-/// (solid content-layer surface) rather than the iPhone's
-/// `.ultraThinMaterial` `GlassCard`.
+/// Design-align (Task 3): layout is now a single vertical column of
+/// full-width sections (Worked / Active contracts / Top projects / Activity),
+/// matching the web original — NOT the earlier adaptive `LazyVGrid` of tiles.
+/// Cards use the frosted `glassCard()` helper (Task 1) and the shared
+/// `SectionHeaderLabel`, not the solid `contentCard()` / local `TileHeader`.
 struct DashboardView: View {
     let store: StoreOf<IPadAppFeature>
 
@@ -76,7 +75,7 @@ struct DashboardView: View {
         billing.loadState == .loading && billing.dataset == nil
     }
 
-    private let tileColumns = [GridItem(.adaptive(minimum: 360, maximum: 560), spacing: 16)]
+    private var monthLabel: String { month.replacingOccurrences(of: "-", with: "/") }
 
     var body: some View {
         ZStack {
@@ -87,18 +86,21 @@ struct DashboardView: View {
                 }
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    // Single vertical column, 24pt gaps between sections —
+                    // mirrors the web original's `flexDirection: 'column', gap: 24`.
+                    VStack(alignment: .leading, spacing: 24) {
                         statusBanner
-                        LazyVGrid(columns: tileColumns, alignment: .leading, spacing: 16) {
-                            workedTile
-                            if !burns.isEmpty {
-                                contractsTile
-                            }
-                            topProjectsTile
-                            activityTile
+                        workedSection
+                        if !burns.isEmpty {
+                            contractsSection
                         }
+                        topProjectsSection
+                        activitySection
                     }
-                    .padding(24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 32)
                 }
                 .refreshable {
                     await billing.send(.refreshRequested).finish()
@@ -156,100 +158,118 @@ struct DashboardView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .contentCard(cornerRadius: 12)
+        .glassCard(cornerRadius: 12)
     }
 
-    // MARK: - Worked
+    // MARK: - Worked ("Odpracováno" in the web original)
 
-    private var workedTile: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TileHeader(title: "Worked")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 10)], spacing: 10) {
-                KpiMini(label: "Today", minutes: kpis.today.minutes, earnedCzk: kpis.today.earnedCzk)
-                KpiMini(label: "Sprint", minutes: kpis.sprint.minutes, earnedCzk: kpis.sprint.earnedCzk)
-                KpiMini(label: "This month", minutes: kpis.month.minutes, earnedCzk: kpis.month.earnedCzk)
+    private var workedSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionHeaderLabel("Worked")
+            // Three equal-width KPI tiles in one non-wrapping row — the web
+            // original wraps on phone width, but iPad is always wide enough
+            // for a single row (no isNarrow branch needed here).
+            HStack(spacing: 10) {
+                KpiTile(label: "Today", minutes: kpis.today.minutes, earnedCzk: kpis.today.earnedCzk)
+                KpiTile(label: "Sprint", minutes: kpis.sprint.minutes, earnedCzk: kpis.sprint.earnedCzk)
+                KpiTile(label: "This month", minutes: kpis.month.minutes, earnedCzk: kpis.month.earnedCzk)
             }
         }
-        .padding(16)
-        .contentCard()
     }
 
-    // MARK: - Active contracts
+    // MARK: - Active contracts ("Aktivní kontrakty")
 
-    private var contractsTile: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TileHeader(title: "Active contracts")
-            VStack(spacing: 10) {
+    private var contractsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionHeaderLabel("Active contracts")
+            VStack(spacing: 8) {
                 ForEach(burns, id: \.projectId) { burn in
-                    BurnRow(burn: burn)
+                    ContractCard(burn: burn)
                 }
             }
         }
-        .padding(16)
-        .contentCard()
     }
 
-    // MARK: - Top projects
+    // MARK: - Top projects ("Top projekty")
 
-    private var topProjectsTile: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TileHeader(title: "Top projects — \(month.replacingOccurrences(of: "-", with: "/"))")
-            if !monthHasData {
-                Text("no data for this month")
-                    .font(.subheadline)
-                    .foregroundStyle(Palette.textMuted)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 12)
-            } else if top.isEmpty {
-                Text("no data")
-                    .font(.subheadline)
-                    .foregroundStyle(Palette.textMuted)
-            } else {
-                VStack(spacing: 12) {
-                    ForEach(Array(top.enumerated()), id: \.element.projectId) { index, project in
-                        TopRow(rank: index + 1, project: project, maxMinutes: topMaxMinutes)
+    @ViewBuilder
+    private var topProjectsSection: some View {
+        // Mirrors the web original exactly: the header only renders when the
+        // month has data at all; with no data for the month at all, a single
+        // standalone centered card replaces header+list entirely.
+        if monthHasData {
+            VStack(alignment: .leading, spacing: 0) {
+                SectionHeaderLabel("Top projects — \(monthLabel)")
+                if top.isEmpty {
+                    Text("no data")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.textMuted)
+                        .padding(.vertical, 8)
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(Array(top.enumerated()), id: \.element.projectId) { index, project in
+                            TopRow(rank: index + 1, project: project, maxMinutes: topMaxMinutes)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .glassCard(cornerRadius: 12)
+                }
+            }
+        } else {
+            Text("no data for this month")
+                .font(.system(size: 14))
+                .foregroundStyle(Palette.textMuted)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 28)
+                .padding(.horizontal, 16)
+                .glassCard(cornerRadius: 12)
+        }
+    }
+
+    // MARK: - Activity ("Aktivita")
+
+    private var activitySection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionHeaderLabel("Activity (30 days)")
+            VStack(alignment: .leading, spacing: 12) {
+                let maxMinutes = max(heatmap.days.map(\.minutes).max() ?? 1, 1)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 7), spacing: 3) {
+                    ForEach(heatmap.days, id: \.date) { day in
+                        HeatCell(day: day, maxMinutes: maxMinutes)
                     }
                 }
+                // Cap the width so cells stay small squares on a wide iPad
+                // instead of stretching to ~width/7 — matches the web
+                // original's `maxWidth: 280`.
+                .frame(maxWidth: 280)
+
+                statStrip
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .glassCard(cornerRadius: 12)
         }
-        .padding(16)
-        .contentCard()
-    }
-
-    // MARK: - Activity
-
-    private var activityTile: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TileHeader(title: "Activity (30 days)")
-            let maxMinutes = max(heatmap.days.map(\.minutes).max() ?? 1, 1)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 7), spacing: 3) {
-                ForEach(heatmap.days, id: \.date) { day in
-                    HeatCell(day: day, maxMinutes: maxMinutes)
-                }
-            }
-            .frame(maxWidth: 280)
-
-            statStrip
-        }
-        .padding(16)
-        .contentCard()
     }
 
     private var statStrip: some View {
-        // `.accessibilityLabel` lives on each HeatCell; the strip below
-        // mirrors the React `StatStrip` text summary.
         let stats = heatmap.stats
-        return VStack(alignment: .leading, spacing: 4) {
-            Text("\(stats.currentStreak) day streak")
-            Text("longest: \(stats.longestStreak)")
-            Text("active days: \(stats.activeDays)")
-            Text("weekly avg: \(CzFormat.hours(Double(stats.weeklyAvgMinutes)))")
+        return HStack(alignment: .top, spacing: 16) {
+            statItem(Text("\(stats.currentStreak)").foregroundStyle(Palette.accent), "day streak")
+            statItem(Text("\(stats.longestStreak)").foregroundStyle(Palette.textPrimary), "longest streak")
+            statItem(Text("\(stats.activeDays)").foregroundStyle(Palette.textPrimary), "active days")
+            statItem(Text(CzFormat.hours(Double(stats.weeklyAvgMinutes))).foregroundStyle(Palette.textPrimary), "avg/week")
             if let busiest = stats.busiestDay {
-                Text("busiest: \(CzFormat.dateCz(busiest))")
+                statItem(Text(CzFormat.dateCz(busiest)).foregroundStyle(Palette.textPrimary), "busiest")
             }
         }
         .font(.caption)
-        .foregroundStyle(Palette.textMuted)
+    }
+
+    /// A bold colored value followed by a muted label — mirrors the web
+    /// `StatStrip`'s `<strong>` + plain-text pattern.
+    private func statItem(_ value: Text, _ label: String) -> some View {
+        value.fontWeight(.semibold) + Text(" \(label)").foregroundStyle(Palette.textMuted)
     }
 
     private var toastPill: some View {
@@ -267,22 +287,9 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Tile header
+// MARK: - KPI tile
 
-private struct TileHeader: View {
-    let title: String
-
-    var body: some View {
-        Text(title.uppercased())
-            .font(.caption.weight(.bold))
-            .foregroundStyle(Palette.textMuted)
-            .tracking(0.8)
-    }
-}
-
-// MARK: - KPI mini card
-
-private struct KpiMini: View {
+private struct KpiTile: View {
     let label: String
     let minutes: Double
     let earnedCzk: Double
@@ -290,9 +297,9 @@ private struct KpiMini: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased())
-                .font(.caption2.weight(.semibold))
+                .font(.system(size: 11, weight: .semibold))
+                .kerning(0.6)
                 .foregroundStyle(Palette.textMuted)
-                .tracking(0.6)
             Text(CzFormat.hours(minutes))
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(Palette.textPrimary)
@@ -300,15 +307,16 @@ private struct KpiMini: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Palette.accent)
         }
-        .frame(minWidth: 100, maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .glassCard(cornerRadius: 12)
     }
 }
 
-// MARK: - Contract burn row
+// MARK: - Contract burn card
 
-private struct BurnRow: View {
+private struct ContractCard: View {
     let burn: ContractBurn
 
     /// Render an MD limit the way React prints the raw `limit` number: whole
@@ -342,15 +350,16 @@ private struct BurnRow: View {
                     .lineLimit(1)
                 Spacer()
                 if let remaining = burn.workdaysRemaining {
-                    Text("\(remaining) wd left")
+                    Text("\(remaining) days left")
                         .font(.caption)
                         .foregroundStyle(Palette.textMuted)
                 }
             }
             burnBar
         }
-        .padding(12)
-        .background(Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .glassCard(cornerRadius: 12)
     }
 
     @ViewBuilder
@@ -415,9 +424,9 @@ private struct TopRow: View {
                     .font(.caption2)
                     .foregroundStyle(Palette.textMuted)
                     .frame(width: 18, alignment: .trailing)
-                Circle()
-                    .fill(Color(hex: project.color ?? "#38bdf8"))
-                    .frame(width: 8, height: 8)
+                if let color = project.color {
+                    Circle().fill(Color(hex: color)).frame(width: 8, height: 8)
+                }
                 Text(project.name.isEmpty ? "(no name)" : project.name)
                     .font(.subheadline)
                     .foregroundStyle(Palette.textPrimary)
@@ -438,7 +447,7 @@ private struct TopRow: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.10))
                     Capsule()
-                        .fill(Color(hex: project.color ?? "#38bdf8"))
+                        .fill(project.color.map { Color(hex: $0) } ?? Palette.chartViolet)
                         .frame(width: geo.size.width * min(1, fraction))
                 }
             }
