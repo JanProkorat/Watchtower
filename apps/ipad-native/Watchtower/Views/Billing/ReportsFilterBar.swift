@@ -7,6 +7,8 @@ import WatchtowerCore
 /// Same three fields (Period / Granularity / Project) and the same
 /// `ReportsFeature` actions, but laid out as **one horizontal row** — the
 /// iPad has the width for it, unlike the iPhone's stacked-vertical layout.
+/// Design-align (Task 5): container is `glassCard()` — matching the web
+/// original's `glassCard(14)` filter row — instead of the flat `contentCard()`.
 struct ReportsFilterBar: View {
     let store: StoreOf<ReportsFeature>
     let projects: [ProjectRow]
@@ -46,7 +48,7 @@ struct ReportsFilterBar: View {
             .frame(width: 220)
         }
         .padding(16)
-        .contentCard()
+        .glassCard()
     }
 
     // MARK: - Labeled field

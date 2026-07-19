@@ -4,14 +4,17 @@ import WatchtowerCore
 import WatchtowerBridge
 
 /// iPad port of the iPhone `ReportsView` (in turn ported from
-/// `packages/module-timetracker/src/billing/reports/ReportsView.tsx`).
-/// Same shared stores (`BillingFeature`'s dataset/loadState + `ReportsFeature`'s
-/// filter selection) and the same pure derivations (`trendSeries`,
-/// `rateChangeMarkers`, `earningsSummary`, `projectBreakdown`,
-/// `activityHeatmapRange`) as the iPhone view, but the layout is a **2×2
-/// `LazyVGrid`** of the four report panels instead of the iPhone's vertical
-/// stack, and the filter bar lays its three fields out horizontally (see
-/// `ReportsFilterBar`) instead of stacking them.
+/// `packages/module-timetracker/src/billing/ReportsView.tsx` — the ORIGINAL
+/// Capacitor design, not iphone-native). Same shared stores (`BillingFeature`'s
+/// dataset/loadState + `ReportsFeature`'s filter selection) and the same pure
+/// derivations (`trendSeries`, `rateChangeMarkers`, `earningsSummary`,
+/// `projectBreakdown`, `activityHeatmapRange`) as before.
+///
+/// Design-align (Task 5): layout is now a single vertical stack of
+/// `glassCard`-wrapped panels — filter bar, then Trend / Earnings / By
+/// projects / Activity, in that order, each under a `SectionHeaderLabel` —
+/// matching the web original, replacing the earlier 2×2 `LazyVGrid` of
+/// `contentCard()` tiles.
 ///
 /// Project-tap behavior: the iPhone view pushes `ProjectDetailView` onto its
 /// own `NavigationStack` via `.navigationDestination(item:)`. Reports has no
@@ -23,7 +26,7 @@ struct ReportsView: View {
     let store: StoreOf<IPadAppFeature>
 
     var body: some View {
-        ReportsGridView(
+        ReportsStackView(
             billing: store.scope(state: \.billing, action: \.billing),
             reports: store.scope(state: \.reports, action: \.reports)
         )
@@ -33,14 +36,9 @@ struct ReportsView: View {
 /// Split into its own type so `reports` can be `@Bindable` — required for
 /// the `$reports.scope(state:action:)` sheet-presentation binding below,
 /// which a computed (non-stored) property can't carry.
-private struct ReportsGridView: View {
+private struct ReportsStackView: View {
     let billing: StoreOf<BillingFeature>
     @Bindable var reports: StoreOf<ReportsFeature>
-
-    private static let gridColumns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16),
-    ]
 
     private var dataset: BillingDataset {
         billing.dataset ?? BillingDataset(worklogs: [], contracts: [], daysOff: [], projects: [], tasks: [], epics: [], fetchedAt: "")
@@ -85,25 +83,23 @@ private struct ReportsGridView: View {
                 }
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 24) {
                         ReportsFilterBar(store: reports, projects: dataset.projects)
 
-                        LazyVGrid(columns: Self.gridColumns, spacing: 16) {
-                            tile(title: "Trend") {
-                                TrendChartPanel(series: trend, markers: markers, from: range.from, to: range.to, granularity: granularity)
-                            }
+                        section("Trend") {
+                            TrendChartPanel(series: trend, markers: markers, from: range.from, to: range.to, granularity: granularity)
+                        }
 
-                            tile(title: "Earnings") {
-                                EarningsSummaryPanel(summary: earnings, onOpenProject: { reports.send(.openProjectTapped($0)) })
-                            }
+                        section("Earnings") {
+                            EarningsSummaryPanel(summary: earnings, onOpenProject: { reports.send(.openProjectTapped($0)) })
+                        }
 
-                            tile(title: "By projects") {
-                                ProjectDonutPanel(slices: breakdown, onOpenProject: { reports.send(.openProjectTapped($0)) })
-                            }
+                        section("By projects") {
+                            ProjectDonutPanel(slices: breakdown, onOpenProject: { reports.send(.openProjectTapped($0)) })
+                        }
 
-                            tile(title: "Activity") {
-                                ActivityHeatmapPanel(heatmap: heat)
-                            }
+                        section("Activity") {
+                            ActivityHeatmapPanel(heatmap: heat)
                         }
                     }
                     .padding(24)
@@ -119,13 +115,16 @@ private struct ReportsGridView: View {
         }
     }
 
+    /// One vertically-stacked report panel: an uppercase `SectionHeaderLabel`
+    /// above a `glassCard`-framed content panel — mirroring the web
+    /// original's `Section` wrapper and `EarningsView`'s section pattern.
     @ViewBuilder
-    private func tile<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: title)
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeaderLabel(title)
             content()
+                .padding(16)
+                .glassCard()
         }
-        .padding(16)
-        .contentCard()
     }
 }
