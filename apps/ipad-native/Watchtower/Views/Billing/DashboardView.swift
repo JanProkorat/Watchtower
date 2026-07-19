@@ -89,7 +89,14 @@ struct DashboardView: View {
                     // Single vertical column, 24pt gaps between sections —
                     // mirrors the web original's `flexDirection: 'column', gap: 24`.
                     VStack(alignment: .leading, spacing: 24) {
-                        statusBanner
+                        // A true ViewBuilder omission (zero children) when
+                        // fresh/loading — not an `EmptyView()` occupying a
+                        // slot, which would still absorb the outer VStack's
+                        // 24pt inter-child spacing and leave a phantom gap
+                        // above "Worked" on the common (fresh) load path.
+                        if billing.loadState == .offline || billing.loadState == .cached {
+                            statusBanner
+                        }
                         workedSection
                         if !burns.isEmpty {
                             contractsSection
@@ -120,26 +127,26 @@ struct DashboardView: View {
     }
 
     // MARK: - Stale / offline chrome
+    //
+    // Only called from the `.offline`/`.cached` branch at the call site, so
+    // this can assume one of those two states.
 
     @ViewBuilder
     private var statusBanner: some View {
-        switch billing.loadState {
-        case .offline:
+        if billing.loadState == .offline {
             bannerRow(
                 icon: "wifi.slash",
                 text: "Offline — dashboard data unavailable",
                 tint: Palette.chartAmber,
                 showRetry: true
             )
-        case .cached:
+        } else {
             bannerRow(
                 icon: "clock.arrow.circlepath",
                 text: "Showing cached data — pull to refresh",
                 tint: Palette.textMuted,
                 showRetry: false
             )
-        case .loading, .fresh:
-            EmptyView()
         }
     }
 
