@@ -47,6 +47,23 @@ extension View {
             .background(RoundedRectangle(cornerRadius: cornerRadius).fill(Palette.dataPanelFill))
             .overlay(RoundedRectangle(cornerRadius: cornerRadius).stroke(Palette.hairline, lineWidth: 1))
     }
+
+    /// Glass-styled text input — the native equivalent of apps/ipad's
+    /// `ConnectionFields.tsx` `inputStyle` (translucent fill
+    /// `rgba(255,255,255,0.06)`, hairline border `rgba(255,255,255,0.14)`,
+    /// radius 11, 15pt text). Apply directly to a `TextField`/`SecureField` in
+    /// place of the native `.textFieldStyle(.roundedBorder)` wherever the
+    /// screen is matching the original's glass chrome (Settings / Connection
+    /// editor / Remote Mac credential form — design-align Task 8).
+    func glassField() -> some View {
+        self
+            .font(.system(size: 15))
+            .foregroundStyle(Palette.textPrimary)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 11)
+            .background(RoundedRectangle(cornerRadius: 11).fill(Color.white.opacity(0.06)))
+            .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.white.opacity(0.14), lineWidth: 1))
+    }
 }
 
 /// Uppercase section header used across every screen (KPI groups, contract

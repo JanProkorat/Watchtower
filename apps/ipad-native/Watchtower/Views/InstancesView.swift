@@ -88,37 +88,50 @@ struct InstancesView: View {
         .padding(.top, 10)
     }
 
+    // Port of apps/ipad's TabStrip.tsx: a centered, pill-shaped, horizontally-
+    // scrolling glass strip (height ~38pt) — centers when the tabs fit, scrolls
+    // once they overflow. `.frame(maxWidth: .infinity, alignment: .center)`
+    // inside the ScrollView achieves both without extra plumbing: the frame's
+    // upper bound is never binding, so overflow still scrolls normally.
     private var tabStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            GlassEffectContainer(spacing: 8) {
-                HStack(spacing: 8) {
+            GlassEffectContainer(spacing: 6) {
+                HStack(spacing: 6) {
                     ForEach(store.groups) { group in
                         groupTab(group)
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .center)
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
         }
+        .frame(height: 38)
     }
 
+    // Port of TabStrip.tsx's `GroupTab` — three-state status dot (amber glow
+    // for attention, accentHover glow for the active tab, flat muted grey
+    // otherwise) always rendered alongside the label, active tab in white on
+    // a brighter glass fill.
     private func groupTab(_ group: ProjectGroup) -> some View {
         let selected = group.id == store.activeGroupId
         let needsAttention = group.instanceIds.contains { store.attentionIds.contains($0) }
+        let dotColor: Color = needsAttention ? Palette.chartAmber : (selected ? Palette.accentHover : Color(white: 0.44))
+        let glowing = needsAttention || selected
         return Button {
             store.send(.groupActivated(groupId: group.id))
         } label: {
             HStack(spacing: 6) {
-                if needsAttention {
-                    Circle().fill(Palette.chartAmber).frame(width: 8, height: 8)
-                }
+                Circle()
+                    .fill(dotColor)
+                    .frame(width: 6, height: 6)
+                    .shadow(color: glowing ? dotColor : .clear, radius: glowing ? 5 : 0)
                 Text(group.label)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .foregroundStyle(selected ? Palette.accent : Palette.textMuted)
-            .floatingGlass(cornerRadius: 12, tint: selected ? Palette.accentWash : nil)
+            .padding(.horizontal, 12)
+            .frame(height: 26)
+            .foregroundStyle(selected ? .white : Palette.textSecondary)
+            .floatingGlass(cornerRadius: 10, tint: selected ? Color.white.opacity(0.20) : nil)
         }
         .buttonStyle(.plain)
         .disabled(group.instanceIds.isEmpty)
