@@ -3,21 +3,33 @@ import ComposableArchitecture
 import WatchtowerCore
 import WatchtowerBridge
 
-/// iPad port of the iPhone `ProjectDetailView` — identical derivations
-/// (`activeContract`, `rollupEarningsByContract`) and identical section
-/// order (header / rate-history / monthly ledger), but rendered as the
-/// **trailing pane** of `EarningsView`'s master-detail split instead of a
-/// pushed `NavigationStack` destination. Two adaptations follow from that:
-///   - No `.navigationTitle`/`.navigationBarTitleDisplayMode` — there's no
-///     enclosing `NavigationStack` on this pane (the project name is already
-///     shown prominently in `headerCard`), so a nav-bar title would be inert.
-///   - Cards use the iPad design system's `contentCard()` (solid) instead of
-///     the iPhone's `GlassCard`/`.ultraThinMaterial`.
-/// The contract-drawer `.sheet` presentation and `canEdit` gating (hide
-/// "+ Add rate", disable/hide the rate-history row tap) are unchanged.
+/// iPad port of `packages/module-timetracker/src/billing/ProjectDetailView.tsx`
+/// (the ORIGINAL Capacitor design, not iphone-native). Identical derivations
+/// (`activeContract`, `rollupEarningsByContract`) and identical section order
+/// (header / rate-history / monthly ledger) as before.
+///
+/// Design-align (Task 4): rendered as the **pushed** full-screen destination
+/// reached from `EarningsView` via `.navigationDestination(item:)` (Reports
+/// still reaches it via a `.sheet`) — replacing the earlier D2 split's inline
+/// trailing pane. A custom sticky glass back bar ("‹ Earnings") replaces the
+/// system navigation bar (hidden via `.toolbar(.hidden, for: .navigationBar)`)
+/// to match the web `navBarStyle` treatment: a floating glass pill pinned
+/// above the scroll content, not a native large-title bar — and matches the
+/// web original exactly in always reading "‹ Earnings" regardless of the
+/// caller (the web's `onBack` label is likewise hardcoded, not caller-aware).
+/// `dismiss()` is presentation-agnostic, so the same back bar correctly pops
+/// the push (Earnings) or closes the sheet (Reports).
+///
+/// Cards use the frosted `glassCard()` helper and `SectionHeaderLabel` (Task
+/// 1); the worklog ledger uses the dense, non-frosted `dataPanel()` helper —
+/// matching the web's `glassCard`/`dataPanelFill` split. The contract-drawer
+/// `.sheet` presentation and `canEdit` gating (hide "+ Add rate", disable the
+/// rate-history row tap) are unchanged.
 struct ProjectDetailView: View {
     @Bindable var store: StoreOf<ProjectDetailFeature>
     let billing: StoreOf<BillingFeature>
+
+    @Environment(\.dismiss) private var dismiss
 
     // UTC calendar for the "today" date string — matches WatchtowerCore's
     // date-arithmetic convention (never the local time zone). Same pattern
@@ -79,24 +91,64 @@ struct ProjectDetailView: View {
         canEdit(store.loadState)
     }
 
-    var body: some View {
-        ZStack {
-            Palette.baseBg.ignoresSafeArea()
+    private var isLoading: Bool {
+        store.loadState == .loading && store.dataset == nil
+    }
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    headerCard
-                    rateHistorySection
-                    ledgerSection
+    var body: some View {
+        VStack(spacing: 0) {
+            backBar
+
+            ZStack {
+                Palette.baseBg.ignoresSafeArea()
+
+                if isLoading {
+                    VStack(spacing: 12) {
+                        ProgressView().tint(Palette.accentIcon)
+                        Text("Loading…").foregroundStyle(Palette.textMuted)
+                    }
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            headerCard
+                            rateHistorySection
+                            ledgerSection
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 32)
+                    }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 32)
             }
         }
+        .background(Palette.baseBg)
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(item: $store.scope(state: \.contractDrawer, action: \.contractDrawer)) { drawerStore in
             ContractDrawerView(store: drawerStore, billing: billing)
         }
+    }
+
+    // MARK: - Sticky back bar
+
+    private var backBar: some View {
+        HStack {
+            Button {
+                dismiss()
+            } label: {
+                Text("‹ Earnings")
+                    .font(.system(size: 16))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Palette.accent)
+            .accessibilityLabel("Back to Earnings")
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .glassCard(cornerRadius: 16)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
     }
 
     // MARK: - 1. Header card
@@ -110,7 +162,7 @@ struct ProjectDetailView: View {
 
             HStack(alignment: .top, spacing: 20) {
                 VStack(alignment: .leading, spacing: 4) {
-                    SectionHeader(title: "Month")
+                    SectionHeaderLabel("Month")
                     HStack(spacing: 8) {
                         Button {
                             store.send(.monthStepped(-1))
@@ -145,7 +197,7 @@ struct ProjectDetailView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    SectionHeader(title: "Hours")
+                    SectionHeaderLabel("Hours")
                     Text(CzFormat.hours(totalMinutes))
                         .font(.system(size: 16, weight: .bold, design: .monospaced))
                         .foregroundStyle(Palette.chartCyan)
@@ -153,7 +205,7 @@ struct ProjectDetailView: View {
 
                 if let active = activeContractRow {
                     VStack(alignment: .leading, spacing: 4) {
-                        SectionHeader(title: "Rate")
+                        SectionHeaderLabel("Rate")
                         Text(rateLabel(active))
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
                             .foregroundStyle(Palette.chartViolet)
@@ -162,7 +214,7 @@ struct ProjectDetailView: View {
             }
         }
         .padding(16)
-        .contentCard()
+        .glassCard()
     }
 
     // MARK: - 2. Rate history
@@ -170,7 +222,7 @@ struct ProjectDetailView: View {
     private var rateHistorySection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                SectionHeader(title: "Rate history")
+                SectionHeaderLabel("Rate history")
                 Spacer()
                 if editable {
                     Button {
@@ -191,7 +243,7 @@ struct ProjectDetailView: View {
                     .foregroundStyle(Palette.textMuted)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 12)
-                    .contentCard()
+                    .glassCard(cornerRadius: 12)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(contractPeriods.enumerated()), id: \.element.contract.syncId) { index, earning in
@@ -208,7 +260,7 @@ struct ProjectDetailView: View {
                     }
                 }
                 .padding(.horizontal, 4)
-                .contentCard()
+                .glassCard(cornerRadius: 12)
             }
         }
     }
@@ -217,13 +269,13 @@ struct ProjectDetailView: View {
 
     private var ledgerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "Worklogs — \(CzFormat.czechMonthLabel(store.month))")
+            SectionHeaderLabel("Records — \(CzFormat.czechMonthLabel(store.month))")
 
             VStack(spacing: 0) {
                 ledgerColumns
 
                 if ledgerRows.isEmpty {
-                    Text("No worklogs this month")
+                    Text("No records this month")
                         .font(.subheadline)
                         .foregroundStyle(Palette.textMuted)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -232,13 +284,13 @@ struct ProjectDetailView: View {
                     ForEach(Array(ledgerRows.enumerated()), id: \.element.syncId) { index, row in
                         ledgerRowView(row)
                         if index < ledgerRows.count - 1 {
-                            Divider().overlay(Color.white.opacity(0.08))
+                            Divider().overlay(Palette.hairline)
                         }
                     }
                     ledgerFooter
                 }
             }
-            .contentCard(cornerRadius: 12)
+            .dataPanel(cornerRadius: 12)
         }
     }
 
