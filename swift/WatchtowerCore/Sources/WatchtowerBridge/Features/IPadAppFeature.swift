@@ -138,8 +138,30 @@ public struct IPadAppFeature {
                 return .none
 
             case let .authEvent(present):
+                let wasPresent = state.authPresent
                 state.authPresent = present
-                return .none
+                // Refetch billing only on the false→true transition (a fresh
+                // sign-in via the Billing auth bar, e.g. after a cold,
+                // unauthenticated launch left billing empty/offline with no
+                // pull-to-refresh available) — never on a token-refresh
+                // re-emission of `present == true` while already signed in,
+                // which must not spam a refetch. `.onAppear` (not
+                // `.refreshRequested`) mirrors AppFeature's own choice for
+                // its sign-in transition: it re-runs cache-load + fetch
+                // without the "Updated" toast that `.refreshRequested`
+                // reserves for an explicit user-initiated pull-to-refresh —
+                // a toast would be a spurious surprise on an automatic,
+                // auth-driven reload. Earnings/reports/records are
+                // deliberately NOT re-sent here (unlike AppFeature): their
+                // cursor state doesn't depend on auth and was already seeded
+                // by the unconditional `onAppear` fan-out above; resending
+                // `reports(.onAppear(earliest: nil))` here would clobber an
+                // already-correct `earliest` back to nil without the
+                // `.billing` case below re-seeding it (that guard only fires
+                // on dataset nil → non-nil, which won't retrigger if a
+                // dataset was already loaded pre-sign-in).
+                guard present, !wasPresent else { return .none }
+                return .send(.billing(.onAppear))
 
             case .signOutTapped:
                 return .run { _ in await supabase.signOut() }

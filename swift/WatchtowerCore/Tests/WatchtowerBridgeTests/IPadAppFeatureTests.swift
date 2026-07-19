@@ -253,4 +253,57 @@ final class IPadAppFeatureTests: XCTestCase {
         XCTAssertEqual(store.state.reports.earliest, "2025-01-01")
         await store.finish()
     }
+
+    func testAuthEventSignInRefetchesBilling() async {
+        // Cross-task bug found in whole-branch review: the Billing auth bar
+        // (Task 3) flips `authPresent` via `.authEvent(true)`, but the
+        // billing fan-out previously only fired from `onAppear`. Billing's
+        // sub-screens have no pull-to-refresh, so a user who signs in after
+        // a cold, unauthenticated launch (empty/offline billing) was stuck
+        // until relaunch. Assert the false→true transition forces a billing
+        // reload (`.onAppear`, not `.refreshRequested` — no spurious
+        // "Updated" toast for an automatic, auth-driven reload), and a
+        // redundant true→true re-emission (a token refresh while already
+        // signed in) does NOT re-fire it.
+        let fetchCount = LockIsolated(0)
+        let store = TestStore(initialState: IPadAppFeature.State()) {
+            IPadAppFeature()
+        } withDependencies: {
+            $0.billingCache.load = { nil }
+            $0.billingCache.save = { _ in }
+            $0.billingClient.fetchBillingDataset = {
+                fetchCount.withValue { $0 += 1 }
+                return self.ds()
+            }
+            // The `.billing` reseed case fires `.reports(.onAppear)` once
+            // this fetch lands (dataset was nil before), which reads
+            // `date.now` — stub it even though this test isn't asserting on
+            // Reports.
+            $0.date.now = Date(timeIntervalSince1970: 1_780_000_000)
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.authEvent(true)) {
+            $0.authPresent = true
+        }
+        await store.receive(\.billing.onAppear)
+        // Cache-load and network-fetch race; accept either interleaving.
+        for _ in 0..<2 {
+            await store.receive { action in
+                if case .billing(.cacheLoaded) = action { return true }
+                if case .billing(.fetchResponse) = action { return true }
+                return false
+            }
+        }
+        XCTAssertEqual(store.state.billing.dataset, self.ds())
+        XCTAssertEqual(store.state.billing.loadState, .fresh)
+        XCTAssertFalse(store.state.billing.showRefreshToast)
+        XCTAssertEqual(fetchCount.value, 1)
+
+        // true→true (e.g. a token-refresh re-emission while already signed
+        // in) must be a no-op — no second reload.
+        await store.send(.authEvent(true))
+        await store.finish()
+        XCTAssertEqual(fetchCount.value, 1)
+    }
 }
