@@ -92,6 +92,13 @@ private struct EarningsRootView: View {
             .navigationDestination(item: $earnings.scope(state: \.projectDetail, action: \.projectDetail)) { detailStore in
                 ProjectDetailView(store: detailStore, billing: billing)
             }
+            // Root view has no title/back button of its own, so hide the
+            // system nav bar entirely — otherwise an empty ~90pt bar renders
+            // above the month picker. `ProjectDetailView` (the pushed
+            // destination) sets its own `.toolbar(.hidden, for: .navigationBar)`
+            // and draws a custom back bar instead, so this only affects the
+            // root screen, matching the web original's chromeless top.
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
@@ -194,26 +201,6 @@ private struct EarningsRootView: View {
                 .glassCard(cornerRadius: 12)
             }
         }
-    }
-}
-
-// MARK: - Shared section label (also used by ReportsView / WorklogFormView /
-// TimeOffView / ContractDrawerView / TaskFormView)
-
-/// Small uppercase caption header, mirroring `DashboardView`'s private
-/// `TileHeader` — kept internal (not `private`) so the sibling Billing views
-/// in this module can reuse it instead of redefining the same style thrice.
-/// Design-align: `EarningsView`/`ProjectDetailView` themselves have moved to
-/// the newer `SectionHeaderLabel` (Task 1); this type stays alive purely for
-/// the still-unmigrated call sites listed above.
-struct SectionHeader: View {
-    let title: String
-
-    var body: some View {
-        Text(title.uppercased())
-            .font(.caption.weight(.bold))
-            .foregroundStyle(Palette.textMuted)
-            .tracking(0.8)
     }
 }
 

@@ -6,7 +6,7 @@ import WatchtowerCore
 /// `packages/module-timetracker/src/billing/reports/ProjectDonut.tsx`).
 /// Value-only, no store — identical donut (Swift Charts `SectorMark`) +
 /// tappable legend as the iPhone panel. The enclosing `ReportsView` supplies
-/// the outer `contentCard()`, so this view renders its content only (no
+/// the outer `glassCard()`, so this view renders its content only (no
 /// `GlassCard` wrapper, unlike the iPhone original).
 struct ProjectDonutPanel: View {
     let slices: [ProjectBreakdownSlice]

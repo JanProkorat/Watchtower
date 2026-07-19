@@ -6,13 +6,14 @@ import WatchtowerBridge
 /// iPad port of the iPhone `ContractDrawerView` — create/edit sheet for a
 /// single contract (rate history entry), bound to `ContractDrawerFeature`.
 /// Same Save/Delete/Close wiring, same shared-project checklist. Two
-/// adaptations: cards use the iPad design system's `contentCard()` instead
-/// of `GlassCard`/`.ultraThinMaterial`, and the Save/Delete buttons are
-/// additionally `.disabled` when `!canEdit(store.loadState)` — the iPhone
-/// reference only gates via the reducer's internal `canEdit` guard (which
-/// no-ops with an error message), but the brief for this iPad pass calls for
-/// visibly disabling every write affordance, not just relying on the silent
-/// reducer-level guard.
+/// adaptations: cards use the design-align `glassCard()` helper (not
+/// `GlassCard`/`.ultraThinMaterial`) and the shared `SectionHeaderLabel` for
+/// field captions, and the Save/Delete buttons are additionally `.disabled`
+/// when `!canEdit(store.loadState)` — the iPhone reference only gates via
+/// the reducer's internal `canEdit` guard (which no-ops with an error
+/// message), but the brief for this iPad pass calls for visibly disabling
+/// every write affordance, not just relying on the silent reducer-level
+/// guard.
 ///
 /// `sharedProjectIds` prefill: `ProjectDetailFeature.contractRowTapped`
 /// already seeds `store.sharedProjectIds` from the group's current
@@ -70,7 +71,7 @@ struct ContractDrawerView: View {
                             }
                         }
                         .padding(16)
-                        .contentCard()
+                        .glassCard()
 
                         Button {
                             store.send(.saveTapped)
@@ -122,7 +123,7 @@ struct ContractDrawerView: View {
     private var dateFields: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
-                SectionHeader(title: "Effective from")
+                SectionHeaderLabel("Effective from")
                 TextField("YYYY-MM-DD", text: $store.effectiveFromText)
                     .keyboardType(.numbersAndPunctuation)
                     .padding(12)
@@ -132,7 +133,7 @@ struct ContractDrawerView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                SectionHeader(title: "End date (optional)")
+                SectionHeaderLabel("End date (optional)")
                 TextField("YYYY-MM-DD", text: $store.endDateText)
                     .keyboardType(.numbersAndPunctuation)
                     .padding(12)
@@ -145,7 +146,7 @@ struct ContractDrawerView: View {
 
     private var rateTypePicker: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SectionHeader(title: "Rate type")
+            SectionHeaderLabel("Rate type")
             Picker("Rate type", selection: $store.rateType) {
                 Text("Hourly").tag("hourly")
                 Text("Daily").tag("daily")
@@ -158,7 +159,7 @@ struct ContractDrawerView: View {
     private var rateFields: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
-                SectionHeader(title: "Rate amount")
+                SectionHeaderLabel("Rate amount")
                 TextField("e.g. 1500", text: $store.rateAmountText)
                     .keyboardType(.decimalPad)
                     .padding(12)
@@ -168,7 +169,7 @@ struct ContractDrawerView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                SectionHeader(title: "Hours per day")
+                SectionHeaderLabel("Hours per day")
                 TextField("e.g. 8", text: $store.hoursPerDayText)
                     .keyboardType(.decimalPad)
                     .padding(12)
@@ -181,7 +182,7 @@ struct ContractDrawerView: View {
 
     private var mdLimitField: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SectionHeader(title: "MD limit (optional)")
+            SectionHeaderLabel("MD limit (optional)")
             TextField("Optional", text: $store.mdLimitText)
                 .keyboardType(.decimalPad)
                 .padding(12)
@@ -195,7 +196,7 @@ struct ContractDrawerView: View {
 
     private var sharedProjectsChecklist: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SectionHeader(title: "Shared with projects (optional)")
+            SectionHeaderLabel("Shared with projects (optional)")
             VStack(spacing: 0) {
                 ForEach(Array(shareableProjects.enumerated()), id: \.element.id) { index, project in
                     Toggle(isOn: sharedBinding(for: project.id)) {

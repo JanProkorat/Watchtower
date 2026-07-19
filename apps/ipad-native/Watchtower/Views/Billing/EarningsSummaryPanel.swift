@@ -5,8 +5,8 @@ import WatchtowerCore
 /// `packages/module-timetracker/src/billing/reports/EarningsSummaryPanel.tsx`).
 /// Value-only, no store — same 2×2 stat tiles + per-project earnings
 /// breakdown as the iPhone panel. The enclosing `ReportsView` supplies the
-/// outer `contentCard()` for the whole panel, so the per-project list here
-/// is a plain `VStack` (not a nested `GlassCard`/`contentCard`) and the stat
+/// outer `glassCard()` for the whole panel, so the per-project list here
+/// is a plain `VStack` (not a nested `GlassCard`/`glassCard`) and the stat
 /// tiles use the iPad design system's flat fill (matching `DashboardView`'s
 /// `KpiMini`) instead of the iPhone's `.ultraThinMaterial`.
 struct EarningsSummaryPanel: View {

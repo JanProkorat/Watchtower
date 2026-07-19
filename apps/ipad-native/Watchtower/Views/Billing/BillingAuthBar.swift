@@ -9,7 +9,7 @@ import WatchtowerCore
 /// presents a login sheet bound to the same `AuthFeature` store the iPhone
 /// app gates its whole shell with; here it's just a convenience to restore
 /// sync, adapted from `apps/iphone-native/Watchtower/Views/AuthView.swift`
-/// for the iPad design system (`contentCard`/`floatingGlass`, not
+/// for the iPad design system (`glassCard`/`floatingGlass`, not
 /// `GlassCard`/`.ultraThinMaterial`).
 struct BillingAuthBar: View {
     @Bindable var store: StoreOf<AuthFeature>
@@ -61,12 +61,12 @@ private struct BillingSignInSheet: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .padding(12)
-                        .contentCard(cornerRadius: 12)
+                        .glassCard(cornerRadius: 12)
 
                     SecureField("Password", text: $store.password)
                         .textContentType(.password)
                         .padding(12)
-                        .contentCard(cornerRadius: 12)
+                        .glassCard(cornerRadius: 12)
 
                     if let error = store.errorMessage {
                         Text(error).font(.footnote).foregroundStyle(.red)

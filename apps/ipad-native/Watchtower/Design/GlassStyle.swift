@@ -69,10 +69,10 @@ extension View {
 /// Uppercase section header used across every screen (KPI groups, contract
 /// lists, dashboard sections) — canonical cross-module equivalent of
 /// `glass.ts`-driven web `SectionHeader` styling (11px bold, 0.8 kerning,
-/// uppercase, muted text, 8pt bottom padding). A `SectionHeader` view already
-/// exists in `Views/Billing` (Phase 5, per-file style); this is added
-/// alongside it without breaking existing call sites — consolidation is a
-/// later design-align task.
+/// uppercase, muted text, 8pt bottom padding). The Billing module's earlier,
+/// per-file `SectionHeader` (Phase 5) has been fully migrated to this type
+/// and removed (design-align cleanup) — this is now the only section-label
+/// view in the app.
 struct SectionHeaderLabel: View {
     private let title: String
 

@@ -109,8 +109,6 @@ private struct ReportsStackView: View {
         .sheet(item: $reports.scope(state: \.projectDetail, action: \.projectDetail)) { detailStore in
             NavigationStack {
                 ProjectDetailView(store: detailStore, billing: billing)
-                    .navigationTitle("Project")
-                    .navigationBarTitleDisplayMode(.inline)
             }
         }
     }
