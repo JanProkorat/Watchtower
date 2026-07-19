@@ -29,6 +29,8 @@ targets:
         product: WatchtowerRemote
       - package: RoyalVNCKit
         product: RoyalVNCKit
+        embed: true
+        codeSign: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.greencode.watchtower.ipados
