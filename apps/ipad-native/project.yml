@@ -9,6 +9,9 @@ packages:
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm
     from: "1.14.0"
+  RoyalVNCKit:
+    url: https://github.com/royalapplications/royalvnc
+    revision: 337197afdb32020d3dfdb7d058989115b740cdc4
 targets:
   Watchtower:
     type: application
@@ -22,6 +25,12 @@ targets:
         product: WatchtowerBridge
       - package: SwiftTerm
         product: SwiftTerm
+      - package: WatchtowerCore
+        product: WatchtowerRemote
+      - package: RoyalVNCKit
+        product: RoyalVNCKit
+        embed: true
+        codeSign: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.greencode.watchtower.ipados
