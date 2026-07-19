@@ -22,15 +22,47 @@ struct BillingView: View {
             if !store.authPresent {
                 BillingAuthBar(store: store.scope(state: \.auth, action: \.auth))
             }
-            detail
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            BillingRouterView(
+                store: store,
+                billing: store.scope(state: \.billing, action: \.billing),
+                records: store.scope(state: \.records, action: \.records)
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+}
+
+/// Split into its own type so `records` can be `@Bindable` — required for
+/// the `$records.scope(state:action:)` sheet-presentation bindings for the
+/// worklog/task editor forms, which a computed (non-stored) property can't
+/// carry. Mirrors the split the old (now-deleted) `RecordsView.swift`'s
+/// `RecordsSwitcherView` used for the same reason.
+///
+/// Hosting the two sheets here — once, at the router level, covering every
+/// case — matters: the first cut of this router dropped `RecordsView` (and
+/// its `.sheet(item:)` pair) entirely, orphaning
+/// `records.worklogForm`/`records.taskForm`. `WorklogListView`
+/// (addWorklogTapped/worklogRowTapped), `TaskGridView` (gridCellTapped), and
+/// `TaskListView` (addTaskTapped/taskRowTapped) still set that presentation
+/// state — with no sheet bound to it, tapping "+" or a row/cell silently did
+/// nothing. Builds green regardless, because the state itself is
+/// well-typed; it just had no presenter.
+private struct BillingRouterView: View {
+    let store: StoreOf<IPadAppFeature>
+    let billing: StoreOf<BillingFeature>
+    @Bindable var records: StoreOf<RecordsFeature>
+
+    var body: some View {
+        detail
+            .sheet(item: $records.scope(state: \.worklogForm, action: \.worklogForm)) { formStore in
+                WorklogFormView(store: formStore)
+            }
+            .sheet(item: $records.scope(state: \.taskForm, action: \.taskForm)) { formStore in
+                TaskFormView(store: formStore)
+            }
     }
 
     @ViewBuilder private var detail: some View {
-        let billing = store.scope(state: \.billing, action: \.billing)
-        let records = store.scope(state: \.records, action: \.records)
-
         switch store.billingSection {
         case .earnings:
             EarningsView(store: store)
