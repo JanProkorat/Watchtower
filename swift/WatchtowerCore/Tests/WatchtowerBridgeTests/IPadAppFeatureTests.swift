@@ -112,6 +112,23 @@ final class IPadAppFeatureTests: XCTestCase {
         }
     }
 
+    func testBillingSectionSelected() async {
+        let store = TestStore(initialState: IPadAppFeature.State()) {
+            IPadAppFeature()
+        }
+        // Earnings: activates Billing, sets the section, does NOT touch records.
+        await store.send(.billingSectionSelected(.earnings)) {
+            $0.selectedModule = .billing
+            $0.billingSection = .earnings
+        }
+        // A records-backed sub-item also syncs RecordsFeature.section so the
+        // reused Phase-5 sub-view renders the matching content.
+        await store.send(.billingSectionSelected(.recordsGrid)) {
+            $0.billingSection = .recordsGrid
+            $0.records.section = .grid
+        }
+    }
+
     func testSignOutCallsSupabase() async {
         let signedOut = LockIsolated(false)
         let store = TestStore(initialState: IPadAppFeature.State()) {
