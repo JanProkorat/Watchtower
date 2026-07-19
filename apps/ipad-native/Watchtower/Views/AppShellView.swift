@@ -35,7 +35,7 @@ struct AppShellView: View {
         case .remote:
             RemoteView(store: remoteStore)
         case .billing:
-            PlaceholderView(title: "Billing", subtitle: "Billing arrives in Phase 5")
+            BillingView(store: store)
         case .settings:
             SettingsView(store: store)
         }
