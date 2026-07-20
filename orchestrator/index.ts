@@ -75,7 +75,7 @@ import { mergeGithubPr, mergeAzdoPr } from './services/prWatch/merge.js';
 import { PrWatcher } from './services/prWatch/PrWatcher.js';
 import { githubWatched, azdoWatched } from './services/prWatch/queries.js';
 import { resolveGithubLogin, resolveAzdoUser } from './services/prWatch/identity.js';
-import { prepareImplementLaunch } from './services/prImplement.js';
+import { prepareImplementLaunch, safeRemoveWorktree } from './services/prImplement.js';
 import { defaultExec } from './services/prProviders/exec.js';
 import { PrWatchStateRepo } from './db/repositories/prWatchState.js';
 import { buildInbox, markPrSeen } from './services/prWatch/inbox.js';
@@ -856,7 +856,17 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'removeInstance': {
       const removedId = req.payload.instanceId;
+      const worktreePath = repo().get(removedId)?.worktreePath ?? null;
       disposeInstanceRow(removedId);
+      // Fire-and-forget: clean up a dedicated implement-session worktree (if
+      // any) now that the instance row is gone. NON-force removal — git
+      // refuses when there are uncommitted changes, so nothing is discarded;
+      // committed work survives on the branch regardless. Must not block the
+      // removal response, hence `void`.
+      void safeRemoveWorktree(worktreePath, {
+        exec: (cmd, args) => defaultExec(cmd, args),
+        warn: (msg) => console.warn('[prImplement] worktree cleanup:', msg),
+      });
       // Notify all clients so they refetch and drop the removed instance.
       // Clients refetch the instance list on any stateChanged; without this the
       // removed instance lingers in stale lists (e.g. the iPad's project

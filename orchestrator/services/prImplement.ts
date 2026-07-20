@@ -102,3 +102,21 @@ export async function prepareImplementLaunch(
   const prompt = buildImplementPrompt(pr, threads);
   return { worktreePath, prompt, commentCount: threads.length };
 }
+
+/**
+ * Remove an implement-session worktree when its instance is removed. NON-force:
+ * git refuses if the worktree has uncommitted changes, so nothing uncommitted is
+ * ever discarded. Committed work survives regardless (it lives on the branch, not
+ * the worktree). On failure we warn with the path and leave the worktree in place.
+ */
+export async function safeRemoveWorktree(
+  worktreePath: string | null,
+  deps: { exec: (cmd: string, args: string[]) => Promise<string>; warn: (msg: string) => void },
+): Promise<void> {
+  if (!worktreePath) return;
+  try {
+    await deps.exec('git', ['-C', worktreePath, 'worktree', 'remove', worktreePath]);
+  } catch {
+    deps.warn(`Left the worktree at ${worktreePath} (it has uncommitted changes or could not be removed). Remove it manually when done.`);
+  }
+}
