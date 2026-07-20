@@ -138,8 +138,10 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
     try {
       const { instanceId } = await implementComments(pr);
       if (instanceId) onImplementLaunched(instanceId);
-    } catch (e) {
-      showError(e instanceof Error ? e.message : String(e));
+    } catch {
+      // invoke() already surfaced the failure via a global error toast (repo
+      // CLAUDE.md "Surfacing IPC errors"); the catch exists only so the void'd
+      // click promise doesn't reject unhandled — the finally resets the spinner.
     } finally {
       setImplementing(false);
     }
