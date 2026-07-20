@@ -99,6 +99,59 @@ export function useReviews() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ─── Live updates (no manual Refresh needed) ───
+  // Two triggers keep the list current on their own:
+  //   1. prWatchEvent — pushed by the orchestrator's PR-watch poller the moment
+  //      it detects a new comment / review / approval / changes-requested on a
+  //      watched PR (orchestrator/index.ts `startPrWatch`). Same push the
+  //      notification badge rides (usePrWatch).
+  //   2. an adaptive interval (60s focused / 300s unfocused, mirroring the
+  //      poller) — a backstop that also catches what prWatchEvent does NOT emit:
+  //      brand-new PRs appearing and PRs merged/closed by someone else.
+  // Both go through backgroundRefresh: it re-fetches like the Refresh button but
+  // WITHOUT flipping `loading` (which would disable the button and flash the
+  // empty-state spinner every cycle) and WITHOUT toasting on a transient failure
+  // (a background poll must stay quiet; the next cycle retries). Concurrent
+  // triggers are coalesced — a burst of pushes from one poll cycle does a single
+  // extra fetch, never one per event.
+  const bgBusyRef = useRef(false);
+  const bgQueuedRef = useRef(false);
+  const backgroundRefresh = useCallback(async (): Promise<void> => {
+    if (bgBusyRef.current) { bgQueuedRef.current = true; return; }
+    bgBusyRef.current = true;
+    try {
+      const res = await invoke('prs:refresh', {}, { silent: true });
+      setPullRequests(res.pullRequests);
+      setSyncedAt(res.syncedAt);
+    } catch {
+      // Background poll: swallow. A manual Refresh still surfaces errors loudly.
+    } finally {
+      bgBusyRef.current = false;
+      if (bgQueuedRef.current) { bgQueuedRef.current = false; void backgroundRefresh(); }
+    }
+  }, []);
+
+  useEffect(() => {
+    const off = window.watchtower.on('prWatchEvent', () => { void backgroundRefresh(); });
+    return () => { off(); };
+  }, [backgroundRefresh]);
+
+  useEffect(() => {
+    const FOCUSED_MS = 60_000;
+    const UNFOCUSED_MS = 300_000;
+    const isFocused = () =>
+      typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Self-rescheduling so the cadence re-evaluates focus each tick. First fire
+    // is after the interval (mount already loaded above), not immediately.
+    function tick(): void {
+      void backgroundRefresh();
+      timer = setTimeout(tick, isFocused() ? FOCUSED_MS : UNFOCUSED_MS);
+    }
+    timer = setTimeout(tick, isFocused() ? FOCUSED_MS : UNFOCUSED_MS);
+    return () => { if (timer) clearTimeout(timer); };
+  }, [backgroundRefresh]);
   // Squash-merge a PR (Task 11's Merge button). electron-main injects any
   // devopsPats needed for Azure DevOps — the renderer never sends them.
   const mergePr = useCallback(async (host: PrHost, repoKey: string, prNumber: number, deleteBranch: boolean): Promise<void> => {
