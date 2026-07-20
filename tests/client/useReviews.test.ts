@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { groupPrsByProject, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex, useReviews } from '../../apps/desktop/src/state/useReviews.js';
+import { groupPrsByProject, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex, useReviews, countImplementableComments } from '../../apps/desktop/src/state/useReviews.js';
 import { toast } from '../../apps/desktop/src/state/useToast';
 import type { PrFindingPayload } from '../../packages/shared/src/ipcContract.js';
 
@@ -202,5 +202,37 @@ describe('useReviews live updates', () => {
     const refreshCalls = wt.invoke.mock.calls.filter((c) => c[0] === 'prs:refresh').length;
     expect(refreshCalls).toBeGreaterThanOrEqual(1);
     expect(refreshCalls).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('countImplementableComments', () => {
+  const t = (o: any = {}) => ({ id: 'x', file: 'a.ts', line: 1, status: null, comments: [{ author: 'r', date: 'x', body: 'b' }], ...o });
+  it('counts code-anchored, unresolved threads only', () => {
+    expect(countImplementableComments([
+      t(), t({ id: 'g', file: null, line: null }), t({ id: 'f', status: 'fixed' }), t({ id: 'a', status: 'active' }),
+    ])).toBe(2); // default-null + active
+  });
+});
+
+describe('useReviews implementComments', () => {
+  beforeEach(() => {
+    (globalThis as any).window = (globalThis as any).window ?? {};
+    (window as any).watchtower = {
+      invoke: vi.fn(async (kind: string) => {
+        if (kind === 'prs:list' || kind === 'prs:refresh') return { pullRequests: [], syncedAt: 'x', warnings: [] };
+        if (kind === 'prReview:list') return { reviews: [] };
+        if (kind === 'prImplement:start') return { instanceId: 'inst-1', worktreePath: '/w' };
+        return {};
+      }),
+      on: vi.fn(() => () => {}),
+    };
+  });
+  it('invokes prImplement:start with host/repoKey/prNumber and returns the payload', async () => {
+    const { result } = renderHook(() => useReviews());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const out = await act(async () => result.current.implementComments(
+      { host: 'github', repoKey: 'gh:a/b', number: 5 } as any));
+    expect((window as any).watchtower.invoke).toHaveBeenCalledWith('prImplement:start', { host: 'github', repoKey: 'gh:a/b', prNumber: 5 });
+    expect(out).toEqual({ instanceId: 'inst-1', worktreePath: '/w' });
   });
 });

@@ -62,6 +62,15 @@ export function applyPrFilter(prs: PullRequestPayload[], host: HostFilter, query
       || String(p.number).includes(q)));
 }
 
+const RESOLVED_STATUSES = new Set(['fixed', 'closed']);
+// Client-side count for the drawer button badge: code-anchored + unresolved.
+// The authorship ("from others") filter runs server-side, where the login is
+// known — so this may slightly over-count on GitHub; that is acceptable for a
+// badge and the server refuses launches with zero qualifying comments.
+export function countImplementableComments(threads: PrCommentThreadPayload[]): number {
+  return threads.filter((t) => t.file != null && t.line != null && !(t.status != null && RESOLVED_STATUSES.has(t.status))).length;
+}
+
 export function relativeAge(iso: string, nowMs: number): string {
   const diff = nowMs - Date.parse(iso);
   if (diff < 60_000) return 'just now';
@@ -187,6 +196,13 @@ export function useReviews() {
   const loadComments = useCallback(async (pr: PullRequestPayload): Promise<PrCommentThreadPayload[]> => {
     const res = await invoke('prs:comments', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
     return res.threads;
+  }, []);
+
+  // Kick off the "implement review comments" agent: a new instance in a fresh
+  // worktree that addresses code-anchored, unresolved review comments. The
+  // orchestrator applies the authoritative (authorship + resolved) filter.
+  const implementComments = useCallback(async (pr: PullRequestPayload): Promise<{ instanceId: string | null; worktreePath: string | null }> => {
+    return invoke('prImplement:start', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
   }, []);
 
   // ─── PR review agent (Report tab) ───
@@ -321,7 +337,7 @@ export function useReviews() {
 
   return {
     pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr, closePr,
-    fetchReviewState, approvePr,
+    fetchReviewState, approvePr, implementComments,
     review, reviewRunning, openReviewFor, runReview, startReview, cancelReview, getReview, listReviews, latestReviewFor,
     reviewStateFor, postComments,
   };
