@@ -25,6 +25,7 @@ function baseRow(over: Partial<InstanceRow>): InstanceRow {
     argsJson: null,
     kind: 'claude',
     taskId: null,
+    worktreePath: null,
     ...over,
   };
 }

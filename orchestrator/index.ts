@@ -804,6 +804,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           argsJson: req.payload.args ? JSON.stringify(req.payload.args) : null,
           kind: instanceKind,
           taskId: null,
+          worktreePath: null,
         });
         spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [], kind: instanceKind });
         return { instanceId: id };

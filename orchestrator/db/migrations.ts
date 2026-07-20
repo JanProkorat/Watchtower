@@ -502,6 +502,18 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       db.exec(`CREATE INDEX IF NOT EXISTS idx_notes_sort ON notes(pinned, due_date)`);
     },
   },
+  {
+    version: 25,
+    up: (db: SqliteLike) => {
+      // Constant default (NULL) only — a non-constant ADD COLUMN default diverges
+      // between node:sqlite (tests) and better-sqlite3 (prod). Nullable: only the
+      // Reviews "implement review comments" agent sets it; every other instance
+      // (interactive spawns, shells) leaves it NULL. Guarded via addColumnIfMissing
+      // (not a raw ALTER TABLE) so a replay-from-behind-latest doesn't die on
+      // "duplicate column name" — see the v13-replay regression test.
+      addColumnIfMissing(db, 'instances', 'worktree_path', 'TEXT');
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

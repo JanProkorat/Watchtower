@@ -42,7 +42,7 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(24);
+    expect(version.v).toBe(25);
   });
 
   it('v12 adds task_id column to instances', () => {
@@ -175,7 +175,7 @@ describe('migrations', () => {
     db.exec('DELETE FROM schema_version WHERE version > 12');
     expect(() => runMigrations(db as unknown as SqliteLike)).not.toThrow();
     const v = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(v.v).toBe(24);
+    expect(v.v).toBe(25);
   });
 
   it('v13 backfills sync_id + updated_at on pre-existing rows', () => {

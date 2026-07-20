@@ -24,7 +24,8 @@ function makeInstance(over: Partial<InstanceRow> = {}): InstanceRow {
     id: 'inst-1', cwd: '/work/alpha', status: 'finished',
     claudeSessionId: null, spawnedAt: T, lastActivityAt: T, exitCode: 0,
     terminationReason: 'session-end', resumedFromInstanceId: null,
-    jiraKeyHint: null, argsJson: null, kind: 'claude', taskId: null, ...over,
+    jiraKeyHint: null, argsJson: null, kind: 'claude', taskId: null,
+    worktreePath: null, ...over,
   };
 }
 
