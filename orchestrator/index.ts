@@ -75,6 +75,8 @@ import { mergeGithubPr, mergeAzdoPr } from './services/prWatch/merge.js';
 import { PrWatcher } from './services/prWatch/PrWatcher.js';
 import { githubWatched, azdoWatched } from './services/prWatch/queries.js';
 import { resolveGithubLogin, resolveAzdoUser } from './services/prWatch/identity.js';
+import { prepareImplementLaunch } from './services/prImplement.js';
+import { defaultExec } from './services/prProviders/exec.js';
 import { PrWatchStateRepo } from './db/repositories/prWatchState.js';
 import { buildInbox, markPrSeen } from './services/prWatch/inbox.js';
 import type { WatchedPr, WatchEvent } from './services/prWatch/types.js';
@@ -1489,12 +1491,43 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       return { reviewId: id };
     }
 
-    // Stub: the exhaustive switch over OrchRequest['kind'] requires this case
-    // to exist as soon as 'prImplement:start' is added to the shared IPC
-    // contract, but the real handler (worktree + agent spawn) is a later
-    // task. Placeholder keeps `handleRequest` type-checking in the meantime.
-    case 'prImplement:start':
-      return { instanceId: null, worktreePath: null, error: 'not implemented' };
+    case 'prImplement:start': {
+      const p = req.payload;
+      // Reuse the review resolver to get the local clone path + the PR's source
+      // branch (it also fetches, harmlessly). Then resolve the repoLabel for the
+      // prompt from resolveRepos().
+      const target = await reviewsSvc().resolveRepoAndPr(p.host, p.repoKey, p.prNumber);
+      if (!target) throw new Error(`Cannot resolve repo/PR: ${p.host}:${p.repoKey}#${p.prNumber}`);
+      const { github, azdo } = await reviewsSvc().resolveRepos();
+      const repoCfg = (p.host === 'github' ? github : azdo).find((r) => r.repoKey === p.repoKey);
+      const baseDir = path.join(homedir(), '.watchtower', 'worktrees');
+      const launch = await prepareImplementLaunch(
+        { host: p.host, repoKey: p.repoKey, number: p.prNumber, title: target.pr.title,
+          repoLabel: repoCfg?.repoLabel ?? '', sourceBranch: target.pr.sourceBranch, clonePath: target.clonePath },
+        {
+          exec: (cmd, args) => defaultExec(cmd, args),
+          fetchComments: () => reviewsSvc().comments(p.host, p.repoKey, p.prNumber, p.devopsPats),
+          // github author = login (reliable). azdo authors are display names, not
+          // reliably comparable — skip the authorship filter there.
+          resolveMyAuthor: async () => (p.host === 'github' ? await resolveGithubLogin().catch(() => null) : null),
+          ensureDir: (dir) => { mkdirSync(dir, { recursive: true }); },
+          baseDir,
+        },
+      );
+      // Spawn an interactive claude in the worktree, seeded with the prompt as a
+      // positional arg (stays interactive; default permission mode asks before edits).
+      const id = randomUUID();
+      const now = Date.now();
+      repo().insert({
+        id, cwd: launch.worktreePath, status: 'spawning', claudeSessionId: id,
+        spawnedAt: now, lastActivityAt: now, exitCode: null, terminationReason: null,
+        resumedFromInstanceId: null, jiraKeyHint: null,
+        argsJson: JSON.stringify([launch.prompt]), kind: 'claude', taskId: null,
+        worktreePath: launch.worktreePath,
+      });
+      spawnPtyForInstance({ id, cwd: launch.worktreePath, extraArgs: [launch.prompt], kind: 'claude' });
+      return { instanceId: id, worktreePath: launch.worktreePath };
+    }
 
     case 'prReview:get': {
       const row = prReviewsRepo().get(req.payload.reviewId);
