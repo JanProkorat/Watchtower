@@ -6,9 +6,9 @@ import { CommentThread, newestThreadId } from './CommentThread.js';
 import { ReviewReport } from './ReviewReport.js';
 import { MergeButton } from './MergeButton.js';
 import { useToast } from '../../state/useToast.js';
-import type { PrReviewState } from '../../state/useReviews.js';
+import { countImplementableComments, type PrReviewState } from '../../state/useReviews.js';
 
-export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments, mergePr, closePr, fetchReviewState, approvePr, focusComments = false }: {
+export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review, reviewRunning, openReviewFor, runReview, cancelReview, postComments, mergePr, closePr, fetchReviewState, approvePr, implementComments, onImplementLaunched, focusComments = false }: {
   pr: PullRequestPayload | null; onClose(): void;
   /** Opened from a notification — jump to the Comments tab and highlight the newest thread. */
   focusComments?: boolean;
@@ -24,6 +24,8 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   closePr(host: PullRequestPayload['host'], repoKey: string, prNumber: number): Promise<void>;
   fetchReviewState(host: PullRequestPayload['host'], repoKey: string, number: number): Promise<PrReviewState>;
   approvePr(host: PullRequestPayload['host'], repoKey: string, number: number): Promise<void>;
+  implementComments(pr: PullRequestPayload): Promise<{ instanceId: string | null; worktreePath: string | null }>;
+  onImplementLaunched(instanceId: string): void;
 }): JSX.Element {
   const [tab, setTab] = useState(0);
   const [files, setFiles] = useState<DiffFilePayload[]>([]);
@@ -36,7 +38,9 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   // second executes; arming auto-reverts after 3s if not confirmed.
   const [closeArmed, setCloseArmed] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [implementing, setImplementing] = useState(false);
   const { showError } = useToast();
+  const implementCount = countImplementableComments(threads);
 
   useEffect(() => {
     if (!closeArmed) return;
@@ -128,6 +132,19 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
     }
   };
 
+  const handleImplement = async (): Promise<void> => {
+    if (!pr) return;
+    setImplementing(true);
+    try {
+      const { instanceId } = await implementComments(pr);
+      if (instanceId) onImplementLaunched(instanceId);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImplementing(false);
+    }
+  };
+
   return (
     <Drawer anchor="right" open={pr != null} onClose={onClose} PaperProps={{ sx: { width: 'min(1200px, 92vw)', maxWidth: '92vw', display: 'flex', flexDirection: 'column' } }}>
       {pr && (
@@ -153,6 +170,14 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
               <Button variant="outlined" size="small" color="error" disabled={closing}
                 onClick={() => void handleClose()} sx={{ mr: 1 }}>
                 {closeArmed ? 'Confirm close?' : pr.host === 'github' ? 'Close PR' : 'Abandon PR'}
+              </Button>
+            )}
+            {/* Launches the implement-comments agent — author-only, and only when
+                there's at least one implementable review comment to act on. */}
+            {reviewState?.amIAuthor && implementCount > 0 && (
+              <Button variant="outlined" size="small" disabled={implementing}
+                onClick={() => void handleImplement()} sx={{ mr: 1 }}>
+                Fix with agent ({implementCount})
               </Button>
             )}
             {/* Hidden on my own PRs — GitHub rejects self-approval and ADO's is
