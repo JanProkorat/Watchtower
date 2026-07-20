@@ -1518,15 +1518,35 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       // positional arg (stays interactive; default permission mode asks before edits).
       const id = randomUUID();
       const now = Date.now();
-      repo().insert({
-        id, cwd: launch.worktreePath, status: 'spawning', claudeSessionId: id,
-        spawnedAt: now, lastActivityAt: now, exitCode: null, terminationReason: null,
-        resumedFromInstanceId: null, jiraKeyHint: null,
-        argsJson: JSON.stringify([launch.prompt]), kind: 'claude', taskId: null,
-        worktreePath: launch.worktreePath,
-      });
-      spawnPtyForInstance({ id, cwd: launch.worktreePath, extraArgs: [launch.prompt], kind: 'claude' });
-      return { instanceId: id, worktreePath: launch.worktreePath };
+      try {
+        repo().insert({
+          id, cwd: launch.worktreePath, status: 'spawning', claudeSessionId: id,
+          spawnedAt: now, lastActivityAt: now, exitCode: null, terminationReason: null,
+          resumedFromInstanceId: null, jiraKeyHint: null,
+          argsJson: JSON.stringify([launch.prompt]), kind: 'claude', taskId: null,
+          worktreePath: launch.worktreePath,
+        });
+        spawnPtyForInstance({ id, cwd: launch.worktreePath, extraArgs: [launch.prompt], kind: 'claude' });
+        return { instanceId: id, worktreePath: launch.worktreePath };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[orchestrator] prImplement:start failed:', message);
+        try {
+          repo().updateStatus(id, 'crashed', Date.now());
+          repo().setTermination(id, 'crash', null);
+        } catch {
+          /* row may not have been inserted yet */
+        }
+        // Best-effort: the worktree was already created by prepareImplementLaunch
+        // above; if the spawn itself failed, remove it so a re-run isn't blocked
+        // by "branch already checked out elsewhere".
+        try {
+          await defaultExec('git', ['-C', launch.worktreePath, 'worktree', 'remove', '--force', launch.worktreePath]);
+        } catch {
+          /* ignore */
+        }
+        throw err;
+      }
     }
 
     case 'prReview:get': {
