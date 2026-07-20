@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { filterImplementComments, buildImplementPrompt, sanitizeSlug, worktreePathFor } from '../../orchestrator/services/prImplement.js';
+import { filterImplementComments, buildImplementPrompt, sanitizeSlug, worktreePathFor, prepareImplementLaunch } from '../../orchestrator/services/prImplement.js';
 
 const thread = (o: Partial<any> = {}) => ({
   id: 't', file: 'src/a.ts', line: 10, status: null,
@@ -51,5 +51,46 @@ describe('worktreePathFor / sanitizeSlug', () => {
   it('sanitizes repoKey and builds a stable path', () => {
     expect(sanitizeSlug('azdo:dev.azure.com/o/r')).toBe('azdo-dev.azure.com-o-r');
     expect(worktreePathFor('/base', 'gh:acme/w', 7)).toBe('/base/gh-acme-w-pr7');
+  });
+});
+
+describe('prepareImplementLaunch', () => {
+  const basePr = { host: 'github' as const, repoKey: 'gh:acme/w', number: 7, title: 'Add widget', repoLabel: 'Spot', sourceBranch: 'feat/widget', clonePath: '/repo' };
+  const okThreads = [{ id: 't', file: 'src/a.ts', line: 3, status: null, comments: [{ author: 'rev', date: 'x', body: 'fix' }] }];
+
+  it('fetches the source branch and adds a worktree on it, returning prompt + path', async () => {
+    const calls: string[][] = [];
+    const launch = await prepareImplementLaunch(basePr, {
+      exec: async (cmd, args) => { calls.push([cmd, ...args]); return ''; },
+      fetchComments: async () => okThreads as any,
+      resolveMyAuthor: async () => 'me',
+      ensureDir: () => {},
+      baseDir: '/base',
+    });
+    expect(launch.worktreePath).toBe('/base/gh-acme-w-pr7');
+    expect(launch.commentCount).toBe(1);
+    expect(launch.prompt).toContain('src/a.ts');
+    // git fetch origin feat/widget
+    expect(calls.some((c) => c.join(' ') === 'git -C /repo fetch --no-tags --force origin feat/widget')).toBe(true);
+    // git worktree add <path> feat/widget  (no -B: never resets an existing local branch)
+    expect(calls.some((c) => c.join(' ') === 'git -C /repo worktree add /base/gh-acme-w-pr7 feat/widget')).toBe(true);
+  });
+
+  it('throws when there are no qualifying comments (nothing to implement)', async () => {
+    await expect(prepareImplementLaunch(basePr, {
+      exec: async () => '',
+      fetchComments: async () => [{ id: 'g', file: null, line: null, status: null, comments: [{ author: 'rev', date: 'x', body: 'lgtm' }] }] as any,
+      resolveMyAuthor: async () => 'me',
+      ensureDir: () => {}, baseDir: '/base',
+    })).rejects.toThrow(/no unresolved code comments/i);
+  });
+
+  it('propagates a git worktree-add failure (e.g. branch already checked out)', async () => {
+    await expect(prepareImplementLaunch(basePr, {
+      exec: async (_cmd, args) => { if (args.includes('add')) throw new Error("fatal: 'feat/widget' is already checked out"); return ''; },
+      fetchComments: async () => okThreads as any,
+      resolveMyAuthor: async () => 'me',
+      ensureDir: () => {}, baseDir: '/base',
+    })).rejects.toThrow(/already checked out/);
   });
 });

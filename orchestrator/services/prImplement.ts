@@ -71,3 +71,34 @@ export function buildImplementPrompt(
     `- Then ASK the user before running \`git push\` (it updates the live PR). Never force-push.`,
   ].join('\n');
 }
+
+export interface PrepareImplementDeps {
+  exec: (cmd: string, args: string[]) => Promise<string>;
+  fetchComments: () => Promise<PrCommentThreadPayload[]>;
+  resolveMyAuthor: () => Promise<string | null>;
+  ensureDir: (dir: string) => void;
+  baseDir: string;
+}
+export interface ImplementLaunch { worktreePath: string; prompt: string; commentCount: number; }
+
+export async function prepareImplementLaunch(
+  pr: { host: 'github' | 'azdo'; repoKey: string; number: number; title: string; repoLabel: string; sourceBranch: string; clonePath: string },
+  deps: PrepareImplementDeps,
+): Promise<ImplementLaunch> {
+  const myAuthor = await deps.resolveMyAuthor().catch(() => null);
+  const threads = filterImplementComments(await deps.fetchComments(), myAuthor);
+  if (threads.length === 0) {
+    throw new Error('This PR has no unresolved code comments to implement.');
+  }
+  const worktreePath = worktreePathFor(deps.baseDir, pr.repoKey, pr.number);
+  deps.ensureDir(deps.baseDir);
+  // Fetch the source branch, then check it out in a fresh worktree. No -B: we
+  // never reset an existing local branch (that could drop the user's commits);
+  // plain `worktree add <path> <branch>` reuses the local branch if present,
+  // else creates it tracking origin/<branch>. Fails if the branch is already
+  // checked out elsewhere — surfaced to the user verbatim.
+  await deps.exec('git', ['-C', pr.clonePath, 'fetch', '--no-tags', '--force', 'origin', pr.sourceBranch]);
+  await deps.exec('git', ['-C', pr.clonePath, 'worktree', 'add', worktreePath, pr.sourceBranch]);
+  const prompt = buildImplementPrompt(pr, threads);
+  return { worktreePath, prompt, commentCount: threads.length };
+}
