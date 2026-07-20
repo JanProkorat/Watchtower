@@ -1489,6 +1489,13 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       return { reviewId: id };
     }
 
+    // Stub: the exhaustive switch over OrchRequest['kind'] requires this case
+    // to exist as soon as 'prImplement:start' is added to the shared IPC
+    // contract, but the real handler (worktree + agent spawn) is a later
+    // task. Placeholder keeps `handleRequest` type-checking in the meantime.
+    case 'prImplement:start':
+      return { instanceId: null, worktreePath: null, error: 'not implemented' };
+
     case 'prReview:get': {
       const row = prReviewsRepo().get(req.payload.reviewId);
       return { review: row ? reviewPayloadOf(row) : null };

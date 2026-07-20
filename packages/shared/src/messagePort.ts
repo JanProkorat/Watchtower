@@ -152,6 +152,16 @@ export type OrchRequest =
       kind: 'prReview:start';
       payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number };
     }
+  | {
+      id: string;
+      kind: 'prImplement:start';
+      payload: {
+        host: import('./ipcContract.js').PrHost;
+        repoKey: string;
+        prNumber: number;
+        devopsPats?: Record<string, string>;
+      };
+    }
   | { id: string; kind: 'prReview:get'; payload: { reviewId: number } }
   | { id: string; kind: 'prReview:list'; payload: { repoKey?: string } }
   | { id: string; kind: 'prReview:cancel'; payload: { reviewId: number } }
@@ -685,6 +695,10 @@ export type OrchResponse =
       payload: { host: 'github' | 'azdo' | null; devopsHost: string | null; repoLabel: string | null };
     }
   | { kind: 'prReview:start'; payload: { reviewId: number } }
+  | {
+      kind: 'prImplement:start';
+      payload: { instanceId: string | null; worktreePath: string | null; error?: string };
+    }
   | { kind: 'prReview:get'; payload: { review: import('./ipcContract.js').PrReviewPayload | null } }
   | { kind: 'prReview:list'; payload: { reviews: import('./ipcContract.js').PrReviewPayload[] } }
   | { kind: 'prReview:cancel'; payload: { ok: true } }
