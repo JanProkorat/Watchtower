@@ -9,7 +9,7 @@ import { fireMacNotification, fireTestNotification } from './notifications.js';
 import { runBoardSignIn } from './boardSignIn.js';
 import { setPat, patStatus, getPats } from './devopsPat.js';
 import { getCloudSyncConfig, setCloudSyncConfig } from './cloudSync.js';
-import { createOrFocusTeamsWindow, closeTeamsWindow } from './teamsWindow.js';
+import { joinMeeting, focusCall, closeTeamsWindow } from './teamsWindow.js';
 
 type DeepLinkPayload = Extract<IpcPush, { kind: 'deep-link' }>['payload'];
 
@@ -157,8 +157,12 @@ export function registerIpc(): void {
         return { ok: true };
       }
 
-      if (kind === 'teams:open') {
-        createOrFocusTeamsWindow();
+      if (kind === 'teams:joinMeeting') {
+        joinMeeting((payload as { joinUrl: string }).joinUrl);
+        return { ok: true };
+      }
+      if (kind === 'teams:focusCall') {
+        focusCall();
         return { ok: true };
       }
       if (kind === 'teams:close') {

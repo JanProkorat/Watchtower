@@ -2,8 +2,6 @@ import { BrowserWindow, session, desktopCapturer } from 'electron';
 import { deriveTeamsState } from '@watchtower/shared/teamsState.js';
 import { pushToRenderer } from './ipc.js';
 
-const TEAMS_URL = 'https://teams.microsoft.com/';
-
 // A current desktop Edge UA so Teams serves the full web app rather than its
 // "unsupported browser" fallback. Bump periodically if Teams starts degrading.
 const EDGE_UA =
@@ -22,9 +20,10 @@ function emitState(): void {
   pushToRenderer('teamsStateChanged', next);
 }
 
-export function createOrFocusTeamsWindow(): void {
+export function joinMeeting(joinUrl: string): void {
   if (teamsWindow && !teamsWindow.isDestroyed()) {
     if (teamsWindow.isMinimized()) teamsWindow.restore();
+    void teamsWindow.loadURL(joinUrl);
     teamsWindow.focus();
     emitState();
     return;
@@ -62,7 +61,7 @@ export function createOrFocusTeamsWindow(): void {
   });
 
   teamsWindow.webContents.setUserAgent(EDGE_UA);
-  void teamsWindow.loadURL(TEAMS_URL);
+  void teamsWindow.loadURL(joinUrl);
 
   // isCurrentlyAudible() is the source of truth; these events are just triggers,
   // so their exact payload shape across Electron versions does not matter.
@@ -78,6 +77,14 @@ export function createOrFocusTeamsWindow(): void {
   });
 
   emitState();
+}
+
+/** Bring an existing call window to the front (no-op if none). */
+export function focusCall(): void {
+  if (teamsWindow && !teamsWindow.isDestroyed()) {
+    if (teamsWindow.isMinimized()) teamsWindow.restore();
+    teamsWindow.focus();
+  }
 }
 
 export function closeTeamsWindow(): void {
