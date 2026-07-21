@@ -1,8 +1,126 @@
 # Teams calling integration — design
 
 **Date:** 2026-07-21
-**Status:** Approved design, pending implementation plan
-**Prototype:** `docs/prototypes/teams-integration.html`
+**Status:** ⚠️ SUPERSEDED by the "v2 revision" section below. The original
+approach (embed the full Teams web app in a dedicated window) shipped as PR #231,
+was live-reviewed, and rejected by the user: clicking the pill opened the entire
+Teams web app, which is exactly what they wanted to avoid. The v2 design replaces
+it. Read the v2 section as the authoritative design; the sections after it are
+kept only as pivot history.
+**Prototype:** `docs/prototypes/teams-integration.html` (the calendar-list popover
+mockup is now the primary UI; the embedded-window flow is obsolete).
+
+---
+
+## v2 revision (post-live-review) — AUTHORITATIVE
+
+### What the user actually wants
+
+Click the corner pill → a **compact native popover drops down below it** listing
+**today's meetings** (exactly `docs/prototypes/teams-integration.html`'s calendar
+list) → click **Join** on one → **only that meeting's call** opens. No Teams web
+app shell, ever. No always-on background process.
+
+### Data source (decided): reuse the existing `/sync-meetings` pipeline
+
+A native list needs a calendar data source. The two candidates were live in-app
+MS Graph (revived device-code OAuth + an Azure AD app registration) versus reusing
+the repo's existing `/sync-meetings` flow. **Chosen: reuse `/sync-meetings`** — no
+in-app OAuth, no Azure app registration (the user already runs `/sync-meetings`,
+which fetches calendar events through Claude's Microsoft 365 MCP connector).
+
+Accepted trade-off: the popover list is **only as fresh as the user's last
+`/sync-meetings` run** — it is NOT live/auto-refreshing, because the app itself
+cannot run the MCP fetch (`claude -p` hangs on MCP init inside the orchestrator
+subprocess — see `TaskGridView.tsx`, which is why the current "Sync meetings"
+button only copies a slash command to the clipboard).
+
+Note: the repo's in-app MS Graph integration was built and then **reverted**
+(commit `e34b4247` — "drop MS Graph approach; drive global /sync-meetings skill"),
+which is why option 2 (revive Graph) was declined — it re-adopts what was dropped.
+
+### Data pipeline (validated against the live M365 MCP)
+
+Validation (2026-07-21): `outlook_calendar_search` lists events but truncates the
+body and omits the join link; **`read_resource` on an event returns a structured
+`onlineMeeting.joinUrl`** (`https://teams.microsoft.com/l/meetup-join/...`) — the
+reliable source. Events with no `onlineMeeting` (in-person) have no join link.
+
+1. **Capture join URLs via a REPO-SCOPED refresh command (no global-tooling
+   edit):** add `.claude/commands/teams-refresh.md` (+ a small writer script)
+   inside the Watchtower repo. It fetches today's events via the M365 MCP
+   (`outlook_calendar_search`), calls `read_resource` per event to read
+   `onlineMeeting.joinUrl`, and writes the cache below. This is versioned with the
+   app and does NOT modify the user's global `~/.claude/commands/sync-meetings.*`
+   (the billing sync stays untouched). Rationale: the app cannot run the MCP itself
+   (`claude -p` hangs on MCP init in the orchestrator subprocess), so refresh is a
+   chat-run command, mirroring the existing clipboard-copy "Sync meetings" button.
+2. **Store:** a single row in the existing key-value `settings` table under key
+   `teams.meetings_today` holding `{ syncedAt: number, meetings: MeetingSummary[] }`
+   where `MeetingSummary = { id, subject, subtitle, startsAt, endsAt, joinUrl | null }`.
+   Deliberately NOT a new table/migration — ephemeral cache; the `settings` KV
+   store already holds similar markers (`timetracker_migration_status`).
+3. **Read:** a new `meetings:listToday` IPC (renderer → main → orchestrator)
+   returns `{ meetings: MeetingSummary[]; syncedAt: number | null }` (orchestrator
+   reads + parses the settings blob; empty/absent → empty list, `syncedAt: null`).
+
+### Windows & IPC (v2)
+
+- **Pill click → popover** (renderer-only; no window, no IPC to "open").
+- **`teams:joinMeeting` `{ joinUrl }`** (electron-only) → the scoped **call
+  window**: reuse the existing `electron/teamsWindow.ts` window (persistent
+  `persist:teams` partition so login sticks, Edge UA, `media` permission handler,
+  `setDisplayMediaRequestHandler`, audio-state → `teamsStateChanged` push), but it
+  now `loadURL(joinUrl)` for the specific meeting instead of the Teams app root. If
+  a call window already exists, navigate/focus it to the new join URL.
+- **`teams:close`** and the **`teamsStateChanged`** push are retained unchanged.
+- The old **`teams:open`** kind (open the full app) is **removed**.
+
+### Pill states (v2)
+
+- **Idle:** `Teams` — click toggles the meetings popover.
+- **On a call:** `On a call · MM:SS` (audio-state heuristic, unchanged from v1) —
+  the popover header shows a **"Return to call"** row that focuses the call window.
+  Clicking the pill still opens the popover.
+- The v1 "open" (window-open-but-idle) state is gone — there is no persistent
+  browse window now, only a transient call window.
+
+### The meetings popover (new UI)
+
+`MeetingsPopover` anchored below the pill (MUI `Popover`), rendering the mockup:
+"Calendar" header + account line, a per-day group, and a row per meeting
+(time range, title, subtitle, **Join** button). Empty state when the cache is
+absent/old: "No meetings — run `/sync-meetings` to refresh," with the `syncedAt`
+age shown so staleness is visible. Join → `teams:joinMeeting({ joinUrl })` +
+close popover.
+
+### What is reused vs. changed from PR #231
+
+- **Reused as-is:** `packages/shared/src/teamsState.ts` (audio-state derivation +
+  MM:SS), the `teamsStateChanged` push, the corner `TeamsPill` shell + its on-call
+  state, the `electron/teamsWindow.ts` window scaffolding (partition, UA,
+  permission handlers, audio wiring).
+- **Changed:** `teamsWindow.ts` loads a specific join URL, not the app root;
+  `teams:open` → `teams:joinMeeting { joinUrl }`; add `meetings:listToday`; the
+  pill click opens a popover instead of invoking a window; new `MeetingsPopover`;
+  extend `useTeams` to fetch meetings + expose `joinMeeting`.
+- **New external:** the `/sync-meetings` global-tooling extension (join-URL
+  capture + settings-cache write).
+
+### v2 risks
+
+- **Staleness:** the list reflects the last `/teams-refresh` run, not live state —
+  surfaced in the popover via `syncedAt` (shown as an age; empty-state prompts a
+  refresh).
+- **Join-URL availability:** only meetings with `onlineMeeting.joinUrl` get a Join
+  button; in-person/no-link events render without one.
+- **Refresh cost:** the refresh command does one `read_resource` per event to get
+  the structured join URL (search results omit it) — a handful of extra MCP calls
+  per refresh, acceptable for a day's meetings.
+- The v1 audio-state on-call heuristic and unsupported-client (Edge UA) risks
+  carry over unchanged.
+
+---
 
 ## Problem
 
