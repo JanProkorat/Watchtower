@@ -4,6 +4,7 @@ import { mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { PortApi, type OrchRequest, type OrchResponse, type OrchPush, type OrchOverlapError } from '@watchtower/shared/messagePort.js';
+import { parseMeetingsToday } from '@watchtower/shared/meetings.js';
 import { bootstrap, type BootstrapHandle } from './bootstrap.js';
 import { PtyManager } from './ptyManager.js';
 import { InstancesRepo } from './db/repositories/instances.js';
@@ -903,6 +904,11 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'getSetting': {
       const value = new SettingsRepo(handle!.db).getString(req.payload.key, '') || null;
       return { value };
+    }
+
+    case 'meetings:listToday': {
+      const raw = new SettingsRepo(handle!.db).getString('teams.meetings_today', '') || null;
+      return parseMeetingsToday(raw);
     }
 
     case 'setSetting': {
