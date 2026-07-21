@@ -87,7 +87,9 @@ export type IpcRequest =
   | { kind: 'statuslineCapture:status'; payload: Record<string, never> }
   | { kind: 'statuslineCapture:set'; payload: { enabled: boolean } }
   | { kind: 'openExternalUrl'; payload: { url: string } }
-  | { kind: 'teams:open'; payload: Record<string, never> }
+  | { kind: 'teams:joinMeeting'; payload: { joinUrl: string } }
+  | { kind: 'teams:focusCall'; payload: Record<string, never> }
+  | { kind: 'meetings:listToday'; payload: Record<string, never> }
   | { kind: 'teams:close'; payload: Record<string, never> }
   | { kind: 'terminalFocus'; payload: { instanceId: string } }
   | { kind: 'push:registerDevice'; payload: { token: string; platform: string; bundleId?: string } }
@@ -766,7 +768,9 @@ export type IpcResponse =
   | { kind: 'statuslineCapture:status'; payload: { enabled: boolean; available: boolean } }
   | { kind: 'statuslineCapture:set'; payload: { ok: boolean; changed: boolean; backupPath: string | null; error?: string } }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
-  | { kind: 'teams:open'; payload: { ok: boolean } }
+  | { kind: 'teams:joinMeeting'; payload: { ok: boolean } }
+  | { kind: 'teams:focusCall'; payload: { ok: boolean } }
+  | { kind: 'meetings:listToday'; payload: { meetings: import('./meetings.js').MeetingSummary[]; syncedAt: number | null } }
   | { kind: 'teams:close'; payload: { ok: boolean } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
   | { kind: 'push:registerDevice'; payload: { ok: true } }
@@ -991,7 +995,8 @@ export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'cloudSync:getConfig',
   'cloudSync:setConfig',
   'deepLink:ready',
-  'teams:open',
+  'teams:joinMeeting',
+  'teams:focusCall',
   'teams:close',
 ]);
 
