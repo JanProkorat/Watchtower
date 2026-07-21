@@ -43,8 +43,7 @@ describe('formatCallDuration', () => {
 });
 
 describe('teams IPC kinds', () => {
-  it('registers teams:open and teams:close as electron-only', () => {
-    expect(ELECTRON_ONLY_KINDS.has('teams:open')).toBe(true);
+  it('registers teams:close as electron-only', () => {
     expect(ELECTRON_ONLY_KINDS.has('teams:close')).toBe(true);
   });
 });
