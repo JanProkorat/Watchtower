@@ -26,6 +26,7 @@ export function createOrFocusTeamsWindow(): void {
   if (teamsWindow && !teamsWindow.isDestroyed()) {
     if (teamsWindow.isMinimized()) teamsWindow.restore();
     teamsWindow.focus();
+    emitState();
     return;
   }
 
