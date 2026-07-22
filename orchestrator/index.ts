@@ -429,6 +429,28 @@ function startPrWatch(): void {
     } catch (err) {
       console.error('[prWatch] cycle', err);
     }
+    try {
+      await reviewsSvc().backgroundRefresh(watchPats, {
+        notifyMerged: (pr) => {
+          const body = `"${pr.title}" was merged`;
+          emitPush({
+            kind: 'notify',
+            payload: {
+              target: 'pr', host: pr.host, repoKey: pr.repoKey, prNumber: pr.number,
+              title: pr.title, repoLabel: pr.repoLabel, event: 'merged', body,
+            },
+          });
+          try {
+            new NotificationsRepo(handle!.db).log(`pr:${pr.host}:${pr.repoKey}#${pr.number}`, 'pr-merged', body, Date.now());
+          } catch (err) {
+            console.error('[reviews] merged notification log failed', err);
+          }
+        },
+        onListChanged: () => emitPush({ kind: 'prsChanged', payload: {} }),
+      });
+    } catch (err) {
+      console.error('[reviews] backgroundRefresh', err);
+    }
     const focused = notifier?.isWindowFocused() ?? true;
     prWatchTimer = setTimeout(() => void tick(), focused ? PR_WATCH_FOCUSED_MS : PR_WATCH_UNFOCUSED_MS);
     prWatchTimer.unref?.();
