@@ -57,9 +57,19 @@ export function MeetingsPopover(props: MeetingsPopoverProps): JSX.Element {
 
       {meetings.length === 0 ? (
         <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary', fontSize: 12.5 }}>
-          No meetings cached{syncedAt == null ? '' : ` (as of ${dayjs(syncedAt).format('D. M. HH:mm')})`}.
-          <br />
-          Click Refresh, then paste the copied command into the Claude chat.
+          {syncedAt == null ? (
+            <>
+              No meetings cached.
+              <br />
+              Click Refresh, then paste the copied command into the Claude chat.
+            </>
+          ) : (
+            <>
+              No upcoming meetings today.
+              <br />
+              As of {dayjs(syncedAt).format('D. M. HH:mm')} · Refresh to re-sync.
+            </>
+          )}
         </Box>
       ) : (
         meetings.map((m) => (

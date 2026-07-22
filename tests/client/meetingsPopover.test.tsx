@@ -65,6 +65,12 @@ describe('MeetingsPopover', () => {
     expect(screen.queryByRole('button', { name: 'Join' })).toBeNull();
   });
 
+  it('says "no upcoming meetings" when synced but the list is empty (all past)', () => {
+    renderIt({ meetings: [], syncedAt: Date.now() });
+    expect(screen.getByText(/No upcoming meetings today/i)).toBeInTheDocument();
+    expect(screen.queryByText(/No meetings cached/i)).toBeNull();
+  });
+
   it('renders a "Return to call" row when inCall, and clicking it calls onReturnToCall', () => {
     const { onReturnToCall } = renderIt({ inCall: true });
 

@@ -52,3 +52,16 @@ export function parseMeetingsToday(raw: string | null): {
   }
   return { meetings, syncedAt };
 }
+
+/**
+ * Drop meetings that have already ended (endsAt at or before `nowMs`), keeping
+ * in-progress and upcoming ones. Meetings with an unparseable `endsAt` are kept
+ * (fail-open — better to show a joinable link than to hide a real meeting).
+ * Time-relative, so callers re-run it with a fresh `nowMs` each render.
+ */
+export function upcomingMeetings(meetings: MeetingSummary[], nowMs: number): MeetingSummary[] {
+  return meetings.filter((m) => {
+    const end = Date.parse(m.endsAt);
+    return Number.isNaN(end) || end > nowMs;
+  });
+}

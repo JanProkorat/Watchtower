@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { TeamsPushState } from '@watchtower/shared/teamsState.js';
+import { upcomingMeetings } from '@watchtower/shared/meetings.js';
 import type { MeetingSummary } from '@watchtower/shared/meetings.js';
 import { invoke } from './ipc';
 
@@ -27,7 +28,9 @@ export function useTeams(): TeamsHook {
 
   const refreshMeetings = useCallback(async () => {
     const res = await invoke('meetings:listToday', {});
-    setMeetings(res.meetings);
+    // Hide meetings that have already ended today; re-evaluated against the
+    // current clock on every popover open, so the cache needn't be re-synced.
+    setMeetings(upcomingMeetings(res.meetings, Date.now()));
     setSyncedAt(res.syncedAt);
   }, []);
 
