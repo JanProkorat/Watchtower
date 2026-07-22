@@ -335,6 +335,7 @@ export function notificationBody(pr: WatchedPr, ev: WatchEvent): string {
     case 'reviewed': return `${ev.author} reviewed "${pr.title}"`;
     case 'approved': return `${ev.author} approved "${pr.title}"`;
     case 'changes_requested': return `${ev.author} requested changes on "${pr.title}"`;
+    case 'merged': return `"${pr.title}" was merged`;
   }
 }
 
