@@ -969,6 +969,7 @@ export type IpcPush =
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
   | { kind: 'prReviewDone'; payload: { reviewId: number } }
   | { kind: 'prWatchEvent'; payload: { host: PrHost; repoKey: string; prNumber: number } }
+  | { kind: 'prsChanged'; payload: Record<string, never> }
   // Sent by electron/ipc.ts's macOS notification click handler directly on the
   // 'deep-link' webContents channel (not multiplexed through 'watchtower:push'),
   // so the preload bridges it separately — see electron/preload.ts.

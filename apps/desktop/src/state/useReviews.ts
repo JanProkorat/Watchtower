@@ -92,6 +92,14 @@ export function useReviews() {
 
   const refresh = useCallback(() => load('prs:refresh'), [load]);
 
+  // A watched PR merged/closed externally → the orchestrator refreshed its cache
+  // and pushed prsChanged. Re-read the list so the merged PR drops off live
+  // (no manual Refresh). prs:list returns the already-refreshed cache — no network.
+  useEffect(() => {
+    const off = window.watchtower.on('prsChanged', () => { void load('prs:list'); });
+    return () => { off(); };
+  }, [load]);
+
   useEffect(() => {
     void (async () => {
       const res = await load('prs:list');

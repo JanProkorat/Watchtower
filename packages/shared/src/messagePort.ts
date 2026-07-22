@@ -719,7 +719,8 @@ export type OrchPush =
   | { kind: 'rateLimitsUsage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
   | { kind: 'prReviewDone'; payload: { reviewId: number } }
-  | { kind: 'prWatchEvent'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } };
+  | { kind: 'prWatchEvent'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } }
+  | { kind: 'prsChanged'; payload: Record<string, never> };
 
 type AnyPort = {
   postMessage(data: unknown): void;

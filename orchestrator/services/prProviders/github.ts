@@ -36,6 +36,14 @@ export async function listGithubPrs(repo: GithubRepoConfig, exec: Exec = default
   return parseGithubPrList(out, repo);
 }
 
+/** Determines whether a PR that's dropped off the open list was merged (vs
+ *  closed/abandoned). Used by the "gone from open list" reconciliation flow. */
+export async function fetchGithubPrState(nwo: string, prNumber: number, exec: Exec = defaultExec): Promise<{ merged: boolean }> {
+  const out = await exec('gh', ['pr', 'view', String(prNumber), '--repo', nwo, '--json', 'state']);
+  const { state } = JSON.parse(out) as { state?: string };
+  return { merged: state === 'MERGED' };
+}
+
 export async function fetchGithubDiff(repo: GithubRepoConfig, prNumber: number, exec: Exec = defaultExec): Promise<DiffFilePayload[]> {
   const out = await exec('gh', ['pr', 'diff', String(prNumber), '--repo', repo.nwo]);
   return parseUnifiedDiff(out);
