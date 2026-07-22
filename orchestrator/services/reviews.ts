@@ -205,9 +205,12 @@ export class ReviewsService {
    * Silent poll cycle for the PR-watch tick: refetches the open set, diffs it
    * against the cache to find PRs that disappeared (via `detectListChange`),
    * classifies each as merged/closed, and fires `hooks.notifyMerged` for the
-   * merged ones. Always updates the cache (merged/closed PRs removed) and
-   * calls `hooks.onListChanged()` — except on a total fetch failure, where the
-   * list is left untouched and nothing is classified.
+   * merged ones. Always updates the cache (merged/closed PRs removed) — except
+   * on a total fetch failure, where the list is left untouched and nothing is
+   * classified. `hooks.onListChanged()` only fires when the resulting PR set
+   * actually differs from before (by key, not just candidate count — a newly
+   * *appeared* PR changes the list with zero candidates and must still push),
+   * so a no-op poll cycle doesn't cause the renderer to reload for nothing.
    */
   async backgroundRefresh(
     devopsPats: Record<string, string> | undefined,
@@ -230,7 +233,12 @@ export class ReviewsService {
     this.cache = nextCache;
     this.syncedAt = isoNow();
     this.warnings = errors;
-    hooks.onListChanged();
+    const prevKeys = new Set(prev.map(prKey));
+    const nextKeys = new Set(nextCache.map(prKey));
+    const changed = prevKeys.size !== nextKeys.size
+      || [...nextKeys].some((k) => !prevKeys.has(k))
+      || [...prevKeys].some((k) => !nextKeys.has(k));
+    if (changed) hooks.onListChanged();
   }
 
   async diff(host: PrHost, repoKey: string, prNumber: number, _devopsPats: Record<string, string> | undefined): Promise<DiffFilePayload[]> {

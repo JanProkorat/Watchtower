@@ -82,7 +82,7 @@ describe('ReviewsService.backgroundRefresh', () => {
     expect(nums).not.toContain(2);
   });
 
-  it('retains PRs of a repo that transiently failed this cycle, without notifying', async () => {
+  it('retains PRs of a repo that transiently failed this cycle, without notifying or pushing prsChanged', async () => {
     const listAzdo = vi.fn(async () => [azdoPrRow(9)]);
     let cycle = 0;
     const listGithub = vi.fn(async () => {
@@ -109,6 +109,25 @@ describe('ReviewsService.backgroundRefresh', () => {
     const nums = svc.list().pullRequests.map((p) => p.number).sort();
     // github's PRs (1, 2) retained despite this cycle's failure; azdo's PR (9) still open.
     expect(nums).toEqual([1, 2, 9]);
-    expect(onListChanged).toHaveBeenCalledTimes(1);
+    // Same PR-key set as before the cycle (just reassembled from open + retained) → no push.
+    expect(onListChanged).not.toHaveBeenCalled();
+  });
+
+  it('does not push prsChanged when the open set is identical to the cache (no merge, no new PR)', async () => {
+    const listGithub = vi.fn(async () => [ghPr(1), ghPr(2)]);
+    const listAzdo = vi.fn(async () => []);
+    const githubPrState = vi.fn(async () => ({ merged: true }));
+    const svc = new ReviewsService({ ...baseDeps(), listGithub, listAzdo, githubPrState });
+
+    await svc.refresh(undefined);
+
+    const notifyMerged = vi.fn();
+    const onListChanged = vi.fn();
+    await svc.backgroundRefresh(undefined, { notifyMerged, onListChanged });
+
+    expect(githubPrState).not.toHaveBeenCalled();
+    expect(notifyMerged).not.toHaveBeenCalled();
+    expect(onListChanged).not.toHaveBeenCalled();
+    expect(svc.list().pullRequests.map((p) => p.number).sort()).toEqual([1, 2]);
   });
 });
