@@ -166,7 +166,8 @@ export type OrchRequest =
     }
   | { id: string; kind: 'prWatch:setPats'; payload: { pats: Record<string, string> } }
   | { id: string; kind: 'prWatch:list'; payload: Record<string, never> }
-  | { id: string; kind: 'prWatch:markSeen'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } };
+  | { id: string; kind: 'prWatch:markSeen'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } }
+  | { id: string; kind: 'meetings:listToday'; payload: Record<string, never> };
 
 export interface OrchRunningInstance {
   id: string;
@@ -691,7 +692,8 @@ export type OrchResponse =
   | { kind: 'prReview:postComments'; payload: { posted: number; skipped: number; errors: string[] } }
   | { kind: 'prWatch:setPats'; payload: { ok: true } }
   | { kind: 'prWatch:list'; payload: { items: import('./ipcContract.js').PrWatchInboxItem[]; unread: number } }
-  | { kind: 'prWatch:markSeen'; payload: { ok: true } };
+  | { kind: 'prWatch:markSeen'; payload: { ok: true } }
+  | { kind: 'meetings:listToday'; payload: { meetings: import('./meetings.js').MeetingSummary[]; syncedAt: number | null } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

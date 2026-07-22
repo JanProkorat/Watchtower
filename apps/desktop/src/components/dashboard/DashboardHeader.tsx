@@ -23,6 +23,12 @@ export function DashboardHeader({ projects, projectIds, onProjectsChange, todayD
         backgroundColor: 'background.default',
         py: 0.5,
         mb: 1.5,
+        // Reserve room at the top-right for the absolutely-positioned TeamsPill
+        // overlay (mounted in App.tsx) so the date/picker don't slide under it.
+        // Dashboard is the only module without a TabStrip, so its header sits at
+        // the very top-right where the pill lives. Sized for the pill's widest
+        // ("On a call · MM:SS") state.
+        pr: { xs: 0, md: 20 },
       }}
     >
       <Typography variant="h5" sx={{ fontWeight: 600 }}>Dashboard</Typography>
