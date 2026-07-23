@@ -41,4 +41,5 @@ export interface InstanceRow {
   argsJson: string | null;
   kind: InstanceKind;
   taskId: number | null;
+  background: boolean;
 }

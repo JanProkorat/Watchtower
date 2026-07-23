@@ -25,6 +25,7 @@ function baseRow(over: Partial<InstanceRow>): InstanceRow {
     argsJson: null,
     kind: 'claude',
     taskId: null,
+    background: false,
     ...over,
   };
 }
@@ -104,5 +105,36 @@ describe('InstancesRepo taskId', () => {
 
     db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
     expect(repo.get('i-fk')?.taskId).toBeNull();
+  });
+});
+
+describe('InstancesRepo background', () => {
+  let db: SqliteLike;
+  let repo: InstancesRepo;
+
+  beforeEach(() => {
+    const dbPath = path.join(mkdtempSync(path.join(tmpdir(), 'wt-')), 'data.db');
+    const raw = new DatabaseSync(dbPath);
+    runMigrations(raw as unknown as SqliteLike);
+    db = raw as unknown as SqliteLike;
+    repo = new InstancesRepo(db);
+  });
+
+  it('round-trips background: true', () => {
+    repo.insert(baseRow({ id: 'bg1', background: true }));
+    expect(repo.get('bg1')?.background).toBe(true);
+  });
+
+  it('defaults background to false when omitted from an inserted row object', () => {
+    repo.insert(baseRow({ id: 'bg-default' }));
+    expect(repo.get('bg-default')?.background).toBe(false);
+  });
+
+  it('listInstances excludes background rows', () => {
+    const base = { cwd: '/x', status: 'idle-notify' as const, claudeSessionId: null, spawnedAt: 1, lastActivityAt: 1, exitCode: null, terminationReason: null, resumedFromInstanceId: null, jiraKeyHint: null, argsJson: null, kind: 'claude' as const, taskId: null };
+    repo.insert({ ...base, id: 'visible', background: false });
+    repo.insert({ ...base, id: 'hidden', background: true });
+    const ids = repo.listAll().filter((r) => !r.background).map((r) => r.id);
+    expect(ids).toEqual(['visible']);
   });
 });

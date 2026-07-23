@@ -2,7 +2,7 @@ import type { HubConfig } from './hubConfig.js';
 
 export type OrchRequest =
   | { id: string; kind: 'ping'; payload: { now: number } }
-  | { id: string; kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind } }
+  | { id: string; kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind; background?: boolean } }
   | { id: string; kind: 'restartInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { id: string; kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }

@@ -828,6 +828,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           argsJson: req.payload.args ? JSON.stringify(req.payload.args) : null,
           kind: instanceKind,
           taskId: null,
+          background: req.payload.background ?? false,
         });
         spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [], kind: instanceKind });
         return { instanceId: id };
@@ -911,7 +912,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       return { ok: true };
 
     case 'listInstances': {
-      const rows = repo().listAll();
+      const rows = repo().listAll().filter((r) => !r.background);
       return {
         instances: rows.map((r) => ({
           id: r.id,
@@ -1631,6 +1632,12 @@ function respawnIncompleteRowsOnBoot(): void {
   let respawned = 0;
   let crashed = 0;
   for (const row of allRows) {
+    // Background rows are transient (meeting-sync workers). If one survived a
+    // crash mid-job, it's stale — purge it rather than resume it.
+    if (row.background) {
+      disposeInstanceRow(row.id);
+      continue;
+    }
     const action = planBootAction(row);
     if (action === 'leave') continue;
     if (action === 'crash') {

@@ -16,6 +16,7 @@ type DbInstanceRow = {
   args_json: string | null;
   kind: InstanceKind;
   task_id: number | null;
+  background: number;
 };
 
 function toRow(r: DbInstanceRow): InstanceRow {
@@ -33,6 +34,7 @@ function toRow(r: DbInstanceRow): InstanceRow {
     argsJson: r.args_json,
     kind: r.kind,
     taskId: r.task_id,
+    background: r.background === 1,
   };
 }
 
@@ -48,8 +50,8 @@ export class InstancesRepo {
     const displayOrder = (maxRow.m ?? 0) + 1000;
     this.db
       .prepare(
-        `INSERT INTO instances (id, cwd, status, claude_session_id, spawned_at, last_activity_at, exit_code, termination_reason, resumed_from_instance_id, jira_key_hint, args_json, kind, display_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO instances (id, cwd, status, claude_session_id, spawned_at, last_activity_at, exit_code, termination_reason, resumed_from_instance_id, jira_key_hint, args_json, kind, display_order, background)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         row.id,
@@ -65,6 +67,7 @@ export class InstancesRepo {
         row.argsJson,
         row.kind,
         displayOrder,
+        row.background ? 1 : 0,
       );
   }
 

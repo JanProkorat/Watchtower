@@ -2,7 +2,7 @@ import type { HubConfig } from './hubConfig.js';
 
 export type IpcRequest =
   | { kind: 'ping'; payload: { now: number } }
-  | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind } }
+  | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind; background?: boolean } }
   | { kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
   | { kind: 'terminalAttach'; payload: { instanceId: string } }
