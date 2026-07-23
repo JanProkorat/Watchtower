@@ -51,7 +51,7 @@ export class MeetingDriver {
   constructor(private deps: MeetingDriverDeps) {}
 
   async run(spec: MeetingJobSpec): Promise<MeetingResult> {
-    if (this.inFlight.has(spec.key)) {
+    if (this.inFlight.size > 0) {
       return { ok: false, error: 'A meeting sync is already running.' };
     }
     this.inFlight.add(spec.key);

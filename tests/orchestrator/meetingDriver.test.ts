@@ -54,4 +54,13 @@ describe('MeetingDriver', () => {
     expect(p2.error).toMatch(/already running/i);
     await p1;
   });
+
+  it('rejects a concurrent job of a DIFFERENT key (global single-flight, not per-key)', async () => {
+    const driver = new MeetingDriver(makeDeps({ statuses: ['working'], result: null }).deps);
+    const p1 = driver.run({ ...spec, key: 'teams', jobTimeoutMs: 300 });
+    const p2 = await driver.run({ ...spec, key: 'sync' });
+    expect(p2.ok).toBe(false);
+    expect(p2.error).toMatch(/already running/i);
+    await p1;
+  });
 });

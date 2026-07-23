@@ -137,4 +137,12 @@ describe('InstancesRepo background', () => {
     const ids = repo.listAll().filter((r) => !r.background).map((r) => r.id);
     expect(ids).toEqual(['visible']);
   });
+
+  it('liveByCwd excludes background rows at the same cwd but includes non-background ones', () => {
+    const base = { cwd: '/same/cwd', status: 'idle-notify' as const, claudeSessionId: null, spawnedAt: 1, lastActivityAt: 1, exitCode: null, terminationReason: null, resumedFromInstanceId: null, jiraKeyHint: null, argsJson: null, kind: 'claude' as const, taskId: null };
+    repo.insert({ ...base, id: 'visible', background: false });
+    repo.insert({ ...base, id: 'hidden-bg', background: true });
+    const ids = repo.liveByCwd('/same/cwd').map((r) => r.id);
+    expect(ids).toEqual(['visible']);
+  });
 });

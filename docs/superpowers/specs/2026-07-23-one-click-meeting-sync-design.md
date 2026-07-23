@@ -218,7 +218,7 @@ Remove the "paste the copied command into the Claude chat" copy.
 | `--allowedTools` misses a tool → prompt hang | spike covered the real tool set (MCP server + Write + Bash); timeout is the backstop |
 | Transient instance flashes in tab strip | `background` column filtered from `listInstances` before the renderer ever sees it |
 | Cost/latency per click (~fresh session) | acceptable for a manual, occasional action; one-at-a-time guard prevents pile-ups |
-| Writer result file collision across jobs | single-flight guard means at most one job runs; delete-before-spawn clears stale files |
+| Writer result file collision across jobs | single-flight guard is GLOBAL (across both job kinds, not per-key) — at most one meeting job runs at a time; delete-before-spawn clears stale files |
 
 ## Out of scope
 

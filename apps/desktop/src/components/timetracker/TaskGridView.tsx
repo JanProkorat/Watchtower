@@ -645,8 +645,8 @@ export function TaskGridView({ projectId }: Props) {
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
             Clicking runs <code>/sync-meetings</code> in a background Claude
-            session and logs the resulting worklogs — this can take up to a
-            minute.
+            session and logs the resulting worklogs — this can take a few
+            minutes.
           </Typography>
           <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
             <DatePicker

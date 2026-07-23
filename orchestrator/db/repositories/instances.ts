@@ -110,6 +110,7 @@ export class InstancesRepo {
           `SELECT * FROM instances
             WHERE status IN (${placeholders})
               AND cwd = ?
+              AND background = 0
             ORDER BY spawned_at`,
         )
         .all(...LIVE_STATUSES, cwd) as DbInstanceRow[]
