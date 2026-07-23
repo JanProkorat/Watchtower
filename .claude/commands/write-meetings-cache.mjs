@@ -20,10 +20,11 @@
 // missing/empty joinUrl defaults to null.
 
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const SETTINGS_KEY = 'teams.meetings_today';
+const RESULT_FILE = '/tmp/watchtower-meeting-result.json';
 
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.length > 0;
@@ -119,11 +120,21 @@ function main() {
     `Wrote ${meetings.length} meeting(s)${dropped > 0 ? ` (${dropped} dropped: missing id/subject/startsAt/endsAt)` : ''} ` +
       `to "${SETTINGS_KEY}" in ${dbPath} (syncedAt=${blob.syncedAt}).`,
   );
+
+  writeFileSync(
+    RESULT_FILE,
+    JSON.stringify({
+      ok: true,
+      count: meetings.length,
+      detail: `${meetings.length} written${dropped > 0 ? `, ${dropped} dropped` : ''}`,
+    }),
+  );
 }
 
 try {
   main();
 } catch (err) {
   console.error(err.stack ?? err.message);
+  try { writeFileSync(RESULT_FILE, JSON.stringify({ ok: false, error: err.message ?? String(err) })); } catch { /* best effort */ }
   process.exit(1);
 }
