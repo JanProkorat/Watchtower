@@ -7,12 +7,9 @@ import CallIcon from '@mui/icons-material/Call';
 import { formatCallDuration } from '@watchtower/shared/teamsState.js';
 import { glassFill, accentWash, accentActiveText } from '../../theme/glass';
 import { useTeams } from '../../state/useTeams';
-import { useToast, toastMessage } from '../../state/useToast';
+import { useToast } from '../../state/useToast';
+import { invoke } from '../../state/ipc';
 import { MeetingsPopover } from './MeetingsPopover';
-
-// Same DB path TaskGridView's sync-meetings action copies into its clipboard
-// command — the repo-scoped `/teams-refresh` chat command writes its cache here.
-const WATCHTOWER_DB_PATH = '/Users/jan/Library/Application Support/Watchtower/data.db';
 
 /**
  * Standalone Teams control in the top-right corner of the app chrome. Two
@@ -26,6 +23,7 @@ export function TeamsPill(): JSX.Element {
   const { inCall, callStartedAt, meetings, syncedAt, refreshMeetings, joinMeeting, focusCall } = useTeams();
   const [now, setNow] = useState<number>(() => Date.now());
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const { showError, showSuccess } = useToast();
 
   useEffect(() => {
@@ -47,12 +45,17 @@ export function TeamsPill(): JSX.Element {
   const handleClose = () => setAnchorEl(null);
 
   const handleRefresh = async () => {
-    const command = `/teams-refresh "${WATCHTOWER_DB_PATH}"`;
+    setRefreshing(true);
     try {
-      await navigator.clipboard.writeText(command);
-      showSuccess('Command copied to clipboard. Paste it into the Claude Code chat to run it.');
-    } catch (err) {
-      showError(`Failed to copy command: ${toastMessage(err)}`);
+      const res = await invoke('teams:refresh', {});
+      if (res.ok) {
+        await refreshMeetings();
+        showSuccess(`Refreshed — ${res.count ?? 0} meeting${res.count === 1 ? '' : 's'} today.`);
+      } else {
+        showError(res.error ?? 'Teams refresh failed.');
+      }
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -119,6 +122,7 @@ export function TeamsPill(): JSX.Element {
           meetings={meetings}
           syncedAt={syncedAt}
           inCall={inCall}
+          refreshing={refreshing}
           onJoin={(joinUrl) => {
             joinMeeting(joinUrl);
             handleClose();
