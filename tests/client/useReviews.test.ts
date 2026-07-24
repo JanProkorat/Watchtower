@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { groupPrsByProject, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex, useReviews } from '../../apps/desktop/src/state/useReviews.js';
+import { groupPrsByProject, sortByUpdatedDesc, applyPrFilter, relativeAge, sortFindings, worstSeverity, sortFindingsWithIndex, useReviews, countImplementableComments } from '../../apps/desktop/src/state/useReviews.js';
 import { toast } from '../../apps/desktop/src/state/useToast';
 import type { PrFindingPayload } from '../../packages/shared/src/ipcContract.js';
 
@@ -129,5 +129,110 @@ describe('useReviews IPC wrappers', () => {
     const spy = vi.spyOn(toast, 'showWarning');
     renderHook(() => useReviews());
     await waitFor(() => expect(spy).toHaveBeenCalledWith('PPS: Azure DevOps 401'));
+  });
+});
+
+// A window.watchtower double whose `on` records handlers so a test can push
+// events (real bridge behaviour), unlike the no-op `on` in the block above.
+// prs:list starts empty; prs:refresh returns `refreshPrs` — so a test can prove
+// a live update actually flowed new data through without a manual Refresh.
+function makeLiveWatchtower(refreshPrs: any[] = []) {
+  const handlers: Record<string, ((p: any) => void)[]> = {};
+  const invoke = vi.fn(async (kind: string) => {
+    switch (kind) {
+      case 'prs:list': return { pullRequests: [], syncedAt: '2026-07-14T10:00:00Z', warnings: [] };
+      case 'prs:refresh': return { pullRequests: refreshPrs, syncedAt: '2026-07-14T11:00:00Z', warnings: [] };
+      case 'prReview:list': return { reviews: [] };
+      default: return {};
+    }
+  });
+  const on = vi.fn((event: string, cb: (p: any) => void) => {
+    (handlers[event] ??= []).push(cb);
+    return () => { handlers[event] = (handlers[event] ?? []).filter((h) => h !== cb); };
+  });
+  const emit = (event: string, p?: any) => { for (const h of [...(handlers[event] ?? [])]) h(p); };
+  return { invoke, on, emit };
+}
+
+describe('useReviews live updates', () => {
+  it('refreshes the list on a prWatchEvent push, without flipping the loading flag', async () => {
+    const wt = makeLiveWatchtower([pr({ number: 7 })]);
+    (window as any).watchtower = wt;
+    const { result } = renderHook(() => useReviews());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.pullRequests).toEqual([]); // initial prs:list is empty
+
+    act(() => { wt.emit('prWatchEvent', { host: 'github', repoKey: 'gh:o/r', prNumber: 7 }); });
+
+    await waitFor(() => expect(result.current.pullRequests.map((p) => p.number)).toEqual([7]));
+    // Background refresh must not disable the Refresh button / show the spinner.
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('auto-refreshes on the focused (60s) interval with no user action', async () => {
+    vi.useFakeTimers();
+    const focusSpy = vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+    const wt = makeLiveWatchtower([pr({ number: 9 })]);
+    (window as any).watchtower = wt;
+    try {
+      renderHook(() => useReviews());
+      await vi.advanceTimersByTimeAsync(0); // flush the mount load
+      wt.invoke.mockClear();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(wt.invoke.mock.calls.map((c) => c[0])).toContain('prs:refresh');
+    } finally {
+      focusSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('coalesces a burst of prWatchEvents into at most two refreshes', async () => {
+    const wt = makeLiveWatchtower([pr({ number: 3 })]);
+    (window as any).watchtower = wt;
+    const { result } = renderHook(() => useReviews());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    wt.invoke.mockClear();
+
+    await act(async () => {
+      wt.emit('prWatchEvent', { host: 'github', repoKey: 'gh:o/r', prNumber: 3 });
+      wt.emit('prWatchEvent', { host: 'github', repoKey: 'gh:o/r', prNumber: 3 });
+      wt.emit('prWatchEvent', { host: 'github', repoKey: 'gh:o/r', prNumber: 3 });
+    });
+
+    const refreshCalls = wt.invoke.mock.calls.filter((c) => c[0] === 'prs:refresh').length;
+    expect(refreshCalls).toBeGreaterThanOrEqual(1);
+    expect(refreshCalls).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('countImplementableComments', () => {
+  const t = (o: any = {}) => ({ id: 'x', file: 'a.ts', line: 1, status: null, comments: [{ author: 'r', date: 'x', body: 'b' }], ...o });
+  it('counts code-anchored, unresolved threads only', () => {
+    expect(countImplementableComments([
+      t(), t({ id: 'g', file: null, line: null }), t({ id: 'f', status: 'fixed' }), t({ id: 'a', status: 'active' }),
+    ])).toBe(2); // default-null + active
+  });
+});
+
+describe('useReviews implementComments', () => {
+  beforeEach(() => {
+    (globalThis as any).window = (globalThis as any).window ?? {};
+    (window as any).watchtower = {
+      invoke: vi.fn(async (kind: string) => {
+        if (kind === 'prs:list' || kind === 'prs:refresh') return { pullRequests: [], syncedAt: 'x', warnings: [] };
+        if (kind === 'prReview:list') return { reviews: [] };
+        if (kind === 'prImplement:start') return { instanceId: 'inst-1', worktreePath: '/w' };
+        return {};
+      }),
+      on: vi.fn(() => () => {}),
+    };
+  });
+  it('invokes prImplement:start with host/repoKey/prNumber and returns the payload', async () => {
+    const { result } = renderHook(() => useReviews());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const out = await act(async () => result.current.implementComments(
+      { host: 'github', repoKey: 'gh:a/b', number: 5 } as any));
+    expect((window as any).watchtower.invoke).toHaveBeenCalledWith('prImplement:start', { host: 'github', repoKey: 'gh:a/b', prNumber: 5 });
+    expect(out).toEqual({ instanceId: 'inst-1', worktreePath: '/w' });
   });
 });

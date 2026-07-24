@@ -8,7 +8,7 @@ import { PrInspectorDrawer } from './PrInspectorDrawer.js';
 import { glassSurface } from '../../theme/glass.js';
 import { useToast, toastMessage } from '../../state/useToast.js';
 
-export function ModuleReviews({ deepLinkTarget = null, onConsumeDeepLink, watchItems, markSeen, watchError = null }: {
+export function ModuleReviews({ deepLinkTarget = null, onConsumeDeepLink, watchItems, markSeen, watchError = null, onImplementLaunched }: {
   /** Set when a PR notification (macOS click or in-app popover) deep-linked here (App-level). */
   deepLinkTarget?: { host: PrHost; repoKey: string; prNumber: number; focus?: 'comments' } | null;
   /** Called once the target PR has been opened, so App can clear it. */
@@ -17,10 +17,12 @@ export function ModuleReviews({ deepLinkTarget = null, onConsumeDeepLink, watchI
   watchItems: PrWatchInboxItem[];
   markSeen: (host: PrHost, repoKey: string, prNumber: number) => Promise<void>;
   watchError?: string | null;
+  /** Called after "Fix with agent" launches a session, so App can focus it in Instances. */
+  onImplementLaunched: (instanceId: string) => void;
 }): JSX.Element {
   const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr, closePr,
     review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments,
-    fetchReviewState, approvePr } = useReviews();
+    fetchReviewState, approvePr, implementComments } = useReviews();
   const { showError } = useToast();
   const theme = useTheme();
   const [host, setHost] = useState<HostFilter>('all');
@@ -109,7 +111,8 @@ export function ModuleReviews({ deepLinkTarget = null, onConsumeDeepLink, watchI
       <PrInspectorDrawer pr={open} focusComments={openFocusComments} onClose={() => setOpen(null)} loadDiff={loadDiff} loadComments={loadComments}
         review={review} reviewRunning={reviewRunning} openReviewFor={openReviewFor} runReview={runReview}
         cancelReview={cancelReview} postComments={postComments} mergePr={mergePr} closePr={closePr}
-        fetchReviewState={fetchReviewState} approvePr={approvePr} />
+        fetchReviewState={fetchReviewState} approvePr={approvePr}
+        implementComments={implementComments} onImplementLaunched={onImplementLaunched} />
     </Box>
   );
 }

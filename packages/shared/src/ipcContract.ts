@@ -108,6 +108,10 @@ export type IpcRequest =
   | { kind: 'deepLink:ready'; payload: Record<string, never> }
   | { kind: 'reviews:projectRepo'; payload: { projectId: number } }
   | { kind: 'prReview:start'; payload: { host: PrHost; repoKey: string; prNumber: number } }
+  | {
+      kind: 'prImplement:start';
+      payload: { host: PrHost; repoKey: string; prNumber: number; devopsPats?: Record<string, string> };
+    }
   | { kind: 'prReview:get'; payload: { reviewId: number } }
   | { kind: 'prReview:list'; payload: { repoKey?: string } }
   | { kind: 'prReview:cancel'; payload: { reviewId: number } }
@@ -797,6 +801,10 @@ export type IpcResponse =
   | { kind: 'prWatch:list'; payload: { items: PrWatchInboxItem[]; unread: number } }
   | { kind: 'prWatch:markSeen'; payload: { ok: true } }
   | { kind: 'prReview:start'; payload: { reviewId: number } }
+  | {
+      kind: 'prImplement:start';
+      payload: { instanceId: string | null; worktreePath: string | null; error?: string };
+    }
   | { kind: 'prReview:get'; payload: { review: PrReviewPayload | null } }
   | { kind: 'prReview:list'; payload: { reviews: PrReviewPayload[] } }
   | { kind: 'prReview:cancel'; payload: { ok: true } }

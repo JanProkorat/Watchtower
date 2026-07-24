@@ -24,6 +24,7 @@ function makeRow(overrides: Partial<InstanceRow> = {}): InstanceRow {
     jiraKeyHint: null,
     argsJson: null,
     kind: 'claude',
+    worktreePath: null,
     taskId: null,
     background: false,
     ...overrides,

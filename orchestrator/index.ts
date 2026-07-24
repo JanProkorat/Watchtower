@@ -78,6 +78,8 @@ import { mergeGithubPr, mergeAzdoPr } from './services/prWatch/merge.js';
 import { PrWatcher } from './services/prWatch/PrWatcher.js';
 import { githubWatched, azdoWatched } from './services/prWatch/queries.js';
 import { resolveGithubLogin, resolveAzdoUser } from './services/prWatch/identity.js';
+import { prepareImplementLaunch, safeRemoveWorktree } from './services/prImplement.js';
+import { defaultExec } from './services/prProviders/exec.js';
 import { PrWatchStateRepo } from './db/repositories/prWatchState.js';
 import { buildInbox, markPrSeen } from './services/prWatch/inbox.js';
 import type { WatchedPr, WatchEvent } from './services/prWatch/types.js';
@@ -719,7 +721,7 @@ function spawnBackgroundInstance(cwd: string, extraArgs: string[]): string {
     id, cwd, status: 'spawning', claudeSessionId: id, spawnedAt: now,
     lastActivityAt: now, exitCode: null, terminationReason: null,
     resumedFromInstanceId: null, jiraKeyHint: null,
-    argsJson: JSON.stringify(extraArgs), kind: 'claude', taskId: null, background: true,
+    argsJson: JSON.stringify(extraArgs), kind: 'claude', taskId: null, worktreePath: null, background: true,
   });
   spawnPtyForInstance({ id, cwd, extraArgs, kind: 'claude' });
   return id;
@@ -860,6 +862,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           argsJson: req.payload.args ? JSON.stringify(req.payload.args) : null,
           kind: instanceKind,
           taskId: null,
+          worktreePath: null,
           background: req.payload.background ?? false,
         });
         spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [], kind: instanceKind });
@@ -910,7 +913,17 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'removeInstance': {
       const removedId = req.payload.instanceId;
+      const worktreePath = repo().get(removedId)?.worktreePath ?? null;
       disposeInstanceRow(removedId);
+      // Fire-and-forget: clean up a dedicated implement-session worktree (if
+      // any) now that the instance row is gone. NON-force removal — git
+      // refuses when there are uncommitted changes, so nothing is discarded;
+      // committed work survives on the branch regardless. Must not block the
+      // removal response, hence `void`.
+      void safeRemoveWorktree(worktreePath, {
+        exec: (cmd, args) => defaultExec(cmd, args),
+        warn: (msg) => console.warn('[prImplement] worktree cleanup:', msg),
+      });
       // Notify all clients so they refetch and drop the removed instance.
       // Clients refetch the instance list on any stateChanged; without this the
       // removed instance lingers in stale lists (e.g. the iPad's project
@@ -1568,6 +1581,64 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
         })
         .finally(() => { runningReviews.delete(id); });
       return { reviewId: id };
+    }
+
+    case 'prImplement:start': {
+      const p = req.payload;
+      // Reuse the review resolver to get the local clone path + the PR's source
+      // branch (it also fetches, harmlessly). Then resolve the repoLabel for the
+      // prompt from resolveRepos().
+      const target = await reviewsSvc().resolveRepoAndPr(p.host, p.repoKey, p.prNumber);
+      if (!target) throw new Error(`Cannot resolve repo/PR: ${p.host}:${p.repoKey}#${p.prNumber}`);
+      const { github, azdo } = await reviewsSvc().resolveRepos();
+      const repoCfg = (p.host === 'github' ? github : azdo).find((r) => r.repoKey === p.repoKey);
+      const baseDir = path.join(homedir(), '.watchtower', 'worktrees');
+      const launch = await prepareImplementLaunch(
+        { host: p.host, repoKey: p.repoKey, number: p.prNumber, title: target.pr.title,
+          repoLabel: repoCfg?.repoLabel ?? '', sourceBranch: target.pr.sourceBranch, clonePath: target.clonePath },
+        {
+          exec: (cmd, args) => defaultExec(cmd, args),
+          fetchComments: () => reviewsSvc().comments(p.host, p.repoKey, p.prNumber, p.devopsPats),
+          // github author = login (reliable). azdo authors are display names, not
+          // reliably comparable — skip the authorship filter there.
+          resolveMyAuthor: async () => (p.host === 'github' ? await resolveGithubLogin().catch(() => null) : null),
+          ensureDir: (dir) => { mkdirSync(dir, { recursive: true }); },
+          baseDir,
+        },
+      );
+      // Spawn an interactive claude in the worktree, seeded with the prompt as a
+      // positional arg (stays interactive; default permission mode asks before edits).
+      const id = randomUUID();
+      const now = Date.now();
+      try {
+        repo().insert({
+          id, cwd: launch.worktreePath, status: 'spawning', claudeSessionId: id,
+          spawnedAt: now, lastActivityAt: now, exitCode: null, terminationReason: null,
+          resumedFromInstanceId: null, jiraKeyHint: null,
+          argsJson: JSON.stringify([launch.prompt]), kind: 'claude', taskId: null,
+          worktreePath: launch.worktreePath, background: false,
+        });
+        spawnPtyForInstance({ id, cwd: launch.worktreePath, extraArgs: [launch.prompt], kind: 'claude' });
+        return { instanceId: id, worktreePath: launch.worktreePath };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[orchestrator] prImplement:start failed:', message);
+        try {
+          repo().updateStatus(id, 'crashed', Date.now());
+          repo().setTermination(id, 'crash', null);
+        } catch {
+          /* row may not have been inserted yet */
+        }
+        // Best-effort: the worktree was already created by prepareImplementLaunch
+        // above; if the spawn itself failed, remove it so a re-run isn't blocked
+        // by "branch already checked out elsewhere".
+        try {
+          await defaultExec('git', ['-C', launch.worktreePath, 'worktree', 'remove', '--force', launch.worktreePath]);
+        } catch {
+          /* ignore */
+        }
+        throw err;
+      }
     }
 
     case 'prReview:get': {

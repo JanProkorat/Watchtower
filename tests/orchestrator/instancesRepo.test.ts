@@ -25,6 +25,7 @@ function baseRow(over: Partial<InstanceRow>): InstanceRow {
     argsJson: null,
     kind: 'claude',
     taskId: null,
+    worktreePath: null,
     background: false,
     ...over,
   };
@@ -131,7 +132,7 @@ describe('InstancesRepo background', () => {
   });
 
   it('listInstances excludes background rows', () => {
-    const base = { cwd: '/x', status: 'idle-notify' as const, claudeSessionId: null, spawnedAt: 1, lastActivityAt: 1, exitCode: null, terminationReason: null, resumedFromInstanceId: null, jiraKeyHint: null, argsJson: null, kind: 'claude' as const, taskId: null };
+    const base = { cwd: '/x', status: 'idle-notify' as const, claudeSessionId: null, spawnedAt: 1, lastActivityAt: 1, exitCode: null, terminationReason: null, resumedFromInstanceId: null, jiraKeyHint: null, argsJson: null, kind: 'claude' as const, taskId: null, worktreePath: null };
     repo.insert({ ...base, id: 'visible', background: false });
     repo.insert({ ...base, id: 'hidden', background: true });
     const ids = repo.listAll().filter((r) => !r.background).map((r) => r.id);
@@ -139,7 +140,7 @@ describe('InstancesRepo background', () => {
   });
 
   it('liveByCwd excludes background rows at the same cwd but includes non-background ones', () => {
-    const base = { cwd: '/same/cwd', status: 'idle-notify' as const, claudeSessionId: null, spawnedAt: 1, lastActivityAt: 1, exitCode: null, terminationReason: null, resumedFromInstanceId: null, jiraKeyHint: null, argsJson: null, kind: 'claude' as const, taskId: null };
+    const base = { cwd: '/same/cwd', status: 'idle-notify' as const, claudeSessionId: null, spawnedAt: 1, lastActivityAt: 1, exitCode: null, terminationReason: null, resumedFromInstanceId: null, jiraKeyHint: null, argsJson: null, kind: 'claude' as const, taskId: null, worktreePath: null };
     repo.insert({ ...base, id: 'visible', background: false });
     repo.insert({ ...base, id: 'hidden-bg', background: true });
     const ids = repo.liveByCwd('/same/cwd').map((r) => r.id);

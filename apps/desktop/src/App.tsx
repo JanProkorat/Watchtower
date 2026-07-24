@@ -562,6 +562,7 @@ export function App() {
                     watchItems={prWatch.items}
                     markSeen={prWatch.markSeen}
                     watchError={prWatch.error}
+                    onImplementLaunched={(instanceId) => { setActiveModule('instances'); setActive(instanceId); }}
                   />
                 )}
                 {activeModule === 'billing' && (

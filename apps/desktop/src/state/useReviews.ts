@@ -62,6 +62,15 @@ export function applyPrFilter(prs: PullRequestPayload[], host: HostFilter, query
       || String(p.number).includes(q)));
 }
 
+const RESOLVED_STATUSES = new Set(['fixed', 'closed']);
+// Client-side count for the drawer button badge: code-anchored + unresolved.
+// The authorship ("from others") filter runs server-side, where the login is
+// known — so this may slightly over-count on GitHub; that is acceptable for a
+// badge and the server refuses launches with zero qualifying comments.
+export function countImplementableComments(threads: PrCommentThreadPayload[]): number {
+  return threads.filter((t) => t.file != null && t.line != null && !(t.status != null && RESOLVED_STATUSES.has(t.status))).length;
+}
+
 export function relativeAge(iso: string, nowMs: number): string {
   const diff = nowMs - Date.parse(iso);
   if (diff < 60_000) return 'just now';
@@ -107,6 +116,59 @@ export function useReviews() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ─── Live updates (no manual Refresh needed) ───
+  // Two triggers keep the list current on their own:
+  //   1. prWatchEvent — pushed by the orchestrator's PR-watch poller the moment
+  //      it detects a new comment / review / approval / changes-requested on a
+  //      watched PR (orchestrator/index.ts `startPrWatch`). Same push the
+  //      notification badge rides (usePrWatch).
+  //   2. an adaptive interval (60s focused / 300s unfocused, mirroring the
+  //      poller) — a backstop that also catches what prWatchEvent does NOT emit:
+  //      brand-new PRs appearing and PRs merged/closed by someone else.
+  // Both go through backgroundRefresh: it re-fetches like the Refresh button but
+  // WITHOUT flipping `loading` (which would disable the button and flash the
+  // empty-state spinner every cycle) and WITHOUT toasting on a transient failure
+  // (a background poll must stay quiet; the next cycle retries). Concurrent
+  // triggers are coalesced — a burst of pushes from one poll cycle does a single
+  // extra fetch, never one per event.
+  const bgBusyRef = useRef(false);
+  const bgQueuedRef = useRef(false);
+  const backgroundRefresh = useCallback(async (): Promise<void> => {
+    if (bgBusyRef.current) { bgQueuedRef.current = true; return; }
+    bgBusyRef.current = true;
+    try {
+      const res = await invoke('prs:refresh', {}, { silent: true });
+      setPullRequests(res.pullRequests);
+      setSyncedAt(res.syncedAt);
+    } catch {
+      // Background poll: swallow. A manual Refresh still surfaces errors loudly.
+    } finally {
+      bgBusyRef.current = false;
+      if (bgQueuedRef.current) { bgQueuedRef.current = false; void backgroundRefresh(); }
+    }
+  }, []);
+
+  useEffect(() => {
+    const off = window.watchtower.on('prWatchEvent', () => { void backgroundRefresh(); });
+    return () => { off(); };
+  }, [backgroundRefresh]);
+
+  useEffect(() => {
+    const FOCUSED_MS = 60_000;
+    const UNFOCUSED_MS = 300_000;
+    const isFocused = () =>
+      typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Self-rescheduling so the cadence re-evaluates focus each tick. First fire
+    // is after the interval (mount already loaded above), not immediately.
+    function tick(): void {
+      void backgroundRefresh();
+      timer = setTimeout(tick, isFocused() ? FOCUSED_MS : UNFOCUSED_MS);
+    }
+    timer = setTimeout(tick, isFocused() ? FOCUSED_MS : UNFOCUSED_MS);
+    return () => { if (timer) clearTimeout(timer); };
+  }, [backgroundRefresh]);
   // Squash-merge a PR (Task 11's Merge button). electron-main injects any
   // devopsPats needed for Azure DevOps — the renderer never sends them.
   const mergePr = useCallback(async (host: PrHost, repoKey: string, prNumber: number, deleteBranch: boolean): Promise<void> => {
@@ -142,6 +204,13 @@ export function useReviews() {
   const loadComments = useCallback(async (pr: PullRequestPayload): Promise<PrCommentThreadPayload[]> => {
     const res = await invoke('prs:comments', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
     return res.threads;
+  }, []);
+
+  // Kick off the "implement review comments" agent: a new instance in a fresh
+  // worktree that addresses code-anchored, unresolved review comments. The
+  // orchestrator applies the authoritative (authorship + resolved) filter.
+  const implementComments = useCallback(async (pr: PullRequestPayload): Promise<{ instanceId: string | null; worktreePath: string | null }> => {
+    return invoke('prImplement:start', { host: pr.host, repoKey: pr.repoKey, prNumber: pr.number });
   }, []);
 
   // ─── PR review agent (Report tab) ───
@@ -276,7 +345,7 @@ export function useReviews() {
 
   return {
     pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr, closePr,
-    fetchReviewState, approvePr,
+    fetchReviewState, approvePr, implementComments,
     review, reviewRunning, openReviewFor, runReview, startReview, cancelReview, getReview, listReviews, latestReviewFor,
     reviewStateFor, postComments,
   };
