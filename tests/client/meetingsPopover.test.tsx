@@ -85,4 +85,14 @@ describe('MeetingsPopover', () => {
     renderIt({ inCall: false });
     expect(screen.queryByText(/Return to call/i)).toBeNull();
   });
+
+  it('disables Refresh and shows progress while refreshing', () => {
+    renderIt({ meetings: [], syncedAt: null, refreshing: true });
+    expect(screen.getByRole('button', { name: /refresh/i })).toBeDisabled();
+  });
+
+  it('empty state does not mention pasting a command', () => {
+    renderIt({ meetings: [], syncedAt: null });
+    expect(screen.queryByText(/paste/i)).toBeNull();
+  });
 });

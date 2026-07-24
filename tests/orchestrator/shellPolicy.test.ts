@@ -44,7 +44,7 @@ describe('planBootAction', () => {
   const row = (over: Partial<InstanceRow>): InstanceRow => ({
     id: 'i', cwd: '/tmp', status: 'working', claudeSessionId: 'sess', spawnedAt: 1,
     lastActivityAt: 1, exitCode: null, terminationReason: null, resumedFromInstanceId: null,
-    jiraKeyHint: null, argsJson: null, kind: 'claude', ...over,
+    jiraKeyHint: null, argsJson: null, kind: 'claude', taskId: null, background: false, ...over,
   });
 
   it('live shell → respawn-shell', () => {

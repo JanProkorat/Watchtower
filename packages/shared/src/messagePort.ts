@@ -2,7 +2,7 @@ import type { HubConfig } from './hubConfig.js';
 
 export type OrchRequest =
   | { id: string; kind: 'ping'; payload: { now: number } }
-  | { id: string; kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind } }
+  | { id: string; kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind; background?: boolean } }
   | { id: string; kind: 'restartInstance'; payload: { instanceId: string } }
   | { id: string; kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { id: string; kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
@@ -167,7 +167,9 @@ export type OrchRequest =
   | { id: string; kind: 'prWatch:setPats'; payload: { pats: Record<string, string> } }
   | { id: string; kind: 'prWatch:list'; payload: Record<string, never> }
   | { id: string; kind: 'prWatch:markSeen'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } }
-  | { id: string; kind: 'meetings:listToday'; payload: Record<string, never> };
+  | { id: string; kind: 'meetings:listToday'; payload: Record<string, never> }
+  | { id: string; kind: 'meetings:sync'; payload: { from: string; to: string } }
+  | { id: string; kind: 'teams:refresh'; payload: Record<string, never> };
 
 export interface OrchRunningInstance {
   id: string;
@@ -693,7 +695,9 @@ export type OrchResponse =
   | { kind: 'prWatch:setPats'; payload: { ok: true } }
   | { kind: 'prWatch:list'; payload: { items: import('./ipcContract.js').PrWatchInboxItem[]; unread: number } }
   | { kind: 'prWatch:markSeen'; payload: { ok: true } }
-  | { kind: 'meetings:listToday'; payload: { meetings: import('./meetings.js').MeetingSummary[]; syncedAt: number | null } };
+  | { kind: 'meetings:listToday'; payload: { meetings: import('./meetings.js').MeetingSummary[]; syncedAt: number | null } }
+  | { kind: 'meetings:sync'; payload: { ok: boolean; count?: number; error?: string } }
+  | { kind: 'teams:refresh'; payload: { ok: boolean; count?: number; error?: string } };
 
 export type OrchPush =
   | { kind: 'ptyData'; payload: { instanceId: string; chunk: string } }

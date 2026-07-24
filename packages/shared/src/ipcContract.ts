@@ -2,7 +2,7 @@ import type { HubConfig } from './hubConfig.js';
 
 export type IpcRequest =
   | { kind: 'ping'; payload: { now: number } }
-  | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind } }
+  | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind; background?: boolean } }
   | { kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
   | { kind: 'terminalAttach'; payload: { instanceId: string } }
@@ -90,6 +90,8 @@ export type IpcRequest =
   | { kind: 'teams:joinMeeting'; payload: { joinUrl: string } }
   | { kind: 'teams:focusCall'; payload: Record<string, never> }
   | { kind: 'meetings:listToday'; payload: Record<string, never> }
+  | { kind: 'meetings:sync'; payload: { from: string; to: string } }
+  | { kind: 'teams:refresh'; payload: Record<string, never> }
   | { kind: 'teams:close'; payload: Record<string, never> }
   | { kind: 'terminalFocus'; payload: { instanceId: string } }
   | { kind: 'push:registerDevice'; payload: { token: string; platform: string; bundleId?: string } }
@@ -771,6 +773,8 @@ export type IpcResponse =
   | { kind: 'teams:joinMeeting'; payload: { ok: boolean } }
   | { kind: 'teams:focusCall'; payload: { ok: boolean } }
   | { kind: 'meetings:listToday'; payload: { meetings: import('./meetings.js').MeetingSummary[]; syncedAt: number | null } }
+  | { kind: 'meetings:sync'; payload: { ok: boolean; count?: number; error?: string } }
+  | { kind: 'teams:refresh'; payload: { ok: boolean; count?: number; error?: string } }
   | { kind: 'teams:close'; payload: { ok: boolean } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
   | { kind: 'push:registerDevice'; payload: { ok: true } }

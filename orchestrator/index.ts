@@ -1,10 +1,12 @@
 import path from 'node:path';
 import { homedir } from 'node:os';
-import { mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { PortApi, type OrchRequest, type OrchResponse, type OrchPush, type OrchOverlapError } from '@watchtower/shared/messagePort.js';
 import { parseMeetingsToday } from '@watchtower/shared/meetings.js';
+import { MeetingDriver } from './services/meetingDriver.js';
+import { buildSyncCommand, buildTeamsCommand } from './services/meetingCommands.js';
 import { bootstrap, type BootstrapHandle } from './bootstrap.js';
 import { PtyManager } from './ptyManager.js';
 import { InstancesRepo } from './db/repositories/instances.js';
@@ -707,6 +709,36 @@ function disposeInstanceRow(id: string): void {
   ptySizeOwnership.disposeInstance(id);
 }
 
+const MEETING_RESULT_FILE = '/tmp/watchtower-meeting-result.json';
+
+/** Insert a hidden background claude row and spawn its pty. Returns the id. */
+function spawnBackgroundInstance(cwd: string, extraArgs: string[]): string {
+  const id = randomUUID();
+  const now = Date.now();
+  repo().insert({
+    id, cwd, status: 'spawning', claudeSessionId: id, spawnedAt: now,
+    lastActivityAt: now, exitCode: null, terminationReason: null,
+    resumedFromInstanceId: null, jiraKeyHint: null,
+    argsJson: JSON.stringify(extraArgs), kind: 'claude', taskId: null, background: true,
+  });
+  spawnPtyForInstance({ id, cwd, extraArgs, kind: 'claude' });
+  return id;
+}
+
+const meetingDriver = new MeetingDriver({
+  spawn: spawnBackgroundInstance,
+  getStatus: (id) => repo().get(id)?.status ?? null,
+  write: (id, data) => { pty.get(id)?.write(data); },
+  dispose: disposeInstanceRow,
+  readResult: () => {
+    try { return JSON.parse(readFileSync(MEETING_RESULT_FILE, 'utf8')); }
+    catch { return null; }
+  },
+  clearResult: () => { try { unlinkSync(MEETING_RESULT_FILE); } catch { /* absent */ } },
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  now: () => Date.now(),
+});
+
 interface PtySpawnArgs {
   id: string;
   cwd: string;
@@ -828,6 +860,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           argsJson: req.payload.args ? JSON.stringify(req.payload.args) : null,
           kind: instanceKind,
           taskId: null,
+          background: req.payload.background ?? false,
         });
         spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [], kind: instanceKind });
         return { instanceId: id };
@@ -911,7 +944,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       return { ok: true };
 
     case 'listInstances': {
-      const rows = repo().listAll();
+      const rows = repo().listAll().filter((r) => !r.background);
       return {
         instances: rows.map((r) => ({
           id: r.id,
@@ -932,6 +965,26 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'meetings:listToday': {
       const raw = new SettingsRepo(handle!.db).getString('teams.meetings_today', '') || null;
       return parseMeetingsToday(raw);
+    }
+
+    case 'meetings:sync': {
+      const r = await meetingDriver.run({
+        key: 'meetings:sync',
+        command: buildSyncCommand(req.payload.from, req.payload.to),
+        startupTimeoutMs: 30_000,
+        jobTimeoutMs: 300_000,
+      });
+      return { ok: r.ok, count: r.count, error: r.error };
+    }
+
+    case 'teams:refresh': {
+      const r = await meetingDriver.run({
+        key: 'teams:refresh',
+        command: buildTeamsCommand(),
+        startupTimeoutMs: 30_000,
+        jobTimeoutMs: 180_000,
+      });
+      return { ok: r.ok, count: r.count, error: r.error };
     }
 
     case 'setSetting': {
@@ -1631,6 +1684,12 @@ function respawnIncompleteRowsOnBoot(): void {
   let respawned = 0;
   let crashed = 0;
   for (const row of allRows) {
+    // Background rows are transient (meeting-sync workers). If one survived a
+    // crash mid-job, it's stale — purge it rather than resume it.
+    if (row.background) {
+      disposeInstanceRow(row.id);
+      continue;
+    }
     const action = planBootAction(row);
     if (action === 'leave') continue;
     if (action === 'crash') {

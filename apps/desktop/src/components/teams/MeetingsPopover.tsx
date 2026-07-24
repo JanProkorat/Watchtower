@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import VideocamIcon from '@mui/icons-material/Videocam';
@@ -11,6 +12,7 @@ export interface MeetingsPopoverProps {
   meetings: MeetingSummary[];
   syncedAt: number | null;
   inCall: boolean;
+  refreshing?: boolean;
   onJoin(joinUrl: string): void;
   onReturnToCall(): void;
   onRefresh(): void;
@@ -23,14 +25,19 @@ export interface MeetingsPopoverProps {
  */
 export function MeetingsPopover(props: MeetingsPopoverProps): JSX.Element {
   const theme = useTheme();
-  const { meetings, syncedAt, inCall, onJoin, onReturnToCall, onRefresh } = props;
+  const { meetings, syncedAt, inCall, refreshing = false, onJoin, onReturnToCall, onRefresh } = props;
   return (
     <Box sx={{ width: 380, p: 1.5, ...glassSurface(theme, { elevation: 2 }) }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
         <Typography sx={{ fontWeight: 700, fontSize: 13 }}>Calendar</Typography>
         <Box sx={{ flex: 1 }} />
-        <Button size="small" onClick={onRefresh}>
-          Refresh
+        <Button
+          size="small"
+          onClick={onRefresh}
+          disabled={refreshing}
+          startIcon={refreshing ? <CircularProgress size={14} color="inherit" /> : undefined}
+        >
+          {refreshing ? 'Refreshing…' : 'Refresh'}
         </Button>
       </Box>
 
@@ -61,7 +68,7 @@ export function MeetingsPopover(props: MeetingsPopoverProps): JSX.Element {
             <>
               No meetings cached.
               <br />
-              Click Refresh, then paste the copied command into the Claude chat.
+              Click Refresh to load today&rsquo;s meetings.
             </>
           ) : (
             <>
