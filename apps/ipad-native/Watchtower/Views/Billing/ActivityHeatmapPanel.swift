@@ -5,7 +5,7 @@ import WatchtowerCore
 /// `packages/module-timetracker/src/billing/reports/ActivityHeatmapPanel.tsx`).
 /// Value-only, no store — tapping a cell reveals its date/hours in a label
 /// above the grid, same as the iPhone panel (no native tooltip). The
-/// enclosing `ReportsView` supplies the outer `contentCard()`, so this view
+/// enclosing `ReportsView` supplies the outer `glassCard()`, so this view
 /// renders its content only (no `GlassCard` wrapper).
 struct ActivityHeatmapPanel: View {
     let heatmap: HeatmapResult

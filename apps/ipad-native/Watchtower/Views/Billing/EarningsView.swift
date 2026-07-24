@@ -3,23 +3,24 @@ import ComposableArchitecture
 import WatchtowerCore
 import WatchtowerBridge
 
-/// iPad port of the iPhone `EarningsView` — same shared stores
+/// iPad port of `packages/module-timetracker/src/billing/EarningsMonthView.tsx`
+/// (the ORIGINAL Capacitor design, not iphone-native). Same shared stores
 /// (`BillingFeature`'s dataset/loadState + `EarningsFeature`'s month cursor)
-/// and the same pure derivations (`aggregateMonthEarnings`, `trailingMonths`),
-/// but the layout is the iPad design system's **D2 master-detail** rather
-/// than the iPhone's push navigation: month stepper / hero total / trend /
-/// project list live in a leading pane, and whenever `earnings.projectDetail`
-/// is presented, `ProjectDetailView` renders inline in a trailing pane —
-/// never as a `.navigationDestination`. Tapping a project row sends
-/// `.openProjectTapped(id)`; the trailing pane shows a "Select a project"
-/// placeholder until a project is selected, with a close (x) affordance that
-/// nils the presented state back out (the iPhone's equivalent is simply the
-/// system back button, which doesn't exist for an inline pane).
+/// and the same pure derivations (`aggregateMonthEarnings`, `trailingMonths`)
+/// as before.
+///
+/// Design-align (Task 4): layout is now a single vertical scroll — month
+/// picker, hero total, trend chart, project list, in that order — matching
+/// the web original, replacing the earlier D2 master-detail split (a leading
+/// list pane + a trailing "Select a project" pane). Tapping a project row
+/// PUSHES `ProjectDetailView` via `.navigationDestination(item:)` — the same
+/// pattern already proven by iphone-native's `EarningsView` — instead of
+/// presenting it inline in a trailing pane.
 struct EarningsView: View {
     let store: StoreOf<IPadAppFeature>
 
     var body: some View {
-        EarningsSplitView(
+        EarningsRootView(
             billing: store.scope(state: \.billing, action: \.billing),
             earnings: store.scope(state: \.earnings, action: \.earnings)
         )
@@ -29,7 +30,7 @@ struct EarningsView: View {
 /// Split into its own type so `earnings` can be `@Bindable` — required for
 /// the `$earnings.scope(state:action:)` presentation binding below, which a
 /// computed (non-stored) property can't carry.
-private struct EarningsSplitView: View {
+private struct EarningsRootView: View {
     let billing: StoreOf<BillingFeature>
     @Bindable var earnings: StoreOf<EarningsFeature>
 
@@ -55,53 +56,53 @@ private struct EarningsSplitView: View {
         billing.loadState == .loading && billing.dataset == nil
     }
 
-    /// Presented-scope binding for the trailing pane. Reading `.wrappedValue`
-    /// gives the (possibly nil) child store; writing `nil` to it dismisses —
-    /// exactly what `.navigationDestination(item:)` does on the iPhone when
-    /// the user taps back.
-    private var projectDetailBinding: Binding<StoreOf<ProjectDetailFeature>?> {
-        $earnings.scope(state: \.projectDetail, action: \.projectDetail)
-    }
-
     var body: some View {
-        HStack(spacing: 0) {
-            leadingPane
-                .frame(width: 420)
-            Divider().overlay(Palette.hairline)
-            trailingPane
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .background(Palette.baseBg)
-    }
+        NavigationStack {
+            ZStack {
+                Palette.baseBg.ignoresSafeArea()
 
-    // MARK: - Leading pane
+                VStack(spacing: 0) {
+                    monthPicker
 
-    private var leadingPane: some View {
-        VStack(spacing: 0) {
-            monthPicker
-
-            if isLoading {
-                Spacer()
-                VStack(spacing: 12) {
-                    ProgressView().tint(Palette.accentIcon)
-                    Text("Loading…").foregroundStyle(Palette.textMuted)
-                }
-                Spacer()
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        heroTotal
-                        trendSection
-                        projectsSection
+                    if isLoading {
+                        Spacer()
+                        VStack(spacing: 12) {
+                            ProgressView().tint(Palette.accentIcon)
+                            Text("Loading…").foregroundStyle(Palette.textMuted)
+                        }
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 24) {
+                                heroTotal
+                                trendSection
+                                projectsSection
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                            .padding(.bottom, 32)
+                        }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 32)
                 }
             }
+            // The single vertical scroll of a `NavigationStack`'s root view;
+            // tapping a project row pushes `ProjectDetailView` full-screen —
+            // matching the web's in-place full-view swap / the iPhone's push
+            // navigation — instead of presenting it in a trailing pane.
+            .navigationDestination(item: $earnings.scope(state: \.projectDetail, action: \.projectDetail)) { detailStore in
+                ProjectDetailView(store: detailStore, billing: billing)
+            }
+            // Root view has no title/back button of its own, so hide the
+            // system nav bar entirely — otherwise an empty ~90pt bar renders
+            // above the month picker. `ProjectDetailView` (the pushed
+            // destination) sets its own `.toolbar(.hidden, for: .navigationBar)`
+            // and draws a custom back bar instead, so this only affects the
+            // root screen, matching the web original's chromeless top.
+            .toolbar(.hidden, for: .navigationBar)
         }
-        .background(Palette.baseBg)
     }
+
+    // MARK: - Month picker
 
     private var monthPicker: some View {
         HStack(spacing: 12) {
@@ -138,7 +139,7 @@ private struct EarningsSplitView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
-        .contentCard(cornerRadius: 16)
+        .glassCard(cornerRadius: 16)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
@@ -157,17 +158,17 @@ private struct EarningsSplitView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(16)
-        .contentCard()
+        .glassCard()
     }
 
     // MARK: - Trend
 
     private var trendSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "Trend (8 months)")
+            SectionHeaderLabel("Trend (8 months)")
             TrailingBars(months: trailing, selectedMonth: selectedMonth)
                 .padding(16)
-                .contentCard()
+                .glassCard(cornerRadius: 12)
         }
     }
 
@@ -175,21 +176,20 @@ private struct EarningsSplitView: View {
 
     private var projectsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "Projects")
+            SectionHeaderLabel("Projects")
             if agg.perProject.isEmpty {
                 Text("No earnings this month")
                     .font(.subheadline)
                     .foregroundStyle(Palette.textMuted)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 12)
-                    .contentCard()
+                    .glassCard(cornerRadius: 12)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(agg.perProject.enumerated()), id: \.element.projectId) { index, project in
                         EarningsProjectRow(
                             project: project,
                             barFraction: project.earnedCzk / maxEarned,
-                            isSelected: projectDetailBinding.wrappedValue?.projectId == project.projectId,
                             onTap: { earnings.send(.openProjectTapped(project.projectId)) }
                         )
                         if index < agg.perProject.count - 1 {
@@ -198,63 +198,9 @@ private struct EarningsSplitView: View {
                     }
                 }
                 .padding(.horizontal, 4)
-                .contentCard()
+                .glassCard(cornerRadius: 12)
             }
         }
-    }
-
-    // MARK: - Trailing pane
-
-    @ViewBuilder
-    private var trailingPane: some View {
-        if let detailStore = projectDetailBinding.wrappedValue {
-            VStack(spacing: 0) {
-                trailingCloseBar
-                ProjectDetailView(store: detailStore, billing: billing)
-            }
-        } else {
-            VStack(spacing: 8) {
-                Image(systemName: "folder")
-                    .font(.system(size: 32))
-                    .foregroundStyle(Palette.textMuted)
-                Text("Select a project")
-                    .font(.title3)
-                    .foregroundStyle(Palette.textMuted)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    private var trailingCloseBar: some View {
-        HStack {
-            Spacer()
-            Button {
-                projectDetailBinding.wrappedValue = nil
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(Palette.textMuted)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Close project detail")
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-    }
-}
-
-// MARK: - Shared section label (also used by ProjectDetailView / ContractDrawerView)
-
-/// Small uppercase caption header, mirroring `DashboardView`'s private
-/// `TileHeader` — kept internal (not `private`) so the sibling Billing views
-/// in this module can reuse it instead of redefining the same style thrice.
-struct SectionHeader: View {
-    let title: String
-
-    var body: some View {
-        Text(title.uppercased())
-            .font(.caption.weight(.bold))
-            .foregroundStyle(Palette.textMuted)
-            .tracking(0.8)
     }
 }
 
@@ -310,7 +256,6 @@ private struct TrailingBars: View {
 private struct EarningsProjectRow: View {
     let project: ProjectEarning
     let barFraction: Double
-    let isSelected: Bool
     let onTap: () -> Void
 
     var body: some View {
@@ -350,7 +295,6 @@ private struct EarningsProjectRow: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 8)
-            .background(isSelected ? Color.white.opacity(0.05) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

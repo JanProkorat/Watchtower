@@ -2,14 +2,15 @@ import SwiftUI
 import ComposableArchitecture
 import WatchtowerCore
 
-/// iPad port of the iPhone `TaskListView` — same search filter + sort
-/// (localized project name then title) and the same "+"-add / row-tap-to-
-/// edit affordances (→ `addTaskTapped` / `taskRowTapped`), but cards use the
-/// iPad design system's `contentCard()` instead of `GlassCard`/
-/// `.ultraThinMaterial`.
+/// Records → "Tasks" — ported from the ORIGINAL
+/// `packages/module-timetracker/src/billing/records/TaskListView.tsx` (NOT
+/// iphone-native): same search filter + sort (localized project name then
+/// title), same sticky glass search bar + "+ Add task" CTA, and the same
+/// flat list of individually-`glassCard(10)`'d rows (project dot, mono task
+/// number, title, status chip).
 ///
-/// Adds explicit `canEdit` gating the iPhone reference doesn't have at the
-/// view layer: the "+ add" affordance is hidden, and every row becomes
+/// Adds explicit `canEdit` gating the web original doesn't have at the view
+/// layer: the "+ Add task" affordance is hidden, and every row becomes
 /// untappable, whenever `!canEdit(billing.loadState)`.
 struct TaskListView: View {
     let billing: StoreOf<BillingFeature>
@@ -72,8 +73,12 @@ struct TaskListView: View {
                     Spacer()
                 } else {
                     ScrollView {
-                        VStack(spacing: 0) {
-                            ForEach(Array(rows.enumerated()), id: \.element.syncId) { index, task in
+                        // Individual `glassCard(10)` per row with a 6pt gap —
+                        // matches `TaskListView.tsx`'s per-row `glassCard(10)`
+                        // buttons in a `gap: 6` column, NOT a single grouped
+                        // card with dividers.
+                        VStack(spacing: 6) {
+                            ForEach(rows, id: \.syncId) { task in
                                 Button {
                                     records.send(.taskRowTapped(task))
                                 } label: {
@@ -81,12 +86,8 @@ struct TaskListView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(!editable)
-                                if index < rows.count - 1 {
-                                    Divider().overlay(Palette.hairline)
-                                }
                             }
                         }
-                        .contentCard()
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
                         .padding(.bottom, 32)
@@ -118,21 +119,26 @@ struct TaskListView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .contentCard(cornerRadius: 16)
+        .glassCard(cornerRadius: 16)
         .padding(.horizontal, 16)
         .padding(.top, 12)
     }
 
+    /// Solid CTA pill — mirrors the web original's `ctaGradient`-filled
+    /// "+ Přidat úkol" button.
     private var addButton: some View {
         Button {
             guard let epicId = defaultEpicId else { return }
             records.send(.addTaskTapped(epicId: epicId))
         } label: {
-            Image(systemName: "plus.circle.fill")
-                .font(.system(size: 22))
+            Text("+ Add task")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .frame(height: 34)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(Palette.accentIcon)
+        .background(Palette.ctaGradient, in: RoundedRectangle(cornerRadius: 11))
         .disabled(defaultEpicId == nil)
         .accessibilityLabel("Add task")
     }
@@ -150,10 +156,19 @@ private func taskStatusLabel(_ status: String) -> String {
     }
 }
 
-private func taskStatusColor(_ status: String) -> Color {
+/// Status chip fill/border opacity — mirrors `TaskListView.tsx`'s
+/// `statusChipStyle`: open/done are a muted flat pill; in_progress and
+/// to_accept share the accent text color but to_accept renders a visibly
+/// stronger fill/border (0.28/0.55 vs 0.18/0.40), signalling it's the more
+/// urgent of the two "in flight" states.
+private func taskStatusChipStyle(_ status: String) -> (text: Color, fill: Color, border: Color) {
     switch status {
-    case "in_progress", "to_accept": return Palette.accent
-    default: return Palette.textMuted
+    case "in_progress":
+        return (Palette.accent, Palette.accent.opacity(0.18), Palette.accent.opacity(0.40))
+    case "to_accept":
+        return (Palette.accent, Palette.accent.opacity(0.28), Palette.accent.opacity(0.55))
+    default:
+        return (Palette.textMuted, Color.white.opacity(0.05), Color.white.opacity(0.10))
     }
 }
 
@@ -181,18 +196,24 @@ private struct TaskRowView: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 4)
-            Text(taskStatusLabel(task.status))
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(taskStatusColor(task.status))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(taskStatusColor(task.status).opacity(0.15), in: Capsule())
-                .overlay(
-                    Capsule().stroke(taskStatusColor(task.status).opacity(0.4), lineWidth: 1)
-                )
-                .fixedSize()
+            statusChip
         }
         .padding(.vertical, 8)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 12)
+        .glassCard(cornerRadius: 10)
+    }
+
+    private var statusChip: some View {
+        let style = taskStatusChipStyle(task.status)
+        return Text(taskStatusLabel(task.status))
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(style.text)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(style.fill, in: Capsule())
+            .overlay(
+                Capsule().stroke(style.border, lineWidth: 1)
+            )
+            .fixedSize()
     }
 }

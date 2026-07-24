@@ -6,7 +6,7 @@ import WatchtowerCore
 /// `packages/module-timetracker/src/billing/reports/TrendChart.tsx`).
 /// Value-only, no store — identical zero-filled bar chart + tap-to-select +
 /// dashed rate-change markers as the iPhone panel. Only the outer card
-/// styling differs (`contentCard()` instead of `GlassCard`), which the
+/// styling differs (`glassCard()` instead of `GlassCard`), which the
 /// enclosing `ReportsView` applies, not this view itself.
 struct TrendChartPanel: View {
     let series: [TrendBucket]

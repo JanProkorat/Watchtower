@@ -2,19 +2,32 @@ import SwiftUI
 import ComposableArchitecture
 import WatchtowerCore
 
-/// iPad port of the iPhone `TaskGridView` — the task x day matrix. Read-only
-/// in structure: cells are plain display, with no inline edit widgets of
-/// their own. The one interaction a cell carries is a tap that opens the
-/// worklog editor sheet (via `RecordsFeature.gridCellTapped`, same as the
-/// iPhone reference) — gated by `canEdit(billing.loadState)` below, so it is
-/// inert whenever the dataset isn't in a writable state.
+/// Records → "Grid" — ported from the ORIGINAL
+/// `packages/module-timetracker/src/billing/records/TaskGridView.tsx` (NOT
+/// iphone-native): the task x day spreadsheet. Read-only in structure: cells
+/// are plain display, with no inline edit widgets of their own. The one
+/// interaction a cell carries is a tap that opens the worklog editor sheet
+/// (via `RecordsFeature.gridCellTapped`, same as the original) — gated by
+/// `canEdit(billing.loadState)` below, so it is inert whenever the dataset
+/// isn't in a writable state.
 ///
-/// Layout is ported verbatim from the iPhone reference (same fixed
-/// `nameW`/`sigW`/`dayW` geometry, same frozen-left-column + horizontally-
-/// scrolling day-region split sharing one vertical `ScrollView` so the two
-/// sides stay aligned "for free"). No reducer/model changes: on the wider
-/// iPad screen, the horizontal day-region simply shows more columns before
-/// the user needs to scroll — nothing else differs.
+/// The table surface uses `dataPanel()` — the non-frosted, near-solid fill
+/// the design-align pass reserves for dense data grids (crisp numbers, no
+/// blur softening digits) — while the header bar above it uses `glassCard()`
+/// like every other sticky filter bar in this module.
+///
+/// Layout keeps the fixed `nameW`/`sigW`/`dayW` geometry and the frozen-left-
+/// column + horizontally-scrolling day-region split sharing one vertical
+/// `ScrollView` so the two sides stay aligned "for free". KNOWN GAP vs the
+/// web original: the header row and footer are NOT pinned to the viewport
+/// during vertical scroll (CSS `position: sticky` has no direct SwiftUI
+/// equivalent for a footer, and pinning the header would require reworking
+/// the frozen-column/day-region split into a row-synchronized double-scroll
+/// construct) — they scroll with the body like a normal table. The frozen
+/// LEFT columns (task name + Σ), the part of the spec this most depends on
+/// for usability at a wide iPad width, are unaffected. No reducer/derivation
+/// changes: on the wider iPad screen, the horizontal day-region simply shows
+/// more columns before the user needs to scroll — nothing else differs.
 struct TaskGridView: View {
     let billing: StoreOf<BillingFeature>
     let records: StoreOf<RecordsFeature>
@@ -111,12 +124,13 @@ struct TaskGridView: View {
                     .multilineTextAlignment(.center)
                 stepButton("›") { records.send(.gridMonthStepped(1)) }
                 Spacer()
+                todayButton
             }
             projectMenu
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .contentCard(cornerRadius: 16)
+        .glassCard(cornerRadius: 16)
         .padding(.horizontal, 16)
         .padding(.top, 12)
     }
@@ -128,8 +142,35 @@ struct TaskGridView: View {
                 .frame(width: 34, height: 34)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(Palette.textPrimary)
+        .foregroundStyle(Palette.accentIcon)
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+    }
+
+    /// Jumps `gridMonth` to the current month by dispatching the existing
+    /// `gridMonthStepped(delta)` action with a computed delta — there's no
+    /// dedicated "jump to today" reducer action, matching the same trick
+    /// `WorklogListView`'s Today button uses.
+    private var todayButton: some View {
+        Button("Today") {
+            let delta = Self.monthIndex(String(utcTodayIso().prefix(7))) - Self.monthIndex(records.gridMonth)
+            records.send(.gridMonthStepped(delta))
+        }
+        .buttonStyle(.plain)
+        .font(.system(size: 12.5, weight: .semibold))
+        .foregroundStyle(Palette.textSecondary)
+        .padding(.horizontal, 14)
+        .frame(height: 34)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private static func monthIndex(_ month: String) -> Int {
+        let p = month.split(separator: "-")
+        guard p.count == 2, let y = Int(p[0]), let m = Int(p[1]) else { return 0 }
+        return y * 12 + (m - 1)
     }
 
     private var projectMenu: some View {
@@ -229,7 +270,9 @@ struct TaskGridView: View {
                 dayRegion
             }
         }
-        .contentCard(cornerRadius: 12)
+        // Non-frosted, near-solid surface for dense data — matches the web
+        // original's `dataPanelFill` wrapper around the ledger table.
+        .dataPanel(cornerRadius: 12)
     }
 
     // MARK: - Frozen left column (task name + Σ)
