@@ -4,14 +4,17 @@ import type { PrHost, PullRequestPayload, DiffFilePayload, PrCommentThreadPayloa
 import type { GithubRepoConfig, AzdoRepoConfig, Exec } from './prProviders/types.js';
 import {
   listGithubPrs, fetchGithubDiff, fetchGithubComments, parseGitRemoteNwo, githubReviewState, approveGithubPr, closeGithubPr,
+  fetchGithubPrState,
   type GithubReviewState,
 } from './prProviders/github.js';
 import {
   listAzdoPrs, fetchAzdoDiff, fetchAzdoComments, fetchAzdoPrDetail, parseAzureRemote, fetchAzdoReviewState, approveAzdoPr, abandonAzdoPr,
+  fetchAzdoPrState,
   type AzdoReviewState,
 } from './prProviders/azureDevops.js';
 import { defaultExec } from './prProviders/exec.js';
 import { resolveGithubLogin, resolveAzdoUser } from './prWatch/identity.js';
+import { detectListChange, prKey } from './reviews/detectMerged.js';
 
 /** Same shape from both providers — what the `prs:reviewState` IPC returns. */
 export type ReviewStatePayload = GithubReviewState | AzdoReviewState;
@@ -32,6 +35,8 @@ export interface ReviewsDeps {
   abandonAzdoPr?: (apiBase: string, repo: string, prNumber: number, pat: string) => Promise<void>;
   resolveGithubLogin?: () => Promise<string>;
   resolveAzdoUser?: (apiBase: string, pat: string) => Promise<{ id: string; displayName: string }>;
+  githubPrState?: (nwo: string, prNumber: number) => Promise<{ merged: boolean }>;
+  azdoPrState?: (repo: AzdoRepoConfig, prNumber: number, pat: string) => Promise<{ merged: boolean }>;
 }
 
 /** Everything mergeAzdoPr needs, resolved from the repo config + a fresh PR GET. */
@@ -75,6 +80,8 @@ export class ReviewsService {
   private abandonAzdoPrFn: (apiBase: string, repo: string, prNumber: number, pat: string) => Promise<void>;
   private resolveGithubLoginFn: () => Promise<string>;
   private resolveAzdoUserFn: (apiBase: string, pat: string) => Promise<{ id: string; displayName: string }>;
+  private githubPrStateFn: (nwo: string, prNumber: number) => Promise<{ merged: boolean }>;
+  private azdoPrStateFn: (repo: AzdoRepoConfig, prNumber: number, pat: string) => Promise<{ merged: boolean }>;
   /** Memoized per apiBase — `Task 2` (ADO list filter) reuses this cache via `azdoUser()`. */
   private azdoUserCache = new Map<string, { id: string; displayName: string }>();
 
@@ -93,6 +100,8 @@ export class ReviewsService {
     this.abandonAzdoPrFn = deps.abandonAzdoPr ?? ((apiBase, repo, n, pat) => abandonAzdoPr(apiBase, repo, n, pat));
     this.resolveGithubLoginFn = deps.resolveGithubLogin ?? (() => resolveGithubLogin());
     this.resolveAzdoUserFn = deps.resolveAzdoUser ?? ((apiBase, pat) => resolveAzdoUser(apiBase, pat));
+    this.githubPrStateFn = deps.githubPrState ?? ((nwo, n) => fetchGithubPrState(nwo, n));
+    this.azdoPrStateFn = deps.azdoPrState ?? ((r, n, pat) => fetchAzdoPrState(r, n, pat));
   }
 
   /** Memoized ADO user-id resolver, cached per apiBase (an org can host multiple repos). */
@@ -134,12 +143,22 @@ export class ReviewsService {
 
   list() { return { pullRequests: this.cache, syncedAt: this.syncedAt, warnings: this.warnings }; }
 
-  async refresh(devopsPats: Record<string, string> | undefined) {
+  /**
+   * Fetches the current open-PR set across every resolved repo, tolerating
+   * per-repo failures (collected as `errors`). `succeededRepoKeys` records
+   * which repos' list call succeeded this cycle — `backgroundRefresh` uses it
+   * to distinguish "PR merged/closed" from "repo transiently failed to fetch"
+   * when a PR drops out of the open set.
+   */
+  private async fetchOpenSet(devopsPats: Record<string, string> | undefined): Promise<{
+    results: PullRequestPayload[]; errors: string[]; succeededRepoKeys: Set<string>;
+  }> {
     const results: PullRequestPayload[] = [];
     const errors: string[] = [];
+    const succeededRepoKeys = new Set<string>();
     const { github, azdo } = await this.resolveRepos();
     for (const r of github) {
-      try { results.push(...(await this.listGithub(r))); }
+      try { results.push(...(await this.listGithub(r))); succeededRepoKeys.add(r.repoKey); }
       catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
     }
     for (const r of azdo) {
@@ -148,8 +167,14 @@ export class ReviewsService {
       try {
         const user = await this.azdoUser(r.apiBase, pat);
         results.push(...(await this.listAzdo(r, pat, user.id)));
+        succeededRepoKeys.add(r.repoKey);
       } catch (e) { errors.push(`${r.repoLabel}: ${e instanceof Error ? e.message : String(e)}`); }
     }
+    return { results, errors, succeededRepoKeys };
+  }
+
+  async refresh(devopsPats: Record<string, string> | undefined) {
+    const { results, errors } = await this.fetchOpenSet(devopsPats);
     this.cache = results;
     this.syncedAt = isoNow();
     // A total failure (nothing to show) is a hard error; a partial failure keeps
@@ -160,6 +185,60 @@ export class ReviewsService {
     }
     this.warnings = errors;
     return this.list();
+  }
+
+  /** Resolves whether a PR that dropped off the open list was merged (vs closed). */
+  private async classifyMerged(pr: PullRequestPayload, devopsPats: Record<string, string> | undefined): Promise<boolean> {
+    const { github, azdo } = await this.resolveRepos();
+    if (pr.host === 'github') {
+      const repo = github.find((r) => r.repoKey === pr.repoKey);
+      if (!repo) return false;
+      return (await this.githubPrStateFn(repo.nwo, pr.number)).merged;
+    }
+    const repo = azdo.find((r) => r.repoKey === pr.repoKey);
+    const pat = repo ? devopsPats?.[repo.devopsHost] : undefined;
+    if (!repo || !pat) return false;
+    return (await this.azdoPrStateFn(repo, pr.number, pat)).merged;
+  }
+
+  /**
+   * Silent poll cycle for the PR-watch tick: refetches the open set, diffs it
+   * against the cache to find PRs that disappeared (via `detectListChange`),
+   * classifies each as merged/closed, and fires `hooks.notifyMerged` for the
+   * merged ones. Always updates the cache (merged/closed PRs removed) — except
+   * on a total fetch failure, where the list is left untouched and nothing is
+   * classified. `hooks.onListChanged()` only fires when the resulting PR set
+   * actually differs from before (by key, not just candidate count — a newly
+   * *appeared* PR changes the list with zero candidates and must still push),
+   * so a no-op poll cycle doesn't cause the renderer to reload for nothing.
+   */
+  async backgroundRefresh(
+    devopsPats: Record<string, string> | undefined,
+    hooks: { notifyMerged(pr: PullRequestPayload): void; onListChanged(): void },
+  ): Promise<void> {
+    const prev = this.cache;
+    const { results, errors, succeededRepoKeys } = await this.fetchOpenSet(devopsPats);
+    // Total failure (nothing fetched, all errored) → leave the list untouched, notify nothing.
+    if (results.length === 0 && errors.length > 0 && succeededRepoKeys.size === 0) return;
+    const { nextCache, candidates } = detectListChange(prev, results, succeededRepoKeys);
+    for (const pr of candidates) {
+      try {
+        if (await this.classifyMerged(pr, devopsPats)) hooks.notifyMerged(pr);
+      } catch (e) {
+        // Classification failed (transient) — the PR is still removed from the list
+        // (it left the open set of a succeeded repo); we simply skip the notification.
+        console.error('[reviews] classifyMerged failed', prKey(pr), e);
+      }
+    }
+    this.cache = nextCache;
+    this.syncedAt = isoNow();
+    this.warnings = errors;
+    const prevKeys = new Set(prev.map(prKey));
+    const nextKeys = new Set(nextCache.map(prKey));
+    const changed = prevKeys.size !== nextKeys.size
+      || [...nextKeys].some((k) => !prevKeys.has(k))
+      || [...prevKeys].some((k) => !nextKeys.has(k));
+    if (changed) hooks.onListChanged();
   }
 
   async diff(host: PrHost, repoKey: string, prNumber: number, _devopsPats: Record<string, string> | undefined): Promise<DiffFilePayload[]> {

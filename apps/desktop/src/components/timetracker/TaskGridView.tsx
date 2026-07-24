@@ -34,10 +34,10 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import EventRepeatIcon from '@mui/icons-material/EventRepeat';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CircularProgress from '@mui/material/CircularProgress';
 import dayjs, { type Dayjs } from 'dayjs';
 import 'dayjs/locale/cs';
-import { useToast, toastMessage } from '../../state/useToast.js';
+import { useToast } from '../../state/useToast.js';
 import { invoke } from '../../state/ipc';
 import { formatDateLongCz } from '../../util/format.js';
 import { useTaskGrid } from '../../state/useTaskGrid.js';
@@ -51,9 +51,6 @@ import type {
   TaskViewPayload,
   WorklogViewPayload,
 } from '@watchtower/shared/ipcContract.js';
-
-const WATCHTOWER_DB_PATH =
-  '/Users/jan/Library/Application Support/Watchtower/data.db';
 
 const MONTH_LABELS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -209,16 +206,14 @@ export function TaskGridView({ projectId }: Props) {
 
   const [jiraSyncOpen, setJiraSyncOpen] = useState(false);
 
-  // Sync-meetings — copies a `/sync-meetings` slash command to the clipboard
-  // for the user to paste into their Claude Code chat (where the M365 MCP is
-  // already authenticated). The button does NOT spawn `claude -p` itself —
-  // that hangs on MCP init in the orchestrator's subprocess in this user's
-  // env (see the abandoned attempts in git history). The range defaults to the
-  // grid's displayed month.
+  // Sync-meetings — runs `meetings:sync` in the orchestrator, which logs
+  // Outlook meetings for the picked range as worklogs directly. The range
+  // defaults to the grid's displayed month.
   const { showError, showSuccess } = useToast();
   const [syncMeetingsAnchor, setSyncMeetingsAnchor] = useState<HTMLElement | null>(null);
   const [syncMeetingsFrom, setSyncMeetingsFrom] = useState<Dayjs | null>(null);
   const [syncMeetingsTo, setSyncMeetingsTo] = useState<Dayjs | null>(null);
+  const [syncMeetingsPending, setSyncMeetingsPending] = useState(false);
 
   const openSyncMeetings = (anchor: HTMLElement) => {
     const monthStart = dayjs(new Date(year, month - 1, 1)).startOf('day');
@@ -249,15 +244,21 @@ export function TaskGridView({ projectId }: Props) {
 
   const submitSyncMeetings = async () => {
     if (!syncRangeValid || !syncMeetingsFrom || !syncMeetingsTo) return;
-    const command =
-      `/sync-meetings ${syncMeetingsFrom.format('YYYY-MM-DD')} ${syncMeetingsTo.format('YYYY-MM-DD')} ` +
-      `"${WATCHTOWER_DB_PATH}"`;
+    setSyncMeetingsPending(true);
     try {
-      await navigator.clipboard.writeText(command);
-      setSyncMeetingsAnchor(null);
-      showSuccess('Command copied to clipboard. Paste it into the Claude Code chat to run it.');
-    } catch (err) {
-      showError(`Failed to copy command: ${toastMessage(err)}`);
+      const res = await invoke('meetings:sync', {
+        from: syncMeetingsFrom.format('YYYY-MM-DD'),
+        to: syncMeetingsTo.format('YYYY-MM-DD'),
+      });
+      if (res.ok) {
+        setSyncMeetingsAnchor(null);
+        showSuccess(`Logged ${res.count ?? 0} meeting${res.count === 1 ? '' : 's'} as worklogs.`);
+        void grid.refresh();
+      } else {
+        showError(res.error ?? 'Meeting sync failed.');
+      }
+    } finally {
+      setSyncMeetingsPending(false);
     }
   };
 
@@ -643,9 +644,9 @@ export function TaskGridView({ projectId }: Props) {
             {formatDateLongCz(monthEnd.format('YYYY-MM-DD'))}).
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-            Clicking copies the <code>/sync-meetings</code> command to your clipboard.
-            Paste it into your Claude Code chat and press Enter — Watchtower
-            will pick up the new worklogs directly from the DB.
+            Clicking runs <code>/sync-meetings</code> in a background Claude
+            session and logs the resulting worklogs — this can take a few
+            minutes.
           </Typography>
           <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
             <DatePicker
@@ -669,11 +670,11 @@ export function TaskGridView({ projectId }: Props) {
             <Button onClick={() => setSyncMeetingsAnchor(null)}>Cancel</Button>
             <Button
               variant="contained"
-              startIcon={<ContentCopyIcon />}
-              disabled={!syncRangeValid}
+              startIcon={syncMeetingsPending ? <CircularProgress size={16} color="inherit" /> : <EventRepeatIcon />}
+              disabled={!syncRangeValid || syncMeetingsPending}
               onClick={() => void submitSyncMeetings()}
             >
-              Copy command
+              {syncMeetingsPending ? 'Syncing…' : 'Sync'}
             </Button>
           </Stack>
         </Box>

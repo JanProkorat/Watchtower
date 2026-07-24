@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "WatchtowerCore", targets: ["WatchtowerCore"]),
         .library(name: "WatchtowerBridge", targets: ["WatchtowerBridge"]),
+        .library(name: "WatchtowerRemote", targets: ["WatchtowerRemote"]),
     ],
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.15.0"),
@@ -34,6 +35,17 @@ let package = Package(
         .testTarget(
             name: "WatchtowerBridgeTests",
             dependencies: ["WatchtowerBridge"]
+        ),
+        .target(
+            name: "WatchtowerRemote",
+            dependencies: [
+                "WatchtowerBridge",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ]
+        ),
+        .testTarget(
+            name: "WatchtowerRemoteTests",
+            dependencies: ["WatchtowerRemote"]
         ),
     ]
 )

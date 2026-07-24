@@ -9,6 +9,7 @@ import { fireMacNotification, fireTestNotification } from './notifications.js';
 import { runBoardSignIn } from './boardSignIn.js';
 import { setPat, patStatus, getPats } from './devopsPat.js';
 import { getCloudSyncConfig, setCloudSyncConfig } from './cloudSync.js';
+import { joinMeeting, focusCall, closeTeamsWindow } from './teamsWindow.js';
 
 type DeepLinkPayload = Extract<IpcPush, { kind: 'deep-link' }>['payload'];
 
@@ -153,6 +154,19 @@ export function registerIpc(): void {
           return { ok: false, error: 'openExternalUrl: only https:// URLs are allowed' };
         }
         await shell.openExternal(url);
+        return { ok: true };
+      }
+
+      if (kind === 'teams:joinMeeting') {
+        joinMeeting((payload as { joinUrl: string }).joinUrl);
+        return { ok: true };
+      }
+      if (kind === 'teams:focusCall') {
+        focusCall();
+        return { ok: true };
+      }
+      if (kind === 'teams:close') {
+        closeTeamsWindow();
         return { ok: true };
       }
 

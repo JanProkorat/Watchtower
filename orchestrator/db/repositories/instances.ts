@@ -17,6 +17,7 @@ type DbInstanceRow = {
   kind: InstanceKind;
   task_id: number | null;
   worktree_path: string | null;
+  background: number;
 };
 
 function toRow(r: DbInstanceRow): InstanceRow {
@@ -35,6 +36,7 @@ function toRow(r: DbInstanceRow): InstanceRow {
     kind: r.kind,
     taskId: r.task_id,
     worktreePath: r.worktree_path,
+    background: r.background === 1,
   };
 }
 
@@ -50,8 +52,8 @@ export class InstancesRepo {
     const displayOrder = (maxRow.m ?? 0) + 1000;
     this.db
       .prepare(
-        `INSERT INTO instances (id, cwd, status, claude_session_id, spawned_at, last_activity_at, exit_code, termination_reason, resumed_from_instance_id, jira_key_hint, args_json, kind, worktree_path, display_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO instances (id, cwd, status, claude_session_id, spawned_at, last_activity_at, exit_code, termination_reason, resumed_from_instance_id, jira_key_hint, args_json, kind, worktree_path, display_order, background)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         row.id,
@@ -68,6 +70,7 @@ export class InstancesRepo {
         row.kind,
         row.worktreePath,
         displayOrder,
+        row.background ? 1 : 0,
       );
   }
 
@@ -110,6 +113,7 @@ export class InstancesRepo {
           `SELECT * FROM instances
             WHERE status IN (${placeholders})
               AND cwd = ?
+              AND background = 0
             ORDER BY spawned_at`,
         )
         .all(...LIVE_STATUSES, cwd) as DbInstanceRow[]

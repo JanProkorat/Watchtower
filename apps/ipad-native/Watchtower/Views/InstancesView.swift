@@ -28,7 +28,6 @@ struct InstancesView: View {
                 detail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .background(Palette.baseBg.ignoresSafeArea())
             .navigationTitle("Instances")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -37,12 +36,15 @@ struct InstancesView: View {
                         Button("Remove", role: .destructive) {
                             showRemoveConfirm = true
                         }
+                        .buttonStyle(.glass)
                     }
                     Button {
                         store.send(.spawnRequested)
                     } label: {
                         Label("New", systemImage: "plus")
                     }
+                    .buttonStyle(.glassProminent)
+                    .tint(Palette.accent)
                 }
             }
             .confirmationDialog(
@@ -69,24 +71,30 @@ struct InstancesView: View {
     }
 
     private var authBanner: some View {
-        HStack {
+        let colors = Palette.status(.authBlock)
+        return HStack {
             Text("Mac is waiting for a login")
                 .font(.callout.weight(.medium))
-                .foregroundStyle(Palette.textPrimary)
+                .foregroundStyle(colors.accent)
             Spacer()
             Button("Open Remote Mac", action: onOpenRemote)
                 .buttonStyle(.borderedProminent)
+                .tint(colors.accent)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Color.orange.opacity(0.18))
+        .floatingGlass(cornerRadius: 14, tint: colors.fill)
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
     }
 
     private var tabStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(store.groups) { group in
-                    groupTab(group)
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    ForEach(store.groups) { group in
+                        groupTab(group)
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -95,12 +103,10 @@ struct InstancesView: View {
     }
 
     private func groupTab(_ group: ProjectGroup) -> some View {
-        let selected = group.instanceIds.contains(store.selectedInstanceId ?? "")
+        let selected = group.id == store.activeGroupId
         let needsAttention = group.instanceIds.contains { store.attentionIds.contains($0) }
         return Button {
-            guard let firstId = group.instanceIds.first else { return }
-            let activeId = group.instanceIds.first { $0 == store.selectedInstanceId } ?? firstId
-            store.send(.instanceSelected(activeId))
+            store.send(.groupActivated(groupId: group.id))
         } label: {
             HStack(spacing: 6) {
                 if needsAttention {
@@ -111,23 +117,41 @@ struct InstancesView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(selected ? Color.white.opacity(0.1) : .clear)
-            )
             .foregroundStyle(selected ? Palette.accent : Palette.textMuted)
+            .floatingGlass(cornerRadius: 12, tint: selected ? Palette.accentWash : nil)
         }
         .buttonStyle(.plain)
         .disabled(group.instanceIds.isEmpty)
     }
 
     @ViewBuilder private var detail: some View {
-        // A dangling `selectedInstanceId` (its instance was removed/restarted
-        // away) must not force-unwrap into a dead terminal — fall back to the
-        // empty state instead.
-        if let id = store.selectedInstanceId, store.instances.contains(where: { $0.id == id }) {
-            RemoteTerminalView(instanceId: id)
-                .id(id)
+        // No active group / no persisted layout / an active group with no
+        // live instances left must not force-unwrap into a dead tree — fall
+        // back to the empty state instead.
+        if let groupId = store.activeGroupId,
+           let layout = store.layouts[groupId],
+           let group = store.groups.first(where: { $0.id == groupId }),
+           !group.instanceIds.isEmpty {
+            WorkspacePaneView(
+                node: layout.root,
+                focusedLeafId: layout.focusedLeafId,
+                groupInstanceIds: group.instanceIds,
+                onSplit: { leafId, dir, position, instanceId in
+                    store.send(.paneSplit(leafId: leafId, dir: dir, position: position, instanceId: instanceId))
+                },
+                onClose: { leafId in
+                    store.send(.paneClosed(leafId: leafId))
+                },
+                onResize: { splitId, sizes in
+                    store.send(.paneResized(splitId: splitId, sizes: sizes))
+                },
+                onResizeCommitted: {
+                    store.send(.paneResizeCommitted)
+                },
+                onFocus: { leafId in
+                    store.send(.paneFocused(leafId: leafId))
+                }
+            )
         } else {
             VStack(spacing: 8) {
                 Text("Select or spawn an instance")

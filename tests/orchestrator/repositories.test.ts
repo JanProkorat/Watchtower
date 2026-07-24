@@ -25,6 +25,8 @@ function makeRow(overrides: Partial<InstanceRow> = {}): InstanceRow {
     argsJson: null,
     kind: 'claude',
     worktreePath: null,
+    taskId: null,
+    background: false,
     ...overrides,
   };
 }

@@ -504,6 +504,16 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
   },
   {
     version: 25,
+    up: (db) => {
+      // Hidden, orchestrator-driven instances (e.g. the meeting-sync driver's
+      // short-lived worker). Filtered out of listInstances so they never enter
+      // the tab strip. Constant default 0 (node:sqlite vs better-sqlite3
+      // ADD COLUMN divergence — see memory sqlite-add-column-engine-divergence).
+      addColumnIfMissing(db, 'instances', 'background', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  },
+  {
+    version: 26,
     up: (db: SqliteLike) => {
       // Constant default (NULL) only — a non-constant ADD COLUMN default diverges
       // between node:sqlite (tests) and better-sqlite3 (prod). Nullable: only the

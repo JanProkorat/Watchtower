@@ -2,7 +2,7 @@ import type { HubConfig } from './hubConfig.js';
 
 export type IpcRequest =
   | { kind: 'ping'; payload: { now: number } }
-  | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind } }
+  | { kind: 'spawnInstance'; payload: { cwd: string; args?: string[]; instanceKind?: import('./stateModel.js').InstanceKind; background?: boolean } }
   | { kind: 'ptyWrite'; payload: { instanceId: string; data: string } }
   | { kind: 'ptyResize'; payload: { instanceId: string; cols: number; rows: number } }
   | { kind: 'terminalAttach'; payload: { instanceId: string } }
@@ -87,6 +87,12 @@ export type IpcRequest =
   | { kind: 'statuslineCapture:status'; payload: Record<string, never> }
   | { kind: 'statuslineCapture:set'; payload: { enabled: boolean } }
   | { kind: 'openExternalUrl'; payload: { url: string } }
+  | { kind: 'teams:joinMeeting'; payload: { joinUrl: string } }
+  | { kind: 'teams:focusCall'; payload: Record<string, never> }
+  | { kind: 'meetings:listToday'; payload: Record<string, never> }
+  | { kind: 'meetings:sync'; payload: { from: string; to: string } }
+  | { kind: 'teams:refresh'; payload: Record<string, never> }
+  | { kind: 'teams:close'; payload: Record<string, never> }
   | { kind: 'terminalFocus'; payload: { instanceId: string } }
   | { kind: 'push:registerDevice'; payload: { token: string; platform: string; bundleId?: string } }
   | { kind: 'prs:list'; payload: Record<string, never> }
@@ -768,6 +774,12 @@ export type IpcResponse =
   | { kind: 'statuslineCapture:status'; payload: { enabled: boolean; available: boolean } }
   | { kind: 'statuslineCapture:set'; payload: { ok: boolean; changed: boolean; backupPath: string | null; error?: string } }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
+  | { kind: 'teams:joinMeeting'; payload: { ok: boolean } }
+  | { kind: 'teams:focusCall'; payload: { ok: boolean } }
+  | { kind: 'meetings:listToday'; payload: { meetings: import('./meetings.js').MeetingSummary[]; syncedAt: number | null } }
+  | { kind: 'meetings:sync'; payload: { ok: boolean; count?: number; error?: string } }
+  | { kind: 'teams:refresh'; payload: { ok: boolean; count?: number; error?: string } }
+  | { kind: 'teams:close'; payload: { ok: boolean } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
   | { kind: 'push:registerDevice'; payload: { ok: true } }
   | { kind: 'prs:list'; payload: { pullRequests: PullRequestPayload[]; syncedAt: string | null; warnings: string[] } }
@@ -967,6 +979,7 @@ export type IpcPush =
   | { kind: 'authBlock'; payload: { instanceId: string; blocked: boolean; reason?: string } }
   | { kind: 'badge'; payload: { count: number } }
   | { kind: 'activateInstance'; payload: { instanceId: string } }
+  | { kind: 'teamsStateChanged'; payload: import('./teamsState.js').TeamsPushState }
   | { kind: 'triggerNewInstance'; payload: Record<string, never> }
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimitsUsage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
@@ -977,6 +990,7 @@ export type IpcPush =
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
   | { kind: 'prReviewDone'; payload: { reviewId: number } }
   | { kind: 'prWatchEvent'; payload: { host: PrHost; repoKey: string; prNumber: number } }
+  | { kind: 'prsChanged'; payload: Record<string, never> }
   // Sent by electron/ipc.ts's macOS notification click handler directly on the
   // 'deep-link' webContents channel (not multiplexed through 'watchtower:push'),
   // so the preload bridges it separately — see electron/preload.ts.
@@ -994,6 +1008,9 @@ export const ELECTRON_ONLY_KINDS: ReadonlySet<IpcRequest['kind']> = new Set([
   'cloudSync:getConfig',
   'cloudSync:setConfig',
   'deepLink:ready',
+  'teams:joinMeeting',
+  'teams:focusCall',
+  'teams:close',
 ]);
 
 export interface WatchtowerBridge {

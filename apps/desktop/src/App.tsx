@@ -52,6 +52,7 @@ import { ModuleNotes } from './components/notes/ModuleNotes.js';
 import { SlotRegistryProvider } from './components/instances/SlotRegistry.js';
 import { TerminalPool } from './components/instances/TerminalPool.js';
 import { WorkspaceRoot } from './components/instances/WorkspaceRoot.js';
+import { TeamsPill } from './components/teams/TeamsPill.js';
 import { routeSpawnToTab } from './layout/routeSpawnToTab.js';
 import {
   collectTabIds,
@@ -476,7 +477,10 @@ export function App() {
                 onOpenNotification={openNotification}
                 onMarkAllNotificationsSeen={markAllNotificationsSeen}
               />
-              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative' }}>
+                <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
+                  <TeamsPill />
+                </Box>
                 {/* Instance tab bar — visible on every module so you can jump back
                     to a session from anywhere. Hidden on the dashboard, which
                     already lists sessions in its own card. */}

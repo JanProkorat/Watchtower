@@ -47,4 +47,5 @@ export type WatchEvent =
   | { type: 'commented'; author: string }
   | { type: 'reviewed'; author: string }
   | { type: 'approved'; author: string }
-  | { type: 'changes_requested'; author: string };
+  | { type: 'changes_requested'; author: string }
+  | { type: 'merged' };

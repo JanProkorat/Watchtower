@@ -42,7 +42,7 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(25);
+    expect(version.v).toBe(26);
   });
 
   it('v12 adds task_id column to instances', () => {
@@ -175,7 +175,7 @@ describe('migrations', () => {
     db.exec('DELETE FROM schema_version WHERE version > 12');
     expect(() => runMigrations(db as unknown as SqliteLike)).not.toThrow();
     const v = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(v.v).toBe(25);
+    expect(v.v).toBe(26);
   });
 
   it('v13 backfills sync_id + updated_at on pre-existing rows', () => {
@@ -281,6 +281,15 @@ describe('migrations', () => {
     expect(col!.notnull).toBe(0); // nullable
     const idx = db.prepare(`PRAGMA index_list(contracts)`).all() as Array<{ name: string }>;
     expect(idx.some((i) => i.name === 'idx_contracts_group')).toBe(true);
+  });
+
+  it('v25 adds instances.background defaulting to 0', () => {
+    const db = new DatabaseSync(':memory:');
+    runMigrations(db);
+    const cols = (db.prepare(`PRAGMA table_info(instances)`).all() as Array<{ name: string; dflt_value: string | null }>);
+    const bg = cols.find((c) => c.name === 'background');
+    expect(bg).toBeDefined();
+    expect(bg!.dflt_value).toBe('0');
   });
 
   it('v19 renames is_default → is_pinned and allows multiple pinned projects', () => {

@@ -43,4 +43,9 @@ describe('notificationBody', () => {
     const ev: WatchEvent = { type: 'changes_requested', author: 'dave' };
     expect(notificationBody(pr, ev)).toBe('dave requested changes on "Add sprockets"');
   });
+
+  it('formats merged with no author', () => {
+    const ev: WatchEvent = { type: 'merged' };
+    expect(notificationBody(pr, ev)).toBe('"Add sprockets" was merged');
+  });
 });

@@ -48,3 +48,7 @@ apps/ipad/dist/
 apps/ipad/ios/App/App/public/
 apps/iphone/dist/
 apps/iphone/ios/App/App/public/
+
+# WatchtowerCore is a path-referenced library; its lockfile is re-churned by
+# the app xcodegen/build. Each app pins via its own .xcodeproj Package.resolved.
+swift/WatchtowerCore/Package.resolved

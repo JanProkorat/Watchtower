@@ -34,7 +34,11 @@
     <dict>
         <key>NSAllowsArbitraryLoads</key>
         <true/>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
     </dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Watchtower connects to your Mac over the local network for screen sharing and wake-on-LAN.</string>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationLandscapeLeft</string>

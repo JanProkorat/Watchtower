@@ -81,6 +81,20 @@ export async function fetchAzdoPrDetail(
   return { lastMergeSourceCommitId: commitId };
 }
 
+/**
+ * Determines whether a PR that's dropped off the open list was merged (vs
+ * closed/abandoned). Uses the same Basic-auth GET helper and URL shape as
+ * `fetchAzdoPrDetail`. Azure DevOps PR `status`: `'completed'` = merged,
+ * `'abandoned'` = closed, `'active'` = open.
+ */
+export async function fetchAzdoPrState(
+  repo: AzdoRepoConfig, prNumber: number, pat: string, get: HttpGet = defaultGet,
+): Promise<{ merged: boolean }> {
+  const url = `${repo.apiBase}/_apis/git/repositories/${repo.repo}/pullRequests/${prNumber}?${API}`;
+  const data = (await get(url, pat)) as { status?: string };
+  return { merged: data.status === 'completed' };
+}
+
 export async function fetchAzdoDiff(
   repo: AzdoRepoConfig, sourceBranch: string, targetBranch: string, exec: Exec = defaultExec,
 ): Promise<DiffFilePayload[]> {

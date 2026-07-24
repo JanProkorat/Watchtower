@@ -44,4 +44,5 @@ export interface InstanceRow {
   /** For a Reviews "implement comments" session: the dedicated git worktree the
    *  session runs in, so closing the instance can clean it up. Null otherwise. */
   worktreePath: string | null;
+  background: boolean;
 }
