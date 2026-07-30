@@ -26,7 +26,11 @@ describe('MeetingDriver', () => {
     const h = makeDeps({ statuses: ['spawning', 'working', 'working'], result: { ok: true, count: 2 }, resultAfterTicks: 3 });
     const res = await new MeetingDriver(h.deps).run(spec);
     expect(res).toEqual({ ok: true, count: 2 });
-    expect(h.writes()).toEqual(['/teams-refresh "db"\r']);
+    // The Enter MUST be a separate write. The command is a slash command, so
+    // a single `text + '\r'` chunk lets the TUI's autocomplete popup consume
+    // the CR instead of submitting — the line sits in the composer, no turn
+    // starts, and the driver spins until jobTimeoutMs.
+    expect(h.writes()).toEqual(['/teams-refresh "db"', '\r']);
     expect(h.disposed()).toBe(1);
   });
 

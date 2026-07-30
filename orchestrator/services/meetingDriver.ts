@@ -42,6 +42,8 @@ export const MEETING_ALLOWLIST_ARGS = ['--allowedTools', 'mcp__claude_ai_Microso
 
 const POLL_MS = 500;
 const SETTLE_MS = 1500;
+/** Gap between typing the command and pressing Enter — see the inject site. */
+const SUBMIT_GAP_MS = 500;
 // Terminal / turn-complete statuses (from packages/shared/src/stateModel.ts).
 const DONE_STATUSES = new Set(['waiting-input', 'idle-notify', 'finished', 'crashed']);
 const EXITED_STATUSES = new Set(['finished', 'crashed']);
@@ -72,7 +74,17 @@ export class MeetingDriver {
         await this.deps.sleep(POLL_MS);
       }
       await this.deps.sleep(SETTLE_MS);
-      this.deps.write(id, spec.command + '\r');
+      // Text and Enter MUST be two separate writes. `command` is a SLASH
+      // command, so typing it opens the TUI's autocomplete popup; when the CR
+      // arrives in the same read as the text, the popup consumes it (accept /
+      // complete) instead of submitting. The line then just sits in the
+      // composer, no turn ever starts, and we spin until jobTimeoutMs.
+      // A short gap lets the popup settle so the CR reaches the composer.
+      // (Plain-text injection is unaffected — verified — hence deliverReply's
+      // single-chunk write is fine.)
+      this.deps.write(id, spec.command);
+      await this.deps.sleep(SUBMIT_GAP_MS);
+      this.deps.write(id, '\r');
 
       // Phase 2 — a result file appearing is success. A turn that ends with no
       // file (Stop → waiting-input, or process exit) is a failure. 'waiting-input'
