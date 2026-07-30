@@ -241,6 +241,13 @@ export function TabStrip({
   // user-facing tab — never render it in the strip.
   const visibleTabs = tabs.filter((t) => t.id !== DASHBOARD_TAB_ID);
   const ids = visibleTabs.map((t) => t.id);
+  // "Hide from workspace" only makes sense while the window is shared: it drops
+  // this tab's pane so the remaining ones take the space back. With a single
+  // project mounted there is no split to shrink — hiding would just leave an
+  // empty workspace — so the button is noise and stays out of the strip.
+  // Counted over visibleTabs so the dashboard fallback leaf never counts as a
+  // second pane.
+  const sharesTheWindow = visibleTabs.filter((t) => mountedTabIds.has(t.id)).length >= 2;
   const [ctxMenu, setCtxMenu] = useState<{ id: TabId; x: number; y: number } | null>(null);
 
   return (
@@ -281,7 +288,11 @@ export function TabStrip({
                 attention={attentionTabIds.has(t.id)}
                 active={focusedTabId === t.id}
                 onClick={() => onSelect(t.id)}
-                onHide={!mountedTabIds.has(t.id) ? undefined : () => onHideTab(t.id)}
+                onHide={
+                  sharesTheWindow && mountedTabIds.has(t.id)
+                    ? () => onHideTab(t.id)
+                    : undefined
+                }
                 onClose={() => onCloseTab(t.id)}
               />
             </Box>

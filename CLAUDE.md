@@ -56,6 +56,29 @@ version: v5.
 PROTOTYPE.md decision #13). Don't rename `project_rates` → `contracts`
 or drop `is_billable` until the absorption has run on enough dogfood data.
 
+### Meeting-sync routing settings
+
+Meeting → worklog routing is **not** decided in this repo. `/sync-meetings`
+fetches the calendar and hands the events to
+`~/.claude/commands/log-meetings.mjs` (outside git), which reads three
+`settings` rows to pick the target task:
+
+| Key | Rule |
+|---|---|
+| `meetings.one_on_one_task_id` | subject contains `1:1` or `.NET sync` |
+| `meetings.all_company_task_id` | subject matches `celofiremní porada` |
+| `meetings.default_task_id` | everything else, unless the subject carries a known task number |
+
+No task number is hardcoded. An unset (or dangling) key means those meetings
+are reported **unresolved** and nothing is logged — the script warns per key and
+exits 2, while the result file still reports `ok: true` with the counts. The UI
+for all three lives in `components/settings/MeetingTaskSettings.tsx`
+(Settings → General → Meetings).
+
+`orchestrator/services/meetingRules.ts` is an in-repo mirror of the script's
+rules — unit-tested, but nothing in the app calls it. **Change both copies
+together** or the tests stop describing what actually runs.
+
 ## ~/.claude/ filesystem layout (Settings module reads this)
 
 | Path | Purpose |

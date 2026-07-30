@@ -20,11 +20,23 @@ export interface TaskRef {
   title: string;
 }
 
+/**
+ * The three rule tasks all come from the `settings` table — the user picks them
+ * in Settings → General → Meetings:
+ *
+ *   meetings.one_on_one_task_id   → oneOnOneTask
+ *   meetings.all_company_task_id  → allCompanyTask
+ *   meetings.default_task_id      → defaultTask
+ *
+ * A null slot means "not configured": matching events are reported `unresolved`
+ * rather than being filed somewhere arbitrary. No task number is hardcoded
+ * anywhere in the routing.
+ */
 export interface RuleConfig {
-  /** Resolved task for "1:1" / ".NET sync" meetings (GREEN-100 by convention). */
-  green100: TaskRef | null;
-  /** Resolved task for "celofiremní porada" (GREEN-34 by convention). */
-  green34: TaskRef | null;
+  /** Resolved task for "1:1" / ".NET sync" meetings. */
+  oneOnOneTask: TaskRef | null;
+  /** Resolved task for "celofiremní porada" (all-company meeting). */
+  allCompanyTask: TaskRef | null;
   /** Fallback when no rule matches and no in-title task number resolves. */
   defaultTask: TaskRef | null;
   /** Look up a task by its `number` column (e.g. "GREEN-456"). */
@@ -118,10 +130,10 @@ export function decide(event: RawEvent, config: RuleConfig): Decision {
   let matchedRule = '';
 
   if (CELOFIREMNI_RE.test(lower)) {
-    task = config.green34;
+    task = config.allCompanyTask;
     matchedRule = 'celofiremni-porada';
   } else if (ONE_ON_ONE_RE.test(lower) || DOTNET_SYNC_RE.test(lower)) {
-    task = config.green100;
+    task = config.oneOnOneTask;
     matchedRule = '1:1 / .NET sync';
   } else {
     const m = subject.match(TASK_NUMBER_RE);
@@ -139,7 +151,9 @@ export function decide(event: RawEvent, config: RuleConfig): Decision {
   if (!task) {
     return {
       status: 'unresolved',
-      reason: `no task available for "${subject}" (rule: ${matchedRule || 'default'})`,
+      reason:
+        `no task configured for rule "${matchedRule || 'default'}"` +
+        ' — set it in Settings → General → Meetings',
     };
   }
 

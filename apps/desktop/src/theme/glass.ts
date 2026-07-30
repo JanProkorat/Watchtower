@@ -37,18 +37,38 @@ export const GLASS_FILL_LIGHT_OPACITY = 0.50;
 export const GLASS_FILL_LIGHT_OPACITY_MAX = 0.85;
 
 /**
+ * Base color the ambient window background paints its glows over. Exported so
+ * {@link glassPinned} can composite the glass fill against the real backdrop
+ * instead of guessing.
+ */
+export const AMBIENT_BASE_DARK = '#0a0d13';
+export const AMBIENT_BASE_LIGHT = '#eef2f7';
+
+/** Shared internal: the fill's RGB components + resolved opacity for a mode + elevation. */
+function computeGlassFillParts(
+  isDark: boolean,
+  elevation: number,
+): { rgb: string; opacity: number } {
+  const elevationOpacityBoost = elevation * 0.04;
+  if (isDark) {
+    return {
+      rgb: GLASS_FILL_DARK_RGB,
+      opacity: Math.min(GLASS_FILL_DARK_OPACITY + elevationOpacityBoost, GLASS_FILL_DARK_OPACITY_MAX),
+    };
+  }
+  return {
+    rgb: GLASS_FILL_LIGHT_RGB,
+    opacity: Math.min(GLASS_FILL_LIGHT_OPACITY + elevationOpacityBoost, GLASS_FILL_LIGHT_OPACITY_MAX),
+  };
+}
+
+/**
  * Shared internal: computes the fill color string for a given mode + elevation.
  * Used by both glassSurface and glassFill to keep the rgba math in one place.
  */
 function computeGlassFill(isDark: boolean, elevation: number): string {
-  const elevationOpacityBoost = elevation * 0.04;
-  if (isDark) {
-    const opacity = Math.min(GLASS_FILL_DARK_OPACITY + elevationOpacityBoost, GLASS_FILL_DARK_OPACITY_MAX);
-    return `rgba(${GLASS_FILL_DARK_RGB},${opacity.toFixed(2)})`;
-  } else {
-    const opacity = Math.min(GLASS_FILL_LIGHT_OPACITY + elevationOpacityBoost, GLASS_FILL_LIGHT_OPACITY_MAX);
-    return `rgba(${GLASS_FILL_LIGHT_RGB},${opacity.toFixed(2)})`;
-  }
+  const { rgb, opacity } = computeGlassFillParts(isDark, elevation);
+  return `rgba(${rgb},${opacity.toFixed(2)})`;
 }
 
 /**
@@ -115,6 +135,38 @@ export function glassFill(theme: Theme, opts?: GlassSurfaceOptions): GlassFillSt
     backgroundColor: fill,
     border: `1px solid ${borderColor}`,
   };
+}
+
+/**
+ * Fully OPAQUE fill for *pinned* surfaces — sticky table headers, frozen
+ * columns, sticky footer totals.
+ *
+ * Scrolled content passes *underneath* these, so a translucent glass fill lets
+ * rows bleed through and smears the pinned text (the grid's totals rows had
+ * exactly this bug). The returned color is the same elevated glass fill
+ * composited over the ambient window base, so a pinned surface keeps the
+ * frosted tone of its translucent neighbours while transmitting nothing.
+ *
+ * Use this instead of `alpha(fill, 0.98)`-style near-opacity hacks: those still
+ * transmit, and they shift the tone lighter than the surrounding glass.
+ */
+export function glassPinned(theme: Theme, opts?: GlassSurfaceOptions): string {
+  const elevation = Math.max(0, opts?.elevation ?? 0);
+  const isDark = theme.palette.mode === 'dark';
+  const { rgb, opacity } = computeGlassFillParts(isDark, elevation);
+  const base = isDark ? AMBIENT_BASE_DARK : AMBIENT_BASE_LIGHT;
+  return compositeOver(rgb, opacity, base);
+}
+
+/** Alpha-composites `rgba(fillRgb, alpha)` over an opaque `#rrggbb` base. */
+function compositeOver(fillRgb: string, fillAlpha: number, baseHex: string): string {
+  const fill = fillRgb.split(',').map((n) => Number(n.trim()));
+  const hex = baseHex.replace('#', '');
+  const mix = [0, 1, 2].map((i) => {
+    const base = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    return Math.round((fill[i] ?? 0) * fillAlpha + base * (1 - fillAlpha));
+  });
+  return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,13 +237,13 @@ export function ambientBackground(theme: Theme): string {
       `radial-gradient(58% 52% at 2% 0%, ${alpha(p, 0.18)}, transparent 60%),` +
       `radial-gradient(64% 60% at 100% 4%, ${alpha(theme.palette.info.main, 0.13)}, transparent 55%),` +
       `radial-gradient(82% 82% at 92% 100%, ${alpha(theme.palette.secondary.main, 0.1)}, transparent 58%),` +
-      `#0a0d13`
+      AMBIENT_BASE_DARK
     );
   }
   return (
     `radial-gradient(58% 52% at 2% 0%, ${alpha(p, 0.12)}, transparent 60%),` +
     `radial-gradient(64% 60% at 100% 4%, ${alpha(theme.palette.info.main, 0.08)}, transparent 55%),` +
-    `#eef2f7`
+    AMBIENT_BASE_LIGHT
   );
 }
 

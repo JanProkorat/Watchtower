@@ -22,7 +22,7 @@ import {
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useTheme, alpha, type Theme } from '@mui/material/styles';
-import { glassSurface } from '../../theme/glass.js';
+import { glassPinned, glassSurface } from '../../theme/glass.js';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TodayIcon from '@mui/icons-material/Today';
@@ -744,7 +744,12 @@ function Grid({
   // glassSurface backgroundColor gives the correctly elevated opaque-enough fill;
   // we extract only the fill color (no border/shadow/blur per-cell).
   const paper = glassSurface(theme, { elevation: 2 }).backgroundColor;
-  const headerBg = alpha(paper, 0.98);
+  // Every PINNED surface (sticky header row, frozen Key/Title/Logged columns,
+  // sticky totals + earnings rows) must be fully opaque: task rows scroll
+  // underneath them, and a translucent fill lets those rows bleed through.
+  // glassPinned is the same fill pre-composited over the ambient backdrop, so
+  // the tone matches the translucent data cells next to it.
+  const stickyBg = glassPinned(theme, { elevation: 2 });
   const totalBg = alpha(theme.palette.primary.main, 0.08);
   const earningsBg = alpha(theme.palette.success.main, 0.06);
   const weekendBg = alpha(theme.palette.primary.main, 0.05);
@@ -754,7 +759,9 @@ function Grid({
   const colHighlightBg = alpha(theme.palette.warning.main, 0.22);
   const divider = theme.palette.divider;
 
-  const solidOver = (tint: string) => `linear-gradient(${tint}, ${tint}), ${paper}`;
+  // Tint layered over the opaque pinned fill — used by the sticky header cells
+  // and the sticky totals / earnings rows, never by scrolling data cells.
+  const solidOver = (tint: string) => `linear-gradient(${tint}, ${tint}), ${stickyBg}`;
   // Layers an overlay tint on top of an existing background string. The base
   // may itself be a layered gradient (sticky-row tints already are), so the
   // overlay is just prepended as a new layer.
@@ -828,7 +835,7 @@ function Grid({
             background: paper,
             whiteSpace: 'nowrap',
           },
-          '& thead th': { position: 'sticky', top: 0, zIndex: 3, background: headerBg },
+          '& thead th': { position: 'sticky', top: 0, zIndex: 3, background: stickyBg },
           '& thead th.col-key, & thead th.col-title, & thead th.col-logged': { zIndex: 4 },
         }}
       >
@@ -898,7 +905,7 @@ function Grid({
               // scrolling rows beneath, so we want it opaque). Today/weekend
               // tints are solids too; the highlight overlay is layered on
               // top via `overlay()` when active.
-              let headerBgValue: string = headerBg;
+              let headerBgValue: string = stickyBg;
               if (d.isToday) headerBgValue = solidOver(todayBg);
               else if (isNonWorking) headerBgValue = solidOver(weekendBg);
               if (isHighlighted) headerBgValue = overlay(headerBgValue, colHighlightBg);
@@ -1191,8 +1198,11 @@ function TaskRow({
 }) {
   const perDay = displayMode === 'tracked' ? task.perDayTracked : task.perDayReported;
   const totalMinutes = displayMode === 'tracked' ? task.totalTracked : task.totalReported;
-  // Match the elevated fill used for all grid cells (defined in Grid above).
-  const paper = glassSurface(theme, { elevation: 2 }).backgroundColor;
+  // The Key / Title / Logged cells are frozen columns — day cells scroll
+  // underneath them horizontally, so they need the opaque pinned fill (the
+  // translucent grid fill let the day columns show through). Same tone as the
+  // translucent cells; see glassPinned.
+  const stickyBg = glassPinned(theme, { elevation: 2 });
   const StatusIcon =
     task.status === 'done'
       ? TaskAltIcon
@@ -1234,7 +1244,7 @@ function TaskRow({
           zIndex: 1,
           minWidth: KEY_COL_WIDTH,
           width: KEY_COL_WIDTH,
-          background: paper,
+          background: stickyBg,
         }}
       >
         <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
@@ -1278,7 +1288,7 @@ function TaskRow({
           minWidth: titleColWidth,
           width: titleColWidth,
           maxWidth: titleColWidth,
-          background: paper,
+          background: stickyBg,
           fontSize: 13,
           color: theme.palette.text.primary,
           overflow: 'hidden',
@@ -1296,7 +1306,7 @@ function TaskRow({
           zIndex: 1,
           minWidth: LOGGED_COL_WIDTH,
           width: LOGGED_COL_WIDTH,
-          background: paper,
+          background: stickyBg,
           fontWeight: 600,
           textAlign: 'right',
           borderRight: `2px solid ${divider}`,
