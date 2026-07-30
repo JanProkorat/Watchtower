@@ -9,14 +9,17 @@ import {
   type RuleConfig,
 } from '../../orchestrator/services/meetingRules.js';
 
-const G100 = { id: 1, number: 'GREEN-100', title: '1:1 + syncs' };
-const G34 = { id: 2, number: 'GREEN-34', title: 'Celofiremní porada' };
+// The three rule tasks are whatever the user configured in Settings
+// (meetings.one_on_one_task_id / all_company_task_id / default_task_id) — the
+// task numbers below are just this fixture's choice, not built-in constants.
+const ONE_ON_ONE = { id: 1, number: 'GREEN-100', title: '1:1 + syncs' };
+const ALL_COMPANY = { id: 2, number: 'GREEN-34', title: 'Celofiremní porada' };
 const DEFAULT_TASK = { id: 3, number: 'GREEN-345', title: 'Sprint 19' };
 const G456 = { id: 4, number: 'GREEN-456', title: 'Some other epic' };
 
 const CFG: RuleConfig = {
-  green100: G100,
-  green34: G34,
+  oneOnOneTask: ONE_ON_ONE,
+  allCompanyTask: ALL_COMPANY,
   defaultTask: DEFAULT_TASK,
   lookupByNumber: (n) => (n === 'GREEN-456' ? G456 : null),
 };
@@ -88,23 +91,23 @@ describe('decide', () => {
     expect(decide(graphEvent({ subject: 'TECH LUNCH May' }), CFG).status).toBe('skipped');
   });
 
-  it('routes 1:1 meetings to GREEN-100', () => {
+  it('routes 1:1 meetings to the configured 1:1 task', () => {
     const d = decide(graphEvent({ subject: '1:1 with Pavel' }), CFG);
     expect(d.status).toBe('logged');
-    expect(d.worklog?.taskId).toBe(G100.id);
+    expect(d.worklog?.taskId).toBe(ONE_ON_ONE.id);
   });
 
-  it('routes .NET sync to GREEN-100', () => {
+  it('routes .NET sync to the configured 1:1 task', () => {
     const d = decide(graphEvent({ subject: '.NET sync' }), CFG);
-    expect(d.worklog?.taskId).toBe(G100.id);
+    expect(d.worklog?.taskId).toBe(ONE_ON_ONE.id);
   });
 
-  it('routes celofiremní porada to GREEN-34 (with and without diacritics)', () => {
+  it('routes celofiremní porada to the configured all-company task (with and without diacritics)', () => {
     expect(decide(graphEvent({ subject: 'Celofiremní porada' }), CFG).worklog?.taskId).toBe(
-      G34.id,
+      ALL_COMPANY.id,
     );
     expect(decide(graphEvent({ subject: 'celofiremni porada' }), CFG).worklog?.taskId).toBe(
-      G34.id,
+      ALL_COMPANY.id,
     );
   });
 
@@ -145,7 +148,9 @@ describe('decide', () => {
     expect(
       decide(mcpEvent({ end: '2026-05-13T07:30:00.000Z' }), CFG).worklog?.minutes,
     ).toBe(30);
-    expect(decide(mcpEvent({ subject: '1:1 Honza' }), CFG).worklog?.taskId).toBe(G100.id);
+    expect(decide(mcpEvent({ subject: '1:1 Honza' }), CFG).worklog?.taskId).toBe(
+      ONE_ON_ONE.id,
+    );
     expect(decide(mcpEvent({ isAllDay: true }), CFG).status).toBe('skipped');
   });
 
@@ -153,5 +158,25 @@ describe('decide', () => {
     const cfg: RuleConfig = { ...CFG, defaultTask: null };
     const d = decide(graphEvent({ subject: 'Unmatched' }), cfg);
     expect(d.status).toBe('unresolved');
+  });
+
+  // An unconfigured rule task must NOT silently fall through to the default
+  // task — the meeting is reported so the user knows to set the setting.
+  it('reports 1:1 / .NET sync as unresolved when that task is not configured', () => {
+    const cfg: RuleConfig = { ...CFG, oneOnOneTask: null };
+    for (const subject of ['1:1 with Pavel', '.NET sync']) {
+      const d = decide(graphEvent({ subject }), cfg);
+      expect(d.status).toBe('unresolved');
+      expect(d.worklog).toBeUndefined();
+      expect(d.reason).toContain('1:1');
+    }
+  });
+
+  it('reports celofiremní porada as unresolved when that task is not configured', () => {
+    const cfg: RuleConfig = { ...CFG, allCompanyTask: null };
+    const d = decide(graphEvent({ subject: 'Celofiremní porada' }), cfg);
+    expect(d.status).toBe('unresolved');
+    expect(d.worklog).toBeUndefined();
+    expect(d.reason).toContain('celofiremni-porada');
   });
 });
