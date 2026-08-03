@@ -1,5 +1,5 @@
 import { BrowserWindow, session, desktopCapturer } from 'electron';
-import { deriveTeamsState } from '@watchtower/shared/teamsState.js';
+import { deriveTeamsState, type TeamsPushState } from '@watchtower/shared/teamsState.js';
 import { pushToRenderer } from './ipc.js';
 
 // A current desktop Edge UA so Teams serves the full web app rather than its
@@ -8,16 +8,57 @@ const EDGE_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0';
 
+/** How often we re-check audibility while the window is open. */
+const AUDIBILITY_POLL_MS = 5_000;
+
 let teamsWindow: BrowserWindow | null = null;
 let callStartedAt: number | null = null;
+let lastAudibleAt: number | null = null;
+let pollTimer: NodeJS.Timeout | null = null;
+let lastPushed: TeamsPushState | null = null;
 
 /** Recompute state from live window/audio and push it to the renderer. */
 function emitState(): void {
   const open = teamsWindow != null && !teamsWindow.isDestroyed();
   const audible = open ? teamsWindow!.webContents.isCurrentlyAudible() : false;
-  const next = deriveTeamsState({ open, audible, prevCallStartedAt: callStartedAt, now: Date.now() });
+  const next = deriveTeamsState({
+    open,
+    audible,
+    prevCallStartedAt: callStartedAt,
+    prevLastAudibleAt: lastAudibleAt,
+    now: Date.now(),
+  });
   callStartedAt = next.callStartedAt;
-  pushToRenderer('teamsStateChanged', next);
+  lastAudibleAt = next.lastAudibleAt;
+
+  const push: TeamsPushState = { open: next.open, inCall: next.inCall, callStartedAt: next.callStartedAt };
+  // The poll re-runs this every few seconds; only push real transitions so the
+  // renderer isn't re-rendered (and the pill's clock re-keyed) for nothing.
+  if (
+    lastPushed != null &&
+    lastPushed.open === push.open &&
+    lastPushed.inCall === push.inCall &&
+    lastPushed.callStartedAt === push.callStartedAt
+  ) {
+    return;
+  }
+  lastPushed = push;
+  pushToRenderer('teamsStateChanged', push);
+}
+
+/**
+ * Continuing silence fires no Electron event, so the grace period in
+ * deriveTeamsState would never expire on events alone — poll while open.
+ */
+function startPolling(): void {
+  if (pollTimer != null) return;
+  pollTimer = setInterval(emitState, AUDIBILITY_POLL_MS);
+}
+
+function stopPolling(): void {
+  if (pollTimer == null) return;
+  clearInterval(pollTimer);
+  pollTimer = null;
 }
 
 export function joinMeeting(joinUrl: string): void {
@@ -73,9 +114,12 @@ export function joinMeeting(joinUrl: string): void {
   teamsWindow.on('closed', () => {
     teamsWindow = null;
     callStartedAt = null;
+    lastAudibleAt = null;
+    stopPolling();
     emitState();
   });
 
+  startPolling();
   emitState();
 }
 

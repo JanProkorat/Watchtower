@@ -13,18 +13,49 @@ export interface TeamsPushState {
   callStartedAt: number | null;
 }
 
+/** Internal call state — the pushed shape plus the audibility bookkeeping. */
+export interface TeamsCallState extends TeamsPushState {
+  /** Last moment audio was observed audible, or null when not in a call. */
+  lastAudibleAt: number | null;
+}
+
+/**
+ * How long a call survives silence. Chromium's AudioStreamMonitor reports a
+ * WebContents as non-audible after ~2s below its silence threshold, so a live
+ * call goes "silent" whenever nobody is speaking. Without this grace the pill
+ * flickered idle and restarted its timer on every pause in the conversation.
+ * The cost is that a call the user hung up on (window left open) keeps showing
+ * for up to this long.
+ */
+export const CALL_SILENCE_GRACE_MS = 60_000;
+
 export function deriveTeamsState(input: {
   open: boolean;
   audible: boolean;
   prevCallStartedAt: number | null;
+  /** Previous `lastAudibleAt`; omit to treat the call as having no audio history. */
+  prevLastAudibleAt?: number | null;
   now: number;
-}): TeamsPushState {
-  const inCall = input.open && input.audible;
-  let callStartedAt: number | null;
-  if (!inCall) callStartedAt = null;
-  else if (input.prevCallStartedAt != null) callStartedAt = input.prevCallStartedAt;
-  else callStartedAt = input.now;
-  return { open: input.open, inCall, callStartedAt };
+  graceMs?: number;
+}): TeamsCallState {
+  const graceMs = input.graceMs ?? CALL_SILENCE_GRACE_MS;
+  const ended = { open: input.open, inCall: false, callStartedAt: null, lastAudibleAt: null };
+  if (!input.open) return ended;
+
+  if (input.audible) {
+    return {
+      open: true,
+      inCall: true,
+      callStartedAt: input.prevCallStartedAt ?? input.now,
+      lastAudibleAt: input.now,
+    };
+  }
+
+  // Silent: hold the call (and its clock) until the silence outlasts the grace.
+  const lastAudibleAt = input.prevLastAudibleAt ?? null;
+  if (input.prevCallStartedAt == null || lastAudibleAt == null) return ended;
+  if (input.now - lastAudibleAt >= graceMs) return ended;
+  return { open: true, inCall: true, callStartedAt: input.prevCallStartedAt, lastAudibleAt };
 }
 
 /** Format an elapsed duration (ms) as MM:SS; minutes grow past 59. */
