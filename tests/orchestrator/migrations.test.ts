@@ -42,7 +42,7 @@ describe('migrations', () => {
     runMigrations(db as unknown as SqliteLike);
     runMigrations(db as unknown as SqliteLike);
     const version = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(version.v).toBe(26);
+    expect(version.v).toBe(27);
   });
 
   it('v12 adds task_id column to instances', () => {
@@ -175,7 +175,7 @@ describe('migrations', () => {
     db.exec('DELETE FROM schema_version WHERE version > 12');
     expect(() => runMigrations(db as unknown as SqliteLike)).not.toThrow();
     const v = db.prepare('SELECT MAX(version) v FROM schema_version').get() as { v: number };
-    expect(v.v).toBe(26);
+    expect(v.v).toBe(27);
   });
 
   it('v13 backfills sync_id + updated_at on pre-existing rows', () => {
@@ -290,6 +290,26 @@ describe('migrations', () => {
     const bg = cols.find((c) => c.name === 'background');
     expect(bg).toBeDefined();
     expect(bg!.dflt_value).toBe('0');
+  });
+
+  it('v27 heals a DB that recorded v25 from the pre-renumber worktree_path migration', () => {
+    // Production collision: the Reviews branch first shipped worktree_path as
+    // v25 (commit f7aed04f) and dogfood DBs stamped version 25 on 2026-07-20.
+    // The meeting-sync branch then claimed v25 for instances.background and
+    // worktree_path was renumbered to v26. runMigrations skips any
+    // `version <= current`, so those DBs skipped background forever and every
+    // spawn died with "table instances has no column named background".
+    // Emulate that state: fully migrated schema, background dropped, version
+    // row left at max.
+    runMigrations(db as unknown as SqliteLike);
+    db.exec('ALTER TABLE instances DROP COLUMN background');
+    db.exec('DELETE FROM schema_version WHERE version > 26');
+    runMigrations(db as unknown as SqliteLike);
+    const cols = (db.prepare(`PRAGMA table_info(instances)`).all() as Array<{ name: string }>).map(
+      (c) => c.name,
+    );
+    expect(cols).toContain('background');
+    expect(cols).toContain('worktree_path');
   });
 
   it('v19 renames is_default → is_pinned and allows multiple pinned projects', () => {
