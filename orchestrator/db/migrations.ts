@@ -524,6 +524,19 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       addColumnIfMissing(db, 'instances', 'worktree_path', 'TEXT');
     },
   },
+  {
+    version: 27,
+    up: (db: SqliteLike) => {
+      // Heals the v25 collision. worktree_path originally shipped as v25 on the
+      // Reviews branch; dogfood DBs recorded version 25 before it was renumbered
+      // to v26 in favour of instances.background. runMigrations skips any
+      // `version <= current`, so on those DBs the background migration never ran
+      // and every spawn failed with "table instances has no column named
+      // background". Re-add it here — addColumnIfMissing makes this a no-op on
+      // healthy DBs that already applied the real v25.
+      addColumnIfMissing(db, 'instances', 'background', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {
