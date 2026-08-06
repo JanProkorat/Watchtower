@@ -85,7 +85,7 @@ import { buildInbox, markPrSeen } from './services/prWatch/inbox.js';
 import type { WatchedPr, WatchEvent } from './services/prWatch/types.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { RateLimitsPayload, RateLimitsSnapshot } from '@watchtower/shared/rateLimitsFormat.js';
-import { extractRateLimits } from '@watchtower/shared/rateLimitsFormat.js';
+import { extractRateLimits, rollForwardRateLimits } from '@watchtower/shared/rateLimitsFormat.js';
 import type { SqliteLike } from './db/migrations.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
@@ -1494,7 +1494,10 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       return latestTokenUsage ?? (await refreshTokenUsage());
 
     case 'rateLimits:usage':
-      return latestRateLimits as RateLimitsPayload;
+      // Age the snapshot on read: it may have been captured (or restored from
+      // `settings` at boot) before a window rolled over, and nothing pushes a
+      // fresh one while no Claude session is rendering a statusline.
+      return rollForwardRateLimits(latestRateLimits, Date.now()) as RateLimitsPayload;
 
     case 'statuslineCapture:status':
       return captureStatus(userSettingsPath(), resolveStatuslineHelperPath());

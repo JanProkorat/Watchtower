@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { extractRateLimits } from '../../packages/shared/src/rateLimitsFormat.js';
+import {
+  extractRateLimits,
+  nextRateLimitResetMs,
+  rollForwardRateLimits,
+} from '../../packages/shared/src/rateLimitsFormat.js';
 
 const AT = 1_700_000_000_000;
 
@@ -34,5 +38,85 @@ describe('extractRateLimits', () => {
 
   it('drops a window with a non-numeric used_percentage', () => {
     expect(extractRateLimits({ rate_limits: { five_hour: { used_percentage: 'x' } } }, AT)).toBeNull();
+  });
+});
+
+// A snapshot is only refreshed when some Claude session renders a statusline.
+// Nothing renders while the user is idle, so a snapshot taken just before a
+// window rolls over would otherwise keep reporting the pre-reset percentage
+// forever (it is also persisted across app restarts).
+describe('rollForwardRateLimits', () => {
+  const snap = (sessionResetsAt: number, weekResetsAt: number) => ({
+    session: { usedPercent: 89, resetsAt: sessionResetsAt },
+    week: { usedPercent: 71, resetsAt: weekResetsAt },
+    capturedAt: AT,
+  });
+
+  it('passes null through', () => {
+    expect(rollForwardRateLimits(null, AT)).toBeNull();
+  });
+
+  it('returns the same object when no window has reset yet', () => {
+    const s = snap(1_700_010_000, 1_700_600_000);
+    expect(rollForwardRateLimits(s, AT)).toBe(s);
+  });
+
+  it('zeroes a window whose resetsAt has passed', () => {
+    // resets_at is epoch SECONDS; AT is epoch ms.
+    const s = snap(AT / 1000 - 60, 1_700_600_000);
+    expect(rollForwardRateLimits(s, AT)).toEqual({
+      session: { usedPercent: 0, resetsAt: 0 },
+      week: { usedPercent: 71, resetsAt: 1_700_600_000 },
+      capturedAt: AT,
+    });
+  });
+
+  it('zeroes exactly at the reset instant', () => {
+    const s = snap(AT / 1000, 1_700_600_000);
+    expect(rollForwardRateLimits(s, AT)?.session).toEqual({ usedPercent: 0, resetsAt: 0 });
+  });
+
+  it('zeroes both windows independently', () => {
+    const s = snap(AT / 1000 - 1, AT / 1000 - 1);
+    expect(rollForwardRateLimits(s, AT)).toEqual({
+      session: { usedPercent: 0, resetsAt: 0 },
+      week: { usedPercent: 0, resetsAt: 0 },
+      capturedAt: AT,
+    });
+  });
+
+  it('leaves an unknown resetsAt (0) alone — it carries no rollover instant', () => {
+    const s = { session: { usedPercent: 89, resetsAt: 0 }, week: null, capturedAt: AT };
+    expect(rollForwardRateLimits(s, AT)).toBe(s);
+  });
+
+  it('is idempotent — a rolled-forward snapshot rolls forward to itself', () => {
+    const once = rollForwardRateLimits(snap(AT / 1000 - 60, AT / 1000 - 60), AT);
+    expect(rollForwardRateLimits(once, AT)).toBe(once);
+  });
+});
+
+describe('nextRateLimitResetMs', () => {
+  it('returns null when there is nothing pending', () => {
+    expect(nextRateLimitResetMs(null, AT)).toBeNull();
+    expect(nextRateLimitResetMs({ session: { usedPercent: 1, resetsAt: 0 }, week: null, capturedAt: AT }, AT)).toBeNull();
+  });
+
+  it('returns the earliest future reset, in ms', () => {
+    const s = {
+      session: { usedPercent: 89, resetsAt: 1_700_010_000 },
+      week: { usedPercent: 71, resetsAt: 1_700_600_000 },
+      capturedAt: AT,
+    };
+    expect(nextRateLimitResetMs(s, AT)).toBe(1_700_010_000_000);
+  });
+
+  it('ignores resets already in the past', () => {
+    const s = {
+      session: { usedPercent: 89, resetsAt: AT / 1000 - 60 },
+      week: { usedPercent: 71, resetsAt: 1_700_600_000 },
+      capturedAt: AT,
+    };
+    expect(nextRateLimitResetMs(s, AT)).toBe(1_700_600_000_000);
   });
 });

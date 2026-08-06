@@ -50,3 +50,52 @@ export function extractRateLimits(body: unknown, capturedAt: number): RateLimits
   if (!session && !week) return null;
   return { session, week, capturedAt };
 }
+
+/** A window that has rolled over: fresh, nothing consumed, next reset unknown. */
+const FRESH: RateLimitEntry = { usedPercent: 0, resetsAt: 0 };
+
+function isRolledOver(e: RateLimitEntry | null, nowMs: number): boolean {
+  // resetsAt === 0 means "not reported" — no rollover instant to compare against.
+  return e !== null && e.resetsAt > 0 && nowMs >= e.resetsAt * 1000;
+}
+
+/**
+ * Age a snapshot to `nowMs`: any window whose `resetsAt` has passed is a *new*
+ * window, so it reports 0% used and an unknown next reset.
+ *
+ * A snapshot only refreshes when some Claude session renders a statusline, and
+ * it is persisted across restarts — without this, an idle rollover leaves the
+ * usage bars frozen at the pre-reset percentage indefinitely. Returns the input
+ * object unchanged (same reference) when nothing has rolled over, so callers can
+ * use it as a render/push guard.
+ */
+export function rollForwardRateLimits(
+  snap: RateLimitsSnapshot | null,
+  nowMs: number,
+): RateLimitsSnapshot | null {
+  if (!snap) return null;
+  const sessionStale = isRolledOver(snap.session, nowMs);
+  const weekStale = isRolledOver(snap.week, nowMs);
+  if (!sessionStale && !weekStale) return snap;
+  return {
+    session: sessionStale ? FRESH : snap.session,
+    week: weekStale ? FRESH : snap.week,
+    capturedAt: snap.capturedAt,
+  };
+}
+
+/**
+ * Epoch **ms** of the earliest window reset still in the future, or null when no
+ * window reports one. Lets a UI re-evaluate exactly when a window rolls over
+ * instead of polling.
+ */
+export function nextRateLimitResetMs(
+  snap: RateLimitsSnapshot | null,
+  nowMs: number,
+): number | null {
+  if (!snap) return null;
+  const pending = [snap.session, snap.week]
+    .map((e) => (e && e.resetsAt > 0 ? e.resetsAt * 1000 : null))
+    .filter((ms): ms is number => ms !== null && ms > nowMs);
+  return pending.length ? Math.min(...pending) : null;
+}

@@ -320,204 +320,232 @@ export function ModuleRail({
         )}
       </Box>
 
-      {ITEMS.map((item) => {
-        const isActive = active === item.id && item.enabled;
-        const sub = subSections[item.id];
-        const row = (
-          <ButtonBase
-            disabled={!item.enabled}
-            onClick={() => item.enabled && handleParentClick(item.id)}
-            sx={{
-              width: expanded ? '100%' : 56,
-              height: expanded ? 40 : 48,
-              alignSelf: expanded ? 'stretch' : 'center',
-              borderRadius: expanded ? 1 : '14px',
-              px: expanded ? 1 : 0,
-              justifyContent: expanded ? 'flex-start' : 'center',
-              gap: expanded ? 1.25 : 0,
-              color: isActive
-                ? 'text.primary'
-                : item.enabled
-                  ? 'text.secondary'
-                  : 'text.disabled',
-              // Active: purple wash fill + 1px purple ring (prototype #s-rail .nav.on).
-              backgroundColor: isActive ? activeItemBg : 'transparent',
-              boxShadow: isActive
-                ? activeItemRingShadow
-                : 'none',
-              transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
-              ':hover': {
-                backgroundColor: isActive ? activeItemBg : 'action.hover',
-                color: item.enabled ? 'text.primary' : 'text.disabled',
-              },
-            }}
-          >
-            {/* Active item: icon tinted with theme accent color (prototype .nav.on svg). */}
-            <Box
+      {/* Scroll region for the nav itself. Expanding a sub-section (Settings has
+          eight children) can make the nav taller than the window; without its own
+          scroller the overflow was clipped by the rail's `overflow: hidden`, which
+          pushed the usage bars out of place and swallowed the collapse button
+          entirely. `minHeight: 0` is what lets a flex child actually shrink below
+          its content height and scroll instead of forcing the column taller. */}
+      <Box
+        sx={{
+          flex: '1 1 auto',
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'stretch',
+          gap: 0.5,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          // Understated scrollbar — the rail is chrome, not content.
+          scrollbarWidth: 'thin',
+          '&::-webkit-scrollbar': { width: 6 },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: 'action.disabled',
+            borderRadius: 3,
+          },
+        }}
+      >
+        {ITEMS.map((item) => {
+          const isActive = active === item.id && item.enabled;
+          const sub = subSections[item.id];
+          const row = (
+            <ButtonBase
+              disabled={!item.enabled}
+              onClick={() => item.enabled && handleParentClick(item.id)}
               sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: expanded ? 24 : 'auto',
-                // Larger glyphs when collapsed so they fill the wider icon rail.
-                fontSize: expanded ? 20 : 26,
-                color: isActive ? accentColor : 'inherit',
+                width: expanded ? '100%' : 56,
+                height: expanded ? 40 : 48,
+                alignSelf: expanded ? 'stretch' : 'center',
+                borderRadius: expanded ? 1 : '14px',
+                px: expanded ? 1 : 0,
+                justifyContent: expanded ? 'flex-start' : 'center',
+                gap: expanded ? 1.25 : 0,
+                color: isActive
+                  ? 'text.primary'
+                  : item.enabled
+                    ? 'text.secondary'
+                    : 'text.disabled',
+                // Active: purple wash fill + 1px purple ring (prototype #s-rail .nav.on).
+                backgroundColor: isActive ? activeItemBg : 'transparent',
+                boxShadow: isActive
+                  ? activeItemRingShadow
+                  : 'none',
+                transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
+                ':hover': {
+                  backgroundColor: isActive ? activeItemBg : 'action.hover',
+                  color: item.enabled ? 'text.primary' : 'text.disabled',
+                },
               }}
             >
-              {item.icon}
-            </Box>
-            {expanded && (
-              <Typography
-                variant="body2"
+              {/* Active item: icon tinted with theme accent color (prototype .nav.on svg). */}
+              <Box
                 sx={{
-                  fontSize: 13,
-                  fontWeight: isActive ? 600 : 500,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  color: 'inherit',
-                  flex: 1,
-                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: expanded ? 24 : 'auto',
+                  // Larger glyphs when collapsed so they fill the wider icon rail.
+                  fontSize: expanded ? 20 : 26,
+                  color: isActive ? accentColor : 'inherit',
                 }}
               >
-                {item.label}
-              </Typography>
-            )}
-          </ButtonBase>
-        );
-
-        // Chevron lives outside the ButtonBase so clicking it doesn't also
-        // fire the row's onClick (which would switch modules). Only rendered
-        // for items that own a sub-section and when the rail is expanded.
-        const chevron = sub && expanded ? (
-          <IconButton
-            size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              sub.setExpanded((v) => !v);
-            }}
-            aria-label={`${sub.expanded ? 'Collapse' : 'Expand'} ${sub.label}`}
-            sx={{
-              width: 28,
-              height: 28,
-              ml: 0.5,
-              color: 'text.secondary',
-              ':hover': { color: 'text.primary', backgroundColor: 'action.hover' },
-            }}
-          >
-            {sub.expanded ? (
-              <ExpandLessIcon fontSize="small" />
-            ) : (
-              <ExpandMoreIcon fontSize="small" />
-            )}
-          </IconButton>
-        ) : null;
-
-        // Reviews rail item carries the unread PR-notifications control: a bell
-        // + popover when expanded, and a count badge on the icon when collapsed.
-        const reviewsBell = item.id === 'reviews' && expanded ? (
-          <PrNotificationsButton
-            items={reviewsNotifications}
-            unread={reviewsUnread}
-            onOpen={onOpenNotification}
-            onMarkAllSeen={onMarkAllNotificationsSeen}
-          />
-        ) : null;
-
-        const parentRow = expanded ? (
-          <Box key={item.id} sx={{ display: 'flex', alignItems: 'center' }}>
-            <Box sx={{ flex: 1, display: 'flex' }}>{row}</Box>
-            {chevron}
-            {reviewsBell}
-          </Box>
-        ) : (
-          <Tooltip
-            key={item.id}
-            title={item.enabled ? item.label : `${item.label} (coming soon)`}
-            placement="right"
-          >
-            <span style={{ display: 'flex', justifyContent: 'center' }}>
-              {item.id === 'reviews' && reviewsUnread > 0 ? (
-                <Badge color="error" badgeContent={reviewsUnread} overlap="circular">{row}</Badge>
-              ) : row}
-            </span>
-          </Tooltip>
-        );
-
-        if (!sub || !expanded || !sub.expanded) return parentRow;
-
-        return (
-          <Box key={item.id} sx={{ display: 'flex', flexDirection: 'column' }}>
-            {parentRow}
-            {sub.tabs.map((tab) => {
-              const subActive = active === item.id && sub.activeTab === tab.id;
-              return (
-                <ButtonBase
-                  key={tab.id}
-                  onClick={() => sub.onSelect(tab.id)}
+                {item.icon}
+              </Box>
+              {expanded && (
+                <Typography
+                  variant="body2"
                   sx={{
-                    height: 32,
-                    pl: 4,
-                    pr: 1,
-                    borderRadius: 1,
-                    justifyContent: 'flex-start',
-                    gap: 1,
-                    color: subActive ? 'text.primary' : 'text.secondary',
-                    // Active sub-item: same purple wash + ring as parent items.
-                    backgroundColor: subActive ? activeItemBg : 'transparent',
-                    boxShadow: subActive
-                      ? activeItemRingShadow
-                      : 'none',
-                    transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
-                    ':hover': {
-                      backgroundColor: subActive ? activeItemBg : 'action.hover',
-                      color: 'text.primary',
-                    },
+                    fontSize: 13,
+                    fontWeight: isActive ? 600 : 500,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    color: 'inherit',
+                    flex: 1,
+                    textAlign: 'left',
                   }}
                 >
-                  <Box
+                  {item.label}
+                </Typography>
+              )}
+            </ButtonBase>
+          );
+
+          // Chevron lives outside the ButtonBase so clicking it doesn't also
+          // fire the row's onClick (which would switch modules). Only rendered
+          // for items that own a sub-section and when the rail is expanded.
+          const chevron = sub && expanded ? (
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                sub.setExpanded((v) => !v);
+              }}
+              aria-label={`${sub.expanded ? 'Collapse' : 'Expand'} ${sub.label}`}
+              sx={{
+                width: 28,
+                height: 28,
+                ml: 0.5,
+                color: 'text.secondary',
+                ':hover': { color: 'text.primary', backgroundColor: 'action.hover' },
+              }}
+            >
+              {sub.expanded ? (
+                <ExpandLessIcon fontSize="small" />
+              ) : (
+                <ExpandMoreIcon fontSize="small" />
+              )}
+            </IconButton>
+          ) : null;
+
+          // Reviews rail item carries the unread PR-notifications control: a bell
+          // + popover when expanded, and a count badge on the icon when collapsed.
+          const reviewsBell = item.id === 'reviews' && expanded ? (
+            <PrNotificationsButton
+              items={reviewsNotifications}
+              unread={reviewsUnread}
+              onOpen={onOpenNotification}
+              onMarkAllSeen={onMarkAllNotificationsSeen}
+            />
+          ) : null;
+
+          const parentRow = expanded ? (
+            <Box key={item.id} sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ flex: 1, display: 'flex' }}>{row}</Box>
+              {chevron}
+              {reviewsBell}
+            </Box>
+          ) : (
+            <Tooltip
+              key={item.id}
+              title={item.enabled ? item.label : `${item.label} (coming soon)`}
+              placement="right"
+            >
+              <span style={{ display: 'flex', justifyContent: 'center' }}>
+                {item.id === 'reviews' && reviewsUnread > 0 ? (
+                  <Badge color="error" badgeContent={reviewsUnread} overlap="circular">{row}</Badge>
+                ) : row}
+              </span>
+            </Tooltip>
+          );
+
+          if (!sub || !expanded || !sub.expanded) return parentRow;
+
+          return (
+            <Box key={item.id} sx={{ display: 'flex', flexDirection: 'column' }}>
+              {parentRow}
+              {sub.tabs.map((tab) => {
+                const subActive = active === item.id && sub.activeTab === tab.id;
+                return (
+                  <ButtonBase
+                    key={tab.id}
+                    onClick={() => sub.onSelect(tab.id)}
                     sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: 18,
-                      fontSize: 16,
-                      // Active sub-item: icon tinted with theme accent color.
-                      color: subActive ? accentColor : 'inherit',
+                      height: 32,
+                      pl: 4,
+                      pr: 1,
+                      borderRadius: 1,
+                      justifyContent: 'flex-start',
+                      gap: 1,
+                      color: subActive ? 'text.primary' : 'text.secondary',
+                      // Active sub-item: same purple wash + ring as parent items.
+                      backgroundColor: subActive ? activeItemBg : 'transparent',
+                      boxShadow: subActive
+                        ? activeItemRingShadow
+                        : 'none',
+                      transition: 'background-color 120ms ease, color 120ms ease, box-shadow 120ms ease',
+                      ':hover': {
+                        backgroundColor: subActive ? activeItemBg : 'action.hover',
+                        color: 'text.primary',
+                      },
                     }}
                   >
-                    {tab.icon}
-                  </Box>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: 12.5,
-                      fontWeight: subActive ? 600 : 400,
-                      color: 'inherit',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {tab.label}
-                  </Typography>
-                </ButtonBase>
-              );
-            })}
-          </Box>
-        );
-      })}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 18,
+                        fontSize: 16,
+                        // Active sub-item: icon tinted with theme accent color.
+                        color: subActive ? accentColor : 'inherit',
+                      }}
+                    >
+                      {tab.icon}
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: subActive ? 600 : 400,
+                        color: 'inherit',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {tab.label}
+                    </Typography>
+                  </ButtonBase>
+                );
+              })}
+            </Box>
+          );
+        })}
+      </Box>
 
-      <Box sx={{ flex: 1 }} />
-
-      <SidebarUsage collapsed={!expanded} />
+      {/* Pinned footer. `flexShrink: 0` on each child is what keeps the nav's
+          scroll region — not this cluster — absorbing any overflow. */}
+      <Box sx={{ flexShrink: 0 }}>
+        <SidebarUsage collapsed={!expanded} />
+      </Box>
 
       {!expanded && (
         <Tooltip
           title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           placement="right"
         >
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, flexShrink: 0 }}>
             <IconButton
               size="small"
               onClick={onToggleMode}
@@ -536,7 +564,9 @@ export function ModuleRail({
       )}
 
       <Tooltip title={expanded ? 'Collapse sidebar' : 'Expand sidebar'} placement="right">
-        <Box sx={{ display: 'flex', justifyContent: expanded ? 'flex-end' : 'center' }}>
+        <Box
+          sx={{ display: 'flex', justifyContent: expanded ? 'flex-end' : 'center', flexShrink: 0 }}
+        >
           <IconButton
             size="small"
             onClick={() => setExpanded((v) => !v)}
