@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MeetingDriver, type MeetingDriverDeps, type MeetingResult } from '../../orchestrator/services/meetingDriver.js';
+import { MEETING_SPAWN_ARGS, MeetingDriver, type MeetingDriverDeps, type MeetingResult } from '../../orchestrator/services/meetingDriver.js';
 
 function makeDeps(over: Partial<MeetingDriverDeps> & { statuses: string[]; result: MeetingResult | null; resultAfterTicks?: number }) {
   let tick = 0;
@@ -40,6 +40,31 @@ describe('MeetingDriver', () => {
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/without producing a result/i);
     expect(h.disposed()).toBe(1);
+  });
+
+  it('fails fast when the hidden session stops on a permission prompt', async () => {
+    const h = makeDeps({ statuses: ['working', 'working', 'waiting-permission'], result: null });
+    const res = await new MeetingDriver(h.deps).run(spec);
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/permission/i);
+    expect(h.disposed()).toBe(1);
+  });
+
+  it('still prefers a result file written just before a permission prompt', async () => {
+    const h = makeDeps({
+      statuses: ['working', 'working', 'waiting-permission'],
+      result: { ok: true, count: 4 },
+      resultAfterTicks: 2,
+    });
+    const res = await new MeetingDriver(h.deps).run(spec);
+    expect(res).toEqual({ ok: true, count: 4 });
+  });
+
+  it('pins the permission mode so a project defaultMode cannot make the hidden session prompt', () => {
+    // The instance is spawned headless-but-interactive with no UI attached; in
+    // `default`/manual mode the first prompt hangs it until jobTimeoutMs.
+    expect(MEETING_SPAWN_ARGS).toContain('--permission-mode');
+    expect(MEETING_SPAWN_ARGS[MEETING_SPAWN_ARGS.indexOf('--permission-mode') + 1]).toBe('auto');
   });
 
   it('times out when nothing ever completes', async () => {

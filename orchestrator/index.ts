@@ -702,6 +702,10 @@ function disposeInstanceRow(id: string): void {
   } catch {
     /* pty already dead */
   }
+  // Drop the attention flag before the row goes: a disposed instance never
+  // transitions out of waiting-permission / idle-notify, so without this its
+  // +1 stays in the notifier's flagged set and the dock badge sticks forever.
+  notifier?.clearAttention(id);
   new HookEventsRepo(handle!.db).deleteForInstance(id);
   new NotificationsRepo(handle!.db).deleteForInstance(id);
   repo().delete(id);

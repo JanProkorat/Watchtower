@@ -38,7 +38,23 @@ export interface MeetingDriverDeps {
 }
 
 export const MEETING_SYNC_CWD = '/Users/jan/Projects/Watchtower';
-export const MEETING_ALLOWLIST_ARGS = ['--allowedTools', 'mcp__claude_ai_Microsoft_365', 'Write', 'Bash'];
+/**
+ * Spawn args for the hidden instance.
+ *
+ * `--permission-mode auto` is load-bearing, not a convenience: the cwd above is
+ * a repo with its own `.claude/settings.json`, whose `permissions.defaultMode`
+ * overrides the user-global one. When that resolves to `default` (manual), the
+ * first tool outside the allowlist raises a prompt in a window nobody can see
+ * and the session sits there until jobTimeoutMs. Pinning the mode on the
+ * command line keeps a settings change from silently re-hanging the sync.
+ *
+ * The allowlist stays scoped (not `--dangerously-skip-permissions`) so the
+ * deny rules that protect .env/secrets still apply.
+ */
+export const MEETING_SPAWN_ARGS = [
+  '--permission-mode', 'auto',
+  '--allowedTools', 'mcp__claude_ai_Microsoft_365', 'Write', 'Bash',
+];
 
 const POLL_MS = 500;
 const SETTLE_MS = 1500;
@@ -46,6 +62,9 @@ const SETTLE_MS = 1500;
 const SUBMIT_GAP_MS = 500;
 // Terminal / turn-complete statuses (from packages/shared/src/stateModel.ts).
 const DONE_STATUSES = new Set(['waiting-input', 'idle-notify', 'finished', 'crashed']);
+// A permission prompt in a hidden instance can never be answered — nothing
+// renders its terminal. Treat it as terminal rather than spinning to timeout.
+const BLOCKED_STATUS = 'waiting-permission';
 const EXITED_STATUSES = new Set(['finished', 'crashed']);
 
 export class MeetingDriver {
@@ -60,7 +79,7 @@ export class MeetingDriver {
     let id: string | null = null;
     try {
       this.deps.clearResult();
-      id = this.deps.spawn(MEETING_SYNC_CWD, MEETING_ALLOWLIST_ARGS);
+      id = this.deps.spawn(MEETING_SYNC_CWD, MEETING_SPAWN_ARGS);
 
       // Phase 1 — wait for the session to come up, then inject. SessionStart
       // drives the row to 'working'; if it never leaves 'spawning' within the
@@ -95,6 +114,9 @@ export class MeetingDriver {
         const r = this.deps.readResult();
         if (r) return r;
         const s = this.deps.getStatus(id);
+        if (s === BLOCKED_STATUS) {
+          return { ok: false, error: 'The meeting session stopped on a permission prompt it cannot show. Check that this project allows the tools the command needs (permission mode `auto`, no deny rule over them).' };
+        }
         if (s != null && DONE_STATUSES.has(s)) {
           const r2 = this.deps.readResult();
           return r2 ?? { ok: false, error: 'The meeting session finished without producing a result (possible Microsoft 365 authentication error).' };
