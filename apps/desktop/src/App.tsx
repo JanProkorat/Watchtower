@@ -38,7 +38,7 @@ import { useTabs } from './state/useTabs.js';
 import { useWorkspaceLayout } from './state/useWorkspaceLayout.js';
 import { useHiddenInstances } from './state/useHiddenInstances.js';
 import { useFocusedInstance } from './state/useFocusedInstance.js';
-import { ensureTabMountedAndFocused } from './state/spawnIntoTab.js';
+import { ensureTabMountedAndFocused, focusLaunchedSession } from './state/spawnIntoTab.js';
 import { TabStrip } from './components/TabStrip.js';
 import { tabsNeedingAttention } from './util/tabAttention.js';
 import { NewInstanceModal } from './components/NewInstanceModal.js';
@@ -203,6 +203,20 @@ export function App() {
     const tabId = routeSpawnToTab(inst.cwd, projects);
     ensureTabMountedAndFocused({ layout, actions: layoutActions }, tabId);
     layoutActions.focusColumnInTab(tabId, id);
+  };
+  // Reveal a session the orchestrator spawned for us (Reviews → "Fix with
+  // agent"): its cwd is a fresh PR worktree, so it needs the same tab
+  // registration + mount doSpawn does — see focusLaunchedSession.
+  const revealLaunchedSession = (instanceId: string, cwd: string) => {
+    focusLaunchedSession(
+      { layout, actions: layoutActions },
+      { instanceId, cwd, projects },
+      {
+        addAdHocCwd: (c) => setOpenAdHocCwds((s) => new Set(s).add(c)),
+        showInstances: () => setActiveModule('instances'),
+        activateInstance: setActive,
+      },
+    );
   };
   const switchToNewInstanceForCwd = (cwd: string) => {
     setActiveModule('instances');
@@ -562,7 +576,7 @@ export function App() {
                     watchItems={prWatch.items}
                     markSeen={prWatch.markSeen}
                     watchError={prWatch.error}
-                    onImplementLaunched={(instanceId) => { setActiveModule('instances'); setActive(instanceId); }}
+                    onImplementLaunched={revealLaunchedSession}
                   />
                 )}
                 {activeModule === 'billing' && (

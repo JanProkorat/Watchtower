@@ -79,6 +79,7 @@ import { PrWatcher } from './services/prWatch/PrWatcher.js';
 import { githubWatched, azdoWatched } from './services/prWatch/queries.js';
 import { resolveGithubLogin, resolveAzdoUser } from './services/prWatch/identity.js';
 import { prepareImplementLaunch, safeRemoveWorktree } from './services/prImplement.js';
+import { defaultTrustDeps, ensureProjectTrusted } from './services/claudeTrust.js';
 import { defaultExec } from './services/prProviders/exec.js';
 import { PrWatchStateRepo } from './db/repositories/prWatchState.js';
 import { buildInbox, markPrSeen } from './services/prWatch/inbox.js';
@@ -1613,6 +1614,13 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           baseDir,
         },
       );
+      // The worktree is a directory Claude Code has never seen, so it would open
+      // on the workspace-trust modal and run nothing until the user answers it.
+      // Pre-accept trust for this one path — best-effort; a failure only costs
+      // the prompt.
+      if (ensureProjectTrusted(launch.worktreePath, defaultTrustDeps())) {
+        console.log('[prImplement] pre-accepted workspace trust for', launch.worktreePath);
+      }
       // Spawn an interactive claude in the worktree, seeded with the prompt as a
       // positional arg (stays interactive; default permission mode asks before edits).
       const id = randomUUID();

@@ -25,7 +25,8 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
   fetchReviewState(host: PullRequestPayload['host'], repoKey: string, number: number): Promise<PrReviewState>;
   approvePr(host: PullRequestPayload['host'], repoKey: string, number: number): Promise<void>;
   implementComments(pr: PullRequestPayload): Promise<{ instanceId: string | null; worktreePath: string | null }>;
-  onImplementLaunched(instanceId: string): void;
+  /** `worktreePath` is the launched session's cwd — the caller needs it to mount its tab. */
+  onImplementLaunched(instanceId: string, worktreePath: string): void;
 }): JSX.Element {
   const [tab, setTab] = useState(0);
   const [files, setFiles] = useState<DiffFilePayload[]>([]);
@@ -136,8 +137,8 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
     if (!pr) return;
     setImplementing(true);
     try {
-      const { instanceId } = await implementComments(pr);
-      if (instanceId) onImplementLaunched(instanceId);
+      const { instanceId, worktreePath } = await implementComments(pr);
+      if (instanceId && worktreePath) onImplementLaunched(instanceId, worktreePath);
     } catch {
       // invoke() already surfaced the failure via a global error toast (repo
       // CLAUDE.md "Surfacing IPC errors"); the catch exists only so the void'd
@@ -175,11 +176,13 @@ export function PrInspectorDrawer({ pr, onClose, loadDiff, loadComments, review,
               </Button>
             )}
             {/* Launches the implement-comments agent — author-only, and only when
-                there's at least one implementable review comment to act on. */}
+                there's at least one implementable review comment to act on. The
+                busy label names the work: fetching the comments and cutting the
+                worktree runs before the session's tab can appear. */}
             {reviewState?.amIAuthor && implementCount > 0 && (
               <Button variant="outlined" size="small" disabled={implementing}
                 onClick={() => void handleImplement()} sx={{ mr: 1 }}>
-                Fix with agent ({implementCount})
+                {implementing ? 'Preparing worktree…' : `Fix with agent (${implementCount})`}
               </Button>
             )}
             {/* Hidden on my own PRs — GitHub rejects self-approval and ADO's is

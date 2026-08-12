@@ -17,8 +17,11 @@ export function ModuleReviews({ deepLinkTarget = null, onConsumeDeepLink, watchI
   watchItems: PrWatchInboxItem[];
   markSeen: (host: PrHost, repoKey: string, prNumber: number) => Promise<void>;
   watchError?: string | null;
-  /** Called after "Fix with agent" launches a session, so App can focus it in Instances. */
-  onImplementLaunched: (instanceId: string) => void;
+  /**
+   * Called after "Fix with agent" launches a session, so App can mount and focus
+   * its tab in Instances. `worktreePath` is the session's cwd.
+   */
+  onImplementLaunched: (instanceId: string, worktreePath: string) => void;
 }): JSX.Element {
   const { pullRequests, syncedAt, loading, error, refresh, loadDiff, loadComments, mergePr, closePr,
     review, reviewRunning, openReviewFor, runReview, cancelReview, reviewStateFor, postComments,

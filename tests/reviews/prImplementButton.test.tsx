@@ -26,7 +26,21 @@ describe('Fix with agent button', () => {
     const btn = await screen.findByRole('button', { name: /fix with agent \(1\)/i });
     fireEvent.click(btn);
     await waitFor(() => expect(props.implementComments).toHaveBeenCalledWith(pr));
-    await waitFor(() => expect(props.onImplementLaunched).toHaveBeenCalledWith('inst-1'));
+    // The worktree path must come along — App needs it to mount the session's tab.
+    await waitFor(() => expect(props.onImplementLaunched).toHaveBeenCalledWith('inst-1', '/w'));
+  });
+
+  it('names the work in progress while the worktree is being prepared', async () => {
+    let release: (v: { instanceId: string; worktreePath: string }) => void = () => {};
+    const props = baseProps({
+      implementComments: vi.fn(() => new Promise((r) => { release = r; })),
+    });
+    render(<ToastProvider><PrInspectorDrawer {...props} /></ToastProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: /fix with agent \(1\)/i }));
+    const busy = await screen.findByRole('button', { name: /preparing worktree/i });
+    expect(busy).toBeDisabled();
+    release({ instanceId: 'inst-1', worktreePath: '/w' });
+    await waitFor(() => expect(props.onImplementLaunched).toHaveBeenCalledWith('inst-1', '/w'));
   });
 
   it('is hidden when the user is not the author', async () => {
