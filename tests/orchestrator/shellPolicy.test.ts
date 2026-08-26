@@ -32,6 +32,41 @@ describe('buildPtySpawnConfig', () => {
     expect(buildPtySpawnConfig({ kind: 'shell', id: 's', extraArgs: [], env: { SHELL: '  ' } }).command).toBe('/bin/zsh');
   });
 
+  // A Finder-launched Electron app inherits no locale, so `pbcopy` (Claude
+  // Code's copy) decoded UTF-8 as the Mac's legacy system encoding and mangled
+  // the clipboard. Every pty must get a UTF-8 ctype.
+  it('locale: sets a UTF-8 ctype when the environment has none', () => {
+    const c = buildPtySpawnConfig({ kind: 'claude', id: 'a', extraArgs: [], env: { PATH: '/usr/bin' } });
+    expect(c.env.LC_CTYPE).toBe('en_US.UTF-8');
+    expect(c.env.LANG).toBe('en_US.UTF-8');
+  });
+
+  it('locale: applies to shells too', () => {
+    const c = buildPtySpawnConfig({ kind: 'shell', id: 's', extraArgs: [], env: {} });
+    expect(c.env.LC_CTYPE).toBe('en_US.UTF-8');
+  });
+
+  it('locale: keeps an inherited UTF-8 locale untouched', () => {
+    const c = buildPtySpawnConfig({
+      kind: 'claude', id: 'a', extraArgs: [], env: { LANG: 'cs_CZ.UTF-8' },
+    });
+    expect(c.env.LANG).toBe('cs_CZ.UTF-8');
+    expect('LC_CTYPE' in c.env).toBe(false);
+  });
+
+  it('locale: repairs a non-UTF-8 LANG via LC_CTYPE', () => {
+    const c = buildPtySpawnConfig({ kind: 'claude', id: 'a', extraArgs: [], env: { LANG: 'C' } });
+    expect(c.env.LANG).toBe('C');
+    expect(c.env.LC_CTYPE).toBe('en_US.UTF-8');
+  });
+
+  it('locale: replaces a non-UTF-8 LC_ALL, which outranks LC_CTYPE', () => {
+    const c = buildPtySpawnConfig({
+      kind: 'claude', id: 'a', extraArgs: [], env: { LC_ALL: 'cs_CZ.ISO8859-2', LANG: 'cs_CZ.UTF-8' },
+    });
+    expect(c.env.LC_ALL).toBe('en_US.UTF-8');
+  });
+
   it('does NOT mutate the caller-supplied env (regression guard: must never corrupt process.env)', () => {
     const e = { SHELL: '/bin/zsh', WATCHTOWER_INSTANCE_ID: 'keep-me' };
     buildPtySpawnConfig({ kind: 'shell', id: 's', extraArgs: [], env: e });
