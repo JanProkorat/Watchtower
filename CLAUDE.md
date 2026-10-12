@@ -40,7 +40,7 @@ version: v5.
 
 | Table | Purpose | Notes |
 |---|---|---|
-| `instances` | One row per Claude Code session under management | `display_order` for the tab strip; `live` is derived from `status`. |
+| `instances` | One row per Claude Code session under management | `display_order` for the tab strip; `live` is derived from `status`. `kind` ∈ `claude` / `shell` / `chat`. |
 | `hook_events` | Raw payloads from Claude hook scripts | Pruned by `pruneOlderThan(ts)`. |
 | `notifications` | Logged macOS notifications | `dismissed_at` set on click. |
 | `settings` | Key-value store (TEXT) | One row per setting key. Also holds the `timetracker_migration_status` marker. |
@@ -184,6 +184,57 @@ sites import — not a monkey-patch.
   PR-watch inbox), form validation, or a JSON-parse error.
 - Toasts are FIFO-queued and expose `showError/showWarning/showSuccess/showInfo`
   via `useToast()` (React) or the module-level `toast` bridge (non-React).
+
+## Chat instances (`kind: 'chat'`, Agent SDK)
+
+A third instance kind beside `claude` (TUI in a pty) and `shell`: a Claude
+Code session driven through `@anthropic-ai/claude-agent-sdk` and drawn
+natively, like the Claude desktop app's chat. No pty, no xterm.
+
+- **Orchestrator** — `orchestrator/services/chat/`: `ChatManager` (one
+  `ChatSession` per instance, SDK imported lazily), `ChatSession` (streaming
+  input via `AsyncQueue`; the CLI process starts on the first message, with
+  `sessionId` = instance id, or `resume` when a transcript exists;
+  `settingSources: user/project/local` so CLAUDE.md, hooks, plugins, mods and
+  MCP load; `canUseTool` → inline permission / `AskUserQuestion` items),
+  `ChatTranscript` (SDK messages and saved history → flat `ChatItem`s).
+  Runs the user's `claude` from PATH (`findOnPath`), else the SDK's bundled one.
+- **IPC** — `chat:snapshot|send|interrupt|respond|setPermissionMode|setModel`,
+  push `chatEvent` (`upsert` by item id / `state` / `reset`). Types in
+  `packages/shared/src/chat.ts`.
+- **Status** — the session reports working / waiting-permission / turn-done
+  into `applyTransition`; the user's watchtower-hook also fires (the SDK gets
+  `WATCHTOWER_INSTANCE_ID`), and both paths are idempotent.
+- **Boot / restart** — `planBootAction` → `chat-ready`: status back to
+  `waiting-input`, nothing spawned until the next message.
+- **Renderer** — `components/chat/` (`ChatView`, `ChatComposer`,
+  `ChatMessages`, `ChatCards`, `chatFormat`), hook `state/useChat.ts`.
+  `PaneCard` renders `ChatView` for chat rows; `TerminalPool` skips them.
+- **Mods** — mod *hooks* run under the SDK; mod *UI* (panes, bands, toasts,
+  status line) does not draw, since the SDK has no surface. A mod whose UI
+  matters needs a bridge like savvy-progress's (below); otherwise use a
+  `claude` terminal instance.
+
+## savvy-progress mod bridge (`plugins/savvy-progress/`)
+
+A vendored, patched copy of the third-party savvy-progress Claude Code mod
+(MIT). Its agents panel draws pixel-crab **SVG**, which Claude Code renders
+only on the desktop surface — in our xterm.js terminal it shows a `▣`. So:
+
+1. The mod (inside a Watchtower pty, `WATCHTOWER_INSTANCE_ID` set) reads
+   `listener.json` and POSTs a state snapshot to `/mods/savvy-progress` on the
+   hook listener on every change (coalesced, 200 ms).
+2. `orchestrator/services/savvyProgressStore.ts` validates it
+   (`parseSavvySnapshot` in `packages/shared/src/savvyProgress.ts`), keeps the
+   latest per instance in memory, and pushes `savvyProgress`;
+   `savvyProgress:get` returns the cached one.
+3. `PaneCard` → `useSavvyChrome` lays the band (below the terminal) and the
+   agents panel (right of it) around the terminal; rows are the mod's own SVG,
+   ported to `components/instances/savvy/savvyDraw.ts`, shown as `<img>` data
+   URIs so their `<style>` can't leak into the app.
+
+Three copies of one shape — mod `types/index.d.ts`, `shared/savvyProgress.ts`,
+and the drawing in `register.tsx` vs `savvyDraw.ts` — **change them together**.
 
 ## Things to NOT do
 

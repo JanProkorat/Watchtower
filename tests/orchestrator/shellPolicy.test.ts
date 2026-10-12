@@ -67,6 +67,18 @@ describe('buildPtySpawnConfig', () => {
     expect(c.env.LC_ALL).toBe('en_US.UTF-8');
   });
 
+  // Finder-launched Electron has no COLORTERM, so Claude Code fell back to 256
+  // colours inside xterm.js, which renders 24-bit.
+  it('colour: advertises truecolor to claude and shells', () => {
+    expect(buildPtySpawnConfig({ kind: 'claude', id: 'a', extraArgs: [], env: {} }).env.COLORTERM).toBe('truecolor');
+    expect(buildPtySpawnConfig({ kind: 'shell', id: 's', extraArgs: [], env: {} }).env.COLORTERM).toBe('truecolor');
+  });
+
+  it('colour: keeps an inherited COLORTERM', () => {
+    const c = buildPtySpawnConfig({ kind: 'claude', id: 'a', extraArgs: [], env: { COLORTERM: '24bit' } });
+    expect(c.env.COLORTERM).toBe('24bit');
+  });
+
   it('does NOT mutate the caller-supplied env (regression guard: must never corrupt process.env)', () => {
     const e = { SHELL: '/bin/zsh', WATCHTOWER_INSTANCE_ID: 'keep-me' };
     buildPtySpawnConfig({ kind: 'shell', id: 's', extraArgs: [], env: e });
@@ -96,6 +108,11 @@ describe('planBootAction', () => {
   });
   it('claude with no session id → crash', () => {
     expect(planBootAction(row({ claudeSessionId: null }))).toBe('crash');
+  });
+  it('chat → ready again (its process starts on the next message), unless finished', () => {
+    expect(planBootAction(row({ kind: 'chat', status: 'working' }))).toBe('chat-ready');
+    expect(planBootAction(row({ kind: 'chat', status: 'crashed', claudeSessionId: null }))).toBe('chat-ready');
+    expect(planBootAction(row({ kind: 'chat', status: 'finished' }))).toBe('leave');
   });
   it('claude with session id → resume', () => {
     expect(planBootAction(row({ claudeSessionId: 'sess' }))).toBe('resume');

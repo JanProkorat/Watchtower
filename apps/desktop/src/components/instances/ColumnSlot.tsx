@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Box } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useSlotRegistration } from './SlotRegistry.js';
+import { TERMINAL_BG } from '../terminalTheme';
 
 interface Props {
   instanceId: string;
@@ -45,7 +46,7 @@ export function ColumnSlot({ instanceId, onFocus }: Props) {
       sx={{
         position: 'absolute',
         inset: 0,
-        backgroundColor: '#0e0f12',
+        backgroundColor: TERMINAL_BG,
         borderRadius: '12px',
         overflow: 'hidden',
         border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,18,24,0.10)'}`,

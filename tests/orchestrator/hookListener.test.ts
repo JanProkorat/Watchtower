@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { startHookListener, type HookListenerHandle } from '../../orchestrator/hookListener.js';
 
 // Binds a real HTTP listener on a real port and makes real round-trips. Under
@@ -139,5 +139,59 @@ describe('hookListener', () => {
       body: JSON.stringify({ blob: big }),
     });
     expect(res.status).toBe(413);
+  });
+});
+
+describe('hookListener /mods/:plugin', () => {
+  let handle: HookListenerHandle;
+  const mods: Array<{ plugin: string; body: unknown; instanceId: string }> = [];
+
+  // One listener for the block: restarting it per test on the same port leaves
+  // fetch's keep-alive sockets pointing at a closed server.
+  beforeAll(async () => {
+    handle = await startHookListener({
+      token: 'test-token',
+      portRange: [17431, 17440],
+      onEvent: async () => {},
+      onModState: (plugin, body, instanceId) => {
+        mods.push({ plugin, body, instanceId });
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await handle.stop();
+  });
+
+  beforeEach(() => {
+    mods.length = 0;
+  });
+
+  const post = (plugin: string, headers: Record<string, string>, body: unknown) =>
+    fetch(`http://127.0.0.1:${handle.port}/mods/${plugin}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+  const auth = { authorization: 'Bearer test-token', 'x-watchtower-instance': 'inst-1' };
+
+  it('delivers a savvy-progress snapshot with its instance id', async () => {
+    const res = await post('savvy-progress', auth, { version: 1, agents: [] });
+    expect(res.status).toBe(204);
+    expect(mods).toEqual([{ plugin: 'savvy-progress', body: { version: 1, agents: [] }, instanceId: 'inst-1' }]);
+  });
+
+  it('rejects a bad token, an unknown mod and a missing instance id', async () => {
+    expect((await post('savvy-progress', { ...auth, authorization: 'Bearer nope' }, {})).status).toBe(401);
+    expect((await post('other-mod', auth, {})).status).toBe(404);
+    expect((await post('savvy-progress', { authorization: 'Bearer test-token' }, {})).status).toBe(400);
+    expect(mods).toHaveLength(0);
+  });
+
+  it('takes snapshots larger than the 32 KB hook-payload limit', async () => {
+    const agents = Array.from({ length: 200 }, (_, i) => ({ id: `t${i}`, description: 'x'.repeat(300) }));
+    const res = await post('savvy-progress', auth, { version: 1, agents });
+    expect(res.status).toBe(204);
+    expect(mods).toHaveLength(1);
   });
 });

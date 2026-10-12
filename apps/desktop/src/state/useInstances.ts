@@ -6,7 +6,7 @@ export interface InstanceView {
   cwd: string;
   status: string;
   lastActivityAt: number;
-  kind: 'claude' | 'shell';
+  kind: 'claude' | 'shell' | 'chat';
   taskId: number | null;
 }
 
@@ -34,7 +34,7 @@ export function useInstances(): {
   activeId: string | null;
   loaded: boolean;
   setActive(id: string | null): void;
-  spawn(cwd: string, args?: string[], kind?: 'claude' | 'shell'): Promise<{ instanceId: string | null; error?: string }>;
+  spawn(cwd: string, args?: string[], kind?: 'claude' | 'shell' | 'chat'): Promise<{ instanceId: string | null; error?: string }>;
   kill(instanceId: string): Promise<void>;
   setTask(instanceId: string, taskId: number | null): Promise<void>;
   remove(instanceId: string): Promise<void>;
@@ -82,7 +82,7 @@ export function useInstances(): {
   }, [refresh]);
 
   const spawn = useCallback(
-    async (cwd: string, args?: string[], kind: 'claude' | 'shell' = 'claude') => {
+    async (cwd: string, args?: string[], kind: 'claude' | 'shell' | 'chat' = 'claude') => {
       const res = await invoke('spawnInstance', { cwd, args, instanceKind: kind });
       if (res.instanceId) {
         // Refresh the instance list BEFORE activating the new tab — otherwise

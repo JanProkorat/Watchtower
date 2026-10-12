@@ -20,7 +20,7 @@ interface Props {
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(): void;
-  onAddSessionAfter(afterInstanceId: string, cwd: string, kind: 'claude' | 'shell'): void;
+  onAddSessionAfter(afterInstanceId: string, cwd: string, kind: 'claude' | 'shell' | 'chat'): void;
   onSetTask?(instanceId: string, taskId: number | null): void;
   dashboardOnNew?(): void;
 }
@@ -28,7 +28,7 @@ interface Props {
 interface SessionInfo {
   id: string;
   status: string;
-  kind: 'claude' | 'shell';
+  kind: 'claude' | 'shell' | 'chat';
   taskId: number | null;
   cwd: string;
 }

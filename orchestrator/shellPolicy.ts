@@ -26,6 +26,17 @@ function forceUtf8Locale(env: Record<string, string>): void {
   if (!env.LANG) env.LANG = UTF8_LOCALE;
 }
 
+/**
+ * Advertise 24-bit colour, which xterm.js renders.
+ *
+ * Terminal apps detect truecolor from COLORTERM, and a Finder-launched Electron
+ * app inherits none — so Claude Code (and anything else in the pane) fell back
+ * to the 256-colour palette, quantizing its themed RGB colours.
+ */
+function advertiseTruecolor(env: Record<string, string>): void {
+  if (!env.COLORTERM) env.COLORTERM = 'truecolor';
+}
+
 export interface PtySpawnConfigInput {
   kind: InstanceKind;
   id: string;
@@ -56,6 +67,7 @@ export function buildPtySpawnConfig(input: PtySpawnConfigInput): PtySpawnConfig 
     if (typeof v === 'string') baseEnv[k] = v;
   }
   forceUtf8Locale(baseEnv);
+  advertiseTruecolor(baseEnv);
 
   if (input.kind === 'shell') {
     const shell = baseEnv.SHELL && baseEnv.SHELL.trim() ? baseEnv.SHELL : SHELL_FALLBACK;
@@ -69,7 +81,7 @@ export function buildPtySpawnConfig(input: PtySpawnConfigInput): PtySpawnConfig 
   return { command: 'claude', args, env: { ...baseEnv, WATCHTOWER_INSTANCE_ID: input.id } };
 }
 
-export type BootAction = 'leave' | 'crash' | 'resume' | 'respawn-shell';
+export type BootAction = 'leave' | 'crash' | 'resume' | 'respawn-shell' | 'chat-ready';
 
 /**
  * Decide what to do with a persisted instance row when the orchestrator boots.
@@ -79,11 +91,14 @@ export type BootAction = 'leave' | 'crash' | 'resume' | 'respawn-shell';
  *   - claude, user-killed  → leave
  *   - claude, no session   → crash (unrecoverable)
  *   - claude, has session  → resume via `claude --resume`
+ *   - chat, not finished   → ready again; its SDK process starts (resuming)
+ *                            on the next message, so nothing spawns at boot
  */
 export function planBootAction(
   row: Pick<InstanceRow, 'kind' | 'status' | 'terminationReason' | 'claudeSessionId'>,
 ): BootAction {
   if (row.kind === 'shell') return row.status === 'crashed' ? 'leave' : 'respawn-shell';
+  if (row.kind === 'chat') return row.status === 'finished' ? 'leave' : 'chat-ready';
   if (row.status === 'finished') return 'leave';
   if (row.terminationReason === 'user-kill') return 'leave';
   if (!row.claudeSessionId) return 'crash';

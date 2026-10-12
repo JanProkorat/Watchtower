@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
 import '@xterm/xterm/css/xterm.css';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useSlotForInstance } from './instances/SlotRegistry.js';
 import { signalTerminalInteraction } from './instances/terminalInteraction.js';
 import { invoke } from '../state/ipc';
+import { TERMINAL_BG, TERMINAL_OPTIONS, TERMINAL_PADDING } from './terminalTheme';
 
 interface Props {
   instanceId: string;
@@ -49,21 +51,13 @@ export function Terminal({ instanceId, status }: Props) {
   // the hidden "home" pool and whatever slot is currently bound.
   useEffect(() => {
     if (!hostRef.current) return;
-    const term = new XTerm({
-      fontFamily: 'Menlo, Monaco, "SF Mono", monospace',
-      fontSize: 13,
-      cursorBlink: true,
-      theme: {
-        background: '#0e0f12',
-        foreground: '#e5e7eb',
-        cursor: '#e5e7eb',
-        cursorAccent: '#0e0f12',
-      },
-      convertEol: true,
-      scrollback: 5000,
-    });
+    const term = new XTerm(TERMINAL_OPTIONS);
     const fit = new FitAddon();
     term.loadAddon(fit);
+    // Emoji and CJK widths as Claude Code measures them (Unicode 11+), so its
+    // box-drawn UI doesn't drift a column after a wide glyph.
+    term.loadAddon(new Unicode11Addon());
+    term.unicode.activeVersion = '11';
     term.open(hostRef.current);
     requestAnimationFrame(() => {
       try {
@@ -163,7 +157,24 @@ export function Terminal({ instanceId, status }: Props) {
     <Box ref={homeRef} sx={{ display: 'none' }} aria-hidden>
       <Box
         ref={hostRef}
-        sx={{ position: 'absolute', inset: 0, backgroundColor: '#0e0f12' }}
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          backgroundColor: TERMINAL_BG,
+          // On .xterm itself so FitAddon subtracts it when sizing the grid.
+          '& .xterm': { padding: TERMINAL_PADDING, height: '100%', boxSizing: 'border-box' },
+          // Thin overlay-style scrollbar instead of the platform's gutter.
+          '& .xterm-viewport': { scrollbarWidth: 'thin', scrollbarColor: 'rgba(232,230,220,0.18) transparent' },
+          '& .xterm-viewport::-webkit-scrollbar': { width: 8 },
+          '& .xterm-viewport::-webkit-scrollbar-track': { background: 'transparent' },
+          '& .xterm-viewport::-webkit-scrollbar-thumb': {
+            backgroundColor: 'rgba(232,230,220,0.16)',
+            borderRadius: 4,
+            border: '2px solid transparent',
+            backgroundClip: 'content-box',
+          },
+          '& .xterm-viewport::-webkit-scrollbar-thumb:hover': { backgroundColor: 'rgba(232,230,220,0.28)' },
+        }}
       >
         {isStarting && (
           <Box
@@ -175,7 +186,7 @@ export function Terminal({ instanceId, status }: Props) {
               alignItems: 'center',
               justifyContent: 'center',
               gap: 1.5,
-              backgroundColor: '#0e0f12',
+              backgroundColor: TERMINAL_BG,
               color: 'text.secondary',
               pointerEvents: 'none',
               zIndex: 10,
@@ -191,3 +202,4 @@ export function Terminal({ instanceId, status }: Props) {
     </Box>
   );
 }
+

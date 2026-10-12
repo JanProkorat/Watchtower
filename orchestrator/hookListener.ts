@@ -10,12 +10,18 @@ const KNOWN_EVENTS = new Set([
   'PostToolUse',
 ]);
 const MAX_BODY = 32 * 1024;
+// Mods that POST their state for Watchtower to draw natively (see
+// plugins/savvy-progress). A snapshot carries up to 200 subagent runs, so the
+// route takes more than a hook payload.
+const KNOWN_MODS = new Set(['savvy-progress']);
+const MAX_MOD_BODY = 512 * 1024;
 
 export interface HookListenerOptions {
   token: string;
   portRange: [number, number];
   onEvent: (event: string, body: unknown, instanceId: string) => Promise<void>;
   onStatusline?: (body: unknown, instanceId: string) => Promise<void> | void;
+  onModState?: (plugin: string, body: unknown, instanceId: string) => Promise<void> | void;
 }
 
 export interface HookListenerHandle {
@@ -60,6 +66,27 @@ export async function startHookListener(opts: HookListenerOptions): Promise<Hook
     const instanceId = String(req.headers['x-watchtower-instance'] ?? '');
     if (opts.onStatusline) {
       await opts.onStatusline(req.body, instanceId);
+    }
+    await reply.code(204).send();
+  });
+
+  app.post<{ Params: { plugin: string } }>('/mods/:plugin', { bodyLimit: MAX_MOD_BODY }, async (req, reply) => {
+    if (req.headers.authorization !== `Bearer ${opts.token}`) {
+      await reply.code(401).send({ error: 'unauthorized' });
+      return;
+    }
+    const plugin = req.params.plugin;
+    if (!KNOWN_MODS.has(plugin)) {
+      await reply.code(404).send({ error: 'unknown mod' });
+      return;
+    }
+    const instanceId = String(req.headers['x-watchtower-instance'] ?? '');
+    if (!instanceId) {
+      await reply.code(400).send({ error: 'missing X-Watchtower-Instance header' });
+      return;
+    }
+    if (opts.onModState) {
+      await opts.onModState(plugin, req.body, instanceId);
     }
     await reply.code(204).send();
   });
