@@ -23,7 +23,7 @@ const MUTED_DOT = 'rgba(255,255,255,0.18)';
 export interface SessionInfo {
   id: string;
   status: string;
-  kind: 'claude' | 'shell';
+  kind: 'claude' | 'shell' | 'chat';
   taskId: number | null;
   /** Working directory of the instance — used to preselect the project in the picker. */
   cwd: string;

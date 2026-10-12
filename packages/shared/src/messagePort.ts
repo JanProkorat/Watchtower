@@ -80,6 +80,12 @@ export type OrchRequest =
   | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
   | { id: string; kind: 'rateLimits:usage'; payload: Record<string, never> }
   | { id: string; kind: 'savvyProgress:get'; payload: { instanceId: string } }
+  | { id: string; kind: 'chat:snapshot'; payload: { instanceId: string } }
+  | { id: string; kind: 'chat:send'; payload: { instanceId: string; text: string } }
+  | { id: string; kind: 'chat:interrupt'; payload: { instanceId: string } }
+  | { id: string; kind: 'chat:respond'; payload: { instanceId: string; itemId: string; response: import('./chat.js').ChatResponse } }
+  | { id: string; kind: 'chat:setPermissionMode'; payload: { instanceId: string; mode: import('./chat.js').ChatPermissionMode } }
+  | { id: string; kind: 'chat:setModel'; payload: { instanceId: string; model: string | null } }
   | { id: string; kind: 'statuslineCapture:status'; payload: Record<string, never> }
   | { id: string; kind: 'statuslineCapture:set'; payload: { enabled: boolean } }
   | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } }
@@ -674,6 +680,12 @@ export type OrchResponse =
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimits:usage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | { kind: 'savvyProgress:get'; payload: import('./savvyProgress.js').SavvyProgressState | null }
+  | { kind: 'chat:snapshot'; payload: import('./chat.js').ChatSnapshot | null }
+  | { kind: 'chat:send'; payload: { ok: boolean; error?: string } }
+  | { kind: 'chat:interrupt'; payload: { ok: true } }
+  | { kind: 'chat:respond'; payload: { ok: boolean } }
+  | { kind: 'chat:setPermissionMode'; payload: { ok: true } }
+  | { kind: 'chat:setModel'; payload: { ok: true } }
   | { kind: 'statuslineCapture:status'; payload: { enabled: boolean; available: boolean } }
   | { kind: 'statuslineCapture:set'; payload: { ok: boolean; changed: boolean; backupPath: string | null; error?: string } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
@@ -740,6 +752,7 @@ export type OrchPush =
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimitsUsage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | { kind: 'savvyProgress'; payload: import('./savvyProgress.js').SavvyProgressState }
+  | { kind: 'chatEvent'; payload: import('./chat.js').ChatEvent }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
   | { kind: 'prReviewDone'; payload: { reviewId: number } }
   | { kind: 'prWatchEvent'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } }

@@ -88,6 +88,7 @@ import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { RateLimitsPayload, RateLimitsSnapshot } from '@watchtower/shared/rateLimitsFormat.js';
 import { extractRateLimits, rollForwardRateLimits } from '@watchtower/shared/rateLimitsFormat.js';
 import { SavvyProgressStore } from './services/savvyProgressStore.js';
+import { ChatManager } from './services/chat/chatManager.js';
 import type { SqliteLike } from './db/migrations.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
@@ -226,6 +227,32 @@ const savvyProgress = new SavvyProgressStore(
   (state) => emitPush({ kind: 'savvyProgress', payload: state }),
   (instanceId) => !!handle && repo().get(instanceId) != null,
 );
+
+// Chat instances: Claude Code sessions run through the Agent SDK and drawn
+// natively by the renderer (no pty). Their hooks still reach the listener —
+// the SDK loads the user's settings and gets WATCHTOWER_INSTANCE_ID — and the
+// session reports its own turn boundaries too, so status works either way.
+const chats = new ChatManager({
+  cwdOf: (instanceId) => {
+    const row = handle ? repo().get(instanceId) : null;
+    return row && row.kind === 'chat' ? row.cwd : null;
+  },
+  env: (instanceId) => ({
+    ...process.env,
+    WATCHTOWER_INSTANCE_ID: instanceId,
+    CLAUDE_AGENT_SDK_CLIENT_APP: 'watchtower',
+  }),
+  emit: (event) => emitPush({ kind: 'chatEvent', payload: event }),
+  onActivity: (instanceId, activity) =>
+    applyTransition(
+      instanceId,
+      activity === 'working'
+        ? { kind: 'userPromptSubmit' }
+        : activity === 'waiting-permission'
+        ? { kind: 'notificationHook' }
+        : { kind: 'stopHook' },
+    ),
+});
 
 function supportDir(): string {
   // WATCHTOWER_SUPPORT_DIR lets a dev run point at an isolated copy of the
@@ -679,6 +706,10 @@ function applyTransition(instanceId: string, event: StateEvent): void {
  * no live pty session (the caller still stamps the message as handled).
  */
 function deliverReply(instanceId: string, text: string): boolean {
+  if (repo().get(instanceId)?.kind === 'chat') {
+    void chats.send(instanceId, text);
+    return true;
+  }
   const session = pty.get(instanceId);
   if (!session) return false;
   session.write(text + '\r');
@@ -723,6 +754,7 @@ function disposeInstanceRow(id: string): void {
   terminalSnapshots.dispose(id);
   ptySizeOwnership.disposeInstance(id);
   savvyProgress.dispose(id);
+  chats.dispose(id);
 }
 
 const MEETING_RESULT_FILE = '/tmp/watchtower-meeting-result.json';
@@ -864,7 +896,8 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           cwd: expandedCwd,
           // Shells have no SessionStart handshake, so they start live ('working')
           // and never show the spinner. Claude starts 'spawning' until the hook.
-          status: instanceKind === 'shell' ? 'working' : 'spawning',
+          // A chat is ready for its first message; its process starts with it.
+          status: instanceKind === 'shell' ? 'working' : instanceKind === 'chat' ? 'waiting-input' : 'spawning',
           // Claude: --session-id <uuid> => session id matches row id. Shells: none.
           claudeSessionId: instanceKind === 'shell' ? null : id,
           spawnedAt: now,
@@ -879,7 +912,9 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           worktreePath: null,
           background: req.payload.background ?? false,
         });
-        spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [], kind: instanceKind });
+        if (instanceKind !== 'chat') {
+          spawnPtyForInstance({ id, cwd: expandedCwd, extraArgs: req.payload.args ?? [], kind: instanceKind });
+        }
         return { instanceId: id };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -920,6 +955,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     }
 
     case 'killInstance':
+      chats.dispose(req.payload.instanceId);
       pty.get(req.payload.instanceId)?.kill();
       terminalSnapshots.dispose(req.payload.instanceId);
       ptySizeOwnership.disposeInstance(req.payload.instanceId);
@@ -949,6 +985,14 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'restartInstance': {
       const row = repo().get(req.payload.instanceId);
       if (!row) return { ok: false };
+      if (row.kind === 'chat') {
+        // A fresh SDK process starts (resuming the transcript) on the next message.
+        chats.dispose(row.id);
+        repo().updateStatus(row.id, 'waiting-input', Date.now());
+        repo().setTermination(row.id, null, null);
+        emitPush({ kind: 'stateChanged', payload: { instanceId: row.id, status: 'waiting-input' } });
+        return { ok: true };
+      }
       // Re-spawn a fresh process into the SAME row id. Shells re-run the login
       // shell; claude rows resume via the row's session id.
       terminalSnapshots.dispose(row.id);
@@ -1503,6 +1547,27 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       // don't have one yet (first call before the poll timer has fired).
       return latestTokenUsage ?? (await refreshTokenUsage());
 
+    case 'chat:snapshot':
+      return chats.snapshot(req.payload.instanceId);
+
+    case 'chat:send':
+      return chats.send(req.payload.instanceId, req.payload.text);
+
+    case 'chat:interrupt':
+      await chats.interrupt(req.payload.instanceId);
+      return { ok: true };
+
+    case 'chat:respond':
+      return { ok: await chats.respond(req.payload.instanceId, req.payload.itemId, req.payload.response) };
+
+    case 'chat:setPermissionMode':
+      await chats.setPermissionMode(req.payload.instanceId, req.payload.mode);
+      return { ok: true };
+
+    case 'chat:setModel':
+      await chats.setModel(req.payload.instanceId, req.payload.model);
+      return { ok: true };
+
     case 'savvyProgress:get':
       return savvyProgress.get(req.payload.instanceId);
 
@@ -1790,6 +1855,11 @@ function respawnIncompleteRowsOnBoot(): void {
     }
     const action = planBootAction(row);
     if (action === 'leave') continue;
+    if (action === 'chat-ready') {
+      r.updateStatus(row.id, 'waiting-input', Date.now());
+      r.setTermination(row.id, null, null);
+      continue;
+    }
     if (action === 'crash') {
       if (row.status !== 'crashed') {
         r.updateStatus(row.id, 'crashed', Date.now());
@@ -1990,4 +2060,5 @@ function respawnIncompleteRowsOnBoot(): void {
 // so pending escalation timers are cleared when the utility process exits.
 process.on('exit', () => {
   escalationGate?.clearAll();
+  chats.disposeAll();
 });

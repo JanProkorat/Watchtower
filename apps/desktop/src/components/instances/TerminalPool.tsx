@@ -12,7 +12,8 @@ interface Props {
 export function TerminalPool({ instances }: Props) {
   return (
     <Box sx={{ display: 'none' }} aria-hidden>
-      {instances.map((i) => (
+      {/* Chat instances have no pty: ChatView draws them. */}
+      {instances.filter((i) => i.kind !== 'chat').map((i) => (
         <TerminalErrorBoundary key={i.id} instanceId={i.id} cwd={i.cwd} active={false}>
           <Terminal instanceId={i.id} status={i.status} />
         </TerminalErrorBoundary>

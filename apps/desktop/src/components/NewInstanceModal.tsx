@@ -44,13 +44,13 @@ interface Props {
   open: boolean;
   defaultCwd?: string;
   onClose(): void;
-  onSpawn(cwd: string, kind: 'claude' | 'shell'): void;
+  onSpawn(cwd: string, kind: 'claude' | 'shell' | 'chat'): void;
 }
 
 export function NewInstanceModal({ open, defaultCwd, onClose, onSpawn }: Props) {
   const [cwd, setCwd] = useState('');
   const [recent, setRecent] = useState<string[]>([]);
-  const [kind, setKind] = useState<'claude' | 'shell'>('claude');
+  const [kind, setKind] = useState<'claude' | 'shell' | 'chat'>('claude');
 
   useEffect(() => {
     if (!open) return;
@@ -90,6 +90,7 @@ export function NewInstanceModal({ open, defaultCwd, onClose, onSpawn }: Props) 
             sx={{ mb: 1 }}
           >
             <ToggleButton value="claude">Claude session</ToggleButton>
+            <ToggleButton value="chat">Chat</ToggleButton>
             <ToggleButton value="shell">Terminal</ToggleButton>
           </ToggleButtonGroup>
           <Stack direction="row" spacing={1} alignItems="flex-start">

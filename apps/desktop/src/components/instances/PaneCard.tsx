@@ -7,7 +7,9 @@ import TerminalIcon from '@mui/icons-material/Terminal';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import GroupsIcon from '@mui/icons-material/Groups';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import { ColumnSlot } from './ColumnSlot.js';
+import { ChatView } from '../chat/ChatView.js';
 import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
 import { useSavvyChrome, SAVVY_GAP } from './savvy/useSavvyChrome.js';
 import { ATTENTION_AMBER } from '../../theme/glass.js';
@@ -15,7 +17,7 @@ import { ATTENTION_AMBER } from '../../theme/glass.js';
 interface Props {
   instanceId: string;
   status: string;
-  kind: 'claude' | 'shell';
+  kind: 'claude' | 'shell' | 'chat';
   taskId: number | null;
   cwd: string;
   focused: boolean;
@@ -28,7 +30,7 @@ interface Props {
   onRestart?(): void;
   onSetTask?(taskId: number | null): void;
   /** Add a new instance of `kind` immediately to the right of this pane. */
-  onNewInstance(kind: 'claude' | 'shell'): void;
+  onNewInstance(kind: 'claude' | 'shell' | 'chat'): void;
 }
 
 /**
@@ -61,7 +63,7 @@ export function PaneCard({
   const closeCtx = () => setCtxAnchor(null);
   // The savvy-progress mod's band + agents panel, drawn natively around the
   // terminal (the CLI can't draw the mod's SVG crabs). Empty unless the mod posts.
-  const savvy = useSavvyChrome(instanceId, kind === 'claude');
+  const savvy = useSavvyChrome(instanceId, kind !== 'shell');
 
   return (
     <Box
@@ -73,7 +75,11 @@ export function PaneCard({
       }}
     >
       <Box sx={{ position: 'absolute', top: 0, left: 0, right: savvy.rightInset, bottom: savvy.bottomInset }}>
-        <ColumnSlot instanceId={instanceId} onFocus={onFocus} />
+        {kind === 'chat' ? (
+          <ChatView instanceId={instanceId} cwd={cwd} onFocus={onFocus} />
+        ) : (
+          <ColumnSlot instanceId={instanceId} onFocus={onFocus} />
+        )}
 
         {/* Top-edge line, drawn as an overlay ABOVE the terminal (an inset shadow
             on the slot would be hidden behind the xterm host). Amber + glowing
@@ -133,6 +139,9 @@ export function PaneCard({
           </ChromeButton>
           <ChromeButton title="New Claude instance to the right" onClick={() => onNewInstance('claude')}>
             <AutoAwesomeIcon sx={{ fontSize: 15 }} />
+          </ChromeButton>
+          <ChromeButton title="New chat to the right" onClick={() => onNewInstance('chat')}>
+            <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />
           </ChromeButton>
           {savvy.isPanelClosed && (
             <ChromeButton title="Show agents panel" onClick={savvy.openPanel}>

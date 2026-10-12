@@ -354,7 +354,7 @@ export function App() {
 
   const doSpawn = async (
     cwd: string,
-    kind: 'claude' | 'shell' = 'claude',
+    kind: 'claude' | 'shell' | 'chat' = 'claude',
     afterInstanceId?: string,
   ) => {
     setSpawnInFlight((n) => n + 1);

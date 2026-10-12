@@ -109,6 +109,11 @@ describe('planBootAction', () => {
   it('claude with no session id → crash', () => {
     expect(planBootAction(row({ claudeSessionId: null }))).toBe('crash');
   });
+  it('chat → ready again (its process starts on the next message), unless finished', () => {
+    expect(planBootAction(row({ kind: 'chat', status: 'working' }))).toBe('chat-ready');
+    expect(planBootAction(row({ kind: 'chat', status: 'crashed', claudeSessionId: null }))).toBe('chat-ready');
+    expect(planBootAction(row({ kind: 'chat', status: 'finished' }))).toBe('leave');
+  });
   it('claude with session id → resume', () => {
     expect(planBootAction(row({ claudeSessionId: 'sess' }))).toBe('resume');
   });

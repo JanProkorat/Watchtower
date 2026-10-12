@@ -16,7 +16,7 @@ interface Props {
   onHideSession(instanceId: string): void;
   onUnhideSession(instanceId: string): void;
   onAddSession(tabId: string): void;
-  onAddSessionAfter(afterInstanceId: string, cwd: string, kind: 'claude' | 'shell'): void;
+  onAddSessionAfter(afterInstanceId: string, cwd: string, kind: 'claude' | 'shell' | 'chat'): void;
   onSetTask?(instanceId: string, taskId: number | null): void;
 }
 

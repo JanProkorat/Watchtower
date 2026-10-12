@@ -25,7 +25,8 @@ export type TerminationReason =
   | 'resume-failed'
   | 'no-session-id';
 
-export type InstanceKind = 'claude' | 'shell';
+/** `chat`: a Claude Code session driven through the Agent SDK and drawn natively (no pty). */
+export type InstanceKind = 'claude' | 'shell' | 'chat';
 
 export interface InstanceRow {
   id: string;
