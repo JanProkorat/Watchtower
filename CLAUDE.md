@@ -185,6 +185,27 @@ sites import — not a monkey-patch.
 - Toasts are FIFO-queued and expose `showError/showWarning/showSuccess/showInfo`
   via `useToast()` (React) or the module-level `toast` bridge (non-React).
 
+## savvy-progress mod bridge (`plugins/savvy-progress/`)
+
+A vendored, patched copy of the third-party savvy-progress Claude Code mod
+(MIT). Its agents panel draws pixel-crab **SVG**, which Claude Code renders
+only on the desktop surface — in our xterm.js terminal it shows a `▣`. So:
+
+1. The mod (inside a Watchtower pty, `WATCHTOWER_INSTANCE_ID` set) reads
+   `listener.json` and POSTs a state snapshot to `/mods/savvy-progress` on the
+   hook listener on every change (coalesced, 200 ms).
+2. `orchestrator/services/savvyProgressStore.ts` validates it
+   (`parseSavvySnapshot` in `packages/shared/src/savvyProgress.ts`), keeps the
+   latest per instance in memory, and pushes `savvyProgress`;
+   `savvyProgress:get` returns the cached one.
+3. `PaneCard` → `useSavvyChrome` lays the band (below the terminal) and the
+   agents panel (right of it) around the terminal; rows are the mod's own SVG,
+   ported to `components/instances/savvy/savvyDraw.ts`, shown as `<img>` data
+   URIs so their `<style>` can't leak into the app.
+
+Three copies of one shape — mod `types/index.d.ts`, `shared/savvyProgress.ts`,
+and the drawing in `register.tsx` vs `savvyDraw.ts` — **change them together**.
+
 ## Things to NOT do
 
 - Don't add CRUD that bypasses the IPC contract. Renderer never reaches

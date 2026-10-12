@@ -6,8 +6,10 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
+import GroupsIcon from '@mui/icons-material/Groups';
 import { ColumnSlot } from './ColumnSlot.js';
 import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
+import { useSavvyChrome, SAVVY_GAP } from './savvy/useSavvyChrome.js';
 import { ATTENTION_AMBER } from '../../theme/glass.js';
 
 interface Props {
@@ -57,6 +59,9 @@ export function PaneCard({
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const closeCtx = () => setCtxAnchor(null);
+  // The savvy-progress mod's band + agents panel, drawn natively around the
+  // terminal (the CLI can't draw the mod's SVG crabs). Empty unless the mod posts.
+  const savvy = useSavvyChrome(instanceId, kind === 'claude');
 
   return (
     <Box
@@ -67,79 +72,93 @@ export function PaneCard({
         setCtxAnchor({ x: e.clientX, y: e.clientY });
       }}
     >
-      <ColumnSlot instanceId={instanceId} onFocus={onFocus} />
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: savvy.rightInset, bottom: savvy.bottomInset }}>
+        <ColumnSlot instanceId={instanceId} onFocus={onFocus} />
 
-      {/* Top-edge line, drawn as an overlay ABOVE the terminal (an inset shadow
-          on the slot would be hidden behind the xterm host). Amber + glowing
-          when the instance needs attention (shown even when unfocused so it's
-          easy to spot); otherwise the accent focus line. iPad language. */}
-      {(focused || attention) && (
+        {/* Top-edge line, drawn as an overlay ABOVE the terminal (an inset shadow
+            on the slot would be hidden behind the xterm host). Amber + glowing
+            when the instance needs attention (shown even when unfocused so it's
+            easy to spot); otherwise the accent focus line. iPad language. */}
+        {(focused || attention) && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '3px',
+              backgroundColor: attention ? ATTENTION_AMBER : accent ?? '#818cf8',
+              boxShadow: attention ? `0 0 10px ${ATTENTION_AMBER}` : 'none',
+              borderTopLeftRadius: '12px',
+              borderTopRightRadius: '12px',
+              zIndex: 7,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+
+        {/* Which instance needs attention — a glowing warning badge, matching the
+            project tab's ⚠ marker. */}
+        {attention && (
+          <WarningRoundedIcon
+            aria-label="needs your attention"
+            sx={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              zIndex: 7,
+              fontSize: 18,
+              color: ATTENTION_AMBER,
+              filter: `drop-shadow(0 0 5px ${ATTENTION_AMBER}aa)`,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+
+        {/* Fading top-right chrome — brighter when the pane is focused. */}
         <Box
           sx={{
             position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '3px',
-            backgroundColor: attention ? ATTENTION_AMBER : accent ?? '#818cf8',
-            boxShadow: attention ? `0 0 10px ${ATTENTION_AMBER}` : 'none',
-            borderTopLeftRadius: '12px',
-            borderTopRightRadius: '12px',
-            zIndex: 7,
-            pointerEvents: 'none',
-          }}
-        />
-      )}
-
-      {/* Which instance needs attention — a glowing warning badge, matching the
-          project tab's ⚠ marker. */}
-      {attention && (
-        <WarningRoundedIcon
-          aria-label="needs your attention"
-          sx={{
-            position: 'absolute',
             top: 8,
-            left: 8,
-            zIndex: 7,
-            fontSize: 18,
-            color: ATTENTION_AMBER,
-            filter: `drop-shadow(0 0 5px ${ATTENTION_AMBER}aa)`,
-            pointerEvents: 'none',
+            right: 8,
+            display: 'flex',
+            gap: 0.5,
+            opacity: focused ? 1 : 0.4,
+            transition: 'opacity 120ms ease',
+            zIndex: 6,
           }}
-        />
-      )}
-
-      {/* Fading top-right chrome — brighter when the pane is focused. */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 8,
-          right: 8,
-          display: 'flex',
-          gap: 0.5,
-          opacity: focused ? 1 : 0.4,
-          transition: 'opacity 120ms ease',
-          zIndex: 6,
-        }}
-      >
-        <ChromeButton title="New terminal to the right" onClick={() => onNewInstance('shell')}>
-          <TerminalIcon sx={{ fontSize: 15 }} />
-        </ChromeButton>
-        <ChromeButton title="New Claude instance to the right" onClick={() => onNewInstance('claude')}>
-          <AutoAwesomeIcon sx={{ fontSize: 15 }} />
-        </ChromeButton>
-        {kind === 'shell' && status === 'crashed' && onRestart && (
-          <ChromeButton title="Restart terminal" onClick={onRestart}>
-            <RefreshIcon sx={{ fontSize: 15 }} />
+        >
+          <ChromeButton title="New terminal to the right" onClick={() => onNewInstance('shell')}>
+            <TerminalIcon sx={{ fontSize: 15 }} />
           </ChromeButton>
-        )}
-        <ChromeButton title="Hide (keep running)" onClick={onHide}>
-          <VisibilityOffIcon sx={{ fontSize: 15 }} />
-        </ChromeButton>
-        <ChromeButton title="Close (kill session)" onClick={onClose}>
-          <CloseIcon sx={{ fontSize: 15 }} />
-        </ChromeButton>
+          <ChromeButton title="New Claude instance to the right" onClick={() => onNewInstance('claude')}>
+            <AutoAwesomeIcon sx={{ fontSize: 15 }} />
+          </ChromeButton>
+          {savvy.isPanelClosed && (
+            <ChromeButton title="Show agents panel" onClick={savvy.openPanel}>
+              <GroupsIcon sx={{ fontSize: 15 }} />
+            </ChromeButton>
+          )}
+          {kind === 'shell' && status === 'crashed' && onRestart && (
+            <ChromeButton title="Restart terminal" onClick={onRestart}>
+              <RefreshIcon sx={{ fontSize: 15 }} />
+            </ChromeButton>
+          )}
+          <ChromeButton title="Hide (keep running)" onClick={onHide}>
+            <VisibilityOffIcon sx={{ fontSize: 15 }} />
+          </ChromeButton>
+          <ChromeButton title="Close (kill session)" onClick={onClose}>
+            <CloseIcon sx={{ fontSize: 15 }} />
+          </ChromeButton>
+        </Box>
       </Box>
+
+      {savvy.band && (
+        <Box sx={{ position: 'absolute', left: 0, right: savvy.rightInset, bottom: 0 }}>{savvy.band}</Box>
+      )}
+      {savvy.panel && (
+        <Box sx={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: savvy.rightInset - SAVVY_GAP }}>{savvy.panel}</Box>
+      )}
 
       <Menu
         open={ctxAnchor != null}

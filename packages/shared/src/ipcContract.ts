@@ -84,6 +84,7 @@ export type IpcRequest =
   | { kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { kind: 'tokens:usage'; payload: Record<string, never> }
   | { kind: 'rateLimits:usage'; payload: Record<string, never> }
+  | { kind: 'savvyProgress:get'; payload: { instanceId: string } }
   | { kind: 'statuslineCapture:status'; payload: Record<string, never> }
   | { kind: 'statuslineCapture:set'; payload: { enabled: boolean } }
   | { kind: 'openExternalUrl'; payload: { url: string } }
@@ -771,6 +772,7 @@ export type IpcResponse =
   | { kind: 'board:remove'; payload: { snapshot: BoardSnapshotPayload } }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimits:usage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
+  | { kind: 'savvyProgress:get'; payload: import('./savvyProgress.js').SavvyProgressState | null }
   | { kind: 'statuslineCapture:status'; payload: { enabled: boolean; available: boolean } }
   | { kind: 'statuslineCapture:set'; payload: { ok: boolean; changed: boolean; backupPath: string | null; error?: string } }
   | { kind: 'openExternalUrl'; payload: { ok: boolean; error?: string } }
@@ -983,6 +985,7 @@ export type IpcPush =
   | { kind: 'triggerNewInstance'; payload: Record<string, never> }
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimitsUsage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
+  | { kind: 'savvyProgress'; payload: import('./savvyProgress.js').SavvyProgressState }
   | {
       kind: 'orchestratorCrashed';
       payload: { code: number | null; restarting: boolean };

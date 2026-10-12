@@ -79,6 +79,7 @@ export type OrchRequest =
   | { id: string; kind: 'board:remove'; payload: { taskId: number; projectId: number } }
   | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
   | { id: string; kind: 'rateLimits:usage'; payload: Record<string, never> }
+  | { id: string; kind: 'savvyProgress:get'; payload: { instanceId: string } }
   | { id: string; kind: 'statuslineCapture:status'; payload: Record<string, never> }
   | { id: string; kind: 'statuslineCapture:set'; payload: { enabled: boolean } }
   | { id: string; kind: 'terminalFocus'; payload: { instanceId: string } }
@@ -672,6 +673,7 @@ export type OrchResponse =
     }
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimits:usage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
+  | { kind: 'savvyProgress:get'; payload: import('./savvyProgress.js').SavvyProgressState | null }
   | { kind: 'statuslineCapture:status'; payload: { enabled: boolean; available: boolean } }
   | { kind: 'statuslineCapture:set'; payload: { ok: boolean; changed: boolean; backupPath: string | null; error?: string } }
   | { kind: 'terminalFocus'; payload: { ok: true } }
@@ -737,6 +739,7 @@ export type OrchPush =
   | { kind: 'badge'; payload: { count: number } }
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimitsUsage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
+  | { kind: 'savvyProgress'; payload: import('./savvyProgress.js').SavvyProgressState }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
   | { kind: 'prReviewDone'; payload: { reviewId: number } }
   | { kind: 'prWatchEvent'; payload: { host: import('./ipcContract.js').PrHost; repoKey: string; prNumber: number } }

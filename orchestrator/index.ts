@@ -87,6 +87,7 @@ import type { WatchedPr, WatchEvent } from './services/prWatch/types.js';
 import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { RateLimitsPayload, RateLimitsSnapshot } from '@watchtower/shared/rateLimitsFormat.js';
 import { extractRateLimits, rollForwardRateLimits } from '@watchtower/shared/rateLimitsFormat.js';
+import { SavvyProgressStore } from './services/savvyProgressStore.js';
 import type { SqliteLike } from './db/migrations.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
 import type { InstanceStatus } from '@watchtower/shared/stateModel.js';
@@ -218,6 +219,13 @@ function onStatuslineBody(db: SqliteLike, body: unknown, now: number): void {
     emitPush({ kind: 'rateLimitsUsage', payload: snap });
   }
 }
+
+// savvy-progress mod snapshots (plugins/savvy-progress → POST /mods/savvy-progress),
+// drawn natively by the renderer next to the instance's terminal.
+const savvyProgress = new SavvyProgressStore(
+  (state) => emitPush({ kind: 'savvyProgress', payload: state }),
+  (instanceId) => !!handle && repo().get(instanceId) != null,
+);
 
 function supportDir(): string {
   // WATCHTOWER_SUPPORT_DIR lets a dev run point at an isolated copy of the
@@ -714,6 +722,7 @@ function disposeInstanceRow(id: string): void {
   void attentionRelay?.closeThread(id);
   terminalSnapshots.dispose(id);
   ptySizeOwnership.disposeInstance(id);
+  savvyProgress.dispose(id);
 }
 
 const MEETING_RESULT_FILE = '/tmp/watchtower-meeting-result.json';
@@ -1494,6 +1503,9 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       // don't have one yet (first call before the poll timer has fired).
       return latestTokenUsage ?? (await refreshTokenUsage());
 
+    case 'savvyProgress:get':
+      return savvyProgress.get(req.payload.instanceId);
+
     case 'rateLimits:usage':
       // Age the snapshot on read: it may have been captured (or restored from
       // `settings` at boot) before a window rolled over, and nothing pushes a
@@ -1863,6 +1875,9 @@ function respawnIncompleteRowsOnBoot(): void {
       },
       onStatusline: (body) => {
         if (handle) onStatuslineBody(handle.db, body, Date.now());
+      },
+      onModState: (plugin, body, instanceId) => {
+        if (plugin === 'savvy-progress') savvyProgress.ingest(body, instanceId, Date.now());
       },
     });
     // Register the WS bridge's broadcast as the secondary push sink so every
