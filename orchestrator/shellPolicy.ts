@@ -26,6 +26,17 @@ function forceUtf8Locale(env: Record<string, string>): void {
   if (!env.LANG) env.LANG = UTF8_LOCALE;
 }
 
+/**
+ * Advertise 24-bit colour, which xterm.js renders.
+ *
+ * Terminal apps detect truecolor from COLORTERM, and a Finder-launched Electron
+ * app inherits none — so Claude Code (and anything else in the pane) fell back
+ * to the 256-colour palette, quantizing its themed RGB colours.
+ */
+function advertiseTruecolor(env: Record<string, string>): void {
+  if (!env.COLORTERM) env.COLORTERM = 'truecolor';
+}
+
 export interface PtySpawnConfigInput {
   kind: InstanceKind;
   id: string;
@@ -56,6 +67,7 @@ export function buildPtySpawnConfig(input: PtySpawnConfigInput): PtySpawnConfig 
     if (typeof v === 'string') baseEnv[k] = v;
   }
   forceUtf8Locale(baseEnv);
+  advertiseTruecolor(baseEnv);
 
   if (input.kind === 'shell') {
     const shell = baseEnv.SHELL && baseEnv.SHELL.trim() ? baseEnv.SHELL : SHELL_FALLBACK;
