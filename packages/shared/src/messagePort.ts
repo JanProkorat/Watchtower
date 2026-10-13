@@ -80,6 +80,11 @@ export type OrchRequest =
   | { id: string; kind: 'tokens:usage'; payload: Record<string, never> }
   | { id: string; kind: 'rateLimits:usage'; payload: Record<string, never> }
   | { id: string; kind: 'savvyProgress:get'; payload: { instanceId: string } }
+  | { id: string; kind: 'fileTree:list'; payload: { instanceId: string; dir: string } }
+  | { id: string; kind: 'fileTree:git'; payload: { instanceId: string } }
+  | { id: string; kind: 'fileTree:search'; payload: { instanceId: string; query: string } }
+  | { id: string; kind: 'fileTree:watch'; payload: { instanceId: string } }
+  | { id: string; kind: 'fileTree:unwatch'; payload: { instanceId: string } }
   | { id: string; kind: 'chat:snapshot'; payload: { instanceId: string } }
   | { id: string; kind: 'chat:send'; payload: { instanceId: string; text: string } }
   | { id: string; kind: 'chat:interrupt'; payload: { instanceId: string } }
@@ -680,6 +685,11 @@ export type OrchResponse =
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimits:usage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | { kind: 'savvyProgress:get'; payload: import('./savvyProgress.js').SavvyProgressState | null }
+  | { kind: 'fileTree:list'; payload: import('./fileTree.js').FileListResult }
+  | { kind: 'fileTree:git'; payload: import('./fileTree.js').FileTreeGit }
+  | { kind: 'fileTree:search'; payload: string[] }
+  | { kind: 'fileTree:watch'; payload: { ok: true } }
+  | { kind: 'fileTree:unwatch'; payload: { ok: true } }
   | { kind: 'chat:snapshot'; payload: import('./chat.js').ChatSnapshot | null }
   | { kind: 'chat:send'; payload: { ok: boolean; error?: string } }
   | { kind: 'chat:interrupt'; payload: { ok: true } }
@@ -752,6 +762,7 @@ export type OrchPush =
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimitsUsage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | { kind: 'savvyProgress'; payload: import('./savvyProgress.js').SavvyProgressState }
+  | { kind: 'fileTreeChanged'; payload: { instanceId: string } }
   | { kind: 'chatEvent'; payload: import('./chat.js').ChatEvent }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
   | { kind: 'prReviewDone'; payload: { reviewId: number } }

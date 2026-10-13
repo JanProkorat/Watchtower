@@ -15,6 +15,10 @@ const SILENT_KINDS = new Set<string>([
   'rateLimits:usage', // statusline-capture snapshot poll; card surfaces its own empty state
   'board:authPing', // board auth probe — expected to fail when not signed in
   'ping',           // health probe
+  'fileTree:git',     // file tree git status, re-read on every folder change
+  'fileTree:search',  // search-as-you-type; the tab shows its own empty state
+  'fileTree:watch',   // live refresh is best-effort
+  'fileTree:unwatch',
 ]);
 
 /**

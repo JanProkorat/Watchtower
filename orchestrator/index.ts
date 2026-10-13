@@ -88,6 +88,8 @@ import type { TokenUsagePayload } from '@watchtower/shared/tokenUsageFormat.js';
 import type { RateLimitsPayload, RateLimitsSnapshot } from '@watchtower/shared/rateLimitsFormat.js';
 import { extractRateLimits, rollForwardRateLimits } from '@watchtower/shared/rateLimitsFormat.js';
 import { SavvyProgressStore } from './services/savvyProgressStore.js';
+import { listDir, readGit, searchFiles } from './services/fileTree.js';
+import { FileTreeWatchers, nodeWatch } from './services/fileTreeWatchers.js';
 import { ChatManager } from './services/chat/chatManager.js';
 import type { SqliteLike } from './db/migrations.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
@@ -227,6 +229,17 @@ const savvyProgress = new SavvyProgressStore(
   (state) => emitPush({ kind: 'savvyProgress', payload: state }),
   (instanceId) => !!handle && repo().get(instanceId) != null,
 );
+
+// Native Files tab: folder watchers shared by every pane on the same cwd.
+const fileTreeWatchers = new FileTreeWatchers(nodeWatch, (instanceId) =>
+  emitPush({ kind: 'fileTreeChanged', payload: { instanceId } }),
+);
+
+function cwdOfInstance(instanceId: string): string {
+  const row = handle ? repo().get(instanceId) : null;
+  if (!row) throw new Error('Unknown instance');
+  return row.cwd;
+}
 
 // Chat instances: Claude Code sessions run through the Agent SDK and drawn
 // natively by the renderer (no pty). Their hooks still reach the listener —
@@ -754,6 +767,7 @@ function disposeInstanceRow(id: string): void {
   terminalSnapshots.dispose(id);
   ptySizeOwnership.disposeInstance(id);
   savvyProgress.dispose(id);
+  fileTreeWatchers.unwatch(id);
   chats.dispose(id);
 }
 
@@ -1570,6 +1584,23 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'savvyProgress:get':
       return savvyProgress.get(req.payload.instanceId);
+
+    case 'fileTree:list':
+      return listDir(cwdOfInstance(req.payload.instanceId), req.payload.dir);
+
+    case 'fileTree:git':
+      return readGit(cwdOfInstance(req.payload.instanceId));
+
+    case 'fileTree:search':
+      return searchFiles(cwdOfInstance(req.payload.instanceId), req.payload.query);
+
+    case 'fileTree:watch':
+      fileTreeWatchers.watch(cwdOfInstance(req.payload.instanceId), req.payload.instanceId);
+      return { ok: true };
+
+    case 'fileTree:unwatch':
+      fileTreeWatchers.unwatch(req.payload.instanceId);
+      return { ok: true };
 
     case 'rateLimits:usage':
       // Age the snapshot on read: it may have been captured (or restored from

@@ -85,6 +85,11 @@ export type IpcRequest =
   | { kind: 'tokens:usage'; payload: Record<string, never> }
   | { kind: 'rateLimits:usage'; payload: Record<string, never> }
   | { kind: 'savvyProgress:get'; payload: { instanceId: string } }
+  | { kind: 'fileTree:list'; payload: { instanceId: string; dir: string } }
+  | { kind: 'fileTree:git'; payload: { instanceId: string } }
+  | { kind: 'fileTree:search'; payload: { instanceId: string; query: string } }
+  | { kind: 'fileTree:watch'; payload: { instanceId: string } }
+  | { kind: 'fileTree:unwatch'; payload: { instanceId: string } }
   | { kind: 'chat:snapshot'; payload: { instanceId: string } }
   | { kind: 'chat:send'; payload: { instanceId: string; text: string } }
   | { kind: 'chat:interrupt'; payload: { instanceId: string } }
@@ -779,6 +784,11 @@ export type IpcResponse =
   | { kind: 'tokens:usage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimits:usage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | { kind: 'savvyProgress:get'; payload: import('./savvyProgress.js').SavvyProgressState | null }
+  | { kind: 'fileTree:list'; payload: import('./fileTree.js').FileListResult }
+  | { kind: 'fileTree:git'; payload: import('./fileTree.js').FileTreeGit }
+  | { kind: 'fileTree:search'; payload: string[] }
+  | { kind: 'fileTree:watch'; payload: { ok: true } }
+  | { kind: 'fileTree:unwatch'; payload: { ok: true } }
   | { kind: 'chat:snapshot'; payload: import('./chat.js').ChatSnapshot | null }
   | { kind: 'chat:send'; payload: { ok: boolean; error?: string } }
   | { kind: 'chat:interrupt'; payload: { ok: true } }
@@ -998,6 +1008,7 @@ export type IpcPush =
   | { kind: 'tokenUsage'; payload: import('./tokenUsageFormat.js').TokenUsagePayload }
   | { kind: 'rateLimitsUsage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | { kind: 'savvyProgress'; payload: import('./savvyProgress.js').SavvyProgressState }
+  | { kind: 'fileTreeChanged'; payload: { instanceId: string } }
   | { kind: 'chatEvent'; payload: import('./chat.js').ChatEvent }
   | {
       kind: 'orchestratorCrashed';
