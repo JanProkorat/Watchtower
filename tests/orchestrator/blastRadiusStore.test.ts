@@ -89,4 +89,28 @@ describe('BlastRadiusStore', () => {
     store.dispose('i1');
     expect(store.get('i1', 1)).toBeNull();
   });
+
+  it('expiring a decided hold clears it without releasing attention', () => {
+    const { store, log, pushed } = make();
+    store.ingest(hold('h1'), 'i1', 0);
+    store.decide('i1', 'h1', 'proceed', 1);
+    const before = pushed.length;
+    store.sweep(HOLD_EXPIRY_MS + 1);
+    expect(store.get('i1', HOLD_EXPIRY_MS + 1)?.hold).toBeNull();
+    expect(pushed).toHaveLength(before + 1);
+    expect(log).toEqual(['hold i1']);
+  });
+
+  it('drop clears a pending hold and pushes, without releasing attention', () => {
+    const { store, log, pushed } = make();
+    store.ingest(release('h0', 'cancel'), 'i1', 0);
+    store.ingest(hold('h1'), 'i1', 1);
+    store.drop('i1');
+    expect(store.get('i1', 2)).toMatchObject({ hold: null, decided: null, outcome: { id: 'h0' } });
+    expect(pushed.at(-1)?.hold).toBeNull();
+    expect(log).toEqual(['hold i1']);
+    const n = pushed.length;
+    store.drop('i1');
+    expect(pushed).toHaveLength(n);
+  });
 });

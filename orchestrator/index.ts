@@ -881,6 +881,7 @@ function spawnPtyForInstance(opts: PtySpawnArgs): void {
         emitPush({ kind: 'stateChanged', payload: { instanceId: opts.id, status: code === 0 ? 'finished' : 'crashed' } });
         return;
       }
+      blastRadius.drop(opts.id);
       const lifespan = Date.now() - spawnedAt;
       // If --resume exits fast, the session probably never had any persisted
       // content (e.g. the user closed the app right after launching claude,
@@ -1002,6 +1003,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'killInstance':
       chats.dispose(req.payload.instanceId);
+      blastRadius.drop(req.payload.instanceId);
       pty.get(req.payload.instanceId)?.kill();
       terminalSnapshots.dispose(req.payload.instanceId);
       ptySizeOwnership.disposeInstance(req.payload.instanceId);
@@ -1034,6 +1036,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
       if (row.kind === 'chat') {
         // A fresh SDK process starts (resuming the transcript) on the next message.
         chats.dispose(row.id);
+        blastRadius.drop(row.id);
         repo().updateStatus(row.id, 'waiting-input', Date.now());
         repo().setTermination(row.id, null, null);
         emitPush({ kind: 'stateChanged', payload: { instanceId: row.id, status: 'waiting-input' } });

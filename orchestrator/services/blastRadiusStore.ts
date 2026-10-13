@@ -67,13 +67,23 @@ export class BlastRadiusStore {
     this.byInstance.delete(instanceId);
   }
 
+  /** Forget a pending hold whose session is gone; its status is the state machine's business, so no release. */
+  drop(instanceId: string): void {
+    const s = this.byInstance.get(instanceId);
+    if (!s?.hold) return;
+    const next: BlastRadiusState = { ...s, hold: null, decided: null };
+    this.byInstance.set(instanceId, next);
+    this.hooks.emit(next);
+  }
+
   /** The state with an expired hold dropped (and announced). */
   private live(instanceId: string, now: number): BlastRadiusState | undefined {
     const s = this.byInstance.get(instanceId);
     if (!s?.hold || now - s.receivedAt <= HOLD_EXPIRY_MS) return s;
     const next: BlastRadiusState = { ...s, hold: null, decided: null, receivedAt: now };
     this.byInstance.set(instanceId, next);
-    this.hooks.release(instanceId);
+    // A decided hold already got its answer; the status is no longer ours to clear.
+    if (!s.decided) this.hooks.release(instanceId);
     this.hooks.emit(next);
     return next;
   }
