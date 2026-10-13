@@ -46,6 +46,16 @@ describe('FilesTab', () => {
     expect(screen.getByText('+2 more')).toBeInTheDocument();
   });
 
+  it('shows a git-deleted file that is gone from disk, without a 1970 date', () => {
+    const t = tree();
+    t.git = { isRepo: true, branch: 'main', upstream: null, ahead: 0, behind: 0, files: [{ path: 'src/old.ts', status: 'deleted', added: 0, deleted: 0 }] };
+    renderTab(t);
+    const row = screen.getByText('old.ts');
+    expect(row).toHaveAttribute('data-status', 'deleted');
+    expect(row.closest('[role="treeitem"]')).not.toHaveTextContent('1970');
+    expect(row.closest('[role="treeitem"]')).not.toHaveTextContent('1. 1.');
+  });
+
   it('a click on a folder toggles it; arrow keys move and expand', () => {
     const t = tree();
     renderTab(t);

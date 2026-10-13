@@ -12,15 +12,31 @@ export interface TreeRow {
   isMore?: boolean;
 }
 
-/** Visible rows: the root listing plus every expanded folder's, depth-first. */
-export function buildRows(listings: ReadonlyMap<string, FileListResult>, expanded: ReadonlySet<string>): TreeRow[] {
+/**
+ * Visible rows: the root listing plus every expanded folder's, depth-first.
+ * `deleted` holds git-deleted paths; each shows under its folder when disk no longer lists it.
+ */
+export function buildRows(
+  listings: ReadonlyMap<string, FileListResult>,
+  expanded: ReadonlySet<string>,
+  deleted?: ReadonlySet<string>,
+): TreeRow[] {
   const rows: TreeRow[] = [];
   const add = (dir: string, depth: number) => {
+    const listed = new Set<string>();
     for (const e of listings.get(dir)?.entries ?? []) {
       const p = dir ? `${dir}/${e.name}` : e.name;
+      listed.add(p);
       const isOpen = e.isDir && expanded.has(p);
       rows.push({ path: p, name: e.name, depth, isDir: e.isDir, size: e.size, mtimeMs: e.mtimeMs, isOpen });
       if (isOpen) add(p, depth + 1);
+    }
+    if (listings.has(dir) && deleted) {
+      for (const p of [...deleted].sort()) {
+        const slash = p.lastIndexOf('/');
+        if (p.slice(0, Math.max(slash, 0)) !== dir || listed.has(p)) continue;
+        rows.push({ path: p, name: p.slice(slash + 1), depth, isDir: false, size: 0, mtimeMs: 0, isOpen: false });
+      }
     }
     const more = listings.get(dir)?.truncated ?? 0;
     if (more > 0) rows.push({ path: `${dir}/+more`, name: `+${more} more`, depth, isDir: false, size: 0, mtimeMs: 0, isOpen: false, isMore: true });

@@ -37,7 +37,8 @@ export function FilesTab({ tree, flash }: Props) {
   const [hits, setHits] = useState<string[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const idx = useMemo(() => indexGit(tree.git), [tree.git]);
-  const rows = useMemo(() => buildRows(tree.listings, tree.expanded), [tree.listings, tree.expanded]);
+  const deleted = useMemo(() => new Set([...idx.files.values()].filter((f) => f.status === 'deleted').map((f) => f.path)), [idx]);
+  const rows = useMemo(() => buildRows(tree.listings, tree.expanded, deleted), [tree.listings, tree.expanded, deleted]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -184,7 +185,7 @@ export function FilesTab({ tree, flash }: Props) {
                 >
                   {totals && (totals.added || totals.deleted)
                     ? `+${totals.added} −${totals.deleted}`
-                    : r.isDir
+                    : r.isDir || !r.mtimeMs
                       ? ''
                       : dayjs(r.mtimeMs).locale('cs').format(`${CZ_DATE_FORMAT} H:mm`)}
                 </Typography>

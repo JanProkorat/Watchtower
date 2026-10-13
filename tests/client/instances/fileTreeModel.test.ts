@@ -21,6 +21,15 @@ describe('buildRows', () => {
     const rows = buildRows(listings, new Set(['src']));
     expect(rows.at(-1)).toMatchObject({ name: '+7 more', depth: 1, isMore: true });
   });
+
+  it('adds git-deleted files under their listed folder, only when it is expanded, never twice', () => {
+    const listings = new Map([ls('', [['src', true], ['top.ts', false]]), ls('src', [['b.ts', false]])]);
+    const deleted = new Set(['src/gone.ts', 'src/b.ts', 'src/deep/x.ts']);
+    const open = buildRows(listings, new Set(['src']), deleted);
+    expect(open.map((r) => r.path)).toEqual(['src', 'src/b.ts', 'src/gone.ts', 'top.ts']);
+    expect(open[2]).toMatchObject({ name: 'gone.ts', depth: 1, isDir: false, size: 0, mtimeMs: 0 });
+    expect(buildRows(listings, new Set(), deleted).map((r) => r.path)).toEqual(['src', 'top.ts']);
+  });
 });
 
 const repo: FileTreeGit = {
