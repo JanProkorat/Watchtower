@@ -7,6 +7,8 @@ export type BlastOutcomeDecision = BlastDecision | 'timeout' | 'interrupted' | '
 export interface BlastHold {
   id: string;
   command: string;
+  /** True when `command` was cut at the 2,000-char cap, so the popup shows it isn't the whole command. */
+  commandTruncated: boolean;
   riskLabel: string;
   summary: string;
   lines: string[];
@@ -44,13 +46,16 @@ const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v)
 
 function parseHold(v: unknown): BlastHold | null {
   if (!isObj(v) || typeof v.id !== 'string' || !v.id) return null;
+  const rawLines = Array.isArray(v.lines) ? v.lines : [];
+  const lines = rawLines.filter((l): l is string => typeof l === 'string').slice(0, 50).map((l) => l.slice(0, 500));
   return {
     id: v.id.slice(0, 200),
     command: str(v.command, 2000),
+    commandTruncated: typeof v.command === 'string' && v.command.length > 2000,
     riskLabel: str(v.riskLabel, 200),
     summary: str(v.summary, 1000),
-    lines: Array.isArray(v.lines) ? v.lines.filter((l): l is string => typeof l === 'string').slice(0, 50).map((l) => l.slice(0, 500)) : [],
-    more: num(v.more),
+    lines,
+    more: Math.max(0, Math.floor(num(v.more))) + (rawLines.length - lines.length),
     note: str(v.note, 1000),
     startedAt: num(v.startedAt),
   };

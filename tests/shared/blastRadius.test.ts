@@ -5,7 +5,7 @@ const hold = { id: 'h1', command: 'rm -rf dist', riskLabel: 'rm -rf', summary: '
 
 describe('parseBlastRadiusPost', () => {
   it('accepts a hold and a release with an outcome', () => {
-    expect(parseBlastRadiusPost({ version: 1, hold })).toEqual({ hold, outcome: null });
+    expect(parseBlastRadiusPost({ version: 1, hold })).toEqual({ hold: { ...hold, commandTruncated: false }, outcome: null });
     expect(parseBlastRadiusPost({ version: 1, hold: null, outcome: { id: 'h1', command: 'rm -rf dist', decision: 'proceed' } })).toEqual({
       hold: null,
       outcome: { id: 'h1', command: 'rm -rf dist', decision: 'proceed' },
@@ -24,7 +24,19 @@ describe('parseBlastRadiusPost', () => {
     expect(p?.hold?.command).toHaveLength(2000);
     expect(p?.hold?.lines).toHaveLength(50);
     expect(p?.hold?.lines[0]).toHaveLength(500);
-    expect(p?.hold?.more).toBe(0);
+    expect(p?.hold?.more).toBe(30);
+    expect(p?.hold?.commandTruncated).toBe(true);
+  });
+
+  it('counts every dropped line in more and sanitises more', () => {
+    const many = Array.from({ length: 80 }, () => 'y');
+    const a = parseBlastRadiusPost({ version: 1, hold: { ...hold, lines: many, more: 2 } });
+    expect(a?.hold?.lines).toHaveLength(50);
+    expect(a?.hold?.more).toBe(32);
+    const b = parseBlastRadiusPost({ version: 1, hold: { ...hold, lines: ['a', 7, null, 'b'], more: 0 } });
+    expect(b?.hold?.lines).toEqual(['a', 'b']);
+    expect(b?.hold?.more).toBe(2);
+    expect(parseBlastRadiusPost({ version: 1, hold: { ...hold, lines: [], more: -3.7 } })?.hold?.more).toBe(0);
   });
 });
 
