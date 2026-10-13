@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import type { BlastDecision, BlastHold } from '@watchtower/shared/blastRadius.js';
 
@@ -22,10 +22,6 @@ const PROCEED_ARM_MS = 500;
 
 /** The blast-radius mod's hold, drawn over its pane: Claude waits until the user answers. */
 export function BlastRadiusDialog({ hold, decided, onDecide }: Props) {
-  const cancelRef = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    cancelRef.current?.focus();
-  }, [hold.id]);
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     setArmed(false);
@@ -70,7 +66,7 @@ export function BlastRadiusDialog({ hold, decided, onDecide }: Props) {
           <Button variant="outlined" color="warning" disabled={!!decided || !armed} onClick={() => armed && onDecide('proceed')}>
             Proceed
           </Button>
-          <Button ref={cancelRef} variant="contained" disabled={!!decided} onClick={() => onDecide('cancel')}>
+          <Button variant="contained" disabled={!!decided} onClick={() => onDecide('cancel')}>
             Cancel
           </Button>
         </Box>

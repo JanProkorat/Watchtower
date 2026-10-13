@@ -35,9 +35,24 @@ describe('BlastRadiusDialog', () => {
     expect(screen.queryByText(/Command shortened/)).not.toBeInTheDocument();
   });
 
-  it('Cancel has focus; Proceed, Cancel and Esc answer', () => {
+  it('never takes focus, not on mount and not for a new hold', () => {
+    const outside = document.createElement('input');
+    document.body.appendChild(outside);
+    outside.focus();
+    const ui = (h: typeof hold) => (
+      <ThemeProvider theme={darkTheme}>
+        <BlastRadiusDialog hold={h} decided={null} onDecide={vi.fn()} />
+      </ThemeProvider>
+    );
+    const { rerender } = render(ui(hold));
+    expect(outside).toHaveFocus();
+    rerender(ui({ ...hold, id: 'h2' }));
+    expect(outside).toHaveFocus();
+    outside.remove();
+  });
+
+  it('Proceed, Cancel and Esc answer', () => {
     const onDecide = renderIt();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
     act(() => {
       vi.advanceTimersByTime(500);
     });
