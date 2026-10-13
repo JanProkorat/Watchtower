@@ -255,8 +255,8 @@ const replay = new ReplayStore(
 const blastRadius = new BlastRadiusStore({
   emit: (state) => emitPush({ kind: 'blastRadius', payload: state }),
   isKnownInstance: (instanceId) => !!handle && repo().get(instanceId) != null,
-  hold: (instanceId) => {
-    if (statusOf(instanceId) !== 'waiting-permission') applyTransition(instanceId, { kind: 'notificationHook' });
+  hold: (instanceId, reassert) => {
+    if (statusOf(instanceId) !== 'waiting-permission') applyTransition(instanceId, { kind: 'notificationHook' }, { silent: reassert });
   },
   release: (instanceId) => {
     if (statusOf(instanceId) === 'waiting-permission') applyTransition(instanceId, { kind: 'userPromptSubmit' });
@@ -716,7 +716,8 @@ function statusOf(id: string): InstanceStatus {
   return repo().get(id)?.status ?? 'crashed';
 }
 
-function applyTransition(instanceId: string, event: StateEvent): void {
+/** `silent` updates the status and pushes `stateChanged` but skips the notifier and escalation gate. */
+function applyTransition(instanceId: string, event: StateEvent, opts?: { silent?: boolean }): void {
   const inst = repo().get(instanceId);
   if (!inst) return;
   const prevStatus = inst.status;
@@ -725,8 +726,8 @@ function applyTransition(instanceId: string, event: StateEvent): void {
   if (result.state !== prevStatus) {
     repo().updateStatus(instanceId, result.state, Date.now());
     emitPush({ kind: 'stateChanged', payload: { instanceId, status: result.state } });
-    if (notifier) notifier.apply(instanceId, inst.cwd, prevStatus, result.state, Date.now());
-    if (!isShell) escalationGate?.apply(instanceId, inst.cwd, prevStatus, result.state);
+    if (notifier && !opts?.silent) notifier.apply(instanceId, inst.cwd, prevStatus, result.state, Date.now());
+    if (!isShell && !opts?.silent) escalationGate?.apply(instanceId, inst.cwd, prevStatus, result.state);
   }
   for (const out of result.outputs) {
     if (out.kind === 'storeClaudeSessionId') {

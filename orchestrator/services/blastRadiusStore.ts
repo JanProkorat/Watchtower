@@ -9,8 +9,8 @@ export const HOLD_EXPIRY_MS = 11 * 60 * 1000;
 export interface BlastRadiusHooks {
   emit(state: BlastRadiusState): void;
   isKnownInstance(instanceId: string): boolean;
-  /** Flag the instance as waiting on the user (idempotent). */
-  hold(instanceId: string): void;
+  /** Flag the instance as waiting on the user (idempotent); `reassert` marks a poll repeating an earlier hold, so no new banner. */
+  hold(instanceId: string, reassert: boolean): void;
   /** Clear that flag (idempotent). */
   release(instanceId: string): void;
 }
@@ -32,7 +32,7 @@ export class BlastRadiusStore {
       ? { instanceId, hold: post.hold, decided: prev?.hold?.id === post.hold.id ? prev.decided : null, outcome: prev?.outcome ?? null, receivedAt: now }
       : { instanceId, hold: null, decided: null, outcome: post.outcome ?? prev?.outcome ?? null, receivedAt: now };
     this.byInstance.set(instanceId, state);
-    if (state.hold) this.hooks.hold(instanceId);
+    if (state.hold) this.hooks.hold(instanceId, false);
     else if (prev?.hold) this.hooks.release(instanceId);
     this.hooks.emit(state);
     return true;
@@ -51,7 +51,7 @@ export class BlastRadiusStore {
     const s = this.live(instanceId, now);
     if (!s?.hold || s.hold.id !== holdId) return undefined;
     // A click into the pane resets its status; keep it flagged while the user still owes an answer.
-    if (!s.decided) this.hooks.hold(instanceId);
+    if (!s.decided) this.hooks.hold(instanceId, true);
     return s.decided;
   }
 

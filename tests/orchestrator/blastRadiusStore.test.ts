@@ -11,7 +11,7 @@ function make() {
   const hooks: BlastRadiusHooks = {
     emit: (s) => pushed.push(s),
     isKnownInstance: (id) => id === 'i1',
-    hold: (id) => log.push(`hold ${id}`),
+    hold: (id, reassert) => log.push(`${reassert ? 'reassert' : 'hold'} ${id}`),
     release: (id) => log.push(`release ${id}`),
   };
   return { store: new BlastRadiusStore(hooks), log, pushed };
@@ -71,7 +71,7 @@ describe('BlastRadiusStore', () => {
     store.ingest(hold('h1'), 'i1', 1);
     store.decisionFor('i1', 'h1', 2);
     store.decisionFor('i1', 'h1', 3);
-    expect(log).toEqual(['hold i1', 'hold i1', 'hold i1']);
+    expect(log).toEqual(['hold i1', 'reassert i1', 'reassert i1']);
     store.decide('i1', 'h1', 'proceed', 4);
     store.decisionFor('i1', 'h1', 5);
     expect(log).toHaveLength(3); // answered: no re-assert
