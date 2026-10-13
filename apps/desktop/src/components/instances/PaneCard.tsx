@@ -19,6 +19,8 @@ import { SavvyAgentsPanel } from './savvy/SavvyAgentsPanel.js';
 import { SidePanel } from './side/SidePanel.js';
 import { sideTabsFor, useSidePanel, type SideTab } from './side/useSidePanel.js';
 import { FilesTab } from './side/FilesTab.js';
+import { BlastRadiusDialog } from './BlastRadiusDialog.js';
+import { useBlastRadius } from '../../state/useBlastRadius.js';
 import { useFileTree } from '../../state/useFileTree.js';
 import { useFileTreeActivity, useFreshFlash } from '../../state/useFileTreeActivity.js';
 import { ATTENTION_AMBER } from '../../theme/glass.js';
@@ -71,6 +73,7 @@ export function PaneCard({
   const [ctxAnchor, setCtxAnchor] = useState<{ x: number; y: number } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  const blast = useBlastRadius(instanceId);
   const closeCtx = () => setCtxAnchor(null);
   // The right-side panel (Agents from the savvy-progress mod, and the Files
   // tree) and the savvy band below the terminal, all drawn natively.
@@ -249,6 +252,10 @@ export function PaneCard({
             {side.tab === 'files' && <FilesTab tree={fileTree} flash={flash} />}
           </SidePanel>
         </Box>
+      )}
+
+      {blast.state?.hold && (
+        <BlastRadiusDialog hold={blast.state.hold} decided={blast.state.decided} onDecide={blast.decide} />
       )}
 
       <Menu
