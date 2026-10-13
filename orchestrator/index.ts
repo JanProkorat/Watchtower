@@ -91,6 +91,7 @@ import { SavvyProgressStore } from './services/savvyProgressStore.js';
 import { listDir, readGit, searchFiles } from './services/fileTree.js';
 import { FileTreeWatchers, nodeWatch } from './services/fileTreeWatchers.js';
 import { FileTreeActivityStore } from './services/fileTreeActivityStore.js';
+import { BlastRadiusStore } from './services/blastRadiusStore.js';
 import { ChatManager } from './services/chat/chatManager.js';
 import type { SqliteLike } from './db/migrations.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
@@ -241,6 +242,20 @@ const fileTreeActivity = new FileTreeActivityStore(
   (state) => emitPush({ kind: 'fileTreeActivity', payload: state }),
   (instanceId) => !!handle && repo().get(instanceId) != null,
 );
+
+// blast-radius mod holds (plugins/blast-radius → POST /mods/blast-radius): a popup over the pane,
+// flagged like a permission prompt until the mod collects the user's answer.
+const blastRadius = new BlastRadiusStore({
+  emit: (state) => emitPush({ kind: 'blastRadius', payload: state }),
+  isKnownInstance: (instanceId) => !!handle && repo().get(instanceId) != null,
+  hold: (instanceId) => {
+    if (statusOf(instanceId) !== 'waiting-permission') applyTransition(instanceId, { kind: 'notificationHook' });
+  },
+  release: (instanceId) => {
+    if (statusOf(instanceId) === 'waiting-permission') applyTransition(instanceId, { kind: 'userPromptSubmit' });
+  },
+});
+setInterval(() => blastRadius.sweep(Date.now()), 60_000).unref();
 
 function cwdOfInstance(instanceId: string): string {
   const row = handle ? repo().get(instanceId) : null;
@@ -776,6 +791,7 @@ function disposeInstanceRow(id: string): void {
   savvyProgress.dispose(id);
   fileTreeWatchers.unwatch(id);
   fileTreeActivity.dispose(id);
+  blastRadius.dispose(id);
   chats.dispose(id);
 }
 
@@ -1596,6 +1612,12 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'fileTreeActivity:get':
       return fileTreeActivity.get(req.payload.instanceId);
 
+    case 'blastRadius:get':
+      return blastRadius.get(req.payload.instanceId, Date.now());
+
+    case 'blastRadius:decide':
+      return { ok: blastRadius.decide(req.payload.instanceId, req.payload.holdId, req.payload.decision, Date.now()) };
+
     case 'fileTree:list':
       return listDir(cwdOfInstance(req.payload.instanceId), req.payload.dir);
 
@@ -1991,7 +2013,10 @@ function respawnIncompleteRowsOnBoot(): void {
       onModState: (plugin, body, instanceId) => {
         if (plugin === 'savvy-progress') savvyProgress.ingest(body, instanceId, Date.now());
         if (plugin === 'filetree') fileTreeActivity.ingest(body, instanceId, Date.now());
+        if (plugin === 'blast-radius') blastRadius.ingest(body, instanceId, Date.now());
       },
+      onModDecision: (plugin, holdId, instanceId) =>
+        plugin === 'blast-radius' ? blastRadius.decisionFor(instanceId, holdId, Date.now()) : undefined,
     });
     // Register the WS bridge's broadcast as the secondary push sink so every
     // emitPush reaches remote (browser) clients as well as the Electron renderer.

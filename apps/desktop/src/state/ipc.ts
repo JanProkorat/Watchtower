@@ -20,6 +20,7 @@ const SILENT_KINDS = new Set<string>([
   'fileTree:watch',   // live refresh is best-effort
   'fileTree:unwatch',
   'fileTreeActivity:get', // filetree mod activity; a miss only means no flash
+  'blastRadius:get', // blast-radius hold fetch; a miss only means no popup
 ]);
 
 /**

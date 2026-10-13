@@ -91,6 +91,8 @@ export type IpcRequest =
   | { kind: 'fileTree:watch'; payload: { instanceId: string } }
   | { kind: 'fileTree:unwatch'; payload: { instanceId: string } }
   | { kind: 'fileTreeActivity:get'; payload: { instanceId: string } }
+  | { kind: 'blastRadius:get'; payload: { instanceId: string } }
+  | { kind: 'blastRadius:decide'; payload: { instanceId: string; holdId: string; decision: import('./blastRadius.js').BlastDecision } }
   | { kind: 'chat:snapshot'; payload: { instanceId: string } }
   | { kind: 'chat:send'; payload: { instanceId: string; text: string } }
   | { kind: 'chat:interrupt'; payload: { instanceId: string } }
@@ -791,6 +793,8 @@ export type IpcResponse =
   | { kind: 'fileTree:watch'; payload: { ok: true } }
   | { kind: 'fileTree:unwatch'; payload: { ok: true } }
   | { kind: 'fileTreeActivity:get'; payload: import('./fileTree.js').FileTreeActivityState | null }
+  | { kind: 'blastRadius:get'; payload: import('./blastRadius.js').BlastRadiusState | null }
+  | { kind: 'blastRadius:decide'; payload: { ok: boolean } }
   | { kind: 'chat:snapshot'; payload: import('./chat.js').ChatSnapshot | null }
   | { kind: 'chat:send'; payload: { ok: boolean; error?: string } }
   | { kind: 'chat:interrupt'; payload: { ok: true } }
@@ -1012,6 +1016,7 @@ export type IpcPush =
   | { kind: 'savvyProgress'; payload: import('./savvyProgress.js').SavvyProgressState }
   | { kind: 'fileTreeChanged'; payload: { instanceId: string } }
   | { kind: 'fileTreeActivity'; payload: import('./fileTree.js').FileTreeActivityState }
+  | { kind: 'blastRadius'; payload: import('./blastRadius.js').BlastRadiusState }
   | { kind: 'chatEvent'; payload: import('./chat.js').ChatEvent }
   | {
       kind: 'orchestratorCrashed';
