@@ -62,6 +62,17 @@ describe('BlastRadiusDialog', () => {
     expect(onDecide.mock.calls.map((c) => c[0])).toEqual(['proceed', 'cancel', 'cancel']);
   });
 
+  it('clicking the popup body focuses it so Esc cancels', () => {
+    const onDecide = renderIt();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).not.toHaveAttribute('aria-modal');
+    fireEvent.mouseDown(dialog);
+    dialog.focus();
+    expect(document.activeElement).toBe(dialog);
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    expect(onDecide).toHaveBeenCalledWith('cancel');
+  });
+
   it('after answering it waits for Claude and stops taking answers', () => {
     const onDecide = renderIt('proceed');
     expect(screen.getByText('Waiting for Claude…')).toBeInTheDocument();
@@ -135,7 +146,7 @@ describe('BlastRadiusDialog keyed by hold id', () => {
 describe('visible', () => {
   it('replaces zero-width, BOM, ALM and line/paragraph separators', () => {
     const out = visible('a\u200Bb\uFEFFc\u061Cd\u2028e\u2029f\u200Cg\u200Dh');
-    expect(out).toBe('a�b�c�d�e�f�g�h');
+    expect(out).toBe('a\uFFFDb\uFFFDc\uFFFDd\uFFFDe\uFFFDf\uFFFDg\uFFFDh');
   });
 
   it('replaces bidi and control characters but keeps newline and tab', () => {
