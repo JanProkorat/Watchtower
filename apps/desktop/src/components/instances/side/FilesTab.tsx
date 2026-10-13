@@ -35,7 +35,7 @@ interface Props {
 export function FilesTab({ tree, flash }: Props) {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<string[] | null>(null);
-  const [cursor, setCursor] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
   const idx = useMemo(() => indexGit(tree.git), [tree.git]);
   const rows = useMemo(() => buildRows(tree.listings, tree.expanded), [tree.listings, tree.expanded]);
 
@@ -53,16 +53,26 @@ export function FilesTab({ tree, flash }: Props) {
   }, [query]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const row = rows[cursor];
-    if (e.key === 'ArrowDown') setCursor((c) => Math.min(rows.length - 1, c + 1));
-    else if (e.key === 'ArrowUp') setCursor((c) => Math.max(0, c - 1));
+    const index = rows.findIndex((r) => r.path === selected);
+    const row = rows[index];
+    const step = (dir: 1 | -1) => {
+      // Skip "+N more" notes; clamp at the ends; from no selection ArrowDown takes the first row.
+      for (let i = index + dir; i >= 0 && i < rows.length; i += dir) {
+        const r = rows[i];
+        if (r && !r.isMore) {
+          setSelected(r.path);
+          return;
+        }
+      }
+    };
+    if (e.key === 'ArrowDown') step(1);
+    else if (e.key === 'ArrowUp') step(-1);
     else if (!row) return;
     else if (e.key === 'ArrowRight' && row.isDir && !row.isOpen) tree.toggle(row.path);
     else if (e.key === 'ArrowLeft' && row.isDir && row.isOpen) tree.toggle(row.path);
     else if (e.key === 'ArrowLeft') {
       const parent = row.path.split('/').slice(0, -1).join('/');
-      const i = rows.findIndex((r) => r.path === parent);
-      if (i >= 0) setCursor(i);
+      if (rows.some((r) => r.path === parent)) setSelected(parent);
     } else if (e.key === 'Enter' && row.isDir) tree.toggle(row.path);
     else return;
     e.preventDefault();
@@ -90,6 +100,7 @@ export function FilesTab({ tree, flash }: Props) {
               aria-label={h}
               onClick={() => {
                 tree.reveal(h);
+                setSelected(h);
                 setQuery('');
               }}
               sx={{ display: 'block', width: '100%', textAlign: 'left', fontSize: 12, px: 0.5, py: 0.25, borderRadius: '4px', ':hover': { backgroundColor: 'action.hover' } }}
@@ -100,7 +111,7 @@ export function FilesTab({ tree, flash }: Props) {
         </Box>
       ) : (
         <Box role="tree" tabIndex={0} onKeyDown={onKeyDown} sx={{ flex: 1, overflowY: 'auto', outline: 'none' }}>
-          {rows.map((r, i) => {
+          {rows.map((r) => {
             if (r.isMore)
               return (
                 <Typography key={r.path} sx={{ fontSize: 11.5, color: 'text.secondary', height: ROW_H, pl: `${r.depth * 12 + 20}px` }}>
@@ -116,12 +127,14 @@ export function FilesTab({ tree, flash }: Props) {
                 key={r.path}
                 role="treeitem"
                 aria-expanded={r.isDir ? r.isOpen : undefined}
+                aria-selected={r.path === selected}
                 data-flash={fl?.kind}
                 onClick={() => {
-                  setCursor(i);
+                  setSelected(r.path);
                   if (r.isDir) tree.toggle(r.path);
                 }}
                 sx={{
+                  position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 0.5,
@@ -131,18 +144,26 @@ export function FilesTab({ tree, flash }: Props) {
                   borderRadius: '4px',
                   cursor: 'default',
                   opacity: status === 'ignored' ? 0.45 : 1,
-                  backgroundColor: i === cursor ? 'action.selected' : 'transparent',
-                  ...(fl && {
-                    // Keyed by `at`, so each new touch replays the fade once.
-                    animation: `wt-flash-${fl.at} 4s ease-out forwards`,
-                    [`@keyframes wt-flash-${fl.at}`]: {
-                      from: { backgroundColor: `${FLASH_COLOR[fl.kind]}55` },
-                      to: { backgroundColor: 'transparent' },
-                    },
-                  }),
+                  backgroundColor: r.path === selected ? 'action.selected' : 'transparent',
                   ':hover': { backgroundColor: 'action.hover' },
                 }}
               >
+                {fl && (
+                  // Purely visual; keyed by `at` so each new touch replays the fade.
+                  <Box
+                    key={fl.at}
+                    aria-hidden
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: '4px',
+                      pointerEvents: 'none',
+                      backgroundColor: `${FLASH_COLOR[fl.kind]}55`,
+                      animation: 'wt-flash 4s ease-out forwards',
+                      '@keyframes wt-flash': { from: { opacity: 1 }, to: { opacity: 0 } },
+                    }}
+                  />
+                )}
                 {r.isDir ? (
                   r.isOpen ? <ExpandMoreIcon sx={{ fontSize: 14, color: 'text.secondary' }} /> : <ChevronRightIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                 ) : (

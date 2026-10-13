@@ -69,6 +69,44 @@ describe('FilesTab', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'src/a.ts' })).toBeNull());
   });
 
+  it('picking a search hit selects its row', async () => {
+    const t = tree();
+    renderTab(t);
+    fireEvent.change(screen.getByPlaceholderText('Search files'), { target: { value: 'a.ts' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'src/a.ts' }));
+    await waitFor(() => expect(screen.getByText('a.ts').closest('[role="treeitem"]')).toHaveAttribute('aria-selected', 'true'));
+  });
+
+  it('selection follows the path when rows appear above it', () => {
+    const t = tree();
+    const { rerender } = renderTab(t);
+    const list = screen.getByRole('tree');
+    fireEvent.keyDown(list, { key: 'ArrowDown' });
+    fireEvent.keyDown(list, { key: 'ArrowDown' }); // src, then src/a.ts
+    expect(screen.getByText('a.ts').closest('[role="treeitem"]')).toHaveAttribute('aria-selected', 'true');
+    const root = t.listings.get('')!;
+    const next = tree({
+      listings: new Map([
+        ['', { ...root, entries: [{ name: 'new', isDir: true, size: 0, mtimeMs: 1 }, ...root.entries] }],
+        ['src', t.listings.get('src')!],
+      ]),
+    });
+    rerender(
+      <ThemeProvider theme={darkTheme}>
+        <FilesTab tree={next} />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText('a.ts').closest('[role="treeitem"]')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('arrow keys on an empty tree do nothing', () => {
+    renderTab(tree({ listings: new Map(), expanded: new Set() }));
+    const list = screen.getByRole('tree');
+    fireEvent.keyDown(list, { key: 'ArrowDown' });
+    fireEvent.keyDown(list, { key: 'ArrowUp' });
+    expect(screen.queryAllByRole('treeitem')).toHaveLength(0);
+  });
+
   it('an inline note replaces the tree when the folder is gone', () => {
     renderTab(tree({ error: 'Folder not found', listings: new Map() }));
     expect(screen.getByText('Folder not found')).toBeInTheDocument();
