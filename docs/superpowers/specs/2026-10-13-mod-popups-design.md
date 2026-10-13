@@ -47,7 +47,11 @@ Watchtower's own UI, so nothing mod-drawn is left inside the terminal:
     - `{ decision: null }` → keep waiting;
     - 404 / "unknown hold" → re-POST the hold (Watchtower restarted), keep waiting;
     - network error → keep waiting;
-  - when the hold ends for any reason, POSTs `{ version: 1, hold: null }`.
+  - when the hold ends for any reason, POSTs
+    `{ version: 1, hold: null, outcome: { id, command, decision } }` with
+    `decision` ∈ `proceed | cancel | timeout | interrupted | error`;
+  - never calls `$.ui.toast` (upstream's "Blast Radius: running it" draws in the
+    terminal's top-right corner); Watchtower shows the outcome as an app toast.
 - The 10-minute limit, interrupt handling and "anything unexpected refuses" stay
   as upstream. Nothing but an explicit `proceed` runs the command.
 - Outside Watchtower: behaviour unchanged.
@@ -73,6 +77,14 @@ Watchtower's own UI, so nothing mod-drawn is left inside the terminal:
   After answering it shows "Waiting for Claude…" until the mod posts `hold: null`.
   It persists across tab switches and reappears when the pane is shown again.
   Hook `state/useBlastRadius.ts`.
+- Outcome toast (app toast system, `useToast` / module `toast` bridge — not a
+  new component), shown once per outcome id, the command shortened to ~60 chars:
+  - proceed → info "Blast Radius: running `<command>`";
+  - cancel → info "Blast Radius: cancelled `<command>`";
+  - timeout / interrupted / error → warning "Blast Radius: didn't run `<command>`
+    (no answer within 10 minutes | turn interrupted | error)".
+  The store carries the last outcome in its push; the renderer de-dupes by id so a
+  re-render or re-fetch never repeats a toast.
 
 ## Section 2 — Replay tab
 
@@ -119,10 +131,12 @@ Watchtower's own UI, so nothing mod-drawn is left inside the terminal:
 - Tests:
   - orchestrator: both stores (stale id, 11-minute expiry, disposal, parsers with
     caps) and the decision GET through the real HTTP listener incl. auth;
-  - renderer: dialog Cancel/Proceed/Esc/waiting state; Replay tab navigation,
+  - renderer: dialog Cancel/Proceed/Esc/waiting state; one outcome toast per id
+    with the right severity and text; Replay tab navigation,
     "· N" label, empty state; `sideTabsFor` with replay;
   - mods (`claude plugin test`, new `tests/` per mod): no pane/band inside
-    Watchtower, hold posted, proceed runs / cancel denies, retry while unreachable,
+    Watchtower, no `$.ui.toast` inside Watchtower, hold posted, outcome posted
+    with the right decision, proceed runs / cancel denies, retry while unreachable,
     re-post on 404, replay turn posted with caps, `/replay` toggles, unchanged
     outside Watchtower;
   - live review in the dev app.
