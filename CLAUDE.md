@@ -236,6 +236,31 @@ only on the desktop surface — in our xterm.js terminal it shows a `▣`. So:
 Three copies of one shape — mod `types/index.d.ts`, `shared/savvyProgress.ts`,
 and the drawing in `register.tsx` vs `savvyDraw.ts` — **change them together**.
 
+## filetree mod bridge and the side panel (`plugins/filetree/`)
+
+Each pane has one right-side panel with tabs (`components/instances/side/`:
+`useSidePanel`, `SidePanel`). **Agents** draws the savvy-progress snapshot;
+**Files** is a native tree from `orchestrator/services/fileTree.ts`
+(`fileTree:list|git|search|watch|unwatch`, push `fileTreeChanged`; watchers in
+`fileTreeWatchers.ts`, shared per cwd).
+
+`plugins/filetree/` is a vendored, patched copy of the third-party filetree mod
+(MIT). Watchtower mode is keyed on `WATCHTOWER_INSTANCE_ID` (`inWatchtower` in
+`register.tsx`): there it never docks its pane, `/filetree` bumps
+`panelToggles`, and Claude's reads/writes POST to `/mods/filetree` →
+`fileTreeActivityStore.ts` → push `fileTreeActivity` → the Files tab flashes
+the row (only touches from the last 4 s, `useFreshFlash`). Shapes in
+`packages/shared/src/fileTree.ts` — **change the mod's body and
+`parseFileTreeActivity` together.**
+
+A new `/mods/<name>` bridge must also be added to `KNOWN_MODS` in
+`orchestrator/hookListener.ts`, or the route rejects it.
+
+Install: set `CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` to the
+`:`-separated plugin folders (`plugins/savvy-progress:plugins/filetree`) and
+disable the upstream `filetree@claude-code-filetree` plugin so the two don't
+both draw.
+
 ## Things to NOT do
 
 - Don't add CRUD that bypasses the IPC contract. Renderer never reaches
