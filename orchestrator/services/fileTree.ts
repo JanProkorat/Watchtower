@@ -131,3 +131,50 @@ export async function readGit(root: string): Promise<FileTreeGit> {
   }
   return { isRepo: true, branch: status.branch, upstream: status.upstream, ahead: status.ahead, behind: status.behind, files };
 }
+
+const SEARCH_LIMIT = 200;
+const WALK_LIMIT = 20_000;
+const WALK_SKIP = new Set(['.git', 'node_modules']);
+
+/** Case-insensitive name match: basename hits first, then shorter paths, then by name. */
+export function rankMatches(paths: readonly string[], query: string, limit = SEARCH_LIMIT): string[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const scored: { p: string; rank: number }[] = [];
+  for (const p of paths) {
+    const lower = p.toLowerCase();
+    if (!lower.includes(q)) continue;
+    scored.push({ p, rank: path.posix.basename(lower).includes(q) ? 0 : 1 });
+  }
+  scored.sort((a, b) => a.rank - b.rank || a.p.length - b.p.length || a.p.localeCompare(b.p));
+  return scored.slice(0, limit).map((s) => s.p);
+}
+
+/** File paths under `root` matching `query`; git's file list in a repo, a capped walk elsewhere. */
+export async function searchFiles(root: string, query: string, limit = SEARCH_LIMIT): Promise<string[]> {
+  let paths: string[];
+  try {
+    const out = await runGit(root, ['ls-files', '--cached', '--others', '--exclude-standard', '-z']);
+    paths = out.split('\0').filter(Boolean);
+  } catch {
+    paths = await walk(root);
+  }
+  return rankMatches(paths, query, limit);
+}
+
+async function walk(root: string): Promise<string[]> {
+  const out: string[] = [];
+  const queue = [''];
+  while (queue.length && out.length < WALK_LIMIT) {
+    const rel = queue.shift() ?? '';
+    const dirents = await readdir(path.join(root, rel), { withFileTypes: true }).catch(() => []);
+    for (const d of dirents) {
+      const p = rel ? `${rel}/${d.name}` : d.name;
+      if (d.isDirectory()) {
+        if (!WALK_SKIP.has(d.name)) queue.push(p);
+      } else out.push(p);
+      if (out.length >= WALK_LIMIT) break;
+    }
+  }
+  return out;
+}

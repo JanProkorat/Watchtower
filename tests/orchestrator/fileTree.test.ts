@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSyn
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { listDir, resolveInside, OUTSIDE_ROOT, parseStatusV2, parseNumstat, readGit } from '../../orchestrator/services/fileTree.js';
+import { listDir, resolveInside, OUTSIDE_ROOT, parseStatusV2, parseNumstat, readGit, rankMatches, searchFiles } from '../../orchestrator/services/fileTree.js';
 
 let root: string;
 let outside: string;
@@ -172,5 +172,32 @@ describe('readGit', () => {
     expect(g.files.find((f) => f.path === 'x.ts')).toMatchObject({ status: 'modified', added: 2, deleted: 1 });
     expect(g.files.find((f) => f.path === 'new.ts')).toMatchObject({ status: 'untracked' });
     expect(g.files.some((f) => f.path === 'top.txt' || f.path.startsWith('src/'))).toBe(false);
+  });
+});
+
+describe('rankMatches', () => {
+  it('ranks basename matches above path-only matches, then shorter paths, case-insensitively', () => {
+    const paths = ['docs/panel/readme.md', 'src/SidePanel.tsx', 'src/side/panel.ts', 'lib/a.ts'];
+    expect(rankMatches(paths, 'PANEL')).toEqual(['src/side/panel.ts', 'src/SidePanel.tsx', 'docs/panel/readme.md']);
+  });
+
+  it('an empty query matches nothing; results are capped', () => {
+    expect(rankMatches(['a'], '  ')).toEqual([]);
+    expect(rankMatches(['a1', 'a2', 'a3'], 'a', 2)).toHaveLength(2);
+  });
+});
+
+describe('searchFiles', () => {
+  it('in a repo: tracked and untracked files, ignored ones left out', async () => {
+    git(root, 'init', '-q', '-b', 'main');
+    writeFileSync(path.join(root, '.gitignore'), 'secret.txt\n');
+    writeFileSync(path.join(root, 'secret.txt'), '');
+    expect(await searchFiles(root, 'txt')).toEqual(['b.txt']);
+  });
+
+  it('outside a repo: walks the folder, skipping node_modules', async () => {
+    mkdirSync(path.join(root, 'node_modules'));
+    writeFileSync(path.join(root, 'node_modules', 'b.txt'), '');
+    expect(await searchFiles(root, 'b.txt')).toEqual(['b.txt']);
   });
 });
