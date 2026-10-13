@@ -1,6 +1,8 @@
 > **Watchtower fork** of [data-goblin/claude-code-filetree](https://github.com/data-goblin/claude-code-filetree)
-> (MIT, see `LICENSE`), vendored at 0.2.24. The only change is the *Watchtower
-> bridge* in `hooks/register.tsx`: inside a Watchtower terminal
+> (MIT, see `LICENSE`), vendored at 0.2.24. Changes versus upstream: the
+> *Watchtower bridge* in `hooks/register.tsx`, `.claude-plugin/plugin.json`
+> (version and description), and tests (`tests/world.ts` extracted from
+> `surfaces.test.tsx`, new `tests/bridge.test.ts`). The bridge: inside a Watchtower terminal
 > (`WATCHTOWER_INSTANCE_ID` set) the mod never docks its pane, `/filetree`
 > toggles Watchtower's Files tab (it counts up `panelToggles`), and every file
 > Claude reads or writes is POSTed to `/mods/filetree` on Watchtower's listener

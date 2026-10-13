@@ -228,9 +228,9 @@ only on the desktop surface — in our xterm.js terminal it shows a `▣`. So:
    (`parseSavvySnapshot` in `packages/shared/src/savvyProgress.ts`), keeps the
    latest per instance in memory, and pushes `savvyProgress`;
    `savvyProgress:get` returns the cached one.
-3. `PaneCard` → `useSavvyChrome` lays the band (below the terminal) and the
-   agents panel (right of it) around the terminal; rows are the mod's own SVG,
-   ported to `components/instances/savvy/savvyDraw.ts`, shown as `<img>` data
+3. `PaneCard` → `useSavvyChrome` lays the band (below the terminal); the
+   Agents tab is drawn inside the pane's side panel (`useSidePanel` /
+   `SidePanel`). Rows are the mod's own SVG, ported to `components/instances/savvy/savvyDraw.ts`, shown as `<img>` data
    URIs so their `<style>` can't leak into the app.
 
 Three copies of one shape — mod `types/index.d.ts`, `shared/savvyProgress.ts`,
@@ -257,7 +257,8 @@ A new `/mods/<name>` bridge must also be added to `KNOWN_MODS` in
 `orchestrator/hookListener.ts`, or the route rejects it.
 
 Install: set `CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` to the
-`:`-separated plugin folders (`plugins/savvy-progress:plugins/filetree`) and
+absolute, `:`-separated plugin folders (e.g.
+`/Users/…/Watchtower/plugins/savvy-progress:/Users/…/Watchtower/plugins/filetree`) and
 disable the upstream `filetree@claude-code-filetree` plugin so the two don't
 both draw.
 
