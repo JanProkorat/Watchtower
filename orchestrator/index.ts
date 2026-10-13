@@ -91,6 +91,7 @@ import { SavvyProgressStore } from './services/savvyProgressStore.js';
 import { listDir, readGit, searchFiles } from './services/fileTree.js';
 import { FileTreeWatchers, nodeWatch } from './services/fileTreeWatchers.js';
 import { FileTreeActivityStore } from './services/fileTreeActivityStore.js';
+import { ReplayStore } from './services/replayStore.js';
 import { BlastRadiusStore } from './services/blastRadiusStore.js';
 import { ChatManager } from './services/chat/chatManager.js';
 import type { SqliteLike } from './db/migrations.js';
@@ -240,6 +241,12 @@ const fileTreeWatchers = new FileTreeWatchers(nodeWatch, (instanceId) =>
 // filetree mod activity (plugins/filetree → POST /mods/filetree): Claude's reads and writes, flashed on the Files tab.
 const fileTreeActivity = new FileTreeActivityStore(
   (state) => emitPush({ kind: 'fileTreeActivity', payload: state }),
+  (instanceId) => !!handle && repo().get(instanceId) != null,
+);
+
+// replay-theater mod turns (plugins/replay-theater → POST /mods/replay-theater): the diff replay on the Replay tab.
+const replay = new ReplayStore(
+  (state) => emitPush({ kind: 'replay', payload: state }),
   (instanceId) => !!handle && repo().get(instanceId) != null,
 );
 
@@ -791,6 +798,7 @@ function disposeInstanceRow(id: string): void {
   savvyProgress.dispose(id);
   fileTreeWatchers.unwatch(id);
   fileTreeActivity.dispose(id);
+  replay.dispose(id);
   blastRadius.dispose(id);
   chats.dispose(id);
 }
@@ -1611,6 +1619,8 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
 
     case 'fileTreeActivity:get':
       return fileTreeActivity.get(req.payload.instanceId);
+    case 'replay:get':
+      return replay.get(req.payload.instanceId);
 
     case 'blastRadius:get':
       return blastRadius.get(req.payload.instanceId, Date.now());
@@ -2013,6 +2023,7 @@ function respawnIncompleteRowsOnBoot(): void {
       onModState: (plugin, body, instanceId) => {
         if (plugin === 'savvy-progress') savvyProgress.ingest(body, instanceId, Date.now());
         if (plugin === 'filetree') fileTreeActivity.ingest(body, instanceId, Date.now());
+        if (plugin === 'replay-theater') replay.ingest(body, instanceId, Date.now());
         if (plugin === 'blast-radius') blastRadius.ingest(body, instanceId, Date.now());
       },
       onModDecision: (plugin, holdId, instanceId) =>
