@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   agentSvg,
+  colorOf,
   compactSvg,
   costumeOf,
   crab,
@@ -66,6 +67,14 @@ describe('savvyDraw', () => {
     expect(idle).toContain('c-careful');
     expect(idle).not.toContain(' run');
     expect(crab(0, 0, 'careful', false, true)).toContain('c-careful run');
+  });
+
+  it('draws R2-D2, not the clay crab: tier-colored panels, R2 blue outside the tiers', () => {
+    const tiered = crab(0, 0, 'careful');
+    expect(tiered).toContain('fill="#C9CCD2"'); // dome
+    expect(tiered).toContain(`fill="${colorOf('careful')}"`);
+    expect(tiered).not.toContain('#D97757');
+    expect(crab(0, 0, 'other')).toContain('fill="#3B6FD1"');
   });
 
   it('escapes user text into the SVG', () => {
