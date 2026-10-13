@@ -74,7 +74,7 @@ IPC kinds (follow the CLAUDE.md "When adding a new kind" steps; shapes in
 
 - The root is the instance's `cwd`.
 - `fileTree:git` runs `git --no-optional-locks status --porcelain=v2 --branch -z
-  --ignored=matching` and `git diff --numstat -z HEAD` through `execFile` (as
+  --untracked-files=all --ignored=matching` and `git diff --numstat -z HEAD` through `execFile` (as
   `services/reviews.ts` does), with a 5 s timeout. Status ∈ `modified`, `added`,
   `untracked`, `deleted`, `renamed`, `ignored`. Folder totals are summed in the
   renderer.
@@ -156,7 +156,7 @@ IPC kinds (follow the CLAUDE.md "When adding a new kind" steps; shapes in
 
 ## Delivery
 
-Three phases, one commit each, each leaving the app working:
+Three phases, each leaving the app working (commits per task; a phase ends on a commit):
 
 1. Tab host + Agents moved into it (`useSidePanel`, `SidePanel`, `PaneCard`).
 2. Native Files tab (orchestrator service, IPC, `FilesTab`).
