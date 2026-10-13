@@ -26,12 +26,14 @@ export class BlastRadiusStore {
     const post = parseBlastRadiusPost(body);
     if (!post) return false;
     const prev = this.byInstance.get(instanceId);
+    // Release only the hold we flagged: a stray post must not clear Claude's own permission prompt.
+    if (!post.hold && prev?.hold && post.outcome && post.outcome.id !== prev.hold.id) return true;
     const state: BlastRadiusState = post.hold
       ? { instanceId, hold: post.hold, decided: prev?.hold?.id === post.hold.id ? prev.decided : null, outcome: prev?.outcome ?? null, receivedAt: now }
       : { instanceId, hold: null, decided: null, outcome: post.outcome ?? prev?.outcome ?? null, receivedAt: now };
     this.byInstance.set(instanceId, state);
     if (state.hold) this.hooks.hold(instanceId);
-    else this.hooks.release(instanceId);
+    else if (prev?.hold) this.hooks.release(instanceId);
     this.hooks.emit(state);
     return true;
   }

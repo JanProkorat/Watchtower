@@ -28,6 +28,22 @@ describe('BlastRadiusStore', () => {
     expect(pushed).toHaveLength(2);
   });
 
+  it('a release with no pending hold records the outcome but never releases attention', () => {
+    const { store, log, pushed } = make();
+    expect(store.ingest(release('h1'), 'i1', 1)).toBe(true);
+    expect(store.get('i1', 1)).toMatchObject({ hold: null, outcome: { id: 'h1' } });
+    expect(pushed).toHaveLength(1);
+    expect(log).toEqual([]);
+  });
+
+  it('a release for another hold id leaves the pending hold untouched', () => {
+    const { store, log } = make();
+    store.ingest(hold('h2'), 'i1', 1);
+    expect(store.ingest(release('h1'), 'i1', 2)).toBe(true);
+    expect(store.get('i1', 2)?.hold?.id).toBe('h2');
+    expect(log).toEqual(['hold i1']);
+  });
+
   it('drops unknown instances and invalid bodies', () => {
     const { store, pushed } = make();
     expect(store.ingest(hold('h1'), 'stranger', 1)).toBe(false);
