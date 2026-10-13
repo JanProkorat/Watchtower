@@ -14,7 +14,7 @@ import { ChatView } from '../chat/ChatView.js';
 import { chatPalette } from '../chat/chatFormat.js';
 import { TERMINAL_BG } from '../terminalTheme';
 import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
-import { useSavvyChrome, SAVVY_GAP } from './savvy/useSavvyChrome.js';
+import { useSavvyChrome } from './savvy/useSavvyChrome.js';
 import { ATTENTION_AMBER } from '../../theme/glass.js';
 
 interface Props {
@@ -91,7 +91,7 @@ export function PaneCard({
           position: 'absolute',
           top: 0,
           left: 0,
-          right: savvy.rightInset,
+          right: 0,
           height: BAR_H,
           boxSizing: 'border-box',
           display: 'flex',
@@ -173,7 +173,18 @@ export function PaneCard({
         </Box>
       </Box>
 
-      <Box sx={{ position: 'absolute', top: BAR_H, left: 0, right: savvy.rightInset, bottom: savvy.bottomInset }}>
+      {/* With the agents panel open, the terminal's bottom-right corner goes
+          square: the panel continues the card from there. */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: BAR_H,
+          left: 0,
+          right: savvy.rightInset,
+          bottom: savvy.bottomInset,
+          ...(savvy.panel ? { '& > *': { borderBottomRightRadius: 0 } } : {}),
+        }}
+      >
         {kind === 'chat' ? (
           <ChatView instanceId={instanceId} cwd={cwd} onFocus={onFocus} />
         ) : (
@@ -183,10 +194,27 @@ export function PaneCard({
       </Box>
 
       {savvy.band && (
-        <Box sx={{ position: 'absolute', left: 0, right: savvy.rightInset, bottom: 0 }}>{savvy.band}</Box>
+        <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>{savvy.band}</Box>
       )}
       {savvy.panel && (
-        <Box sx={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: savvy.rightInset - SAVVY_GAP }}>{savvy.panel}</Box>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: BAR_H,
+            right: 0,
+            bottom: savvy.bottomInset,
+            width: savvy.rightInset,
+            boxSizing: 'border-box',
+            backgroundColor: cardBg,
+            border: `1px solid ${cardBorder}`,
+            borderTop: 'none',
+            borderLeft: 'none',
+            borderRadius: '0 0 12px 0',
+            boxShadow: isDark ? '0 10px 28px rgba(0,0,0,0.40)' : '0 10px 26px rgba(15,18,24,0.16)',
+          }}
+        >
+          {savvy.panel}
+        </Box>
       )}
 
       <Menu

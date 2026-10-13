@@ -26,12 +26,14 @@ describe('parseSavvySnapshot', () => {
       flow: { title: 'Port parser', total: 3, done: 1, running: 1, phase: 'delegate', isFinished: false, tasks: [{ title: 'Write the parser', tier: 'careful', after: [] }] },
       agents: [run()],
       sentAt: 5_000,
+      panelToggles: 3,
     });
     expect(snap).not.toBeNull();
     expect(snap?.flow?.phase).toBe('delegate');
     expect(snap?.flow?.tasks[0]?.tier).toBe('careful');
     expect(snap?.agents[0]?.costUsd).toBe(0.42);
     expect(snap?.sentAt).toBe(5_000);
+    expect(snap?.panelToggles).toBe(3);
   });
 
   it('rejects bodies that are not a v1 snapshot', () => {
@@ -54,6 +56,8 @@ describe('parseSavvySnapshot', () => {
     expect(snap?.agents).toHaveLength(1);
     expect(snap?.agents[0]?.status).toBe('running');
     expect(snap?.agents[0]?.costUsd).toBe(0);
+    // An older mod sends no counter: it reads as 0.
+    expect(snap?.panelToggles).toBe(0);
   });
 
   it('caps the agent list at the mod’s own 200, keeping the newest', () => {
@@ -64,7 +68,7 @@ describe('parseSavvySnapshot', () => {
   });
 
   it('isEmptySnapshot: no flow and no agents', () => {
-    expect(isEmptySnapshot({ lang: 'en', flow: null, agents: [], sentAt: 0 })).toBe(true);
+    expect(isEmptySnapshot({ lang: 'en', flow: null, agents: [], sentAt: 0, panelToggles: 0 })).toBe(true);
     const withAgent = parseSavvySnapshot({ version: 1, flow: null, agents: [run()] });
     expect(withAgent && isEmptySnapshot(withAgent)).toBe(false);
   });

@@ -56,6 +56,7 @@ const STRINGS = {
     isPlanned: 'planned',
     opened: 'Agents panel opened.',
     closed: 'Agents panel closed.',
+    toggled: 'Agents panel toggled in Watchtower.',
     done: 'Done',
     plan: 'Plan',
     design: 'Design',
@@ -84,6 +85,7 @@ const STRINGS = {
     isPlanned: 'запланирована',
     opened: 'Панель агентов открыта.',
     closed: 'Панель агентов закрыта.',
+    toggled: 'Панель агентов переключена в Watchtower.',
     done: 'Готово',
     plan: 'План',
     design: 'Дизайн',
@@ -109,6 +111,8 @@ type Bridge = { url: string; token: string; instanceId: string }
 // means "not looked yet", null "not inside Watchtower".
 let bridge: Bridge | null | undefined
 let isPublishQueued = false
+// Counts `/agents-info` runs while bridged; Watchtower toggles its panel on each rise.
+let panelToggles = 0
 
 async function discoverBridge($: EngineInterface): Promise<Bridge | null> {
   const instanceId = await $.env.get('WATCHTOWER_INSTANCE_ID')
@@ -137,6 +141,7 @@ async function sendSnapshot($: EngineInterface): Promise<void> {
     flow: await read($, flow),
     agents: await read($, agents),
     sentAt: await $.clock.now(),
+    panelToggles,
   })
   try {
     const res = await $.http.fetch(b.url, {
@@ -790,6 +795,15 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'agents-info' }, async $ => {
+    if (bridge === undefined) bridge = await discoverBridge($)
+    if (isBridged()) {
+      // Watchtower draws the panel beside the terminal: toggle that one, and
+      // close a terminal pane left open from before so the two never double up.
+      if ((await $.ui.panes()).some(p => p.id === PANE)) await $.ui.close({ id: PANE })
+      panelToggles++
+      publish($)
+      return { text: tr().toggled }
+    }
     const isOpen = await togglePane($)
     return { text: isOpen ? tr().opened : tr().closed }
   })

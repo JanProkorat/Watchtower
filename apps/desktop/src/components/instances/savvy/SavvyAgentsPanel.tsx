@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Box, ButtonBase, IconButton, Tooltip, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -21,13 +21,20 @@ import {
 } from './savvyDraw.js';
 
 export const PANEL_W = 340;
+const MIN_W = 260;
+const MAX_W = 720;
 const PAD = 12;
-const DRAW_W = PANEL_W - PAD * 2;
+
+export const clampPanelWidth = (w: number): number =>
+  Number.isFinite(w) ? Math.round(Math.min(MAX_W, Math.max(MIN_W, w))) : PANEL_W;
 
 interface Props {
   snapshot: SavvyProgressSnapshot;
   /** "Now" on the mod's clock (renderer time minus the measured skew). */
   at: number;
+  width: number;
+  /** Called while the left edge is dragged, with the width it asks for. */
+  onResize(width: number): void;
   onClose(): void;
 }
 
@@ -35,9 +42,10 @@ interface Props {
  * The savvy-progress mod's agents panel, drawn natively: the same SVG rows the
  * mod draws on Claude Code's desktop surface (crabs and all), laid out the way
  * its `Pane` lays them out. Each row is an `<img>` so its `<style>` stays out of
- * the app's CSS and its animations run on the compositor.
+ * the app's CSS and its animations run on the compositor. The frame (fill,
+ * border) comes from PaneCard, so the panel reads as part of the instance card.
  */
-export function SavvyAgentsPanel({ snapshot, at, onClose }: Props) {
+export function SavvyAgentsPanel({ snapshot, at, width, onResize, onClose }: Props) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const ctx: DrawCtx = { lang: snapshot.lang, dark: isDark };
@@ -53,20 +61,11 @@ export function SavvyAgentsPanel({ snapshot, at, onClose }: Props) {
   const t = totals(list, at);
   const title = f && !f.isFinished ? f.title : '';
   const isEmpty = list.length === 0 && planned.length === 0;
+  const drawW = width - PAD * 2;
 
   return (
-    <Box
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        backgroundColor: isDark ? '#1b1b1a' : '#fbfaf8',
-        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,18,24,0.10)'}`,
-        boxShadow: isDark ? '0 10px 28px rgba(0,0,0,0.40)' : '0 10px 26px rgba(15,18,24,0.16)',
-      }}
-    >
+    <Box sx={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <ResizeEdge width={width} onResize={onResize} />
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: `${PAD}px`, pt: 1, pb: 0.5 }}>
         <Typography sx={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{s.pane}</Typography>
         <TextButton onClick={() => setIsCompact((v) => !v)}>{isCompact ? s.expand : s.collapse}</TextButton>
@@ -80,19 +79,21 @@ export function SavvyAgentsPanel({ snapshot, at, onClose }: Props) {
       <Box sx={{ flex: 1, overflowY: 'auto', px: `${PAD}px`, pb: `${PAD}px` }}>
         {isCompact ? (
           <Row
-            source={compactSvg(ctx, DRAW_W, list, planned, t)}
+            source={compactSvg(ctx, drawW, list, planned, t)}
+            width={drawW}
             height={COMPACT_H}
             alt={`${list.length} ${s.agentsCount}`}
           />
         ) : (
           <>
-            <Row source={headerSvg(ctx, DRAW_W, title, t)} height={headerHeight(title)} alt={title || s.pane} />
+            <Row source={headerSvg(ctx, drawW, title, t)} width={drawW} height={headerHeight(title)} alt={title || s.pane} />
             {isEmpty && <Section>{s.empty}</Section>}
             {running.length > 0 && <Section>{`${s.running} · ${running.length}`}</Section>}
             {running.map((a) => (
               <Row
                 key={a.id}
-                source={agentSvg(ctx, DRAW_W, a, at)}
+                source={agentSvg(ctx, drawW, a, at)}
+                width={drawW}
                 height={AGENT_ROW_H}
                 alt={`${a.description}: ${modelName(a.model)}, ${s.isRunning}`}
               />
@@ -106,7 +107,8 @@ export function SavvyAgentsPanel({ snapshot, at, onClose }: Props) {
               finished.map((a) => (
                 <Row
                   key={a.id}
-                  source={agentSvg(ctx, DRAW_W, a, at)}
+                  source={agentSvg(ctx, drawW, a, at)}
+                  width={drawW}
                   height={AGENT_ROW_H}
                   alt={`${a.description}: ${modelName(a.model)}, ${s.isFinished}`}
                 />
@@ -115,7 +117,8 @@ export function SavvyAgentsPanel({ snapshot, at, onClose }: Props) {
             {planned.map((pl) => (
               <Row
                 key={`plan-${pl.n}`}
-                source={plannedSvg(ctx, DRAW_W, pl)}
+                source={plannedSvg(ctx, drawW, pl)}
+                width={drawW}
                 height={PLANNED_ROW_H}
                 alt={`${pl.n}. ${pl.title}: ${s.isPlanned}`}
               />
@@ -127,8 +130,54 @@ export function SavvyAgentsPanel({ snapshot, at, onClose }: Props) {
   );
 }
 
-function Row({ source, height, alt }: { source: string; height: number; alt: string }) {
-  return <Box component="img" src={svgDataUri(source)} alt={alt} width={DRAW_W} height={height} sx={{ display: 'block' }} />;
+function Row({ source, width, height, alt }: { source: string; width: number; height: number; alt: string }) {
+  return <Box component="img" src={svgDataUri(source)} alt={alt} width={width} height={height} sx={{ display: 'block' }} />;
+}
+
+/** The panel's left edge: drag it to change the width. */
+function ResizeEdge({ width, onResize }: { width: number; onResize(width: number): void }) {
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => onResize(width + (startX - ev.clientX));
+    const up = () => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+  };
+  return (
+    <Box
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize agents panel"
+      onPointerDown={onPointerDown}
+      sx={{
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: -4,
+        width: 8,
+        zIndex: 2,
+        cursor: 'col-resize',
+        ':hover::after': { opacity: 1 },
+        '::after': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: 3,
+          width: 2,
+          backgroundColor: 'primary.main',
+          opacity: 0,
+          transition: 'opacity 120ms ease',
+        },
+      }}
+    />
+  );
 }
 
 function Section({ children }: { children: string }) {

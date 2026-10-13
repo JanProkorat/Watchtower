@@ -12,7 +12,8 @@
 > `listener.json` in Watchtower's support dir) on every change, and Watchtower
 > draws the agents panel and the progress band natively beside the terminal,
 > crabs and animations included. The terminal's own band and auto-opened pane
-> stay hidden there; `/agents-info` still toggles the terminal pane. Outside
+> stay hidden there, and `/agents-info` toggles Watchtower's panel (it counts up
+> `panelToggles` in the snapshot) instead of opening the terminal pane. Outside
 > Watchtower the mod behaves exactly as upstream.
 >
 > **Install** (replaces an upstream install — remove that one first, the two

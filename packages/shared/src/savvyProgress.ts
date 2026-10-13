@@ -52,6 +52,8 @@ export interface SavvyProgressSnapshot {
   agents: SavvyAgentRun[];
   /** The mod's clock (epoch ms) when it sent the snapshot. */
   sentAt: number;
+  /** Bumped by each `/agents-info` run; a rise asks Watchtower to toggle its panel. */
+  panelToggles: number;
 }
 
 /** Payload of the `savvyProgress` push and the `savvyProgress:get` response. */
@@ -133,6 +135,7 @@ export function parseSavvySnapshot(body: unknown): SavvyProgressSnapshot | null 
       .filter((a): a is SavvyAgentRun => a !== null)
       .slice(-MAX_AGENTS),
     sentAt: num(body.sentAt),
+    panelToggles: num(body.panelToggles),
   };
 }
 
