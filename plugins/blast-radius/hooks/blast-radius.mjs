@@ -22,14 +22,26 @@ const LIST_MAX = 10;
 
 // Watchtower bridge. Inside a Watchtower terminal (WATCHTOWER_INSTANCE_ID set) the hold
 // is shown as a popup by Watchtower: post it to the listener and poll for the answer.
-let bridge; // undefined: not looked yet; null: no listener found
+let bridge; // undefined or null: none found yet, looked up again on the next call
+
+const FETCH_TIMEOUT_MS = 2000;
+
+// The engine's HttpInit has no timeout, so race the request against a short sleep.
+async function fetchWithTimeout($, url, init) {
+  return Promise.race([
+    $.http.fetch(url, init),
+    $.clock.sleep(FETCH_TIMEOUT_MS).then(() => {
+      throw new Error("timeout");
+    }),
+  ]);
+}
 
 async function discoverBridge($) {
-  const instanceId = await $.env.get("WATCHTOWER_INSTANCE_ID");
-  if (!instanceId) return null;
-  const home = (await $.env.get("HOME")) ?? "";
-  const dir = (await $.env.get("WATCHTOWER_SUPPORT_DIR")) || `${home}/Library/Application Support/Watchtower`;
   try {
+    const instanceId = await $.env.get("WATCHTOWER_INSTANCE_ID");
+    if (!instanceId) return null;
+    const home = (await $.env.get("HOME")) ?? "";
+    const dir = (await $.env.get("WATCHTOWER_SUPPORT_DIR")) || `${home}/Library/Application Support/Watchtower`;
     const sidecar = JSON.parse(await $.fs.read(`${dir}/listener.json`));
     const port = Number(sidecar.port);
     const token = String(sidecar.token ?? "");
@@ -47,7 +59,7 @@ async function postToWatchtower($, payload) {
   const b = bridge;
   if (!b) return;
   try {
-    const res = await $.http.fetch(b.url, {
+    const res = await fetchWithTimeout($, b.url, {
       method: "POST",
       headers: { "content-type": "application/json", ...bridgeHeaders(b) },
       body: JSON.stringify({ version: 1, ...payload }),
@@ -64,7 +76,7 @@ async function pollWatchtower($, hold) {
   const b = bridge;
   if (!b) return null;
   try {
-    const res = await $.http.fetch(`${b.url}/decision?id=${encodeURIComponent(hold.id)}`, { headers: bridgeHeaders(b) });
+    const res = await fetchWithTimeout($, `${b.url}/decision?id=${encodeURIComponent(hold.id)}`, { headers: bridgeHeaders(b) });
     if (res.status === 404) {
       // Watchtower restarted (or never saw the hold): announce it again.
       await postToWatchtower($, { hold });
@@ -100,7 +112,6 @@ export function register(on) {
     }
     const mine = { command: String(e.command), risk, report: null, decision: null, where: "pane" };
     held = mine;
-    const inWatchtower = Boolean(await $.env.get("WATCHTOWER_INSTANCE_ID"));
     let wire = null;
 
     let opened = { isPlaced: false };
@@ -116,6 +127,7 @@ export function register(on) {
         : await measure($, risk, cwd);
       summary = mine.report.summary;
 
+      const inWatchtower = Boolean(await $.env.get("WATCHTOWER_INSTANCE_ID"));
       if (inWatchtower) {
         mine.where = "watchtower";
         wire = {
@@ -153,6 +165,10 @@ export function register(on) {
             mine.decision = answer;
             break;
           }
+          if (next.signal.aborted) {
+            mine.decision = "interrupted";
+            break;
+          }
         }
         await $.process.run(["sleep", POLL_SECONDS], { timeoutMs: 5000 });
       }
@@ -161,7 +177,11 @@ export function register(on) {
     } finally {
       decision = mine.decision;
       if (wire) {
-        await postToWatchtower($, { hold: null, outcome: { id: wire.id, command: wire.command, decision: decision ?? "error" } });
+        try {
+          await postToWatchtower($, { hold: null, outcome: { id: wire.id, command: wire.command, decision: decision ?? "error" } });
+        } catch {
+          // Watchtower can't be told; the lock below must still be released
+        }
       }
       // Close this call's pane before releasing the hold, so the next call's
       // pane can't be the one that gets closed.

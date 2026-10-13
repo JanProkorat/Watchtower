@@ -12,19 +12,24 @@ interface Post {
   outcome?: { id: string; command: string; decision: string }
 }
 
-type Answer = { status: number; body?: unknown } | 'throw'
+type Answer = { status: number; body?: unknown; text?: string } | 'throw' | 'hang'
 
 function world(
   on: On,
-  opts: { inside: boolean; answers?: Answer[]; allFetchesThrow?: boolean },
+  opts: { inside: boolean; answers?: Answer[]; allFetchesThrow?: boolean; envThrowsOnce?: boolean; releasePostThrows?: boolean; fastForward?: boolean },
 ) {
   const clock = mock.clock(on, { now: 1_000 })
-  mock.env(
-    on,
-    opts.inside
-      ? { WATCHTOWER_INSTANCE_ID: 'inst-1', WATCHTOWER_SUPPORT_DIR: '/support', HOME: '/home/u' }
-      : { HOME: '/home/u' },
-  )
+  const vars: Record<string, string> = opts.inside
+    ? { WATCHTOWER_INSTANCE_ID: 'inst-1', WATCHTOWER_SUPPORT_DIR: '/support', HOME: '/home/u' }
+    : { HOME: '/home/u' }
+  let envThrown = false
+  on('env.get', async (_$, e) => {
+    if (opts.envThrowsOnce && !envThrown) {
+      envThrown = true
+      throw new Error('env unavailable')
+    }
+    return { value: vars[e.name] }
+  })
   const posts: Post[] = []
   const gets: string[] = []
   const answers = [...(opts.answers ?? [])]
@@ -43,6 +48,7 @@ function world(
     if (opts.allFetchesThrow) throw new Error('connection refused')
     const method = e.init?.method ?? 'GET'
     if (method === 'POST') {
+      if (opts.releasePostThrows && JSON.parse(e.init?.body as string).hold === null) throw new Error('refused')
       expect(e.url).toBe('http://127.0.0.1:7531/mods/blast-radius')
       const headers = e.init?.headers as Record<string, string>
       expect(headers.authorization).toBe('Bearer tok')
@@ -54,15 +60,20 @@ function world(
     expect(e.url).toContain('http://127.0.0.1:7531/mods/blast-radius/decision?id=')
     const a = answers.shift() ?? { status: 200, body: { decision: null } }
     if (a === 'throw') throw new Error('connection refused')
+    if (a === 'hang') {
+      // Never answers; the 2 s race needs the mock clock moved on once its timer exists.
+      setTimeout(() => void clock.advance(2_500), 0)
+      return new Promise(() => {})
+    }
     return {
-      value: { status: a.status, ok: a.status >= 200 && a.status < 300, headers: {}, text: JSON.stringify(a.body ?? {}) },
+      value: { status: a.status, ok: a.status >= 200 && a.status < 300, headers: {}, text: a.text ?? JSON.stringify(a.body ?? {}) },
     }
   })
   // measure() takes its "could not measure" path; sleep moves the mock clock.
   on('process.run', async (_$, e) => {
     if (e.argv[0] === 'sleep') {
       sleeps++
-      await clock.advance(opts.allFetchesThrow || !opts.inside ? TEN_MINUTES_AND_A_BIT : 250)
+      await clock.advance(opts.allFetchesThrow || opts.fastForward || !opts.inside ? TEN_MINUTES_AND_A_BIT : 250)
       return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     }
     return { value: { exitCode: 1, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -133,6 +144,51 @@ test('outside Watchtower: opens the pane and never touches the network', async (
   expect(w.opened).toEqual([{ id: 'blast-radius' }])
   expect(w.fetches()).toBe(0)
   expect(w.posts).toEqual([])
+  expect(r.deny).toContain('no answer within 10 minutes')
+  expect(w.calls.length).toBe(0)
+})
+
+test('a rejecting env read denies and releases the hold lock', async ($, on) => {
+  const w = world(on, { inside: true, envThrowsOnce: true, answers: [{ status: 200, body: { decision: 'proceed' } }] })
+  const first = (await $.tool.call(rm)) as { deny?: string }
+  expect(first.deny).toContain('Blast Radius hit an error')
+  expect(w.calls.length).toBe(0)
+  // The lock was released: a second risky call reaches its own hold and runs.
+  const second = await $.tool.call(rm)
+  expect(second).not.toHaveProperty('deny')
+  expect(w.calls.length).toBe(1)
+})
+
+test('a failing release POST still returns the answer and releases the lock', async ($, on) => {
+  const w = world(on, {
+    inside: true,
+    releasePostThrows: true,
+    answers: [{ status: 200, body: { decision: 'cancel' } }, { status: 200, body: { decision: 'proceed' } }],
+  })
+  const first = (await $.tool.call(rm)) as { deny?: string }
+  expect(first.deny).toContain('the user pressed Cancel')
+  const second = await $.tool.call(rm)
+  expect(second).not.toHaveProperty('deny')
+  expect(w.calls.length).toBe(1)
+})
+
+test('a decision request that never answers cannot stall the 10 minute limit', async ($, on) => {
+  const w = world(on, { inside: true, fastForward: true, answers: ['hang'] })
+  const r = (await $.tool.call(rm)) as { deny?: string }
+  expect(r.deny).toContain('no answer within 10 minutes')
+  expect(w.calls.length).toBe(0)
+})
+
+test('a decision other than exactly "proceed" never runs the command', async ($, on) => {
+  const w = world(on, { inside: true, fastForward: true, answers: [{ status: 200, body: { decision: 'PROCEED' } }] })
+  const r = (await $.tool.call(rm)) as { deny?: string }
+  expect(r.deny).toContain('no answer within 10 minutes')
+  expect(w.calls.length).toBe(0)
+})
+
+test('a non-JSON decision body never runs the command', async ($, on) => {
+  const w = world(on, { inside: true, fastForward: true, answers: [{ status: 200, text: 'oops' }] })
+  const r = (await $.tool.call(rm)) as { deny?: string }
   expect(r.deny).toContain('no answer within 10 minutes')
   expect(w.calls.length).toBe(0)
 })
