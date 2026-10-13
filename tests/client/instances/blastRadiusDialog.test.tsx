@@ -118,15 +118,23 @@ describe('BlastRadiusDialog keyed by hold id', () => {
   });
 
   it('strips hidden characters from the risk label', () => {
-    renderIt(null, { ...hold, riskLabel: 'rm‮ -rf' });
-    expect(screen.getByRole('dialog').getAttribute('aria-label')).not.toContain('‮');
-    expect(screen.getByRole('dialog').textContent).not.toContain('‮');
+    renderIt(null, { ...hold, riskLabel: 'rm\u202E -rf' });
+    expect(screen.getByRole('dialog').getAttribute('aria-label')).not.toContain('\u202E');
+    expect(screen.getByRole('dialog').textContent).not.toContain('\u202E');
+  });
+
+  it('strips hidden characters from the summary and note', () => {
+    renderIt(null, { ...hold, summary: 'delete\u202E files', note: 'Paths:\u202E dist' });
+    const text = screen.getByRole('dialog').textContent ?? '';
+    expect(text).not.toContain('\u202E');
+    expect(text).toContain('Would delete\uFFFD files');
+    expect(text).toContain('Paths:\uFFFD dist');
   });
 });
 
 describe('visible', () => {
   it('replaces zero-width, BOM, ALM and line/paragraph separators', () => {
-    const out = visible('a​b﻿c؜d e f‌g‍h');
+    const out = visible('a\u200Bb\uFEFFc\u061Cd\u2028e\u2029f\u200Cg\u200Dh');
     expect(out).toBe('a�b�c�d�e�f�g�h');
   });
 
