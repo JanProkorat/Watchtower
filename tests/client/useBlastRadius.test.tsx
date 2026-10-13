@@ -52,6 +52,12 @@ describe('useBlastRadius', () => {
     expect(toasts).toEqual(['info Blast Radius: running `rm -rf dist`', "warning Blast Radius: didn't run `git clean -fd` (no answer within 10 minutes)"]);
   });
 
+  it('never toasts from a push that carries a hold (its outcome is the previous one)', () => {
+    renderHook(() => useBlastRadius('i1'));
+    act(() => push?.(st({ hold, outcome: { id: 'old', command: 'rm x', decision: 'cancel' } })));
+    expect(toasts).toEqual([]);
+  });
+
   it('never toasts an outcome that was already there when the pane loaded', async () => {
     ipc.initial = st({ outcome: { id: 'old', command: 'rm x', decision: 'cancel' } });
     const { result } = renderHook(() => useBlastRadius('i1'));

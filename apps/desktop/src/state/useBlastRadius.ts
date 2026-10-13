@@ -29,7 +29,8 @@ export function useBlastRadius(instanceId: string): { state: BlastRadiusState | 
       .catch(() => {});
     const off = window.watchtower.on('blastRadius', (payload) => {
       if (payload.instanceId !== instanceId) return;
-      toastOnce(payload);
+      // A hold push carries the previous outcome; only a hold-less push reports a fresh one.
+      if (payload.hold === null) toastOnce(payload);
       setState(payload);
     });
     return () => {
