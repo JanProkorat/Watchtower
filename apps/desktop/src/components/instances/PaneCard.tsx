@@ -263,7 +263,7 @@ export function PaneCard({
       )}
 
       {blast.state?.hold && (
-        <BlastRadiusDialog hold={blast.state.hold} decided={blast.state.decided} onDecide={blast.decide} />
+        <BlastRadiusDialog key={blast.state.hold.id} hold={blast.state.hold} decided={blast.state.decided} onDecide={blast.decide} />
       )}
 
       <Menu

@@ -79,7 +79,42 @@ describe('BlastRadiusDialog', () => {
   });
 });
 
+describe('BlastRadiusDialog keyed by hold id', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('a new hold starts with Proceed disabled on its first render', () => {
+    const ui = (h: typeof hold) => (
+      <ThemeProvider theme={darkTheme}>
+        <BlastRadiusDialog key={h.id} hold={h} decided={null} onDecide={vi.fn()} />
+      </ThemeProvider>
+    );
+    const { rerender } = render(ui(hold));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByRole('button', { name: 'Proceed' })).toBeEnabled();
+    rerender(ui({ ...hold, id: 'h2' }));
+    expect(screen.getByRole('button', { name: 'Proceed' })).toBeDisabled();
+  });
+
+  it('strips hidden characters from the risk label', () => {
+    renderIt(null, { ...hold, riskLabel: 'rm‮ -rf' });
+    expect(screen.getByRole('dialog').getAttribute('aria-label')).not.toContain('‮');
+    expect(screen.getByRole('dialog').textContent).not.toContain('‮');
+  });
+});
+
 describe('visible', () => {
+  it('replaces zero-width, BOM, ALM and line/paragraph separators', () => {
+    const out = visible('a​b﻿c؜d e f‌g‍h');
+    expect(out).toBe('a�b�c�d�e�f�g�h');
+  });
+
   it('replaces bidi and control characters but keeps newline and tab', () => {
     const out = visible('rm -rf \u202Etxt.exe');
     expect(out).toContain('\uFFFD');

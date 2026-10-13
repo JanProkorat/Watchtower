@@ -10,7 +10,7 @@ interface Props {
 
 // Bidi controls and C0/C1 controls (except \n and \t) can disguise what a command does.
 // eslint-disable-next-line no-control-regex
-const HIDDEN_CHARS = /[\u202A-\u202E\u2066-\u2069\u200E\u200F\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
+const HIDDEN_CHARS = /[\u202A-\u202E\u2066-\u2069\u200E\u200F\u061C\u2028\u2029\u200B-\u200D\uFEFF\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
 
 /** Replaces characters that can hide a command's real meaning with a visible marker. */
 export function visible(text: string): string {
@@ -32,7 +32,7 @@ export function BlastRadiusDialog({ hold, decided, onDecide }: Props) {
     const t = setTimeout(() => setArmed(true), PROCEED_ARM_MS);
     return () => clearTimeout(t);
   }, [hold.id]);
-  const title = `⚠ Blast Radius · ${hold.riskLabel}`;
+  const title = `⚠ Blast Radius · ${visible(hold.riskLabel)}`;
 
   return (
     <Box sx={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: '12px' }}>
@@ -57,14 +57,14 @@ export function BlastRadiusDialog({ hold, decided, onDecide }: Props) {
             Command shortened — the full command is longer than shown.
           </Typography>
         )}
-        <Typography sx={{ color: '#e5534b', fontSize: 13, mb: 0.5 }}>{`Would ${hold.summary}`}</Typography>
+        <Typography sx={{ color: '#e5534b', fontSize: 13, mb: 0.5 }}>{`Would ${visible(hold.summary)}`}</Typography>
         {hold.lines.map((l, i) => (
           <Typography key={`${i}:${l}`} sx={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, color: 'text.secondary' }}>
             {visible(l)}
           </Typography>
         ))}
         {hold.more > 0 && <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{`+${hold.more} more`}</Typography>}
-        {hold.note && <Typography sx={{ fontSize: 12, fontStyle: 'italic', color: 'text.secondary', mt: 1 }}>{hold.note}</Typography>}
+        {hold.note && <Typography sx={{ fontSize: 12, fontStyle: 'italic', color: 'text.secondary', mt: 1 }}>{visible(hold.note)}</Typography>}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
           <Typography sx={{ fontSize: 12, color: 'text.secondary', flex: 1 }}>{decided ? 'Waiting for Claude…' : 'Claude is waiting on your answer'}</Typography>
           <Button variant="outlined" color="warning" disabled={!!decided || !armed} onClick={() => armed && onDecide('proceed')}>
