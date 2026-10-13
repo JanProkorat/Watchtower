@@ -115,7 +115,7 @@ async function discoverBridge($: EngineInterface): Promise<Bridge | null> {
   }
 }
 
-const isBridged = (): boolean => !!bridge
+let inWatchtower = false
 
 async function sendSnapshot($: EngineInterface): Promise<void> {
   const b = bridge
@@ -136,12 +136,12 @@ async function sendSnapshot($: EngineInterface): Promise<void> {
 
 // Coalesces a burst of reads and writes into one post.
 function publish($: EngineInterface): void {
-  if (bridge === null || isPublishQueued) return
+  if (!inWatchtower || isPublishQueued) return
   isPublishQueued = true
   $.clock.after(200, () => {
     isPublishQueued = false
     void (async () => {
-      if (bridge === undefined) bridge = await discoverBridge($)
+      if (!bridge) bridge = await discoverBridge($)
       await sendSnapshot($)
     })()
   })
@@ -154,7 +154,11 @@ async function reportActivity($: EngineInterface, paths: string[], kind: 'read' 
 }
 
 async function closeOwnPane($: EngineInterface): Promise<void> {
-  if ((await $.ui.panes()).some(p => p.id === PANE)) await $.ui.close({ id: PANE })
+  try {
+    if ((await $.ui.panes()).some(p => p.id === PANE)) await $.ui.close({ id: PANE })
+  } catch {
+    // A failed close must not break the command or a reset.
+  }
 }
 let home = ''
 let platform: Promise<'linux' | 'darwin' | 'win32'> | null = null
@@ -342,7 +346,7 @@ async function reset($: EngineInterface, root: string, focus = false): Promise<v
   sizeQueue = []
   await put($, () => ({ ...emptyTree(root), showHidden: prev.showHidden, showSize: prev.root ? prev.showSize : sizeDefault }))
   const title = `Files: ${root.split('/').pop() || root}`
-  if (isBridged()) void closeOwnPane($)
+  if (inWatchtower) void closeOwnPane($)
   else if (focus) await $.ui.open({ id: PANE, title, focus: true })
   else if (!noDock) await $.ui.open({ id: PANE, title })
   await loadDirs($, [root])
@@ -821,7 +825,7 @@ function scheduleScan($: EngineInterface, job: Job): void {
 }
 
 async function touched($: EngineInterface, paths: string[], tone: string, show: boolean): Promise<void> {
-  if (isBridged() && show) void reportActivity($, paths, tone === 'purple' ? 'read' : 'write')
+  if (inWatchtower && show) void reportActivity($, paths, tone === 'purple' ? 'read' : 'write')
   if (tone !== 'purple' && previewed && paths.map(posix).includes(previewed.path)) previewed = null
   if (await followCwd($)) return
   const t = await get($)
@@ -1087,6 +1091,7 @@ export const register: Register = (on, options) => {
   sizeDefault = options?.column === 'size'
   openWithSetting = typeof options?.open === 'string' ? options.open : ''
   on('session.start', async ($, e, next) => {
+    inWatchtower = Boolean(await $.env.get('WATCHTOWER_INSTANCE_ID'))
     bridge = await discoverBridge($)
     publish($)
     await $.command.register({ name: 'filetree', description: 'Show the file tree; args: [path] (no path = cwd)' })
@@ -1111,15 +1116,15 @@ export const register: Register = (on, options) => {
       await setActivities($, cur => cur.map(a => (a.state === 'running' ? { ...a, state: 'failed', label: `${a.kind} interrupted` } : a)))
       const cwd = await cwdOf($)
       if (!t.root || t.nodes.length === 0 || (follow && t.root !== cwd)) await reset($, cwd)
-      else if (isBridged()) await closeOwnPane($)
+      else if (inWatchtower) await closeOwnPane($)
       else if (!noDock) await $.ui.open({ id: PANE, title: `Files: ${t.root.split('/').pop() || t.root}` })
     })()
     return next(e)
   })
 
   on('command.run', { command: 'filetree' }, async ($, e) => {
-    if (bridge === undefined) bridge = await discoverBridge($)
-    if (isBridged()) {
+    if (inWatchtower && !bridge) bridge = await discoverBridge($)
+    if (inWatchtower) {
       await closeOwnPane($)
       panelToggles++
       publish($)
