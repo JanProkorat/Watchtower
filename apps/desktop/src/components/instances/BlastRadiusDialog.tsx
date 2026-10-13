@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import type { BlastDecision, BlastHold } from '@watchtower/shared/blastRadius.js';
 
@@ -10,18 +10,27 @@ interface Props {
 
 // Bidi controls and C0/C1 controls (except \n and \t) can disguise what a command does.
 // eslint-disable-next-line no-control-regex
-const HIDDEN_CHARS = /[‪-‮⁦-⁩‎‏\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
+const HIDDEN_CHARS = /[\u202A-\u202E\u2066-\u2069\u200E\u200F\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
 
 /** Replaces characters that can hide a command's real meaning with a visible marker. */
 export function visible(text: string): string {
-  return text.replace(HIDDEN_CHARS, '�');
+  return text.replace(HIDDEN_CHARS, '\uFFFD');
 }
+
+/** Proceed stays disabled this long after the popup appears, so a click already in flight cannot land on it. */
+const PROCEED_ARM_MS = 500;
 
 /** The blast-radius mod's hold, drawn over its pane: Claude waits until the user answers. */
 export function BlastRadiusDialog({ hold, decided, onDecide }: Props) {
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     cancelRef.current?.focus();
+  }, [hold.id]);
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    setArmed(false);
+    const t = setTimeout(() => setArmed(true), PROCEED_ARM_MS);
+    return () => clearTimeout(t);
   }, [hold.id]);
   const title = `⚠ Blast Radius · ${hold.riskLabel}`;
 
@@ -58,7 +67,7 @@ export function BlastRadiusDialog({ hold, decided, onDecide }: Props) {
         {hold.note && <Typography sx={{ fontSize: 12, fontStyle: 'italic', color: 'text.secondary', mt: 1 }}>{hold.note}</Typography>}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
           <Typography sx={{ fontSize: 12, color: 'text.secondary', flex: 1 }}>{decided ? 'Waiting for Claude…' : 'Claude is waiting on your answer'}</Typography>
-          <Button variant="outlined" color="warning" disabled={!!decided} onClick={() => onDecide('proceed')}>
+          <Button variant="outlined" color="warning" disabled={!!decided || !armed} onClick={() => armed && onDecide('proceed')}>
             Proceed
           </Button>
           <Button ref={cancelRef} variant="contained" disabled={!!decided} onClick={() => onDecide('cancel')}>

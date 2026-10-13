@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
 import { darkTheme } from '../../../apps/desktop/src/theme';
 import { BlastRadiusDialog, visible } from '../../../apps/desktop/src/components/instances/BlastRadiusDialog';
@@ -17,6 +17,13 @@ const renderIt = (decided: 'proceed' | 'cancel' | null = null, h = hold) => {
 };
 
 describe('BlastRadiusDialog', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('shows the risk, command, summary, paths and note', () => {
     renderIt();
     expect(screen.getByRole('dialog', { name: /Blast Radius · rm -rf/ })).toBeInTheDocument();
@@ -31,6 +38,9 @@ describe('BlastRadiusDialog', () => {
   it('Cancel has focus; Proceed, Cancel and Esc answer', () => {
     const onDecide = renderIt();
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Proceed' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
@@ -45,25 +55,37 @@ describe('BlastRadiusDialog', () => {
     expect(onDecide).not.toHaveBeenCalled();
   });
 
+  it('arms Proceed only after a beat; Cancel works at once', () => {
+    const onDecide = renderIt();
+    expect(screen.getByRole('button', { name: 'Proceed' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Proceed' }));
+    expect(onDecide).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Proceed' }));
+    expect(onDecide).toHaveBeenCalledWith('proceed');
+  });
+
   it('says when the command was shortened', () => {
     renderIt(null, { ...hold, commandTruncated: true });
     expect(screen.getByText('Command shortened — the full command is longer than shown.')).toBeInTheDocument();
   });
 
   it('shows hidden characters as a visible marker', () => {
-    renderIt(null, { ...hold, command: 'rm -rf ‮txt.exe', lines: ['a‮b'] });
-    expect(screen.getByRole('dialog').textContent).not.toContain('‮');
-    expect(screen.getByRole('dialog').textContent).toContain('�');
+    renderIt(null, { ...hold, command: 'rm -rf \u202Etxt.exe', lines: ['a\u202Eb'] });
+    expect(screen.getByRole('dialog').textContent).not.toContain('\u202E');
+    expect(screen.getByRole('dialog').textContent).toContain('\uFFFD');
   });
 });
 
 describe('visible', () => {
   it('replaces bidi and control characters but keeps newline and tab', () => {
-    const out = visible('rm -rf ‮txt.exe');
-    expect(out).toContain('�');
-    expect(out).not.toContain('‮');
+    const out = visible('rm -rf \u202Etxt.exe');
+    expect(out).toContain('\uFFFD');
+    expect(out).not.toContain('\u202E');
     expect(visible('a\nb')).toBe('a\nb');
     expect(visible('a\tb')).toBe('a\tb');
-    expect(visible('a\u0007b‏c\u0085d')).toBe('a�b�c�d');
+    expect(visible('a\u0007b\u200Fc\u0085d')).toBe('a\uFFFDb\uFFFDc\uFFFDd');
   });
 });

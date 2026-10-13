@@ -204,6 +204,8 @@ export function PaneCard({
           left: 0,
           right: rightInset,
           bottom: savvy.bottomInset,
+          // Keeps xterm's z-indexed layers below the blast-radius overlay.
+          isolation: 'isolate',
           ...(side.isOpen ? { '& > *': { borderBottomRightRadius: 0 } } : {}),
         }}
       >
