@@ -49,7 +49,7 @@ export function ChatView({ instanceId, cwd, onFocus }: Props) {
   return (
     <Box
       onMouseDown={onFocus}
-      sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', backgroundColor: p.bg, borderRadius: '12px', overflow: 'hidden', border: `1px solid ${p.border}` }}
+      sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', backgroundColor: p.bg, borderRadius: '0 0 12px 12px', overflow: 'hidden', border: `1px solid ${p.border}`, borderTop: 'none' }}
     >
       <Box
         ref={scrollRef}

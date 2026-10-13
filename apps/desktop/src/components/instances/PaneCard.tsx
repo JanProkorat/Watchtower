@@ -1,5 +1,6 @@
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -10,6 +11,8 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import { ColumnSlot } from './ColumnSlot.js';
 import { ChatView } from '../chat/ChatView.js';
+import { chatPalette } from '../chat/chatFormat.js';
+import { TERMINAL_BG } from '../terminalTheme';
 import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
 import { useSavvyChrome, SAVVY_GAP } from './savvy/useSavvyChrome.js';
 import { ATTENTION_AMBER } from '../../theme/glass.js';
@@ -33,13 +36,15 @@ interface Props {
   onNewInstance(kind: 'claude' | 'shell' | 'chat'): void;
 }
 
+/** Height of the pane's title bar; the card (terminal / chat / mod chrome) starts below it. */
+const BAR_H = 30;
+
 /**
- * One instance rendered as a floating rounded glass card (the terminal lives in
- * ColumnSlot). Replaces the old per-leaf SessionTabBar header: per-instance
- * controls now float as fading chrome buttons in the card's top-right (iPad
- * PaneTerminal language), and task assignment moves to a right-click menu on
- * the card. The chrome sits on the always-dark terminal, so it stays a
- * light-on-dark glass treatment in both app themes.
+ * One instance rendered as a floating rounded card: a title bar (attention badge,
+ * per-instance controls) on top of the terminal (ColumnSlot) or chat view. The
+ * bar is the card's top edge rather than an overlay, so the controls never cover
+ * what Claude Code or a mod draws in the terminal's corners. Task assignment
+ * lives in a right-click menu on the card.
  */
 export function PaneCard({
   instanceId,
@@ -64,6 +69,11 @@ export function PaneCard({
   // The savvy-progress mod's band + agents panel, drawn natively around the
   // terminal (the CLI can't draw the mod's SVG crabs). Empty unless the mod posts.
   const savvy = useSavvyChrome(instanceId, kind !== 'shell');
+  // The bar takes the fill and border of the card below it, so the two read as one.
+  const isDark = useTheme().palette.mode === 'dark';
+  const chat = chatPalette(isDark);
+  const cardBg = kind === 'chat' ? chat.bg : TERMINAL_BG;
+  const cardBorder = kind === 'chat' ? chat.border : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,18,24,0.10)';
 
   return (
     <Box
@@ -74,45 +84,50 @@ export function PaneCard({
         setCtxAnchor({ x: e.clientX, y: e.clientY });
       }}
     >
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: savvy.rightInset, bottom: savvy.bottomInset }}>
-        {kind === 'chat' ? (
-          <ChatView instanceId={instanceId} cwd={cwd} onFocus={onFocus} />
-        ) : (
-          <ColumnSlot instanceId={instanceId} onFocus={onFocus} />
-        )}
-
-        {/* Top-edge line, drawn as an overlay ABOVE the terminal (an inset shadow
-            on the slot would be hidden behind the xterm host). Amber + glowing
-            when the instance needs attention (shown even when unfocused so it's
-            easy to spot); otherwise the accent focus line. iPad language. */}
+      {/* Title bar: ⚠ badge left, controls right — brighter when the pane is focused. */}
+      <Box
+        onMouseDown={onFocus}
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: savvy.rightInset,
+          height: BAR_H,
+          boxSizing: 'border-box',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.5,
+          px: 0.75,
+          backgroundColor: cardBg,
+          border: `1px solid ${cardBorder}`,
+          borderBottomColor: kind === 'chat' ? chat.border : 'rgba(255,255,255,0.06)',
+          borderRadius: '12px 12px 0 0',
+        }}
+      >
+        {/* Line under the bar: amber + glowing when the instance needs attention
+            (shown even when unfocused so it's easy to spot); otherwise the
+            accent focus line. Replaces the bar's divider. */}
         {(focused || attention) && (
           <Box
             sx={{
               position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '3px',
+              bottom: -1,
+              left: -1,
+              right: -1,
+              height: '2px',
               backgroundColor: attention ? ATTENTION_AMBER : accent ?? '#818cf8',
               boxShadow: attention ? `0 0 10px ${ATTENTION_AMBER}` : 'none',
-              borderTopLeftRadius: '12px',
-              borderTopRightRadius: '12px',
-              zIndex: 7,
+              zIndex: 1,
               pointerEvents: 'none',
             }}
           />
         )}
-
         {/* Which instance needs attention — a glowing warning badge, matching the
             project tab's ⚠ marker. */}
         {attention && (
           <WarningRoundedIcon
             aria-label="needs your attention"
             sx={{
-              position: 'absolute',
-              top: 8,
-              left: 8,
-              zIndex: 7,
               fontSize: 18,
               color: ATTENTION_AMBER,
               filter: `drop-shadow(0 0 5px ${ATTENTION_AMBER}aa)`,
@@ -120,18 +135,14 @@ export function PaneCard({
             }}
           />
         )}
-
-        {/* Fading top-right chrome — brighter when the pane is focused. */}
         <Box
           sx={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
+            ml: 'auto',
             display: 'flex',
             gap: 0.5,
             opacity: focused ? 1 : 0.4,
             transition: 'opacity 120ms ease',
-            zIndex: 6,
+            ':hover': { opacity: 1 },
           }}
         >
           <ChromeButton title="New terminal to the right" onClick={() => onNewInstance('shell')}>
@@ -160,6 +171,15 @@ export function PaneCard({
             <CloseIcon sx={{ fontSize: 15 }} />
           </ChromeButton>
         </Box>
+      </Box>
+
+      <Box sx={{ position: 'absolute', top: BAR_H, left: 0, right: savvy.rightInset, bottom: savvy.bottomInset }}>
+        {kind === 'chat' ? (
+          <ChatView instanceId={instanceId} cwd={cwd} onFocus={onFocus} />
+        ) : (
+          <ColumnSlot instanceId={instanceId} onFocus={onFocus} />
+        )}
+
       </Box>
 
       {savvy.band && (
@@ -204,7 +224,7 @@ export function PaneCard({
   );
 }
 
-/** Small frosted glass control that floats on the (always-dark) terminal card. */
+/** Small frosted glass control in the pane's title bar; dark glass reads on both app themes. */
 function ChromeButton({ title, onClick, children }: { title: string; onClick(): void; children: ReactNode }) {
   return (
     <Tooltip title={title} placement="bottom-end">
