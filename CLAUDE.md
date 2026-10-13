@@ -253,14 +253,41 @@ the row (only touches from the last 4 s, `useFreshFlash`). Shapes in
 `packages/shared/src/fileTree.ts` — **change the mod's body and
 `parseFileTreeActivity` together.**
 
+**Replay tab.** `plugins/replay-theater/` (vendored, patched) POSTs the last
+turn's steps to `/mods/replay-theater` → `orchestrator/services/replayStore.ts`
+→ push `replay`; `replay:get` returns the cached turn. `ReplayTab` steps through
+it; the tab label reads "Replay · N" while N steps are unseen
+(`useUnseenSteps`), and `/replay` bumps `panelToggles` to open the tab. Caps in
+mod and parser: 50 steps, 200 lines per step, 500 chars per line.
+
+**Blast-radius popup.** `plugins/blast-radius/` (vendored, patched) holds a
+risky Bash command and POSTs the hold to `/mods/blast-radius` →
+`orchestrator/services/blastRadiusStore.ts` → push `blastRadius`
+(`blastRadius:get|decide`). The mod polls the authenticated
+`GET /mods/blast-radius/decision?id=` in `hookListener.ts` until the user
+answers. While a hold is pending the store flags the instance as waiting
+(`notificationHook`), re-asserts that on every poll (a click into the pane
+resets it), and releases (`userPromptSubmit`) only for the pending hold, so a
+stray post can't clear Claude's own permission prompt. Holds expire 11 min after
+receipt. `BlastRadiusDialog` arms Proceed after 500 ms, renders text through
+`visible()` (bidi/control characters made visible) and shows a notice when
+`commandTruncated`; outcomes surface as toasts via `outcomeToast`. Mod safety
+rules: only an explicit `proceed` for the pending id runs the command;
+`finalDecision` makes an interrupt win over any answer; bridge calls never throw
+and time out after 2 s. Everything else (cancel, 10 min timeout, error) denies.
+
+**Change together:** `plugins/blast-radius/hooks/blast-radius.mjs` ↔
+`packages/shared/src/blastRadius.ts`; `plugins/replay-theater/hooks/replay-theater.mjs`
+↔ `packages/shared/src/replay.ts`.
+
 A new `/mods/<name>` bridge must also be added to `KNOWN_MODS` in
 `orchestrator/hookListener.ts`, or the route rejects it.
 
 Install: set `CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` to the
-absolute, `:`-separated plugin folders (e.g.
-`/Users/…/Watchtower/plugins/savvy-progress:/Users/…/Watchtower/plugins/filetree`) and
-disable the upstream `filetree@claude-code-filetree` plugin so the two don't
-both draw.
+absolute, `:`-separated plugin folders (all four:
+`/Users/…/Watchtower/plugins/savvy-progress:…/plugins/filetree:…/plugins/blast-radius:…/plugins/replay-theater`)
+and disable the upstream `@claude-code-playground-mods` plugins (and
+`filetree@claude-code-filetree`) so the two don't both draw.
 
 ## Things to NOT do
 
