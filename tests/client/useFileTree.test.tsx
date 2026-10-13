@@ -79,6 +79,20 @@ describe('useFileTree', () => {
     expect(calls.filter((c) => c.kind === 'fileTree:list').map((c) => (c.payload as { dir: string }).dir)).toEqual(['']);
   });
 
+  it('keeps expanded folders across a disable/enable cycle and re-lists them', async () => {
+    const { result, rerender } = renderHook(({ on }) => useFileTree('i1', on), { initialProps: { on: true } });
+    await waitFor(() => expect(result.current.listings.get('')).toBeDefined());
+    act(() => result.current.toggle('src'));
+    await waitFor(() => expect(result.current.listings.get('src')).toBeDefined());
+    rerender({ on: false });
+    calls.length = 0;
+    rerender({ on: true });
+    expect(result.current.expanded.has('src')).toBe(true);
+    await waitFor(() => expect(calls.filter((c) => c.kind === 'fileTree:list').map((c) => (c.payload as { dir: string }).dir).sort()).toEqual(['', 'src']));
+    expect(calls.filter((c) => c.kind === 'fileTree:list').every((c) => c.opts?.silent)).toBe(true);
+    expect(calls.map((c) => c.kind)).toEqual(expect.arrayContaining(['fileTree:watch', 'fileTree:git']));
+  });
+
   it('a missing folder becomes an inline error, not a retry loop', async () => {
     listings[''] = undefined as unknown as FileListResult;
     const { result } = renderHook(() => useFileTree('i1', true));

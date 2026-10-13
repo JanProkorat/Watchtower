@@ -26,6 +26,7 @@ export function useFileTree(instanceId: string, enabled: boolean): FileTreeState
   const [error, setError] = useState<string | null>(null);
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
+  const lastInstance = useRef<string | null>(null);
 
   const load = useCallback(
     async (dir: string, silent: boolean) => {
@@ -45,13 +46,17 @@ export function useFileTree(instanceId: string, enabled: boolean): FileTreeState
 
   useEffect(() => {
     if (!enabled) return;
-    setListings(new Map());
-    setExpanded(new Set());
-    setGit(null);
+    // Expanded folders survive a tab switch; only another instance starts over.
+    if (lastInstance.current !== instanceId) {
+      lastInstance.current = instanceId;
+      setListings(new Map());
+      setExpanded(new Set());
+      setGit(null);
+    }
     setError(null);
     void invoke('fileTree:watch', { instanceId }).catch(() => {});
     // Silent: a root failure shows as the tab's inline note, so no toast too.
-    void load('', true);
+    for (const dir of ['', ...expandedRef.current]) void load(dir, true);
     loadGit();
     const off = window.watchtower.on('fileTreeChanged', (p) => {
       if (p.instanceId !== instanceId) return;
