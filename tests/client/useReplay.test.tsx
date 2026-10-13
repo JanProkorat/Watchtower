@@ -42,6 +42,11 @@ describe('useReplay', () => {
 });
 
 describe('useUnseenSteps', () => {
+  it('counts a turn whose at is 0 as unseen', () => {
+    const { result } = renderHook(() => useUnseenSteps({ at: 0, steps: [step, step] }, false));
+    expect(result.current).toBe(2);
+  });
+
   it('counts an unseen turn until the tab shows it', () => {
     const t1 = { at: 1, steps: [step, step, step] };
     const { result, rerender } = renderHook(({ turn, showing }) => useUnseenSteps(turn, showing), { initialProps: { turn: t1 as ReplayTurn | null, showing: false } });

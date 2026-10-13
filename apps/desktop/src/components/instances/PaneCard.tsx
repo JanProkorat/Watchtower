@@ -19,6 +19,8 @@ import { SavvyAgentsPanel } from './savvy/SavvyAgentsPanel.js';
 import { SidePanel } from './side/SidePanel.js';
 import { sideTabsFor, useSidePanel, type SideTab } from './side/useSidePanel.js';
 import { FilesTab } from './side/FilesTab.js';
+import { ReplayTab } from './side/ReplayTab.js';
+import { useReplay, useUnseenSteps } from '../../state/useReplay.js';
 import { BlastRadiusDialog } from './BlastRadiusDialog.js';
 import { useBlastRadius } from '../../state/useBlastRadius.js';
 import { useFileTree } from '../../state/useFileTree.js';
@@ -81,12 +83,14 @@ export function PaneCard({
   const savvy = useSavvyChrome(instanceId, kind !== 'shell', () => sideToggle.current('agents'));
   const available = sideTabsFor(kind, cwd);
   const activity = useFileTreeActivity(instanceId);
+  const replay = useReplay(instanceId);
   const side = useSidePanel({
     available,
     agentsAutoKey: savvy.agentsAutoKey,
-    toggles: { agents: savvy.panelToggles, files: activity?.snapshot.panelToggles },
+    toggles: { agents: savvy.panelToggles, files: activity?.snapshot.panelToggles, replay: replay?.snapshot.panelToggles },
   });
   sideToggle.current = side.toggle;
+  const unseen = useUnseenSteps(replay?.snapshot.turn, side.isOpen && side.tab === 'replay');
   // The tree loads and watches only while its tab is showing.
   const fileTree = useFileTree(instanceId, side.isOpen && side.tab === 'files');
   const flash = useFreshFlash(activity, cwd);
@@ -241,6 +245,7 @@ export function PaneCard({
             tabs={side.available}
             tab={side.tab}
             width={side.width}
+            counts={{ replay: unseen }}
             onSelect={side.select}
             onClose={side.close}
             onResize={side.setWidth}
@@ -252,6 +257,7 @@ export function PaneCard({
                 <Typography sx={{ fontSize: 12.5, color: 'text.secondary', px: 1.5, py: 1 }}>No subagents yet.</Typography>
               ))}
             {side.tab === 'files' && <FilesTab tree={fileTree} flash={flash} />}
+            {side.tab === 'replay' && <ReplayTab turn={replay?.snapshot.turn ?? null} />}
           </SidePanel>
         </Box>
       )}

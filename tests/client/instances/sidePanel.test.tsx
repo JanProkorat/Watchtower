@@ -33,10 +33,10 @@ const opts = (over: Partial<SidePanelOptions> = {}): SidePanelOptions => ({
 
 describe('sideTabsFor', () => {
   it('offers Agents wherever Claude runs, even before any subagent, and Files wherever there is a folder', () => {
-    expect(sideTabsFor('claude', '/repo')).toEqual(['agents', 'files']);
-    expect(sideTabsFor('chat', '/repo')).toEqual(['agents', 'files']);
+    expect(sideTabsFor('claude', '/repo')).toEqual(['agents', 'files', 'replay']);
+    expect(sideTabsFor('chat', '/repo')).toEqual(['agents', 'files', 'replay']);
     expect(sideTabsFor('shell', '/repo')).toEqual(['files']);
-    expect(sideTabsFor('claude', '')).toEqual(['agents']);
+    expect(sideTabsFor('claude', '')).toEqual(['agents', 'replay']);
   });
 });
 
@@ -87,6 +87,16 @@ describe('useSidePanel', () => {
     expect(result.current.tab).toBe('agents'); // switched, not closed
     rerender(opts({ toggles: { agents: 2, files: 1 } }));
     expect(result.current.isOpen).toBe(false);
+  });
+
+  it('a replay toggle rise opens the Replay tab', () => {
+    const all = ['agents', 'files', 'replay'] as const;
+    const { result, rerender } = renderHook((o: SidePanelOptions) => useSidePanel(o), {
+      initialProps: opts({ available: all, toggles: { replay: 0 } }),
+    });
+    rerender(opts({ available: all, toggles: { replay: 1 } }));
+    expect(result.current.isOpen).toBe(true);
+    expect(result.current.tab).toBe('replay');
   });
 
   it('a counter drop (mod reload) or first sighting does not toggle', () => {
@@ -153,6 +163,16 @@ describe('SidePanel', () => {
     expect(screen.getByRole('tab', { name: 'Agents' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: 'Files' })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByText('body')).toBeInTheDocument();
+  });
+
+  it('appends a positive count to a tab label', () => {
+    renderPanel({ tabs: ['agents', 'files', 'replay'], counts: { replay: 3 } });
+    expect(screen.getByRole('tab', { name: 'Replay · 3' })).toBeInTheDocument();
+  });
+
+  it('shows no count when it is 0', () => {
+    renderPanel({ tabs: ['agents', 'files', 'replay'], counts: { replay: 0 } });
+    expect(screen.getByRole('tab', { name: 'Replay' })).toBeInTheDocument();
   });
 
   it('selects a tab and closes the panel', () => {

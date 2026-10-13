@@ -26,7 +26,7 @@ export function useReplay(instanceId: string): ReplayState | null {
 
 /** Steps of a turn the user hasn't looked at yet; 0 once the Replay tab has shown it. */
 export function useUnseenSteps(turn: ReplayTurn | null | undefined, isShowing: boolean): number {
-  const [seenAt, setSeenAt] = useState(0);
+  const [seenAt, setSeenAt] = useState(-Infinity);
   useEffect(() => {
     if (isShowing && turn) setSeenAt(turn.at);
   }, [isShowing, turn?.at]);

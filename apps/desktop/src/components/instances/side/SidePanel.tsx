@@ -3,12 +3,14 @@ import { Box, ButtonBase, IconButton, Tooltip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import type { SideTab } from './useSidePanel.js';
 
-export const SIDE_TAB_LABEL: Record<SideTab, string> = { agents: 'Agents', files: 'Files' };
+export const SIDE_TAB_LABEL: Record<SideTab, string> = { agents: 'Agents', files: 'Files', replay: 'Replay' };
 
 interface Props {
   tabs: readonly SideTab[];
   tab: SideTab;
   width: number;
+  /** Per-tab badge; shown after the label when above 0. */
+  counts?: Partial<Record<SideTab, number>>;
   onSelect(tab: SideTab): void;
   onClose(): void;
   onResize(width: number): void;
@@ -16,7 +18,7 @@ interface Props {
 }
 
 /** The right-side panel's chrome: tab strip, close button and resize edge. PaneCard draws the frame. */
-export function SidePanel({ tabs, tab, width, onSelect, onClose, onResize, children }: Props) {
+export function SidePanel({ tabs, tab, width, counts, onSelect, onClose, onResize, children }: Props) {
   return (
     <Box sx={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <ResizeEdge width={width} onResize={onResize} />
@@ -39,6 +41,7 @@ export function SidePanel({ tabs, tab, width, onSelect, onClose, onResize, child
             }}
           >
             {SIDE_TAB_LABEL[t]}
+            {counts?.[t] ? ` · ${counts[t]}` : ''}
           </ButtonBase>
         ))}
         <Box sx={{ flex: 1 }} />

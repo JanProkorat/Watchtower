@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { PANEL_W, clampPanelWidth } from '../savvy/SavvyAgentsPanel.js';
 
-export type SideTab = 'agents' | 'files';
+export type SideTab = 'agents' | 'files' | 'replay';
 
 export interface SidePanelOptions {
   /** Tabs with something to show, in strip order. */
@@ -26,9 +26,10 @@ export interface SidePanel {
 
 const WIDTH_KEY = 'watchtower.savvyPanelWidth';
 
-/** A pane's tabs: Agents wherever Claude runs (empty until subagents start), Files wherever there is a folder. */
+/** A pane's tabs: Agents and Replay wherever Claude runs (empty until their mods post), Files wherever there is a folder. */
 export function sideTabsFor(kind: 'claude' | 'shell' | 'chat', cwd: string): SideTab[] {
-  return [...(kind !== 'shell' ? (['agents'] as const) : []), ...(cwd ? (['files'] as const) : [])];
+  const claude = kind !== 'shell';
+  return [...(claude ? (['agents'] as const) : []), ...(cwd ? (['files'] as const) : []), ...(claude ? (['replay'] as const) : [])];
 }
 
 /** One pane's right-side panel: which tab shows, whether it is open, and how wide. */
@@ -63,6 +64,7 @@ export function useSidePanel({ available, agentsAutoKey, toggles }: SidePanelOpt
 
   useToggleRise(toggles.agents, () => toggle('agents'));
   useToggleRise(toggles.files, () => toggle('files'));
+  useToggleRise(toggles.replay, () => toggle('replay'));
 
   const setWidth = (w: number) => {
     const next = clampPanelWidth(w);
