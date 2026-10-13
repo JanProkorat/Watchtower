@@ -92,6 +92,11 @@ async function pollWatchtower($, hold) {
   }
 }
 
+/** The decision to act on: an aborted turn is always "interrupted", whatever the answer. */
+export function finalDecision(answer, aborted) {
+  return aborted && answer !== null && answer !== undefined ? "interrupted" : answer;
+}
+
 // The call being held, or null. One at a time: Bash calls in a turn run in order.
 let held = null;
 
@@ -160,13 +165,9 @@ export function register(on) {
           break;
         }
         if (wire) {
-          const answer = await pollWatchtower($, wire);
+          const answer = finalDecision(await pollWatchtower($, wire), next.signal.aborted);
           if (answer) {
             mine.decision = answer;
-            break;
-          }
-          if (next.signal.aborted) {
-            mine.decision = "interrupted";
             break;
           }
         }
@@ -175,6 +176,8 @@ export function register(on) {
     } catch {
       mine.decision = "error"; // anything unexpected refuses the command
     } finally {
+      // An interrupt beats any answer that arrived with it, a late proceed included.
+      mine.decision = finalDecision(mine.decision, next.signal.aborted);
       decision = mine.decision;
       if (wire) {
         try {
@@ -198,7 +201,7 @@ export function register(on) {
       $.ui.invalidate("ui.render");
     }
 
-    if (decision === "proceed") {
+    if (decision === "proceed" && !next.signal.aborted) {
       if (!wire) {
         $.ui.toast("Blast Radius: running it"); // Watchtower shows its own toast
       }

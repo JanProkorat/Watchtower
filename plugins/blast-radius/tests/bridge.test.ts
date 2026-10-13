@@ -1,5 +1,7 @@
 import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
+// @ts-expect-error untyped .mjs hooks module
+import { finalDecision } from '../hooks/blast-radius.mjs'
 
 // The Watchtower bridge: inside a Watchtower terminal the hold is posted to the
 // listener named in listener.json and the answer is polled; elsewhere it is a pane.
@@ -191,4 +193,13 @@ test('a non-JSON decision body never runs the command', async ($, on) => {
   const r = (await $.tool.call(rm)) as { deny?: string }
   expect(r.deny).toContain('no answer within 10 minutes')
   expect(w.calls.length).toBe(0)
+})
+
+// The kit has no way to abort a pending $.tool.call, so the rule is tested on the helper.
+test('an interrupt always beats a late proceed', async () => {
+  expect(finalDecision('proceed', true)).toBe('interrupted')
+  expect(finalDecision('cancel', true)).toBe('interrupted')
+  expect(finalDecision(null, true)).toBe(null)
+  expect(finalDecision('proceed', false)).toBe('proceed')
+  expect(finalDecision('cancel', false)).toBe('cancel')
 })
