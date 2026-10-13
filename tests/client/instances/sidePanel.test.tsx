@@ -97,6 +97,19 @@ describe('useSidePanel', () => {
     expect(result.current.isOpen).toBe(false);
   });
 
+  it('ignores a request for an unavailable tab and never jumps to it later', () => {
+    const { result, rerender } = renderHook((o: SidePanelOptions) => useSidePanel(o), { initialProps: opts({ available: ['files'] }) });
+    act(() => result.current.toggle('agents'));
+    expect(result.current.isOpen).toBe(false);
+    act(() => result.current.open('agents'));
+    expect(result.current.isOpen).toBe(false);
+    act(() => result.current.open());
+    expect(result.current.tab).toBe('files');
+    // Agents appears later: the panel stays on the tab the user is on.
+    rerender(opts({ available: ['agents', 'files'] }));
+    expect(result.current.tab).toBe('files');
+  });
+
   it('clamps and remembers the width', () => {
     const { result } = renderHook(() => useSidePanel(opts()));
     act(() => result.current.setWidth(5000));

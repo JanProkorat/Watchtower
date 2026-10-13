@@ -36,6 +36,8 @@ export function useSidePanel({ available, agentsAutoKey, toggles }: SidePanelOpt
   const isOpen = isOpenRaw && tab !== null;
 
   const open = (t?: SideTab) => {
+    // A tab with nothing to show is ignored, so it can't be picked behind the user's back.
+    if (t && !available.includes(t)) return;
     const next = t ?? (picked && available.includes(picked) ? picked : available[0]);
     if (!next) return;
     setPicked(next);
