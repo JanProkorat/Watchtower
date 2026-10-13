@@ -213,7 +213,9 @@ natively, like the Claude desktop app's chat. No pty, no xterm.
 - **Mods** — mod *hooks* run under the SDK; mod *UI* (panes, bands, toasts,
   status line) does not draw, since the SDK has no surface. A mod whose UI
   matters needs a bridge like savvy-progress's (below); otherwise use a
-  `claude` terminal instance.
+  `claude` terminal instance. The bridged mods' UI does draw (savvy Agents
+  tab, Files tab, blast-radius popup, Replay tab), because Watchtower draws it
+  from the mods' posts.
 
 ## savvy-progress mod bridge (`plugins/savvy-progress/`)
 
