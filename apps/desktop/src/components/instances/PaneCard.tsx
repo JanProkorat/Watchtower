@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -20,8 +20,7 @@ import { SidePanel } from './side/SidePanel.js';
 import { useSidePanel, type SideTab } from './side/useSidePanel.js';
 import { FilesTab } from './side/FilesTab.js';
 import { useFileTree } from '../../state/useFileTree.js';
-import { useFileTreeActivity } from '../../state/useFileTreeActivity.js';
-import { flashMap } from '@watchtower/shared/fileTree.js';
+import { useFileTreeActivity, useFreshFlash } from '../../state/useFileTreeActivity.js';
 import { ATTENTION_AMBER } from '../../theme/glass.js';
 
 interface Props {
@@ -87,7 +86,7 @@ export function PaneCard({
   sideToggle.current = side.toggle;
   // The tree loads and watches only while its tab is showing.
   const fileTree = useFileTree(instanceId, side.isOpen && side.tab === 'files');
-  const flash = useMemo(() => flashMap(activity?.snapshot ?? null, cwd), [activity, cwd]);
+  const flash = useFreshFlash(activity, cwd);
   const rightInset = side.isOpen ? side.width : 0;
   // The bar takes the fill and border of the card below it, so the two read as one.
   const isDark = useTheme().palette.mode === 'dark';
