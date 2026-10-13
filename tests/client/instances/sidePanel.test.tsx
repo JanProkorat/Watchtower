@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeAll } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, render, screen, fireEvent } from '@testing-library/react';
+import { ThemeProvider } from '@mui/material';
+import { darkTheme } from '../../../apps/desktop/src/theme';
+import { SidePanel } from '../../../apps/desktop/src/components/instances/side/SidePanel';
 import { useSidePanel, type SidePanelOptions } from '../../../apps/desktop/src/components/instances/side/useSidePanel';
 
 beforeAll(() => {
@@ -11,6 +14,14 @@ beforeAll(() => {
     setItem: (k, v) => void store.set(k, String(v)),
     removeItem: (k) => void store.delete(k),
   };
+  // jsdom has no PointerEvent; the resize edge reads clientX from one.
+  globalThis.PointerEvent ??= class extends MouseEvent {
+    pointerId: number;
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init);
+      this.pointerId = init.pointerId ?? 0;
+    }
+  } as unknown as typeof PointerEvent;
 });
 
 const opts = (over: Partial<SidePanelOptions> = {}): SidePanelOptions => ({
@@ -91,5 +102,52 @@ describe('useSidePanel', () => {
     act(() => result.current.setWidth(5000));
     expect(result.current.width).toBe(720);
     expect(localStorage.getItem('watchtower.savvyPanelWidth')).toBe('720');
+  });
+});
+
+describe('SidePanel', () => {
+  const renderPanel = (over: Partial<Parameters<typeof SidePanel>[0]> = {}) => {
+    const calls = { select: [] as string[], close: 0, resize: [] as number[] };
+    render(
+      <ThemeProvider theme={darkTheme}>
+        <SidePanel
+          tabs={['agents', 'files']}
+          tab="agents"
+          width={340}
+          onSelect={(t) => calls.select.push(t)}
+          onClose={() => calls.close++}
+          onResize={(w) => calls.resize.push(w)}
+          {...over}
+        >
+          <div>body</div>
+        </SidePanel>
+      </ThemeProvider>,
+    );
+    return calls;
+  };
+
+  it('shows a tab per available tab and marks the active one', () => {
+    renderPanel();
+    expect(screen.getByRole('tab', { name: 'Agents' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Files' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByText('body')).toBeInTheDocument();
+  });
+
+  it('selects a tab and closes the panel', () => {
+    const calls = renderPanel();
+    fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
+    fireEvent.click(screen.getByLabelText('Hide side panel'));
+    expect(calls.select).toEqual(['files']);
+    expect(calls.close).toBe(1);
+  });
+
+  it('dragging the left edge asks for a wider panel', () => {
+    const calls = renderPanel();
+    const edge = screen.getByLabelText('Resize side panel');
+    edge.setPointerCapture = () => {};
+    fireEvent.pointerDown(edge, { clientX: 500, pointerId: 1 });
+    fireEvent.pointerMove(edge, { clientX: 400, pointerId: 1 });
+    fireEvent.pointerUp(edge, { pointerId: 1 });
+    expect(calls.resize).toEqual([440]);
   });
 });

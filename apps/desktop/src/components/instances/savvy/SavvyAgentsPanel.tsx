@@ -1,7 +1,6 @@
-import { useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Box, ButtonBase, IconButton, Tooltip, Typography } from '@mui/material';
+import { useState } from 'react';
+import { Box, ButtonBase, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import CloseIcon from '@mui/icons-material/Close';
 import type { SavvyProgressSnapshot } from '@watchtower/shared/savvyProgress.js';
 import {
   AGENT_ROW_H,
@@ -33,19 +32,14 @@ interface Props {
   /** "Now" on the mod's clock (renderer time minus the measured skew). */
   at: number;
   width: number;
-  /** Called while the left edge is dragged, with the width it asks for. */
-  onResize(width: number): void;
-  onClose(): void;
 }
 
 /**
  * The savvy-progress mod's agents panel, drawn natively: the same SVG rows the
- * mod draws on Claude Code's desktop surface (crabs and all), laid out the way
- * its `Pane` lays them out. Each row is an `<img>` so its `<style>` stays out of
- * the app's CSS and its animations run on the compositor. The frame (fill,
- * border) comes from PaneCard, so the panel reads as part of the instance card.
+ * mod draws on Claude Code's desktop surface, laid out the way its `Pane` lays
+ * them out. Agents tab body; SidePanel draws the chrome.
  */
-export function SavvyAgentsPanel({ snapshot, at, width, onResize, onClose }: Props) {
+export function SavvyAgentsPanel({ snapshot, at, width }: Props) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const ctx: DrawCtx = { lang: snapshot.lang, dark: isDark };
@@ -64,16 +58,9 @@ export function SavvyAgentsPanel({ snapshot, at, width, onResize, onClose }: Pro
   const drawW = width - PAD * 2;
 
   return (
-    <Box sx={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <ResizeEdge width={width} onResize={onResize} />
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: `${PAD}px`, pt: 1, pb: 0.5 }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{s.pane}</Typography>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: `${PAD}px`, pb: 0.5 }}>
         <TextButton onClick={() => setIsCompact((v) => !v)}>{isCompact ? s.expand : s.collapse}</TextButton>
-        <Tooltip title="Hide panel">
-          <IconButton aria-label="Hide agents panel" size="small" onClick={onClose} sx={{ width: 22, height: 22 }}>
-            <CloseIcon sx={{ fontSize: 14 }} />
-          </IconButton>
-        </Tooltip>
       </Box>
 
       <Box sx={{ flex: 1, overflowY: 'auto', px: `${PAD}px`, pb: `${PAD}px` }}>
@@ -132,52 +119,6 @@ export function SavvyAgentsPanel({ snapshot, at, width, onResize, onClose }: Pro
 
 function Row({ source, width, height, alt }: { source: string; width: number; height: number; alt: string }) {
   return <Box component="img" src={svgDataUri(source)} alt={alt} width={width} height={height} sx={{ display: 'block' }} />;
-}
-
-/** The panel's left edge: drag it to change the width. */
-function ResizeEdge({ width, onResize }: { width: number; onResize(width: number): void }) {
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const el = e.currentTarget;
-    el.setPointerCapture(e.pointerId);
-    const move = (ev: PointerEvent) => onResize(width + (startX - ev.clientX));
-    const up = () => {
-      el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerup', up);
-    };
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', up);
-  };
-  return (
-    <Box
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize agents panel"
-      onPointerDown={onPointerDown}
-      sx={{
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: -4,
-        width: 8,
-        zIndex: 2,
-        cursor: 'col-resize',
-        ':hover::after': { opacity: 1 },
-        '::after': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: 3,
-          width: 2,
-          backgroundColor: 'primary.main',
-          opacity: 0,
-          transition: 'opacity 120ms ease',
-        },
-      }}
-    />
-  );
 }
 
 function Section({ children }: { children: string }) {
