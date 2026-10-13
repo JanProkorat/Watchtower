@@ -1,5 +1,5 @@
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
-import { Box, Divider, IconButton, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
+import { Badge, Box, Divider, IconButton, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -19,6 +19,7 @@ import { SavvyAgentsPanel } from './savvy/SavvyAgentsPanel.js';
 import { SidePanel } from './side/SidePanel.js';
 import { sideTabsFor, useSidePanel, type SideTab } from './side/useSidePanel.js';
 import { FilesTab } from './side/FilesTab.js';
+import { sidePanelButtonTitle } from './side/sidePanelButtonTitle.js';
 import { ReplayTab } from './side/ReplayTab.js';
 import { useReplay, useUnseenSteps } from '../../state/useReplay.js';
 import { BlastRadiusDialog } from './BlastRadiusDialog.js';
@@ -181,8 +182,10 @@ export function PaneCard({
             <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />
           </ChromeButton>
           {!side.isOpen && side.available.length > 0 && (
-            <ChromeButton title="Show side panel" onClick={() => side.open()}>
-              <ViewSidebarOutlinedIcon sx={{ fontSize: 15 }} />
+            <ChromeButton title={sidePanelButtonTitle(unseen)} onClick={() => side.open()}>
+              <Badge badgeContent={unseen} color="primary" max={99} sx={{ '& .MuiBadge-badge': { fontSize: 9, height: 14, minWidth: 14, padding: '0 3px', top: -2, right: -2 } }}>
+                <ViewSidebarOutlinedIcon sx={{ fontSize: 15 }} />
+              </Badge>
             </ChromeButton>
           )}
           {kind === 'shell' && status === 'crashed' && onRestart && (
