@@ -34,6 +34,7 @@ export interface BootstrapOptions {
   onHookEvent?: (event: string, body: unknown, instanceId: string) => Promise<void>;
   onStatusline?: (body: unknown, instanceId: string) => Promise<void> | void;
   onModState?: (plugin: string, body: unknown, instanceId: string) => Promise<void> | void;
+  onModDecision?: (plugin: string, holdId: string, instanceId: string) => unknown | Promise<unknown>;
   /**
    * Override TimeTracker migration behaviour. Pass `{ skip: true }` to bypass
    * entirely (tests do this unless explicitly exercising the migration path).
@@ -188,6 +189,7 @@ export async function bootstrap(opts: BootstrapOptions): Promise<BootstrapHandle
     },
     onStatusline: opts.onStatusline,
     onModState: opts.onModState,
+    onModDecision: opts.onModDecision,
   });
 
   writeListenerSidecar(path.join(opts.supportDir, 'listener.json'), {

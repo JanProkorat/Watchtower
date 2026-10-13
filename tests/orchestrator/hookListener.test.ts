@@ -201,3 +201,40 @@ describe('hookListener /mods/:plugin', () => {
     expect(mods).toHaveLength(1);
   });
 });
+
+describe('GET /mods/:plugin/decision', () => {
+  let handle: HookListenerHandle;
+  const asked: { plugin: string; id: string; instanceId: string }[] = [];
+  beforeAll(async () => {
+    handle = await startHookListener({
+      token: 'test-token',
+      portRange: [17441, 17450],
+      onEvent: async () => {},
+      onModDecision: (plugin, id, instanceId) => {
+        asked.push({ plugin, id, instanceId });
+        return id === 'h1' ? 'proceed' : id === 'h2' ? null : undefined;
+      },
+    });
+  });
+  afterAll(async () => {
+    await handle.stop();
+  });
+
+  const get = (path: string, headers: Record<string, string>) => fetch(`http://127.0.0.1:${handle.port}${path}`, { headers });
+  const auth = { authorization: 'Bearer test-token', 'x-watchtower-instance': 'inst-1' };
+
+  it('returns the recorded decision, null while waiting, 404 for an unknown hold', async () => {
+    const a = await get('/mods/blast-radius/decision?id=h1', auth);
+    expect(a.status).toBe(200);
+    expect(await a.json()).toEqual({ decision: 'proceed' });
+    expect(await (await get('/mods/blast-radius/decision?id=h2', auth)).json()).toEqual({ decision: null });
+    expect((await get('/mods/blast-radius/decision?id=nope', auth)).status).toBe(404);
+    expect(asked[0]).toEqual({ plugin: 'blast-radius', id: 'h1', instanceId: 'inst-1' });
+  });
+
+  it('needs the token, a known mod and the instance header', async () => {
+    expect((await get('/mods/blast-radius/decision?id=h1', { 'x-watchtower-instance': 'inst-1' })).status).toBe(401);
+    expect((await get('/mods/other/decision?id=h1', auth)).status).toBe(404);
+    expect((await get('/mods/blast-radius/decision?id=h1', { authorization: 'Bearer test-token' })).status).toBe(400);
+  });
+});
