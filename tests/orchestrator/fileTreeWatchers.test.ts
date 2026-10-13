@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { FileTreeWatchers, type WatchFn } from '../../orchestrator/services/fileTreeWatchers.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { EventEmitter } from 'node:events';
+import { FileTreeWatchers, nodeWatch, type WatchFn } from '../../orchestrator/services/fileTreeWatchers.js';
 
 let emitters: Map<string, (f: string | null) => void>;
 let closed: string[];
@@ -68,5 +72,31 @@ describe('FileTreeWatchers', () => {
     const w = new FileTreeWatchers(() => { throw new Error('EMFILE'); }, () => {}, 300);
     expect(() => w.watch('/repo', 'a')).not.toThrow();
     expect(() => w.unwatch('a')).not.toThrow();
+  });
+});
+
+describe('FileTreeWatchers resilience', () => {
+  it('a throwing onChange for one pane still notifies the others', () => {
+    const changed: string[] = [];
+    const w = new FileTreeWatchers(fakeWatch, (id) => {
+      if (id === 'a') throw new Error('listener failed');
+      changed.push(id);
+    }, 300);
+    w.watch('/repo', 'a');
+    w.watch('/repo', 'b');
+    emitters.get('/repo')?.('x');
+    expect(() => vi.advanceTimersByTime(300)).not.toThrow();
+    expect(changed).toEqual(['b']);
+  });
+});
+
+describe('nodeWatch', () => {
+  it('survives an error event', () => {
+    vi.useRealTimers();
+    const dir = mkdtempSync(join(tmpdir(), 'ftw-'));
+    const w = nodeWatch(dir, () => {});
+    expect(() => (w as unknown as EventEmitter).emit('error', new Error('boom'))).not.toThrow();
+    w.close();
+    rmSync(dir, { recursive: true });
   });
 });

@@ -3,7 +3,12 @@ import { watch } from 'node:fs';
 export type WatchFn = (dir: string, onEvent: (filename: string | null) => void) => { close(): void };
 
 /** Recursive fs.watch; macOS supports `recursive` natively. */
-export const nodeWatch: WatchFn = (dir, onEvent) => watch(dir, { recursive: true }, (_ev, filename) => onEvent(filename ? String(filename) : null));
+export const nodeWatch: WatchFn = (dir, onEvent) => {
+  const w = watch(dir, { recursive: true }, (_ev, filename) => onEvent(filename ? String(filename) : null));
+  // An unhandled 'error' (e.g. folder deleted) would crash the orchestrator process.
+  w.on('error', () => w.close());
+  return w;
+};
 
 interface Entry {
   close(): void;
@@ -59,7 +64,13 @@ export class FileTreeWatchers {
     if (entry.timer) clearTimeout(entry.timer);
     entry.timer = setTimeout(() => {
       entry.timer = null;
-      for (const id of entry.ids) this.onChange(id);
+      for (const id of entry.ids) {
+        try {
+          this.onChange(id);
+        } catch {
+          // One failing listener must not escape the timer or skip the other panes.
+        }
+      }
     }, this.debounceMs);
   }
 }
