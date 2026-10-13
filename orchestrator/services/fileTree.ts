@@ -122,6 +122,12 @@ export async function readGit(root: string): Promise<FileTreeGit> {
   }
   // No commits yet: there is no HEAD to diff against.
   const numstat = parseNumstat(await runGit(root, ['diff', '--numstat', '-z', 'HEAD']).catch(() => ''));
-  const files: GitFile[] = [...status.files].map(([p, st]) => ({ path: p, status: st, ...(numstat.get(p) ?? { added: 0, deleted: 0 }) }));
+  // Git prints repo-root-relative paths; keep only those under the cwd and make them cwd-relative.
+  const prefix = (await runGit(root, ['rev-parse', '--show-prefix']).catch(() => '')).trim();
+  const files: GitFile[] = [];
+  for (const [p, st] of status.files) {
+    if (!p.startsWith(prefix) || p === prefix.replace(/\/$/, '')) continue;
+    files.push({ path: p.slice(prefix.length), status: st, ...(numstat.get(p) ?? { added: 0, deleted: 0 }) });
+  }
   return { isRepo: true, branch: status.branch, upstream: status.upstream, ahead: status.ahead, behind: status.behind, files };
 }

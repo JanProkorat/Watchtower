@@ -157,4 +157,20 @@ describe('readGit', () => {
     expect(g.files.find((f) => f.path === 'b.txt')).toMatchObject({ status: 'modified', added: 2, deleted: 1 });
     expect(g.files.find((f) => f.path === 'build')).toMatchObject({ status: 'ignored' });
   });
+
+  it('a cwd inside a repo: paths are relative to the cwd and outside entries are dropped', async () => {
+    git(root, 'init', '-q', '-b', 'main');
+    writeFileSync(path.join(root, 'top.txt'), 'a\n');
+    writeFileSync(path.join(root, 'src', 'x.ts'), 'a\n');
+    git(root, 'add', '.');
+    git(root, 'commit', '-qm', 'init');
+    writeFileSync(path.join(root, 'top.txt'), 'b\n');
+    writeFileSync(path.join(root, 'src', 'x.ts'), 'b\nc\n');
+    writeFileSync(path.join(root, 'src', 'new.ts'), 'n');
+    const g = await readGit(path.join(root, 'src'));
+    if (!g.isRepo) throw new Error('expected a repo');
+    expect(g.files.find((f) => f.path === 'x.ts')).toMatchObject({ status: 'modified', added: 2, deleted: 1 });
+    expect(g.files.find((f) => f.path === 'new.ts')).toMatchObject({ status: 'untracked' });
+    expect(g.files.some((f) => f.path === 'top.txt' || f.path.startsWith('src/'))).toBe(false);
+  });
 });
