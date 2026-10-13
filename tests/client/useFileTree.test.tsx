@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import type { FileListResult } from '@watchtower/shared/fileTree.js';
 
-const calls: { kind: string; payload: unknown }[] = [];
+const calls: { kind: string; payload: unknown; opts?: { silent?: boolean } }[] = [];
 let pushes: ((p: { instanceId: string }) => void)[] = [];
 const listings: Record<string, FileListResult> = {
   '': { dir: '', entries: [{ name: 'src', isDir: true, size: 0, mtimeMs: 1 }, { name: 'a.ts', isDir: false, size: 1, mtimeMs: 1 }], truncated: 0 },
@@ -11,8 +11,8 @@ const listings: Record<string, FileListResult> = {
   'src/deep': { dir: 'src/deep', entries: [{ name: 'x.ts', isDir: false, size: 1, mtimeMs: 1 }], truncated: 0 },
 };
 vi.mock('../../apps/desktop/src/state/ipc', () => ({
-  invoke: vi.fn(async (kind: string, payload: { dir?: string }) => {
-    calls.push({ kind, payload });
+  invoke: vi.fn(async (kind: string, payload: { dir?: string }, opts?: { silent?: boolean }) => {
+    calls.push({ kind, payload, opts });
     if (kind === 'fileTree:list') {
       const l = listings[payload.dir ?? ''];
       if (!l) throw new Error('ENOENT: no such file or directory');
@@ -83,6 +83,8 @@ describe('useFileTree', () => {
     listings[''] = undefined as unknown as FileListResult;
     const { result } = renderHook(() => useFileTree('i1', true));
     await waitFor(() => expect(result.current.error).toBe('Folder not found'));
+    // The tab shows the note inline, so the root listing must not also toast.
+    expect(calls.find((c) => c.kind === 'fileTree:list')?.opts).toEqual({ silent: true });
     listings[''] = { dir: '', entries: [], truncated: 0 };
   });
 });

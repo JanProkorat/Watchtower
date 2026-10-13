@@ -18,6 +18,8 @@ import { useSavvyChrome } from './savvy/useSavvyChrome.js';
 import { SavvyAgentsPanel } from './savvy/SavvyAgentsPanel.js';
 import { SidePanel } from './side/SidePanel.js';
 import { useSidePanel, type SideTab } from './side/useSidePanel.js';
+import { FilesTab } from './side/FilesTab.js';
+import { useFileTree } from '../../state/useFileTree.js';
 import { ATTENTION_AMBER } from '../../theme/glass.js';
 
 interface Props {
@@ -69,17 +71,19 @@ export function PaneCard({
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const closeCtx = () => setCtxAnchor(null);
-  // The right-side panel (Agents from the savvy-progress mod, Files in Task 9)
-  // and the savvy band below the terminal, all drawn natively.
+  // The right-side panel (Agents from the savvy-progress mod, and the Files
+  // tree) and the savvy band below the terminal, all drawn natively.
   const sideToggle = useRef<(tab: SideTab) => void>(() => {});
   const savvy = useSavvyChrome(instanceId, kind !== 'shell', () => sideToggle.current('agents'));
-  const available: SideTab[] = savvy.agents ? ['agents'] : [];
+  const available: SideTab[] = [...(savvy.agents ? (['agents'] as const) : []), ...(cwd ? (['files'] as const) : [])];
   const side = useSidePanel({
     available,
     agentsAutoKey: savvy.agentsAutoKey,
     toggles: { agents: savvy.panelToggles },
   });
   sideToggle.current = side.toggle;
+  // The tree loads and watches only while its tab is showing.
+  const fileTree = useFileTree(instanceId, side.isOpen && side.tab === 'files');
   const rightInset = side.isOpen ? side.width : 0;
   // The bar takes the fill and border of the card below it, so the two read as one.
   const isDark = useTheme().palette.mode === 'dark';
@@ -185,7 +189,7 @@ export function PaneCard({
         </Box>
       </Box>
 
-      {/* With the agents panel open, the terminal's bottom-right corner goes
+      {/* With the side panel open, the terminal's bottom-right corner goes
           square: the panel continues the card from there. */}
       <Box
         sx={{
@@ -236,6 +240,7 @@ export function PaneCard({
             {side.tab === 'agents' && savvy.agents && (
               <SavvyAgentsPanel snapshot={savvy.agents.snapshot} at={savvy.agents.at} width={side.width} />
             )}
+            {side.tab === 'files' && <FilesTab tree={fileTree} />}
           </SidePanel>
         </Box>
       )}

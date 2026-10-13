@@ -48,9 +48,10 @@ export function useFileTree(instanceId: string, enabled: boolean): FileTreeState
     setListings(new Map());
     setExpanded(new Set());
     setGit(null);
+    setError(null);
     void invoke('fileTree:watch', { instanceId }).catch(() => {});
-    // The first root listing may toast; later refreshes stay quiet.
-    void load('', false);
+    // Silent: a root failure shows as the tab's inline note, so no toast too.
+    void load('', true);
     loadGit();
     const off = window.watchtower.on('fileTreeChanged', (p) => {
       if (p.instanceId !== instanceId) return;
@@ -71,6 +72,7 @@ export function useFileTree(instanceId: string, enabled: boolean): FileTreeState
       else next.add(dir);
       return next;
     });
+    // A user-initiated expand may toast on failure.
     if (!isOpen) void load(dir, false);
   };
 
