@@ -1,4 +1,4 @@
-import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -7,7 +7,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
-import GroupsIcon from '@mui/icons-material/Groups';
+import ViewSidebarOutlinedIcon from '@mui/icons-material/ViewSidebarOutlined';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import { ColumnSlot } from './ColumnSlot.js';
 import { ChatView } from '../chat/ChatView.js';
@@ -15,6 +15,9 @@ import { chatPalette } from '../chat/chatFormat.js';
 import { TERMINAL_BG } from '../terminalTheme';
 import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
 import { useSavvyChrome } from './savvy/useSavvyChrome.js';
+import { SavvyAgentsPanel } from './savvy/SavvyAgentsPanel.js';
+import { SidePanel } from './side/SidePanel.js';
+import { useSidePanel, type SideTab } from './side/useSidePanel.js';
 import { ATTENTION_AMBER } from '../../theme/glass.js';
 
 interface Props {
@@ -66,9 +69,18 @@ export function PaneCard({
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const closeCtx = () => setCtxAnchor(null);
-  // The savvy-progress mod's band + agents panel, drawn natively around the
-  // terminal (the CLI can't draw the mod's SVG crabs). Empty unless the mod posts.
-  const savvy = useSavvyChrome(instanceId, kind !== 'shell');
+  // The right-side panel (Agents from the savvy-progress mod, Files in Task 9)
+  // and the savvy band below the terminal, all drawn natively.
+  const sideToggle = useRef<(tab: SideTab) => void>(() => {});
+  const savvy = useSavvyChrome(instanceId, kind !== 'shell', () => sideToggle.current('agents'));
+  const available: SideTab[] = savvy.agents ? ['agents'] : [];
+  const side = useSidePanel({
+    available,
+    agentsAutoKey: savvy.agentsAutoKey,
+    toggles: { agents: savvy.panelToggles },
+  });
+  sideToggle.current = side.toggle;
+  const rightInset = side.isOpen ? side.width : 0;
   // The bar takes the fill and border of the card below it, so the two read as one.
   const isDark = useTheme().palette.mode === 'dark';
   const chat = chatPalette(isDark);
@@ -154,9 +166,9 @@ export function PaneCard({
           <ChromeButton title="New chat to the right" onClick={() => onNewInstance('chat')}>
             <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />
           </ChromeButton>
-          {savvy.isPanelClosed && (
-            <ChromeButton title="Show agents panel" onClick={savvy.openPanel}>
-              <GroupsIcon sx={{ fontSize: 15 }} />
+          {!side.isOpen && side.available.length > 0 && (
+            <ChromeButton title="Show side panel" onClick={() => side.open()}>
+              <ViewSidebarOutlinedIcon sx={{ fontSize: 15 }} />
             </ChromeButton>
           )}
           {kind === 'shell' && status === 'crashed' && onRestart && (
@@ -180,9 +192,9 @@ export function PaneCard({
           position: 'absolute',
           top: BAR_H,
           left: 0,
-          right: savvy.rightInset,
+          right: rightInset,
           bottom: savvy.bottomInset,
-          ...(savvy.panel ? { '& > *': { borderBottomRightRadius: 0 } } : {}),
+          ...(side.isOpen ? { '& > *': { borderBottomRightRadius: 0 } } : {}),
         }}
       >
         {kind === 'chat' ? (
@@ -196,14 +208,14 @@ export function PaneCard({
       {savvy.band && (
         <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>{savvy.band}</Box>
       )}
-      {savvy.panel && (
+      {side.isOpen && side.tab && (
         <Box
           sx={{
             position: 'absolute',
             top: BAR_H,
             right: 0,
             bottom: savvy.bottomInset,
-            width: savvy.rightInset,
+            width: rightInset,
             boxSizing: 'border-box',
             backgroundColor: cardBg,
             border: `1px solid ${cardBorder}`,
@@ -213,7 +225,18 @@ export function PaneCard({
             boxShadow: isDark ? '0 10px 28px rgba(0,0,0,0.40)' : '0 10px 26px rgba(15,18,24,0.16)',
           }}
         >
-          {savvy.panel}
+          <SidePanel
+            tabs={side.available}
+            tab={side.tab}
+            width={side.width}
+            onSelect={side.select}
+            onClose={side.close}
+            onResize={side.setWidth}
+          >
+            {side.tab === 'agents' && savvy.agents && (
+              <SavvyAgentsPanel snapshot={savvy.agents.snapshot} at={savvy.agents.at} width={side.width} />
+            )}
+          </SidePanel>
         </Box>
       )}
 

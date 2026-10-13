@@ -73,62 +73,50 @@ const state = (over: Partial<SavvyProgressState['snapshot']> = {}): SavvyProgres
 });
 
 let chrome: SavvyChrome;
+let toggled = 0;
 function Harness({ enabled = true }: { enabled?: boolean }) {
-  chrome = useSavvyChrome('inst-1', enabled);
-  return (
-    <div>
-      {chrome.band}
-      {chrome.panel}
-    </div>
-  );
+  chrome = useSavvyChrome('inst-1', enabled, () => toggled++);
+  return <div>{chrome.band}</div>;
 }
-const tree = (enabled = true) => (
-  <ThemeProvider theme={darkTheme}>
-    <Harness enabled={enabled} />
-  </ThemeProvider>
-);
-const renderIt = (enabled = true) => render(tree(enabled));
+const renderIt = (enabled = true) =>
+  render(
+    <ThemeProvider theme={darkTheme}>
+      <Harness enabled={enabled} />
+    </ThemeProvider>,
+  );
 
 describe('useSavvyChrome', () => {
-  it('takes no space and draws nothing until the mod posts', () => {
+  it('has nothing until the mod posts', () => {
     sp.value = null;
     renderIt();
     expect(chrome.band).toBeNull();
-    expect(chrome.panel).toBeNull();
-    expect(chrome.rightInset).toBe(0);
+    expect(chrome.agents).toBeNull();
+    expect(chrome.agentsAutoKey).toBeNull();
     expect(chrome.bottomInset).toBe(0);
   });
 
   it('stays out of shell panes even with a snapshot', () => {
     sp.value = state();
     renderIt(false);
-    expect(chrome.panel).toBeNull();
+    expect(chrome.agents).toBeNull();
     expect(chrome.band).toBeNull();
   });
 
-  it('shows the band and opens the panel with running and planned agents', () => {
-    sp.value = state();
+  it('offers the band, the agents data and the flow as the auto-open key', () => {
+    sp.value = state({ panelToggles: 3 });
     renderIt();
-    expect(chrome.rightInset).toBeGreaterThan(0);
     expect(chrome.bottomInset).toBeGreaterThan(0);
-    expect(screen.getByText('Agents')).toBeInTheDocument();
-    expect(screen.getByAltText('Write the parser: Opus 5.5, running')).toBeInTheDocument();
-    expect(screen.getByAltText('2. Add tests: planned')).toBeInTheDocument();
-    // Crew = 1 run + 1 planned task not yet started.
-    expect(screen.getByText('×2')).toBeInTheDocument();
+    expect(chrome.agents?.snapshot.agents).toHaveLength(1);
+    expect(chrome.agentsAutoKey).toBe('Port parser');
+    expect(chrome.panelToggles).toBe(3);
   });
 
-  it('closing the panel frees its space; the crew button and openPanel bring it back', () => {
+  it('the crew button asks the side panel to toggle Agents', () => {
     sp.value = state();
+    toggled = 0;
     renderIt();
-    fireEvent.click(screen.getByLabelText('Hide agents panel'));
-    expect(chrome.panel).toBeNull();
-    expect(chrome.rightInset).toBe(0);
-    expect(chrome.isPanelClosed).toBe(true);
     fireEvent.click(screen.getByText('×2'));
-    expect(chrome.panel).not.toBeNull();
-    fireEvent.click(screen.getByLabelText('Hide agents panel'));
-    expect(chrome.isPanelClosed).toBe(true);
+    expect(toggled).toBe(1);
   });
 
   it('dismissing the band hides it for that flow', () => {
@@ -139,43 +127,11 @@ describe('useSavvyChrome', () => {
     expect(chrome.bottomInset).toBe(0);
   });
 
-  it('each /agents-info (a rise in panelToggles) toggles the panel; a mod reload does not', () => {
-    sp.value = state();
-    const { rerender } = renderIt();
-    expect(chrome.panel).not.toBeNull();
-    sp.value = state({ panelToggles: 1 });
-    rerender(tree());
-    expect(chrome.panel).toBeNull();
-    expect(chrome.rightInset).toBe(0);
-    sp.value = state({ panelToggles: 2 });
-    rerender(tree());
-    expect(chrome.panel).not.toBeNull();
-    // The mod restarted and counts from zero again: nothing flips.
-    sp.value = state({ panelToggles: 0 });
-    rerender(tree());
-    expect(chrome.panel).not.toBeNull();
-  });
-
-  it('dragging the left edge resizes the panel within bounds and remembers it', () => {
-    localStorage.removeItem('watchtower.savvyPanelWidth');
-    sp.value = state();
-    renderIt();
-    const start = chrome.rightInset;
-    const edge = screen.getByLabelText('Resize agents panel');
-    edge.setPointerCapture = () => {};
-    fireEvent.pointerDown(edge, { clientX: 500, pointerId: 1 });
-    fireEvent.pointerMove(edge, { clientX: 400, pointerId: 1 });
-    expect(chrome.rightInset).toBe(start + 100);
-    fireEvent.pointerMove(edge, { clientX: -5000, pointerId: 1 });
-    expect(chrome.rightInset).toBe(720);
-    fireEvent.pointerUp(edge, { pointerId: 1 });
-    expect(localStorage.getItem('watchtower.savvyPanelWidth')).toBe('720');
-  });
-
-  it('shows the panel without a band for plain subagents (no flow)', () => {
+  it('plain subagents (no flow): agents data but no band', () => {
     sp.value = state({ flow: null });
     renderIt();
     expect(chrome.band).toBeNull();
-    expect(chrome.panel).not.toBeNull();
+    expect(chrome.agents).not.toBeNull();
+    expect(chrome.agentsAutoKey).toBe('');
   });
 });
