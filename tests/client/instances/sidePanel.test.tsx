@@ -4,7 +4,7 @@ import { renderHook, act, render, screen, fireEvent } from '@testing-library/rea
 import { ThemeProvider } from '@mui/material';
 import { darkTheme } from '../../../apps/desktop/src/theme';
 import { SidePanel } from '../../../apps/desktop/src/components/instances/side/SidePanel';
-import { useSidePanel, type SidePanelOptions } from '../../../apps/desktop/src/components/instances/side/useSidePanel';
+import { sideTabsFor, useSidePanel, type SidePanelOptions } from '../../../apps/desktop/src/components/instances/side/useSidePanel';
 
 beforeAll(() => {
   // Node's own localStorage stub shadows jsdom's; the panel width lives there.
@@ -29,6 +29,15 @@ const opts = (over: Partial<SidePanelOptions> = {}): SidePanelOptions => ({
   agentsAutoKey: null,
   toggles: {},
   ...over,
+});
+
+describe('sideTabsFor', () => {
+  it('offers Agents wherever Claude runs, even before any subagent, and Files wherever there is a folder', () => {
+    expect(sideTabsFor('claude', '/repo')).toEqual(['agents', 'files']);
+    expect(sideTabsFor('chat', '/repo')).toEqual(['agents', 'files']);
+    expect(sideTabsFor('shell', '/repo')).toEqual(['files']);
+    expect(sideTabsFor('claude', '')).toEqual(['agents']);
+  });
 });
 
 describe('useSidePanel', () => {

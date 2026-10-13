@@ -26,6 +26,11 @@ export interface SidePanel {
 
 const WIDTH_KEY = 'watchtower.savvyPanelWidth';
 
+/** A pane's tabs: Agents wherever Claude runs (empty until subagents start), Files wherever there is a folder. */
+export function sideTabsFor(kind: 'claude' | 'shell' | 'chat', cwd: string): SideTab[] {
+  return [...(kind !== 'shell' ? (['agents'] as const) : []), ...(cwd ? (['files'] as const) : [])];
+}
+
 /** One pane's right-side panel: which tab shows, whether it is open, and how wide. */
 export function useSidePanel({ available, agentsAutoKey, toggles }: SidePanelOptions): SidePanel {
   const [isOpenRaw, setIsOpen] = useState(false);

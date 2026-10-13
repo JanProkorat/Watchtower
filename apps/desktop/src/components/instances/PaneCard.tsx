@@ -1,5 +1,5 @@
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
-import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
+import { Box, Divider, IconButton, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -17,7 +17,7 @@ import { InstanceTaskPickerDialog } from './InstanceTaskPickerDialog.js';
 import { useSavvyChrome } from './savvy/useSavvyChrome.js';
 import { SavvyAgentsPanel } from './savvy/SavvyAgentsPanel.js';
 import { SidePanel } from './side/SidePanel.js';
-import { useSidePanel, type SideTab } from './side/useSidePanel.js';
+import { sideTabsFor, useSidePanel, type SideTab } from './side/useSidePanel.js';
 import { FilesTab } from './side/FilesTab.js';
 import { useFileTree } from '../../state/useFileTree.js';
 import { useFileTreeActivity, useFreshFlash } from '../../state/useFileTreeActivity.js';
@@ -76,7 +76,7 @@ export function PaneCard({
   // tree) and the savvy band below the terminal, all drawn natively.
   const sideToggle = useRef<(tab: SideTab) => void>(() => {});
   const savvy = useSavvyChrome(instanceId, kind !== 'shell', () => sideToggle.current('agents'));
-  const available: SideTab[] = [...(savvy.agents ? (['agents'] as const) : []), ...(cwd ? (['files'] as const) : [])];
+  const available = sideTabsFor(kind, cwd);
   const activity = useFileTreeActivity(instanceId);
   const side = useSidePanel({
     available,
@@ -240,9 +240,12 @@ export function PaneCard({
             onClose={side.close}
             onResize={side.setWidth}
           >
-            {side.tab === 'agents' && savvy.agents && (
-              <SavvyAgentsPanel snapshot={savvy.agents.snapshot} at={savvy.agents.at} width={side.width} />
-            )}
+            {side.tab === 'agents' &&
+              (savvy.agents ? (
+                <SavvyAgentsPanel snapshot={savvy.agents.snapshot} at={savvy.agents.at} width={side.width} />
+              ) : (
+                <Typography sx={{ fontSize: 12.5, color: 'text.secondary', px: 1.5, py: 1 }}>No subagents yet.</Typography>
+              ))}
             {side.tab === 'files' && <FilesTab tree={fileTree} flash={flash} />}
           </SidePanel>
         </Box>
