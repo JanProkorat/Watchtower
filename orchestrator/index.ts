@@ -90,6 +90,7 @@ import { extractRateLimits, rollForwardRateLimits } from '@watchtower/shared/rat
 import { SavvyProgressStore } from './services/savvyProgressStore.js';
 import { listDir, readGit, searchFiles } from './services/fileTree.js';
 import { FileTreeWatchers, nodeWatch } from './services/fileTreeWatchers.js';
+import { FileTreeActivityStore } from './services/fileTreeActivityStore.js';
 import { ChatManager } from './services/chat/chatManager.js';
 import type { SqliteLike } from './db/migrations.js';
 import type { StateEvent } from '@watchtower/shared/events.js';
@@ -233,6 +234,12 @@ const savvyProgress = new SavvyProgressStore(
 // Native Files tab: folder watchers shared by every pane on the same cwd.
 const fileTreeWatchers = new FileTreeWatchers(nodeWatch, (instanceId) =>
   emitPush({ kind: 'fileTreeChanged', payload: { instanceId } }),
+);
+
+// filetree mod activity (plugins/filetree → POST /mods/filetree): Claude's reads and writes, flashed on the Files tab.
+const fileTreeActivity = new FileTreeActivityStore(
+  (state) => emitPush({ kind: 'fileTreeActivity', payload: state }),
+  (instanceId) => !!handle && repo().get(instanceId) != null,
 );
 
 function cwdOfInstance(instanceId: string): string {
@@ -768,6 +775,7 @@ function disposeInstanceRow(id: string): void {
   ptySizeOwnership.disposeInstance(id);
   savvyProgress.dispose(id);
   fileTreeWatchers.unwatch(id);
+  fileTreeActivity.dispose(id);
   chats.dispose(id);
 }
 
@@ -1585,6 +1593,9 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'savvyProgress:get':
       return savvyProgress.get(req.payload.instanceId);
 
+    case 'fileTreeActivity:get':
+      return fileTreeActivity.get(req.payload.instanceId);
+
     case 'fileTree:list':
       return listDir(cwdOfInstance(req.payload.instanceId), req.payload.dir);
 
@@ -1979,6 +1990,7 @@ function respawnIncompleteRowsOnBoot(): void {
       },
       onModState: (plugin, body, instanceId) => {
         if (plugin === 'savvy-progress') savvyProgress.ingest(body, instanceId, Date.now());
+        if (plugin === 'filetree') fileTreeActivity.ingest(body, instanceId, Date.now());
       },
     });
     // Register the WS bridge's broadcast as the secondary push sink so every

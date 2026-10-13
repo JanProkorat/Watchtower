@@ -19,6 +19,7 @@ const SILENT_KINDS = new Set<string>([
   'fileTree:search',  // search-as-you-type; the tab shows its own empty state
   'fileTree:watch',   // live refresh is best-effort
   'fileTree:unwatch',
+  'fileTreeActivity:get', // filetree mod activity; a miss only means no flash
 ]);
 
 /**

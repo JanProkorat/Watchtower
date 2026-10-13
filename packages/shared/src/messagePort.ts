@@ -85,6 +85,7 @@ export type OrchRequest =
   | { id: string; kind: 'fileTree:search'; payload: { instanceId: string; query: string } }
   | { id: string; kind: 'fileTree:watch'; payload: { instanceId: string } }
   | { id: string; kind: 'fileTree:unwatch'; payload: { instanceId: string } }
+  | { id: string; kind: 'fileTreeActivity:get'; payload: { instanceId: string } }
   | { id: string; kind: 'chat:snapshot'; payload: { instanceId: string } }
   | { id: string; kind: 'chat:send'; payload: { instanceId: string; text: string } }
   | { id: string; kind: 'chat:interrupt'; payload: { instanceId: string } }
@@ -690,6 +691,7 @@ export type OrchResponse =
   | { kind: 'fileTree:search'; payload: string[] }
   | { kind: 'fileTree:watch'; payload: { ok: true } }
   | { kind: 'fileTree:unwatch'; payload: { ok: true } }
+  | { kind: 'fileTreeActivity:get'; payload: import('./fileTree.js').FileTreeActivityState | null }
   | { kind: 'chat:snapshot'; payload: import('./chat.js').ChatSnapshot | null }
   | { kind: 'chat:send'; payload: { ok: boolean; error?: string } }
   | { kind: 'chat:interrupt'; payload: { ok: true } }
@@ -763,6 +765,7 @@ export type OrchPush =
   | { kind: 'rateLimitsUsage'; payload: import('./rateLimitsFormat.js').RateLimitsPayload }
   | { kind: 'savvyProgress'; payload: import('./savvyProgress.js').SavvyProgressState }
   | { kind: 'fileTreeChanged'; payload: { instanceId: string } }
+  | { kind: 'fileTreeActivity'; payload: import('./fileTree.js').FileTreeActivityState }
   | { kind: 'chatEvent'; payload: import('./chat.js').ChatEvent }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }
   | { kind: 'prReviewDone'; payload: { reviewId: number } }

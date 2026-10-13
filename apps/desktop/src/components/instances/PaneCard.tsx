@@ -1,4 +1,4 @@
-import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { Box, Divider, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -20,6 +20,8 @@ import { SidePanel } from './side/SidePanel.js';
 import { useSidePanel, type SideTab } from './side/useSidePanel.js';
 import { FilesTab } from './side/FilesTab.js';
 import { useFileTree } from '../../state/useFileTree.js';
+import { useFileTreeActivity } from '../../state/useFileTreeActivity.js';
+import { flashMap } from '@watchtower/shared/fileTree.js';
 import { ATTENTION_AMBER } from '../../theme/glass.js';
 
 interface Props {
@@ -76,14 +78,16 @@ export function PaneCard({
   const sideToggle = useRef<(tab: SideTab) => void>(() => {});
   const savvy = useSavvyChrome(instanceId, kind !== 'shell', () => sideToggle.current('agents'));
   const available: SideTab[] = [...(savvy.agents ? (['agents'] as const) : []), ...(cwd ? (['files'] as const) : [])];
+  const activity = useFileTreeActivity(instanceId);
   const side = useSidePanel({
     available,
     agentsAutoKey: savvy.agentsAutoKey,
-    toggles: { agents: savvy.panelToggles },
+    toggles: { agents: savvy.panelToggles, files: activity?.snapshot.panelToggles },
   });
   sideToggle.current = side.toggle;
   // The tree loads and watches only while its tab is showing.
   const fileTree = useFileTree(instanceId, side.isOpen && side.tab === 'files');
+  const flash = useMemo(() => flashMap(activity?.snapshot ?? null, cwd), [activity, cwd]);
   const rightInset = side.isOpen ? side.width : 0;
   // The bar takes the fill and border of the card below it, so the two read as one.
   const isDark = useTheme().palette.mode === 'dark';
@@ -240,7 +244,7 @@ export function PaneCard({
             {side.tab === 'agents' && savvy.agents && (
               <SavvyAgentsPanel snapshot={savvy.agents.snapshot} at={savvy.agents.at} width={side.width} />
             )}
-            {side.tab === 'files' && <FilesTab tree={fileTree} />}
+            {side.tab === 'files' && <FilesTab tree={fileTree} flash={flash} />}
           </SidePanel>
         </Box>
       )}
