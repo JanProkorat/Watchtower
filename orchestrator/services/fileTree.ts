@@ -1,6 +1,7 @@
+import { execFile } from 'node:child_process';
 import { lstat, readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { FileEntry, FileListResult } from '@watchtower/shared/fileTree.js';
+import type { FileEntry, FileListResult, FileTreeGit, GitFile, GitFileStatus } from '@watchtower/shared/fileTree.js';
 
 export const OUTSIDE_ROOT = 'Path is outside the instance folder';
 const LIST_LIMIT = 5_000;
@@ -8,7 +9,10 @@ const LIST_LIMIT = 5_000;
 /** Absolute real path of `rel` under `root`; throws when it resolves outside `root`. */
 export async function resolveInside(root: string, rel: string): Promise<string> {
   const realRoot = await realpath(root);
-  const target = await realpath(path.resolve(realRoot, rel));
+  const lexical = path.resolve(realRoot, rel);
+  // Refuse before touching the filesystem so outside paths can't be probed for existence.
+  if (lexical !== realRoot && !lexical.startsWith(realRoot + path.sep)) throw new Error(OUTSIDE_ROOT);
+  const target = await realpath(lexical);
   if (target !== realRoot && !target.startsWith(realRoot + path.sep)) throw new Error(OUTSIDE_ROOT);
   return target;
 }
@@ -38,4 +42,86 @@ export async function listDir(root: string, dir: string, limit = LIST_LIMIT): Pr
   }
   entries.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }) : a.isDir ? -1 : 1));
   return { dir, entries: entries.slice(0, limit), truncated: Math.max(0, entries.length - limit) };
+}
+
+const GIT_TIMEOUT = 5_000;
+
+export interface StatusV2 {
+  branch: string;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  files: Map<string, GitFileStatus>;
+}
+
+/** Parses `git status --porcelain=v2 --branch -z --ignored=matching`. */
+export function parseStatusV2(out: string): StatusV2 {
+  const s: StatusV2 = { branch: '', upstream: null, ahead: 0, behind: 0, files: new Map() };
+  const fields = out.split('\0');
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i] ?? '';
+    if (f.startsWith('# branch.head ')) s.branch = f.slice(14);
+    else if (f.startsWith('# branch.upstream ')) s.upstream = f.slice(18);
+    else if (f.startsWith('# branch.ab ')) {
+      const m = /\+(\d+) -(\d+)/.exec(f);
+      s.ahead = Number(m?.[1] ?? 0);
+      s.behind = Number(m?.[2] ?? 0);
+    } else if (f.startsWith('1 ')) {
+      const parts = f.split(' ');
+      s.files.set(parts.slice(8).join(' '), statusOf(parts[1] ?? '..'));
+    } else if (f.startsWith('2 ')) {
+      // A rename: the new path ends this field, the original path is the next one.
+      s.files.set(f.split(' ').slice(9).join(' '), 'renamed');
+      i++;
+    } else if (f.startsWith('? ')) s.files.set(f.slice(2), 'untracked');
+    else if (f.startsWith('! ')) s.files.set(f.slice(2).replace(/\/$/, ''), 'ignored');
+  }
+  return s;
+}
+
+function statusOf(xy: string): GitFileStatus {
+  if (xy.includes('D')) return 'deleted';
+  if (xy[0] === 'A') return 'added';
+  if (xy.includes('R')) return 'renamed';
+  return 'modified';
+}
+
+/** Parses `git diff --numstat -z`; renames are keyed by their new path, binary counts as 0. */
+export function parseNumstat(out: string): Map<string, { added: number; deleted: number }> {
+  const res = new Map<string, { added: number; deleted: number }>();
+  const fields = out.split('\0');
+  for (let i = 0; i < fields.length; i++) {
+    const m = /^(-|\d+)\t(-|\d+)\t(.*)$/.exec(fields[i] ?? '');
+    if (!m) continue;
+    const counts = { added: m[1] === '-' ? 0 : Number(m[1]), deleted: m[2] === '-' ? 0 : Number(m[2]) };
+    if (m[3]) res.set(m[3], counts);
+    else {
+      // Rename: the old and the new path follow as their own fields.
+      res.set(fields[i + 2] ?? '', counts);
+      i += 2;
+    }
+  }
+  return res;
+}
+
+function runGit(cwd: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile('git', ['--no-optional-locks', ...args], { cwd, timeout: GIT_TIMEOUT, maxBuffer: 32 * 1024 * 1024 }, (err, out) =>
+      err ? reject(err) : resolve(out),
+    );
+  });
+}
+
+/** Branch, upstream and per-file status with line counts; `{ isRepo: false }` outside a repo or without git. */
+export async function readGit(root: string): Promise<FileTreeGit> {
+  let status: StatusV2;
+  try {
+    status = parseStatusV2(await runGit(root, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all', '--ignored=matching']));
+  } catch {
+    return { isRepo: false };
+  }
+  // No commits yet: there is no HEAD to diff against.
+  const numstat = parseNumstat(await runGit(root, ['diff', '--numstat', '-z', 'HEAD']).catch(() => ''));
+  const files: GitFile[] = [...status.files].map(([p, st]) => ({ path: p, status: st, ...(numstat.get(p) ?? { added: 0, deleted: 0 }) }));
+  return { isRepo: true, branch: status.branch, upstream: status.upstream, ahead: status.ahead, behind: status.behind, files };
 }
