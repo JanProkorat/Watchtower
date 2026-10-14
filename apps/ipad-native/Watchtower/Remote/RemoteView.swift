@@ -41,6 +41,9 @@ struct RemoteView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // Port of RemoteMacView.tsx's credential-entry `glassPanel({ radius: 22 })`
+    // card — a translucent glass surface (not the solid `contentCard`), with
+    // glass-styled inputs and a gradient "Connect" CTA.
     private var credentialForm: some View {
         VStack(spacing: 20) {
             Spacer()
@@ -48,9 +51,15 @@ struct RemoteView: View {
                 Text("Screen Sharing sign-in").font(.headline).foregroundStyle(Palette.textPrimary)
 
                 if store.authFailed {
+                    let colors = Palette.status(.disconnected)
                     Text("Sign-in failed — check your macOS account short name and password.")
                         .font(.callout)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(colors.accent)
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 9)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(colors.fill))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(colors.accent.opacity(0.4), lineWidth: 1))
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -62,7 +71,7 @@ struct RemoteView: View {
                             set: { store.send(.credentialsUsernameChanged($0)) }
                         )
                     )
-                    .textFieldStyle(.roundedBorder)
+                    .glassField()
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                 }
@@ -76,15 +85,16 @@ struct RemoteView: View {
                             set: { store.send(.credentialsPasswordChanged($0)) }
                         )
                     )
-                    .textFieldStyle(.roundedBorder)
+                    .glassField()
                 }
 
-                Button("Submit") { store.send(.submitCredentials) }
+                Button("Connect") { store.send(.submitCredentials) }
                     .buttonStyle(.glassProminent)
                     .tint(Palette.accent)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
             .padding(20)
-            .contentCard()
+            .glassCard(cornerRadius: 22)
             .frame(maxWidth: 420)
             Spacer()
         }
@@ -99,23 +109,36 @@ struct RemoteView: View {
     /// stay reachable here rather than being hidden behind the full-bleed VNC
     /// representable (which would otherwise keep rendering with no way out).
     /// Port of RemoteMacView.tsx:157-165.
+    // Port of RemoteMacView.tsx's `StatusBanner` — a `statusGlass('disconnected')`
+    // tinted panel (red fill/border/dot/text) with Retry / Change login,
+    // plus Wake Mac in the `wakeBar` above (RemoteMacView.tsx:165's
+    // `{connection.mac && <WakeButton/>}` guard).
     private var disconnectedOverlay: some View {
-        VStack(spacing: 20) {
+        let colors = Palette.status(.disconnected)
+        return VStack(spacing: 20) {
             Spacer()
             VStack(spacing: 16) {
-                Text("Mac disconnected").font(.headline).foregroundStyle(Palette.textPrimary)
+                HStack(spacing: 8) {
+                    Circle().fill(colors.accent).frame(width: 8, height: 8)
+                        .shadow(color: colors.accent, radius: 6)
+                    Text("Mac disconnected").font(.headline).foregroundStyle(colors.accent)
+                }
                 Text("Check that the Mac is awake and Screen Sharing is on.")
                     .font(.callout)
                     .foregroundStyle(Palette.textMuted)
+                    .multilineTextAlignment(.center)
                 HStack(spacing: 12) {
                     Button("Retry") { store.send(.retryTapped) }
                         .buttonStyle(.glass)
+                        .tint(colors.accent)
                     Button("Change login") { store.send(.changeLoginTapped) }
                         .buttonStyle(.glass)
+                        .tint(colors.accent)
                 }
             }
             .padding(20)
-            .contentCard()
+            .background(RoundedRectangle(cornerRadius: 16).fill(colors.fill))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(colors.accent.opacity(0.35), lineWidth: 1))
             .frame(maxWidth: 420)
             Spacer()
         }

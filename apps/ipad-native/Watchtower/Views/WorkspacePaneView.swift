@@ -28,6 +28,11 @@ struct WorkspacePaneView: View {
     let groupInstanceIds: [String]
     let onSplit: (NodeId, SplitDir, InsertPosition, String) -> Void
     let onClose: (NodeId) -> Void
+    /// Terminate the pane's instance on the Mac AND drop the pane — port of
+    /// apps/ipad's `WorkspacePane` `onKill` prop (App.tsx wires it to
+    /// `removeInstance` + `workspace.actions.close`). Distinct from `onClose`,
+    /// which only hides the pane while the Mac-side session keeps running.
+    let onKill: (NodeId, String) -> Void
     /// Live divider-drag feedback — fires every frame; mutate-only on the
     /// reducer side (see `onResizeCommitted`).
     let onResize: (NodeId, [Double]) -> Void
@@ -49,6 +54,7 @@ struct WorkspacePaneView: View {
                         pendingSplit = PendingPaneSplit(leafId: leafId, dir: dir, position: position)
                     },
                     onClose: onClose,
+                    onKill: onKill,
                     onResize: onResize,
                     onResizeCommitted: onResizeCommitted,
                     onFocus: onFocus
@@ -155,6 +161,7 @@ private struct PaneNodeView: View {
     let focusedLeafId: NodeId?
     let onSplitRequested: (NodeId, SplitDir, InsertPosition) -> Void
     let onClose: (NodeId) -> Void
+    let onKill: (NodeId, String) -> Void
     let onResize: (NodeId, [Double]) -> Void
     let onResizeCommitted: () -> Void
     let onFocus: (NodeId) -> Void
@@ -168,6 +175,7 @@ private struct PaneNodeView: View {
                 focused: id == focusedLeafId,
                 onSplitRequested: onSplitRequested,
                 onClose: onClose,
+                onKill: onKill,
                 onFocus: onFocus
             )
         case .split(let id, let dir, let sizes, let children):
@@ -179,6 +187,7 @@ private struct PaneNodeView: View {
                 focusedLeafId: focusedLeafId,
                 onSplitRequested: onSplitRequested,
                 onClose: onClose,
+                onKill: onKill,
                 onResize: onResize,
                 onResizeCommitted: onResizeCommitted,
                 onFocus: onFocus
@@ -195,6 +204,7 @@ private struct PaneSplitView: View {
     let focusedLeafId: NodeId?
     let onSplitRequested: (NodeId, SplitDir, InsertPosition) -> Void
     let onClose: (NodeId) -> Void
+    let onKill: (NodeId, String) -> Void
     let onResize: (NodeId, [Double]) -> Void
     let onResizeCommitted: () -> Void
     let onFocus: (NodeId) -> Void
@@ -232,6 +242,7 @@ private struct PaneSplitView: View {
                 focusedLeafId: focusedLeafId,
                 onSplitRequested: onSplitRequested,
                 onClose: onClose,
+                onKill: onKill,
                 onResize: onResize,
                 onResizeCommitted: onResizeCommitted,
                 onFocus: onFocus
@@ -306,17 +317,18 @@ private struct PaneDivider: View {
 
 /// One terminal pane: `RemoteTerminalView` (never remounted — stable
 /// `.id(tabId)`, and this leaf's own node id in the tree never changes across
-/// resizes/focus changes) plus its chrome: split-right, split-down, close,
-/// and a top-edge focus ring. Port of apps/ipad/src/components/PaneTerminal.tsx
-/// (its "kill instance" affordance is intentionally not ported — Task 5's
-/// reducer surface has no kill action; instance removal stays the toolbar's
-/// Remove button, which already targets the focused leaf's instance).
+/// resizes/focus changes) plus its chrome: split-right, split-down, kill
+/// (terminate), close, and a top-edge focus ring. Port of
+/// apps/ipad/src/components/PaneTerminal.tsx, including its two-tap
+/// arm-then-confirm `KillButton` (see `PaneKillButton` below) — distinct from
+/// `onClose`, which only hides the pane while the instance keeps running.
 private struct PaneLeafView: View {
     let leafId: NodeId
     let tabId: String
     let focused: Bool
     let onSplitRequested: (NodeId, SplitDir, InsertPosition) -> Void
     let onClose: (NodeId) -> Void
+    let onKill: (NodeId, String) -> Void
     let onFocus: (NodeId) -> Void
 
     var body: some View {
@@ -351,6 +363,7 @@ private struct PaneLeafView: View {
             HStack(spacing: 4) {
                 chromeButton("arrow.right.to.line") { onSplitRequested(leafId, .row, .after) }
                 chromeButton("arrow.down.to.line") { onSplitRequested(leafId, .col, .after) }
+                PaneKillButton { onKill(leafId, tabId) }
                 chromeButton("xmark") { onClose(leafId) }
             }
         }
@@ -365,5 +378,48 @@ private struct PaneLeafView: View {
         }
         .buttonStyle(.glass)
         .tint(Palette.textMuted)
+    }
+}
+
+/// Kill (terminate) button — destructive, so it arms on the first tap and
+/// only fires `onKill` on a confirming second tap within a short window (no
+/// accidental kills). Auto-disarms after 2.5s. Port of PaneTerminal.tsx's
+/// `KillButton` (⏻ unarmed → "Terminate?" pill armed), English labels per
+/// the native app's locale (the web original is Czech-labeled).
+private struct PaneKillButton: View {
+    let onKill: () -> Void
+
+    @State private var armed = false
+    @State private var disarmTask: Task<Void, Never>?
+
+    var body: some View {
+        Button {
+            disarmTask?.cancel()
+            if armed {
+                armed = false
+                onKill()
+            } else {
+                armed = true
+                disarmTask = Task {
+                    try? await Task.sleep(for: .seconds(2.5))
+                    if !Task.isCancelled { armed = false }
+                }
+            }
+        } label: {
+            if armed {
+                Text("Terminate?")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(height: 26)
+                    .padding(.horizontal, 8)
+            } else {
+                Image(systemName: "power")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 26, height: 26)
+            }
+        }
+        .buttonStyle(.glass)
+        .tint(armed ? Color(hex: "#f87171") : Color(hex: "#f0a0a0"))
+        .accessibilityLabel(armed ? "Tap again to terminate instance" : "Terminate instance")
+        .onDisappear { disarmTask?.cancel() }
     }
 }

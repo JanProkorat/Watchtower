@@ -31,9 +31,44 @@ public struct IPadAppFeature {
         }
     }
 
+    /// Flat sub-items of the sidebar's expandable Billing group (design-align
+    /// T2) — replaces the old in-`BillingView` segmented Earnings/Reports/
+    /// Records switcher (and Records' own further sub-switcher) with a single
+    /// level of rail navigation, matching `apps/ipad/src/components/Rail.tsx`'s
+    /// `BILLING_TABS`. English labels; original Czech was Výdělky / Reporty /
+    /// Seznam / Mřížka / Úkoly / Volno / Nástěnka.
+    public enum BillingSection: String, CaseIterable, Equatable, Sendable {
+        case earnings, reports, recordsList, recordsGrid, recordsTasks, recordsTimeOff, board
+
+        public var title: String {
+            switch self {
+            case .earnings: return "Earnings"
+            case .reports: return "Reports"
+            case .recordsList: return "List"
+            case .recordsGrid: return "Grid"
+            case .recordsTasks: return "Tasks"
+            case .recordsTimeOff: return "Time off"
+            case .board: return "Board"
+            }
+        }
+
+        public var systemImage: String {
+            switch self {
+            case .earnings: return "dollarsign.circle.fill"
+            case .reports: return "chart.bar.fill"
+            case .recordsList: return "list.bullet.rectangle.fill"
+            case .recordsGrid: return "square.grid.3x3.fill"
+            case .recordsTasks: return "checklist"
+            case .recordsTimeOff: return "beach.umbrella.fill"
+            case .board: return "rectangle.split.3x1.fill"
+            }
+        }
+    }
+
     @ObservableState
     public struct State: Equatable {
         public var selectedModule: Module = .dashboard
+        public var billingSection: BillingSection = .earnings
         public var connStatus: ConnStatus = .disconnected
         /// Result of the connectivity probe; nil until the first successful probe.
         public var instancesOnline: Int?
@@ -53,6 +88,11 @@ public struct IPadAppFeature {
     public enum Action {
         case onAppear
         case moduleSelected(Module)
+        /// Sidebar Billing sub-item tap (design-align T2) — activates the
+        /// Billing module and, for the records-backed sub-items, syncs
+        /// `RecordsFeature.section` so the reused Phase-5 sub-view renders
+        /// the right content. Earnings/Reports don't touch `records`.
+        case billingSectionSelected(BillingSection)
         case statusChanged(ConnStatus)
         case probeResponse(Int?)
         case authEvent(Bool)
@@ -119,6 +159,25 @@ public struct IPadAppFeature {
 
             case let .moduleSelected(module):
                 state.selectedModule = module
+                return .none
+
+            case let .billingSectionSelected(section):
+                state.selectedModule = .billing
+                state.billingSection = section
+                switch section {
+                case .earnings, .reports:
+                    break
+                case .recordsList:
+                    state.records.section = .list
+                case .recordsGrid:
+                    state.records.section = .grid
+                case .recordsTasks:
+                    state.records.section = .tasks
+                case .recordsTimeOff:
+                    state.records.section = .timeOff
+                case .board:
+                    state.records.section = .board
+                }
                 return .none
 
             case let .statusChanged(status):
