@@ -92,6 +92,9 @@ export type IpcRequest =
   | { kind: 'fileTree:unwatch'; payload: { instanceId: string } }
   | { kind: 'fileTreeActivity:get'; payload: { instanceId: string } }
   | { kind: 'replay:get'; payload: { instanceId: string } }
+  | { kind: 'run:state'; payload: { instanceId: string } }
+  | { kind: 'run:start'; payload: { instanceId: string; serverId?: string } }
+  | { kind: 'run:stop'; payload: { instanceId: string; serverId?: string } }
   | { kind: 'blastRadius:get'; payload: { instanceId: string } }
   | { kind: 'blastRadius:decide'; payload: { instanceId: string; holdId: string; decision: import('./blastRadius.js').BlastDecision } }
   | { kind: 'chat:snapshot'; payload: { instanceId: string } }
@@ -795,6 +798,9 @@ export type IpcResponse =
   | { kind: 'fileTree:unwatch'; payload: { ok: true } }
   | { kind: 'fileTreeActivity:get'; payload: import('./fileTree.js').FileTreeActivityState | null }
   | { kind: 'replay:get'; payload: import('./replay.js').ReplayState | null }
+  | { kind: 'run:state'; payload: import('./runServers.js').RunState | null }
+  | { kind: 'run:start'; payload: import('./runServers.js').RunState | null }
+  | { kind: 'run:stop'; payload: import('./runServers.js').RunState | null }
   | { kind: 'blastRadius:get'; payload: import('./blastRadius.js').BlastRadiusState | null }
   | { kind: 'blastRadius:decide'; payload: { ok: boolean } }
   | { kind: 'chat:snapshot'; payload: import('./chat.js').ChatSnapshot | null }
@@ -1019,6 +1025,7 @@ export type IpcPush =
   | { kind: 'fileTreeChanged'; payload: { instanceId: string } }
   | { kind: 'fileTreeActivity'; payload: import('./fileTree.js').FileTreeActivityState }
   | { kind: 'replay'; payload: import('./replay.js').ReplayState }
+  | { kind: 'runChanged'; payload: import('./runServers.js').RunState }
   | { kind: 'blastRadius'; payload: import('./blastRadius.js').BlastRadiusState }
   | { kind: 'chatEvent'; payload: import('./chat.js').ChatEvent }
   | {

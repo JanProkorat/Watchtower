@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { PANEL_W, clampPanelWidth } from '../savvy/SavvyAgentsPanel.js';
 
-export type SideTab = 'agents' | 'files' | 'replay';
+export type SideTab = 'agents' | 'files' | 'replay' | 'run';
 
 export interface SidePanelOptions {
   /** Tabs with something to show, in strip order. */
@@ -26,10 +26,15 @@ export interface SidePanel {
 
 const WIDTH_KEY = 'watchtower.savvyPanelWidth';
 
-/** A pane's tabs: Agents and Replay wherever Claude runs (empty until their mods post), Files wherever there is a folder. */
-export function sideTabsFor(kind: 'claude' | 'shell' | 'chat', cwd: string): SideTab[] {
+/** A pane's tabs: Agents and Replay wherever Claude runs (empty until their mods post), Files wherever there is a folder, Run when the repo has a run.json. */
+export function sideTabsFor(kind: 'claude' | 'shell' | 'chat', cwd: string, hasRun = false): SideTab[] {
   const claude = kind !== 'shell';
-  return [...(claude ? (['agents'] as const) : []), ...(cwd ? (['files'] as const) : []), ...(claude ? (['replay'] as const) : [])];
+  return [
+    ...(claude ? (['agents'] as const) : []),
+    ...(cwd ? (['files'] as const) : []),
+    ...(claude ? (['replay'] as const) : []),
+    ...(hasRun ? (['run'] as const) : []),
+  ];
 }
 
 /** One pane's right-side panel: which tab shows, whether it is open, and how wide. */

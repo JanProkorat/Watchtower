@@ -22,6 +22,7 @@ const SILENT_KINDS = new Set<string>([
   'fileTreeActivity:get', // filetree mod activity; a miss only means no flash
   'replay:get', // replay-theater turn; a miss only means an empty tab
   'blastRadius:get', // blast-radius hold fetch; a miss only means no popup
+  'run:state', // Run tab probe on every pane; a miss only means no tab
 ]);
 
 /**

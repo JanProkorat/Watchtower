@@ -87,6 +87,9 @@ export type OrchRequest =
   | { id: string; kind: 'fileTree:unwatch'; payload: { instanceId: string } }
   | { id: string; kind: 'fileTreeActivity:get'; payload: { instanceId: string } }
   | { id: string; kind: 'replay:get'; payload: { instanceId: string } }
+  | { id: string; kind: 'run:state'; payload: { instanceId: string } }
+  | { id: string; kind: 'run:start'; payload: { instanceId: string; serverId?: string } }
+  | { id: string; kind: 'run:stop'; payload: { instanceId: string; serverId?: string } }
   | { id: string; kind: 'blastRadius:get'; payload: { instanceId: string } }
   | { id: string; kind: 'blastRadius:decide'; payload: { instanceId: string; holdId: string; decision: import('./blastRadius.js').BlastDecision } }
   | { id: string; kind: 'chat:snapshot'; payload: { instanceId: string } }
@@ -696,6 +699,9 @@ export type OrchResponse =
   | { kind: 'fileTree:unwatch'; payload: { ok: true } }
   | { kind: 'fileTreeActivity:get'; payload: import('./fileTree.js').FileTreeActivityState | null }
   | { kind: 'replay:get'; payload: import('./replay.js').ReplayState | null }
+  | { kind: 'run:state'; payload: import('./runServers.js').RunState | null }
+  | { kind: 'run:start'; payload: import('./runServers.js').RunState | null }
+  | { kind: 'run:stop'; payload: import('./runServers.js').RunState | null }
   | { kind: 'blastRadius:get'; payload: import('./blastRadius.js').BlastRadiusState | null }
   | { kind: 'blastRadius:decide'; payload: { ok: boolean } }
   | { kind: 'chat:snapshot'; payload: import('./chat.js').ChatSnapshot | null }
@@ -773,6 +779,7 @@ export type OrchPush =
   | { kind: 'fileTreeChanged'; payload: { instanceId: string } }
   | { kind: 'fileTreeActivity'; payload: import('./fileTree.js').FileTreeActivityState }
   | { kind: 'replay'; payload: import('./replay.js').ReplayState }
+  | { kind: 'runChanged'; payload: import('./runServers.js').RunState }
   | { kind: 'blastRadius'; payload: import('./blastRadius.js').BlastRadiusState }
   | { kind: 'chatEvent'; payload: import('./chat.js').ChatEvent }
   | { kind: 'prReviewProgress'; payload: { reviewId: number; status: 'running' | 'done' | 'error'; message: string } }

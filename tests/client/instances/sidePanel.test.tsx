@@ -38,6 +38,11 @@ describe('sideTabsFor', () => {
     expect(sideTabsFor('shell', '/repo')).toEqual(['files']);
     expect(sideTabsFor('claude', '')).toEqual(['agents', 'replay']);
   });
+
+  it('adds Run last, for any kind, only when the repo has a run.json', () => {
+    expect(sideTabsFor('claude', '/repo', true)).toEqual(['agents', 'files', 'replay', 'run']);
+    expect(sideTabsFor('shell', '/repo', true)).toEqual(['files', 'run']);
+  });
 });
 
 describe('useSidePanel', () => {
