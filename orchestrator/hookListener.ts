@@ -13,7 +13,15 @@ const MAX_BODY = 32 * 1024;
 // Mods that POST their state for Watchtower to draw natively (see
 // plugins/savvy-progress). A snapshot carries up to 200 subagent runs, so the
 // route takes more than a hook payload.
-const KNOWN_MODS = new Set(['savvy-progress', 'filetree', 'blast-radius', 'replay-theater']);
+const KNOWN_MODS = new Set([
+  'savvy-progress',
+  'filetree',
+  'blast-radius',
+  'replay-theater',
+  'cache-tax',
+  'collision-guard',
+  'reflect-mod',
+]);
 const MAX_MOD_BODY = 512 * 1024;
 
 export interface HookListenerOptions {

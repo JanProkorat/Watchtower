@@ -187,6 +187,13 @@ describe('hookListener /mods/:plugin', () => {
     expect(mods).toEqual([{ plugin: 'filetree', body: { version: 1, activity: [] }, instanceId: 'inst-1' }]);
   });
 
+  it('accepts the Mods-tab band mods', async () => {
+    for (const plugin of ['cache-tax', 'collision-guard', 'reflect-mod']) {
+      expect((await post(plugin, auth, { version: 1 })).status).toBe(204);
+    }
+    expect(mods.map((m) => m.plugin)).toEqual(['cache-tax', 'collision-guard', 'reflect-mod']);
+  });
+
   it('rejects a bad token, an unknown mod and a missing instance id', async () => {
     expect((await post('savvy-progress', { ...auth, authorization: 'Bearer nope' }, {})).status).toBe(401);
     expect((await post('other-mod', auth, {})).status).toBe(404);

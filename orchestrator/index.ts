@@ -93,6 +93,8 @@ import { FileTreeWatchers, nodeWatch } from './services/fileTreeWatchers.js';
 import { FileTreeActivityStore } from './services/fileTreeActivityStore.js';
 import { ReplayStore } from './services/replayStore.js';
 import { RunServers } from './services/runServers.js';
+import { ModBandsStore } from './services/modBandsStore.js';
+import { BAND_MODS, type BandMod } from '@watchtower/shared/modBands.js';
 import { BlastRadiusStore } from './services/blastRadiusStore.js';
 import { ChatManager } from './services/chat/chatManager.js';
 import type { SqliteLike } from './db/migrations.js';
@@ -250,6 +252,10 @@ const replay = new ReplayStore(
   (state) => emitPush({ kind: 'replay', payload: state }),
   (instanceId) => !!handle && repo().get(instanceId) != null,
 );
+
+// Mods tab: cache-tax, collision-guard and reflect-mod post the state their band above the prompt would draw.
+const isKnownInstance = (instanceId: string) => !!handle && repo().get(instanceId) != null;
+const modBands = new ModBandsStore((state) => emitPush({ kind: 'modBands', payload: state }), isKnownInstance);
 
 // Run tab: a repo's dev servers from `.watchtower/run.json`, shared by every pane in that repo.
 const runServers = new RunServers((state) => emitPush({ kind: 'runChanged', payload: state }));
@@ -804,6 +810,7 @@ function disposeInstanceRow(id: string): void {
   fileTreeWatchers.unwatch(id);
   fileTreeActivity.dispose(id);
   replay.dispose(id);
+  modBands.dispose(id);
   blastRadius.dispose(id);
   chats.dispose(id);
 }
@@ -1630,6 +1637,11 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'replay:get':
       return replay.get(req.payload.instanceId);
 
+    case 'modBands:get':
+      return modBands.get(req.payload.instanceId);
+    case 'modBands:click':
+      return { ok: modBands.click(req.payload.instanceId, req.payload.itemId, req.payload.action) };
+
     case 'run:state':
       return runServers.state(cwdOfInstance(req.payload.instanceId));
     case 'run:start':
@@ -2040,9 +2052,14 @@ function respawnIncompleteRowsOnBoot(): void {
         if (plugin === 'filetree') fileTreeActivity.ingest(body, instanceId, Date.now());
         if (plugin === 'replay-theater') replay.ingest(body, instanceId, Date.now());
         if (plugin === 'blast-radius') blastRadius.ingest(body, instanceId, Date.now());
+        if ((BAND_MODS as readonly string[]).includes(plugin)) modBands.ingest(plugin as BandMod, body, instanceId);
       },
-      onModDecision: (plugin, holdId, instanceId) =>
-        plugin === 'blast-radius' ? blastRadius.decisionFor(instanceId, holdId, Date.now()) : undefined,
+      onModDecision: (plugin, holdId, instanceId) => {
+        if (plugin === 'blast-radius') return blastRadius.decisionFor(instanceId, holdId, Date.now());
+        // reflect-mod polls for Mods-tab clicks; a 404 (unknown instance) makes it re-post its rules.
+        if (plugin === 'reflect-mod') return isKnownInstance(instanceId) ? modBands.nextClick(instanceId) : undefined;
+        return undefined;
+      },
     });
     // Register the WS bridge's broadcast as the secondary push sink so every
     // emitPush reaches remote (browser) clients as well as the Electron renderer.

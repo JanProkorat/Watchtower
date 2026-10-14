@@ -43,6 +43,11 @@ describe('sideTabsFor', () => {
     expect(sideTabsFor('claude', '/repo', true)).toEqual(['agents', 'files', 'replay', 'run']);
     expect(sideTabsFor('shell', '/repo', true)).toEqual(['files', 'run']);
   });
+
+  it('adds Mods before Run once a band mod has posted', () => {
+    expect(sideTabsFor('claude', '/repo', true, true)).toEqual(['agents', 'files', 'replay', 'mods', 'run']);
+    expect(sideTabsFor('claude', '/repo', false, true)).toEqual(['agents', 'files', 'replay', 'mods']);
+  });
 });
 
 describe('useSidePanel', () => {
