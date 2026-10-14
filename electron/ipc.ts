@@ -10,6 +10,7 @@ import { runBoardSignIn } from './boardSignIn.js';
 import { setPat, patStatus, getPats } from './devopsPat.js';
 import { getCloudSyncConfig, setCloudSyncConfig } from './cloudSync.js';
 import { joinMeeting, focusCall, closeTeamsWindow } from './teamsWindow.js';
+import { isOpenableUrl } from './openableUrl.js';
 
 type DeepLinkPayload = Extract<IpcPush, { kind: 'deep-link' }>['payload'];
 
@@ -149,9 +150,9 @@ export function registerIpc(): void {
         const { url } = payload as { url: string };
         // https-only guard: refuse anything else so a malicious payload
         // can't launch local apps via custom URL schemes (file://, mailto:,
-        // tel:, vscode://, etc.).
-        if (!/^https:\/\//.test(url)) {
-          return { ok: false, error: 'openExternalUrl: only https:// URLs are allowed' };
+        // tel:, vscode://, etc.). Plain http is allowed for loopback only (Run tab dev servers).
+        if (!isOpenableUrl(url)) {
+          return { ok: false, error: 'openExternalUrl: only https:// or http://localhost URLs are allowed' };
         }
         await shell.openExternal(url);
         return { ok: true };

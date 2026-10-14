@@ -3,7 +3,7 @@ import { Box, ButtonBase, IconButton, Tooltip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import type { SideTab } from './useSidePanel.js';
 
-export const SIDE_TAB_LABEL: Record<SideTab, string> = { agents: 'Agents', files: 'Files', replay: 'Replay' };
+export const SIDE_TAB_LABEL: Record<SideTab, string> = { agents: 'Agents', files: 'Files', replay: 'Replay', run: 'Run' };
 
 interface Props {
   tabs: readonly SideTab[];

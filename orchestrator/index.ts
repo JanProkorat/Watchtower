@@ -92,6 +92,7 @@ import { listDir, readGit, searchFiles } from './services/fileTree.js';
 import { FileTreeWatchers, nodeWatch } from './services/fileTreeWatchers.js';
 import { FileTreeActivityStore } from './services/fileTreeActivityStore.js';
 import { ReplayStore } from './services/replayStore.js';
+import { RunServers } from './services/runServers.js';
 import { BlastRadiusStore } from './services/blastRadiusStore.js';
 import { ChatManager } from './services/chat/chatManager.js';
 import type { SqliteLike } from './db/migrations.js';
@@ -249,6 +250,9 @@ const replay = new ReplayStore(
   (state) => emitPush({ kind: 'replay', payload: state }),
   (instanceId) => !!handle && repo().get(instanceId) != null,
 );
+
+// Run tab: a repo's dev servers from `.watchtower/run.json`, shared by every pane in that repo.
+const runServers = new RunServers((state) => emitPush({ kind: 'runChanged', payload: state }));
 
 // blast-radius mod holds (plugins/blast-radius → POST /mods/blast-radius): a popup over the pane,
 // flagged like a permission prompt until the mod collects the user's answer.
@@ -1626,6 +1630,13 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
     case 'replay:get':
       return replay.get(req.payload.instanceId);
 
+    case 'run:state':
+      return runServers.state(cwdOfInstance(req.payload.instanceId));
+    case 'run:start':
+      return runServers.start(cwdOfInstance(req.payload.instanceId), req.payload.serverId);
+    case 'run:stop':
+      return runServers.stop(cwdOfInstance(req.payload.instanceId), req.payload.serverId);
+
     case 'blastRadius:get':
       return blastRadius.get(req.payload.instanceId, Date.now());
 
@@ -2144,4 +2155,7 @@ function respawnIncompleteRowsOnBoot(): void {
 process.on('exit', () => {
   escalationGate?.clearAll();
   chats.disposeAll();
+  runServers.stopAll();
 });
+// A signal skips 'exit' handlers unless handled; exiting here runs them, so Run tab servers stop with the app.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) process.once(signal, () => process.exit(0));

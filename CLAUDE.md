@@ -282,6 +282,17 @@ and time out after 2 s. Everything else (cancel, 10 min timeout, error) denies.
 `packages/shared/src/blastRadius.ts`; `plugins/replay-theater/hooks/replay-theater.mjs`
 ↔ `packages/shared/src/replay.ts`.
 
+**Run tab.** Native, no mod. A repo lists its dev servers in
+`<repo>/.watchtower/run.json` (`{ "servers": [{ id, label?, cwd?, command: [argv],
+port?, ready?, url? }] }`, parsed by `parseRunConfig` in
+`packages/shared/src/runServers.ts`). `orchestrator/services/runServers.ts`
+finds the nearest run.json above the pane's cwd, runs each server in its own
+process group (Stop kills its children too), keeps 500 log lines and pushes
+`runChanged`; `run:state|start|stop`. Servers belong to the repo, not the pane,
+and stop when the orchestrator exits (SIGTERM/SIGINT run the exit hook). The tab
+shows only when run.json exists; "Open" goes through `openExternalUrl`, which
+allows http on loopback only (`electron/openableUrl.ts`).
+
 A new `/mods/<name>` bridge must also be added to `KNOWN_MODS` in
 `orchestrator/hookListener.ts`, or the route rejects it.
 

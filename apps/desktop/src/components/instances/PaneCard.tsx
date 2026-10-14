@@ -22,6 +22,8 @@ import { FilesTab } from './side/FilesTab.js';
 import { sidePanelButtonTitle } from './side/sidePanelButtonTitle.js';
 import { ReplayTab } from './side/ReplayTab.js';
 import { useReplay, useUnseenSteps } from '../../state/useReplay.js';
+import { RunTab, runningCount } from './side/RunTab.js';
+import { useRun } from '../../state/useRun.js';
 import { BlastRadiusDialog } from './BlastRadiusDialog.js';
 import { useBlastRadius } from '../../state/useBlastRadius.js';
 import { useFileTree } from '../../state/useFileTree.js';
@@ -82,7 +84,8 @@ export function PaneCard({
   // tree) and the savvy band below the terminal, all drawn natively.
   const sideToggle = useRef<(tab: SideTab) => void>(() => {});
   const savvy = useSavvyChrome(instanceId, kind !== 'shell', () => sideToggle.current('agents'));
-  const available = sideTabsFor(kind, cwd);
+  const run = useRun(instanceId, cwd);
+  const available = sideTabsFor(kind, cwd, run.state !== null);
   const activity = useFileTreeActivity(instanceId);
   const replay = useReplay(instanceId);
   const side = useSidePanel({
@@ -248,7 +251,7 @@ export function PaneCard({
             tabs={side.available}
             tab={side.tab}
             width={side.width}
-            counts={{ replay: unseen }}
+            counts={{ replay: unseen, run: runningCount(run.state) }}
             onSelect={side.select}
             onClose={side.close}
             onResize={side.setWidth}
@@ -261,6 +264,9 @@ export function PaneCard({
               ))}
             {side.tab === 'files' && <FilesTab tree={fileTree} flash={flash} />}
             {side.tab === 'replay' && <ReplayTab turn={replay?.snapshot.turn ?? null} />}
+            {side.tab === 'run' && run.state && (
+              <RunTab state={run.state} onStart={(id) => void run.start(id)} onStop={(id) => void run.stop(id)} onReload={() => void run.reload()} />
+            )}
           </SidePanel>
         </Box>
       )}
