@@ -1,0 +1,6 @@
+{
+  "name": "collision-guard",
+  "version": "0.1.0-watchtower.1",
+  "description": "Warns before editing a file another Claude Code session in the same repository edited in the last 30 minutes, and shows what the other sessions are working on above the prompt. Watchtower fork: inside a Watchtower terminal the peer band is drawn by Watchtower.",
+  "types": "./types/index.d.ts"
+}

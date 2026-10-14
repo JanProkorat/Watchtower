@@ -95,6 +95,8 @@ export type IpcRequest =
   | { kind: 'run:state'; payload: { instanceId: string } }
   | { kind: 'run:start'; payload: { instanceId: string; serverId?: string } }
   | { kind: 'run:stop'; payload: { instanceId: string; serverId?: string } }
+  | { kind: 'modBands:get'; payload: { instanceId: string } }
+  | { kind: 'modBands:click'; payload: { instanceId: string; itemId: string; action: import('./modBands.js').ReflectAction } }
   | { kind: 'blastRadius:get'; payload: { instanceId: string } }
   | { kind: 'blastRadius:decide'; payload: { instanceId: string; holdId: string; decision: import('./blastRadius.js').BlastDecision } }
   | { kind: 'chat:snapshot'; payload: { instanceId: string } }
@@ -801,6 +803,8 @@ export type IpcResponse =
   | { kind: 'run:state'; payload: import('./runServers.js').RunState | null }
   | { kind: 'run:start'; payload: import('./runServers.js').RunState | null }
   | { kind: 'run:stop'; payload: import('./runServers.js').RunState | null }
+  | { kind: 'modBands:get'; payload: import('./modBands.js').ModBandsState }
+  | { kind: 'modBands:click'; payload: { ok: boolean } }
   | { kind: 'blastRadius:get'; payload: import('./blastRadius.js').BlastRadiusState | null }
   | { kind: 'blastRadius:decide'; payload: { ok: boolean } }
   | { kind: 'chat:snapshot'; payload: import('./chat.js').ChatSnapshot | null }
@@ -1026,6 +1030,7 @@ export type IpcPush =
   | { kind: 'fileTreeActivity'; payload: import('./fileTree.js').FileTreeActivityState }
   | { kind: 'replay'; payload: import('./replay.js').ReplayState }
   | { kind: 'runChanged'; payload: import('./runServers.js').RunState }
+  | { kind: 'modBands'; payload: import('./modBands.js').ModBandsState }
   | { kind: 'blastRadius'; payload: import('./blastRadius.js').BlastRadiusState }
   | { kind: 'chatEvent'; payload: import('./chat.js').ChatEvent }
   | {

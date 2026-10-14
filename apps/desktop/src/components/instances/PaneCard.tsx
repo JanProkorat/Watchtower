@@ -24,6 +24,8 @@ import { ReplayTab } from './side/ReplayTab.js';
 import { useReplay, useUnseenSteps } from '../../state/useReplay.js';
 import { RunTab, runningCount } from './side/RunTab.js';
 import { useRun } from '../../state/useRun.js';
+import { ModsTab } from './side/ModsTab.js';
+import { hasModBands, modBandsCount, useModBands } from '../../state/useModBands.js';
 import { BlastRadiusDialog } from './BlastRadiusDialog.js';
 import { useBlastRadius } from '../../state/useBlastRadius.js';
 import { useFileTree } from '../../state/useFileTree.js';
@@ -85,7 +87,8 @@ export function PaneCard({
   const sideToggle = useRef<(tab: SideTab) => void>(() => {});
   const savvy = useSavvyChrome(instanceId, kind !== 'shell', () => sideToggle.current('agents'));
   const run = useRun(instanceId, cwd);
-  const available = sideTabsFor(kind, cwd, run.state !== null);
+  const mods = useModBands(instanceId);
+  const available = sideTabsFor(kind, cwd, run.state !== null, hasModBands(mods.bands));
   const activity = useFileTreeActivity(instanceId);
   const replay = useReplay(instanceId);
   const side = useSidePanel({
@@ -251,7 +254,7 @@ export function PaneCard({
             tabs={side.available}
             tab={side.tab}
             width={side.width}
-            counts={{ replay: unseen, run: runningCount(run.state) }}
+            counts={{ replay: unseen, mods: modBandsCount(mods.bands), run: runningCount(run.state) }}
             onSelect={side.select}
             onClose={side.close}
             onResize={side.setWidth}
@@ -264,6 +267,7 @@ export function PaneCard({
               ))}
             {side.tab === 'files' && <FilesTab tree={fileTree} flash={flash} />}
             {side.tab === 'replay' && <ReplayTab turn={replay?.snapshot.turn ?? null} />}
+            {side.tab === 'mods' && <ModsTab bands={mods.bands} onReflect={(id, action) => void mods.click(id, action)} />}
             {side.tab === 'run' && run.state && (
               <RunTab state={run.state} onStart={(id) => void run.start(id)} onStop={(id) => void run.stop(id)} onReload={() => void run.reload()} />
             )}

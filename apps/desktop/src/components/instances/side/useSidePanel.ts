@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { PANEL_W, clampPanelWidth } from '../savvy/SavvyAgentsPanel.js';
 
-export type SideTab = 'agents' | 'files' | 'replay' | 'run';
+export type SideTab = 'agents' | 'files' | 'replay' | 'mods' | 'run';
 
 export interface SidePanelOptions {
   /** Tabs with something to show, in strip order. */
@@ -26,13 +26,17 @@ export interface SidePanel {
 
 const WIDTH_KEY = 'watchtower.savvyPanelWidth';
 
-/** A pane's tabs: Agents and Replay wherever Claude runs (empty until their mods post), Files wherever there is a folder, Run when the repo has a run.json. */
-export function sideTabsFor(kind: 'claude' | 'shell' | 'chat', cwd: string, hasRun = false): SideTab[] {
+/**
+ * A pane's tabs: Agents and Replay wherever Claude runs (empty until their mods post), Files wherever there is a
+ * folder, Mods once a band mod has posted, Run when the repo has a run.json.
+ */
+export function sideTabsFor(kind: 'claude' | 'shell' | 'chat', cwd: string, hasRun = false, hasMods = false): SideTab[] {
   const claude = kind !== 'shell';
   return [
     ...(claude ? (['agents'] as const) : []),
     ...(cwd ? (['files'] as const) : []),
     ...(claude ? (['replay'] as const) : []),
+    ...(hasMods ? (['mods'] as const) : []),
     ...(hasRun ? (['run'] as const) : []),
   ];
 }

@@ -282,6 +282,18 @@ and time out after 2 s. Everything else (cancel, 10 min timeout, error) denies.
 `packages/shared/src/blastRadius.ts`; `plugins/replay-theater/hooks/replay-theater.mjs`
 ↔ `packages/shared/src/replay.ts`.
 
+**Mods tab.** `plugins/cache-tax`, `plugins/collision-guard` and
+`plugins/reflect-mod` (vendored, patched) draw nothing above the prompt inside
+Watchtower; each POSTs what its band would show to `/mods/<name>` →
+`orchestrator/services/modBandsStore.ts` → push `modBands`
+(`modBands:get|click`). `ModsTab` shows the peers, learned rules and cache
+state; the tab appears once any of them posted. reflect-mod's buttons queue a
+click (`modBands:click`); the mod polls `GET /mods/reflect-mod/decision?id=next`
+every 1.5 s while it has rules waiting and runs the upstream action itself.
+prompt-enhancer stays above the prompt: its buttons act on the prompt box.
+Shapes in `packages/shared/src/modBands.ts` — **change each mod's post body and
+its parser together.**
+
 **Run tab.** Native, no mod. A repo lists its dev servers in
 `<repo>/.watchtower/run.json` (`{ "servers": [{ id, label?, cwd?, command: [argv],
 port?, ready?, url? }] }`, parsed by `parseRunConfig` in
@@ -297,10 +309,12 @@ A new `/mods/<name>` bridge must also be added to `KNOWN_MODS` in
 `orchestrator/hookListener.ts`, or the route rejects it.
 
 Install: set `CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` to the
-absolute, `:`-separated plugin folders (all four:
-`/Users/…/Watchtower/plugins/savvy-progress:…/plugins/filetree:…/plugins/blast-radius:…/plugins/replay-theater`)
+absolute, `:`-separated plugin folders (all seven:
+`/Users/…/Watchtower/plugins/savvy-progress:…/plugins/filetree:…/plugins/blast-radius:…/plugins/replay-theater:…/plugins/cache-tax:…/plugins/collision-guard:…/plugins/reflect-mod`)
 and disable the upstream `@claude-code-playground-mods` plugins (and
-`filetree@claude-code-filetree`) so the two don't both draw.
+`filetree@claude-code-filetree`, `cache-tax@cache-tax-local`,
+`collision-guard@collision-guard-local`, `reflect-mod@claude-reflect-marketplace`)
+so the two don't both draw.
 
 ## Things to NOT do
 
