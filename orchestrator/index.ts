@@ -93,6 +93,7 @@ import { FileTreeWatchers, nodeWatch } from './services/fileTreeWatchers.js';
 import { FileTreeActivityStore } from './services/fileTreeActivityStore.js';
 import { ReplayStore } from './services/replayStore.js';
 import { RunServers } from './services/runServers.js';
+import { SessionTitler, generateTitleWithClaude } from './services/sessionTitle.js';
 import { ModBandsStore } from './services/modBandsStore.js';
 import { BAND_MODS, type BandMod } from '@watchtower/shared/modBands.js';
 import { BlastRadiusStore } from './services/blastRadiusStore.js';
@@ -273,6 +274,17 @@ const blastRadius = new BlastRadiusStore({
   },
 });
 setInterval(() => blastRadius.sweep(Date.now()), 60_000).unref();
+
+// Pane-bar names: a placeholder from the first prompt, then a Haiku-generated name.
+const sessionTitler = new SessionTitler({
+  getTitle: (instanceId) => (handle ? repo().get(instanceId)?.title : undefined),
+  setTitle: (instanceId, title) => {
+    repo().setTitle(instanceId, title);
+    const inst = repo().get(instanceId);
+    if (inst) emitPush({ kind: 'stateChanged', payload: { instanceId, status: inst.status } });
+  },
+  generate: (prompt) => generateTitleWithClaude(prompt),
+});
 
 function cwdOfInstance(instanceId: string): string {
   const row = handle ? repo().get(instanceId) : null;
@@ -1085,6 +1097,7 @@ export async function handleRequest(req: OrchRequest, origin: string = LOCAL_CLI
           lastActivityAt: r.lastActivityAt,
           kind: r.kind,
           taskId: r.taskId,
+          title: r.title ?? null,
         })),
       };
     }
@@ -2038,6 +2051,10 @@ function respawnIncompleteRowsOnBoot(): void {
         authBlockDetector.onHookEvent(eventName, body, instanceId);
         const stateEvent = mapHookEventToStateEvent(eventName, body);
         if (stateEvent) applyTransition(instanceId, stateEvent);
+        if (eventName === 'UserPromptSubmit') {
+          const prompt = (body as { prompt?: unknown } | undefined)?.prompt;
+          if (typeof prompt === 'string') void sessionTitler.onPrompt(instanceId, prompt);
+        }
         // Auto-log this instance's active time to its project on session end
         // (no-op unless the matched project has auto_track enabled). Best-effort:
         // the service swallows its own errors so a logging failure can't break

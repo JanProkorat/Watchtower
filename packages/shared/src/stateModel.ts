@@ -46,4 +46,6 @@ export interface InstanceRow {
    *  session runs in, so closing the instance can clean it up. Null otherwise. */
   worktreePath: string | null;
   background: boolean;
+  /** Name shown in the pane bar, generated from the first prompt; null until then. Always set on rows read back. */
+  title?: string | null;
 }

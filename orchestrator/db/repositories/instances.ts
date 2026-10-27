@@ -18,6 +18,7 @@ type DbInstanceRow = {
   task_id: number | null;
   worktree_path: string | null;
   background: number;
+  title: string | null;
 };
 
 function toRow(r: DbInstanceRow): InstanceRow {
@@ -37,6 +38,7 @@ function toRow(r: DbInstanceRow): InstanceRow {
     taskId: r.task_id,
     worktreePath: r.worktree_path,
     background: r.background === 1,
+    title: r.title ?? null,
   };
 }
 
@@ -138,6 +140,10 @@ export class InstancesRepo {
 
   setTask(id: string, taskId: number | null): void {
     this.db.prepare(`UPDATE instances SET task_id = ? WHERE id = ?`).run(taskId, id);
+  }
+
+  setTitle(id: string, title: string | null): void {
+    this.db.prepare(`UPDATE instances SET title = ? WHERE id = ?`).run(title, id);
   }
 
   delete(id: string): void {

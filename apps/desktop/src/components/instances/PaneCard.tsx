@@ -38,6 +38,8 @@ interface Props {
   kind: 'claude' | 'shell' | 'chat';
   taskId: number | null;
   cwd: string;
+  /** The session's generated name; null until its first prompt. */
+  title?: string | null;
   focused: boolean;
   /** This instance is blocked on the user (waiting-permission/input, crashed). */
   attention: boolean;
@@ -67,6 +69,7 @@ export function PaneCard({
   kind,
   taskId,
   cwd,
+  title,
   focused,
   attention,
   accent,
@@ -167,9 +170,28 @@ export function PaneCard({
             }}
           />
         )}
+        {title && (
+          <Tooltip title={title} placement="bottom-start" enterDelay={600}>
+            <Typography
+              noWrap
+              sx={{
+                minWidth: 0,
+                px: 0.5,
+                fontSize: 12,
+                fontWeight: 500,
+                color: '#d6dae2',
+                opacity: focused ? 0.9 : 0.5,
+                transition: 'opacity 120ms ease',
+              }}
+            >
+              {title}
+            </Typography>
+          </Tooltip>
+        )}
         <Box
           sx={{
             ml: 'auto',
+            flexShrink: 0,
             display: 'flex',
             gap: 0.5,
             opacity: focused ? 1 : 0.4,

@@ -31,6 +31,7 @@ interface SessionInfo {
   kind: 'claude' | 'shell' | 'chat';
   taskId: number | null;
   cwd: string;
+  title: string | null;
 }
 
 export function LeafView({
@@ -69,11 +70,11 @@ export function LeafView({
   const accent = tabAccent(tab.id, tab.color);
   const sessionInfos: SessionInfo[] = tab.columnOrder.map((id) => {
     const inst = instances.find((i) => i.id === id);
-    return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? ('claude' as const), taskId: inst?.taskId ?? null, cwd: inst?.cwd ?? '' };
+    return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? ('claude' as const), taskId: inst?.taskId ?? null, cwd: inst?.cwd ?? '', title: inst?.title ?? null };
   });
   const hiddenSessionInfos: SessionInfo[] = tab.hiddenInstanceIds.map((id) => {
     const inst = instances.find((i) => i.id === id);
-    return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? ('claude' as const), taskId: inst?.taskId ?? null, cwd: inst?.cwd ?? '' };
+    return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? ('claude' as const), taskId: inst?.taskId ?? null, cwd: inst?.cwd ?? '', title: inst?.title ?? null };
   });
 
   // Leaf-level actions cluster — floats at the top-left, opposite the per-card
@@ -198,6 +199,7 @@ export function LeafView({
                   kind={s.kind}
                   taskId={s.taskId}
                   cwd={s.cwd}
+                  title={s.title}
                   focused={focused && tab.focusedInstanceId === instanceId}
                   attention={ACTION_NEEDED_STATUSES.has(s.status)}
                   accent={accent}

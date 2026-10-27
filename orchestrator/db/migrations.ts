@@ -537,6 +537,15 @@ export const MIGRATIONS: Array<{ version: number; up: (db: SqliteLike) => void }
       addColumnIfMissing(db, 'instances', 'background', 'INTEGER NOT NULL DEFAULT 0');
     },
   },
+  {
+    version: 30,
+    up: (db: SqliteLike) => {
+      // Skips 28 and 29: the finance branch already applied those on dogfood DBs,
+      // and runMigrations skips any `version <= current` (the v25 collision again).
+      // The session's name in its pane bar, generated from its first prompt.
+      addColumnIfMissing(db, 'instances', 'title', 'TEXT');
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteLike): void {

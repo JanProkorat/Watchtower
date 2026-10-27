@@ -604,6 +604,7 @@ export type OrchResponse =
           lastActivityAt: number;
           kind: import('./stateModel.js').InstanceKind;
           taskId: number | null;
+          title: string | null;
         }>;
       };
     }

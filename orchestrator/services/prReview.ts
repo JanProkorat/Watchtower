@@ -18,12 +18,12 @@ export interface RunClaudeResult { stdout: string; stderr: string; code: number 
 // timeout by killing the child.
 export function runClaudeProcess(
   claudeBin: string, args: string[], cwd: string,
-  opts: { timeoutMs: number; signal?: AbortSignal } = { timeoutMs: CLAUDE_TIMEOUT_MS },
+  opts: { timeoutMs: number; signal?: AbortSignal; env?: NodeJS.ProcessEnv } = { timeoutMs: CLAUDE_TIMEOUT_MS },
 ): Promise<RunClaudeResult> {
   return new Promise((resolve) => {
     const child = spawn(claudeBin, args, {
       cwd, stdio: ['ignore', 'pipe', 'pipe'],           // stdin=/dev/null → no "no stdin data" warning
-      env: { ...process.env, PATH: `${process.env.PATH ?? ''}:/opt/homebrew/bin:/usr/local/bin` },
+      env: { ...(opts.env ?? process.env), PATH: `${process.env.PATH ?? ''}:/opt/homebrew/bin:/usr/local/bin` },
     });
     let stdout = '', stderr = '', aborted = false;
     const cap = 128 * 1024 * 1024;

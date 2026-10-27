@@ -8,6 +8,7 @@ export interface InstanceView {
   lastActivityAt: number;
   kind: 'claude' | 'shell' | 'chat';
   taskId: number | null;
+  title: string | null;
 }
 
 const ACTIVE_ID_KEY = 'watchtower.activeId';
