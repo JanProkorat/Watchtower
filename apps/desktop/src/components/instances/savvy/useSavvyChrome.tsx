@@ -12,8 +12,6 @@ export interface SavvyChrome {
   band: ReactNode;
   /** Data for the Agents tab; null when there is nothing to show. */
   agents: { snapshot: SavvyProgressSnapshot; at: number } | null;
-  /** Non-null while there are agents; changes when a new flow starts. */
-  agentsAutoKey: string | null;
   /** The mod's `/agents-info` counter. */
   panelToggles: number | undefined;
 }
@@ -51,7 +49,6 @@ export function useSavvyChrome(instanceId: string, enabled: boolean, onToggleAge
         />
       ) : null,
     agents: hasContent && snapshot ? { snapshot, at } : null,
-    agentsAutoKey: hasContent ? flow?.title ?? '' : null,
     panelToggles: snapshot?.panelToggles,
   };
 }

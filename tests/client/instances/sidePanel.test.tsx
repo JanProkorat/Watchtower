@@ -26,7 +26,6 @@ beforeAll(() => {
 
 const opts = (over: Partial<SidePanelOptions> = {}): SidePanelOptions => ({
   available: ['agents', 'files'],
-  agentsAutoKey: null,
   toggles: {},
   ...over,
 });
@@ -67,23 +66,13 @@ describe('useSidePanel', () => {
     expect(result.current.tab).toBe('files');
   });
 
-  it('auto-opens Agents once per new key, only when closed', () => {
-    const { result, rerender } = renderHook((o: SidePanelOptions) => useSidePanel(o), { initialProps: opts() });
-    rerender(opts({ agentsAutoKey: 'flow A' }));
-    expect(result.current.isOpen).toBe(true);
-    expect(result.current.tab).toBe('agents');
-    act(() => result.current.close());
-    rerender(opts({ agentsAutoKey: 'flow A' }));
-    expect(result.current.isOpen).toBe(false); // closing holds for the same flow
-    rerender(opts({ agentsAutoKey: 'flow B' }));
-    expect(result.current.isOpen).toBe(true);
-  });
-
-  it('auto-open never steals a tab the user picked', () => {
-    const { result, rerender } = renderHook((o: SidePanelOptions) => useSidePanel(o), { initialProps: opts() });
-    act(() => result.current.open('files'));
-    rerender(opts({ agentsAutoKey: 'flow A' }));
-    expect(result.current.tab).toBe('files');
+  it('stays closed when a pane remounts onto a running flow (project switch)', () => {
+    const { result, rerender } = renderHook((o: SidePanelOptions) => useSidePanel(o), {
+      initialProps: opts({ toggles: { agents: 3, files: 1 } }),
+    });
+    expect(result.current.isOpen).toBe(false);
+    rerender(opts({ toggles: { agents: 3, files: 1 } }));
+    expect(result.current.isOpen).toBe(false);
   });
 
   it('a toggle rise opens its tab, switches to it from another tab, or closes it', () => {

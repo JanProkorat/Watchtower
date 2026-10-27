@@ -93,7 +93,6 @@ export function PaneCard({
   const replay = useReplay(instanceId);
   const side = useSidePanel({
     available,
-    agentsAutoKey: savvy.agentsAutoKey,
     toggles: { agents: savvy.panelToggles, files: activity?.snapshot.panelToggles, replay: replay?.snapshot.panelToggles },
   });
   sideToggle.current = side.toggle;

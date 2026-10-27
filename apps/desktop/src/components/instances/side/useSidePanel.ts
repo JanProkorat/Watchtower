@@ -6,8 +6,6 @@ export type SideTab = 'agents' | 'files' | 'replay' | 'mods' | 'run';
 export interface SidePanelOptions {
   /** Tabs with something to show, in strip order. */
   available: readonly SideTab[];
-  /** Non-null while the agents tab has content; a new value auto-opens Agents once. */
-  agentsAutoKey: string | null;
   /** Each tab's toggle counter from its mod; a rise toggles that tab. */
   toggles: Partial<Record<SideTab, number | undefined>>;
 }
@@ -41,8 +39,8 @@ export function sideTabsFor(kind: 'claude' | 'shell' | 'chat', cwd: string, hasR
   ];
 }
 
-/** One pane's right-side panel: which tab shows, whether it is open, and how wide. */
-export function useSidePanel({ available, agentsAutoKey, toggles }: SidePanelOptions): SidePanel {
+/** One pane's right-side panel: which tab shows, whether it is open, and how wide. Opens only when the user asks. */
+export function useSidePanel({ available, toggles }: SidePanelOptions): SidePanel {
   const [isOpenRaw, setIsOpen] = useState(false);
   const [picked, setPicked] = useState<SideTab | null>(null);
   const [width, setWidthState] = useState(readWidth);
@@ -60,16 +58,6 @@ export function useSidePanel({ available, agentsAutoKey, toggles }: SidePanelOpt
   };
   const close = () => setIsOpen(false);
   const toggle = (t: SideTab) => (isOpen && tab === t ? close() : open(t));
-
-  // Agents opens by itself once per new flow, and only into a closed panel.
-  const lastAutoKey = useRef<string | null>(null);
-  useEffect(() => {
-    if (agentsAutoKey === null || agentsAutoKey === lastAutoKey.current) return;
-    lastAutoKey.current = agentsAutoKey;
-    if (!isOpen) open('agents');
-    // Only a new key should act; the rest is read as of that render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentsAutoKey]);
 
   useToggleRise(toggles.agents, () => toggle('agents'));
   useToggleRise(toggles.files, () => toggle('files'));

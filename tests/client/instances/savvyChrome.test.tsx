@@ -91,7 +91,6 @@ describe('useSavvyChrome', () => {
     renderIt();
     expect(chrome.band).toBeNull();
     expect(chrome.agents).toBeNull();
-    expect(chrome.agentsAutoKey).toBeNull();
     expect(chrome.bottomInset).toBe(0);
   });
 
@@ -102,12 +101,11 @@ describe('useSavvyChrome', () => {
     expect(chrome.band).toBeNull();
   });
 
-  it('offers the band, the agents data and the flow as the auto-open key', () => {
+  it('offers the band and the agents data', () => {
     sp.value = state({ panelToggles: 3 });
     renderIt();
     expect(chrome.bottomInset).toBeGreaterThan(0);
     expect(chrome.agents?.snapshot.agents).toHaveLength(1);
-    expect(chrome.agentsAutoKey).toBe('Port parser');
     expect(chrome.panelToggles).toBe(3);
   });
 
@@ -132,6 +130,5 @@ describe('useSavvyChrome', () => {
     renderIt();
     expect(chrome.band).toBeNull();
     expect(chrome.agents).not.toBeNull();
-    expect(chrome.agentsAutoKey).toBe('');
   });
 });
