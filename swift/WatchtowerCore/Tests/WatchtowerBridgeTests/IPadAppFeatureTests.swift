@@ -112,6 +112,51 @@ final class IPadAppFeatureTests: XCTestCase {
         }
     }
 
+    func testBillingSectionSelected() async {
+        // Seed records.section away from its default so the earnings/reports
+        // don't-clobber assertions below are unambiguous (not "already at
+        // the default"/coincidentally unchanged).
+        var initialState = IPadAppFeature.State()
+        initialState.records.section = .board
+        let store = TestStore(initialState: initialState) {
+            IPadAppFeature()
+        }
+
+        // Earnings/reports: activate Billing, set the section, but must NOT
+        // touch records.section — omitting it from the trailing closure
+        // asserts it stays exactly as before (still `.board`).
+        await store.send(.billingSectionSelected(.earnings)) {
+            $0.selectedModule = .billing
+            $0.billingSection = .earnings
+        }
+        await store.send(.billingSectionSelected(.reports)) {
+            $0.billingSection = .reports
+        }
+
+        // Every records-backed sub-item syncs RecordsFeature.section so the
+        // reused Phase-5 sub-view renders the matching content.
+        await store.send(.billingSectionSelected(.recordsList)) {
+            $0.billingSection = .recordsList
+            $0.records.section = .list
+        }
+        await store.send(.billingSectionSelected(.recordsGrid)) {
+            $0.billingSection = .recordsGrid
+            $0.records.section = .grid
+        }
+        await store.send(.billingSectionSelected(.recordsTasks)) {
+            $0.billingSection = .recordsTasks
+            $0.records.section = .tasks
+        }
+        await store.send(.billingSectionSelected(.recordsTimeOff)) {
+            $0.billingSection = .recordsTimeOff
+            $0.records.section = .timeOff
+        }
+        await store.send(.billingSectionSelected(.board)) {
+            $0.billingSection = .board
+            $0.records.section = .board
+        }
+    }
+
     func testSignOutCallsSupabase() async {
         let signedOut = LockIsolated(false)
         let store = TestStore(initialState: IPadAppFeature.State()) {

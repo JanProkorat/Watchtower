@@ -8,14 +8,14 @@ private let worklogSourceLabels: [String: String] = [
     "jira-sync": "jira",
 ]
 
-/// iPad port of the iPhone `WorklogListView` — same derivation
-/// (`groupWorklogsByDay`), same month/project filter bar, and the same
-/// "+"-add / row-tap-to-edit affordances (→ `addWorklogTapped` /
-/// `worklogRowTapped`), but cards use the iPad design system's
-/// `contentCard()` instead of `GlassCard`/`.ultraThinMaterial`.
+/// Records → "List" — ported from the ORIGINAL
+/// `packages/module-timetracker/src/billing/records/WorklogListView.tsx`
+/// (NOT iphone-native): same derivation (`groupWorklogsByDay`), same 2-row
+/// glass `MonthBar` (stepper + Today; project filter + "+ Add" CTA), and the
+/// same day-grouped list of individually-`glassCard(10)`'d rows.
 ///
-/// Adds explicit `canEdit` gating the iPhone reference doesn't have at the
-/// view layer (it only relies on the reducer's internal guard): the "+ add"
+/// Adds explicit `canEdit` gating the web original doesn't have at the view
+/// layer (it only relies on the reducer's internal guard): the "+ Add"
 /// affordance is hidden, and every row becomes untappable, whenever
 /// `!canEdit(billing.loadState)` — mirrors the pattern already established
 /// by `ProjectDetailView`/`ContractDrawerView` in this module.
@@ -108,52 +108,79 @@ struct WorklogListView: View {
     }
 
     // MARK: - Month bar
+    //
+    // Two rows, matching `WorklogListView.tsx`'s `MonthBar`: row 1 is the
+    // month stepper + "Today" jump; row 2 is the project filter (grows) +
+    // "+ Add" CTA. There's no dedicated "jump to current month" reducer
+    // action — `worklogMonthStepped(delta)` is reused with a delta computed
+    // from the month difference, so "Today" needs no reducer change.
 
     private var monthBar: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Button {
-                    records.send(.worklogMonthStepped(-1))
-                } label: {
-                    Text("‹")
-                        .font(.system(size: 18))
-                        .frame(width: 34, height: 34)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Palette.accentIcon)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
-
+                stepButton("‹") { records.send(.worklogMonthStepped(-1)) }
                 Text(CzFormat.czechMonthLabel(records.worklogMonth))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Palette.textPrimary)
                     .frame(minWidth: 128)
                     .multilineTextAlignment(.center)
-
-                Button {
-                    records.send(.worklogMonthStepped(1))
-                } label: {
-                    Text("›")
-                        .font(.system(size: 18))
-                        .frame(width: 34, height: 34)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Palette.accentIcon)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+                stepButton("›") { records.send(.worklogMonthStepped(1)) }
 
                 Spacer()
+
+                todayButton
+            }
+
+            HStack(spacing: 10) {
+                projectMenu
+                    .frame(maxWidth: .infinity)
 
                 if editable {
                     addButton
                 }
             }
-
-            projectMenu
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .contentCard(cornerRadius: 16)
+        .glassCard(cornerRadius: 16)
         .padding(.horizontal, 16)
         .padding(.top, 12)
+    }
+
+    private func stepButton(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 18))
+                .frame(width: 34, height: 34)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Palette.accentIcon)
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+    }
+
+    private var todayButton: some View {
+        Button("Today") {
+            let delta = Self.monthIndex(Self.utcTodayIso().prefix(7).description) - Self.monthIndex(records.worklogMonth)
+            records.send(.worklogMonthStepped(delta))
+        }
+        .buttonStyle(.plain)
+        .font(.system(size: 12.5, weight: .semibold))
+        .foregroundStyle(Palette.textSecondary)
+        .padding(.horizontal, 14)
+        .frame(height: 34)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    /// `"YYYY-MM"` → an absolute month index (`year*12 + month-1`), so two
+    /// month strings can be diffed into a single `worklogMonthStepped` delta.
+    private static func monthIndex(_ month: String) -> Int {
+        let p = month.split(separator: "-")
+        guard p.count == 2, let y = Int(p[0]), let m = Int(p[1]) else { return 0 }
+        return y * 12 + (m - 1)
     }
 
     private var projectMenu: some View {
@@ -177,6 +204,7 @@ struct WorklogListView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+            .frame(height: 36)
             .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
             .overlay(
                 RoundedRectangle(cornerRadius: 9)
@@ -194,15 +222,21 @@ struct WorklogListView: View {
         return project.name.isEmpty ? "(no name)" : project.name
     }
 
+    /// Solid CTA pill — mirrors the web original's `ctaGradient`-filled
+    /// "+ Přidat" button (not the icon-only affordance used elsewhere in this
+    /// module's still-unmigrated screens).
     private var addButton: some View {
         Button {
             records.send(.addWorklogTapped(date: defaultWorklogDate, task: defaultWorklogTask))
         } label: {
-            Image(systemName: "plus.circle.fill")
-                .font(.system(size: 22))
+            Text("+ Add")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .frame(height: 36)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(Palette.accentIcon)
+        .background(Palette.ctaGradient, in: RoundedRectangle(cornerRadius: 9))
         .disabled(defaultWorklogTask == nil)
         .accessibilityLabel("Add worklog")
     }
@@ -222,8 +256,11 @@ struct WorklogListView: View {
                     .foregroundStyle(Palette.textMuted)
             }
 
-            VStack(spacing: 0) {
-                ForEach(Array(day.entries.enumerated()), id: \.element.syncId) { index, entry in
+            // Individual `glassCard(10)` per row with a 6pt gap — matches
+            // `WorklogListView.tsx`'s per-row `glassCard(10)` buttons in a
+            // `gap: 6` column, NOT a single grouped card with dividers.
+            VStack(spacing: 6) {
+                ForEach(day.entries, id: \.syncId) { entry in
                     Button {
                         records.send(.worklogRowTapped(entry))
                     } label: {
@@ -231,12 +268,8 @@ struct WorklogListView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(!editable)
-                    if index < day.entries.count - 1 {
-                        Divider().overlay(Palette.hairline)
-                    }
                 }
             }
-            .contentCard()
         }
     }
 }
@@ -291,6 +324,7 @@ private struct WorklogRowView: View {
             .fixedSize()
         }
         .padding(.vertical, 8)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 12)
+        .glassCard(cornerRadius: 10)
     }
 }

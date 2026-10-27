@@ -2,11 +2,18 @@ import SwiftUI
 import ComposableArchitecture
 import WatchtowerCore
 
-/// iPad port of the iPhone `TaskFormView` — same create/edit sheet bound to
+/// Records form sheet — ported from the ORIGINAL
+/// `packages/module-timetracker/src/billing/records/TaskListView.tsx`'s
+/// `TaskDrawer` (NOT iphone-native): same create/edit sheet bound to
 /// `TaskFormFeature` (number/title/status/estimate/description fields), same
-/// mode-derived Delete visibility, but the card uses the iPad design
-/// system's `contentCard()` instead of `GlassCard`, and Save/Delete are
-/// additionally `.disabled` when `!canEdit(store.loadState)` — matching
+/// mode-derived Delete visibility, but the card uses the design-align
+/// `glassCard()` helper (not `contentCard()`), the shared
+/// `SectionHeaderLabel` for field captions, and a read-only project summary
+/// line (looked up from `store.dataset`) matching the web original's epic/
+/// project picker — `TaskFormFeature.State` locks the epic at creation time
+/// (`Mode.create(epicId:)`) with no in-form picker, so this stays read-only
+/// rather than adding new reducer state. Save/Delete are additionally
+/// `.disabled` when `!canEdit(store.loadState)` — matching
 /// `WorklogFormView`/`ContractDrawerView`'s pattern.
 struct TaskFormView: View {
     @Bindable var store: StoreOf<TaskFormFeature>
@@ -24,6 +31,22 @@ struct TaskFormView: View {
         canEdit(store.loadState)
     }
 
+    /// The project this task belongs to (color + name), read-only —
+    /// resolved from `store.dataset` for create mode (via the locked
+    /// `epicId`) or straight off the row for edit mode.
+    private var projectSummary: (name: String, color: String?)? {
+        switch store.mode {
+        case let .edit(row):
+            return (row.projectName, row.projectColor)
+        case let .create(epicId):
+            guard let epic = store.dataset?.epics.first(where: { $0.epicId == epicId }),
+                  let project = store.dataset?.projects.first(where: { $0.id == epic.projectId }) else {
+                return nil
+            }
+            return (project.name, project.color)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -32,26 +55,37 @@ struct TaskFormView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         VStack(alignment: .leading, spacing: 14) {
+                            if let project = projectSummary {
+                                HStack(spacing: 6) {
+                                    if let color = project.color {
+                                        Circle().fill(Color(hex: color)).frame(width: 8, height: 8)
+                                    }
+                                    Text(project.name.isEmpty ? "(no name)" : project.name)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(Palette.textMuted)
+                                }
+                            }
+
                             VStack(alignment: .leading, spacing: 6) {
-                                SectionHeader(title: "Number")
+                                SectionHeaderLabel("Number")
                                 TextField("Task number", text: $store.numberText)
                                     .padding(12)
-                                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
                                     .foregroundStyle(Palette.textPrimary)
                                     .disabled(!editable)
                             }
 
                             VStack(alignment: .leading, spacing: 6) {
-                                SectionHeader(title: "Title")
+                                SectionHeaderLabel("Title")
                                 TextField("Task title", text: $store.titleText)
                                     .padding(12)
-                                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
                                     .foregroundStyle(Palette.textPrimary)
                                     .disabled(!editable)
                             }
 
                             VStack(alignment: .leading, spacing: 6) {
-                                SectionHeader(title: "Status")
+                                SectionHeaderLabel("Status")
                                 Picker("Status", selection: $store.status) {
                                     ForEach(Self.statusOptions, id: \.value) { option in
                                         Text(option.label).tag(option.value)
@@ -62,20 +96,20 @@ struct TaskFormView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 6) {
-                                SectionHeader(title: "Estimate")
+                                SectionHeaderLabel("Estimate")
                                 TextField("e.g. 4:00 or 4h", text: $store.estimateText)
                                     .keyboardType(.numbersAndPunctuation)
                                     .padding(12)
-                                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
                                     .foregroundStyle(Palette.textPrimary)
                                     .disabled(!editable)
                             }
 
                             VStack(alignment: .leading, spacing: 6) {
-                                SectionHeader(title: "Description")
+                                SectionHeaderLabel("Description")
                                 TextField("Optional note", text: $store.descriptionText)
                                     .padding(12)
-                                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 11))
                                     .foregroundStyle(Palette.textPrimary)
                                     .disabled(!editable)
                             }
@@ -87,7 +121,7 @@ struct TaskFormView: View {
                             }
                         }
                         .padding(16)
-                        .contentCard()
+                        .glassCard()
 
                         Button {
                             store.send(.saveTapped)
@@ -108,8 +142,12 @@ struct TaskFormView: View {
                                 Text("Delete")
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 12)
-                                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                                    .foregroundStyle(.red)
+                                    .background(Color(hex: "#6e1818").opacity(0.32), in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color(hex: "#f87171").opacity(0.40), lineWidth: 1)
+                                    )
+                                    .foregroundStyle(Color(hex: "#fca5a5"))
                             }
                             .disabled(store.isSaving || !editable)
                             .accessibilityLabel("Delete task")
