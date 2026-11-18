@@ -103,10 +103,17 @@ describe('savvyDraw', () => {
     expect(planned.map((p) => p.title)).toEqual(['Add tests']);
     expect(planned[0]?.n).toBe(2);
     const t = totals([run(), run({ id: 't2', costUsd: 0.5, status: 'done', endedAt: 31_000 })], 61_000);
-    expect(t.cost).toBe(2);
     expect(t.time).toBe(60_000);
-    expect(headerSvg(en, 316, flow.title, t)).toContain('≈$2.00');
+    expect(headerSvg(en, 316, flow.title, t)).toContain('1:00');
     expect(compactSvg(en, 316, [run()], planned, t)).toContain('c-careful run');
+  });
+
+  it('shows no dollar cost in the header, rows or compact band', () => {
+    const t = totals([run()], 61_000);
+    for (const s of [headerSvg(en, 316, flow.title, t), agentSvg(en, 316, run(), 61_000), compactSvg(en, 316, [run()], [], t)]) {
+      expect(s).not.toContain('$');
+      expect(s).not.toContain('Cost');
+    }
   });
 
   it('wraps SVG as a data URI for <img>', () => {

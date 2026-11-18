@@ -37,7 +37,6 @@ type Lang = 'en' | 'ru'
 const STRINGS = {
   en: {
     pane: 'Agents',
-    cost: 'Cost',
     tokens: 'Tokens',
     time: 'Time',
     collapse: 'Collapse',
@@ -66,7 +65,6 @@ const STRINGS = {
   },
   ru: {
     pane: 'Агенты',
-    cost: 'Стоимость',
     tokens: 'Токены',
     time: 'Время',
     collapse: 'Свернуть',
@@ -418,8 +416,6 @@ const norm = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, 
 const fmtTokens = (n: number): string =>
   n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : `${Math.round(n)}`
 
-const fmtCost = (usd: number): string => `$${usd < 10 ? usd.toFixed(2) : usd.toFixed(1)}`
-
 const fmtTime = (ms: number): string => {
   const s = Math.max(0, Math.round(ms / 1000))
   const h = Math.floor(s / 3600)
@@ -439,11 +435,10 @@ const plannedOf = (f: Flow | null, list: AgentRun[]): Planned[] => {
 }
 
 const totals = (list: AgentRun[], at: number) => {
-  const cost = list.reduce((s, a) => s + a.costUsd, 0)
   const tokens = list.reduce((s, a) => s + a.tokens, 0)
   const start = Math.min(...list.map(a => a.startedAt))
   const end = Math.max(...list.map(a => a.endedAt ?? Math.max(at, a.startedAt)))
-  return { cost, tokens, time: list.length ? end - start : 0 }
+  return { tokens, time: list.length ? end - start : 0 }
 }
 
 // --- desktop drawings: each row is one SVG, as the band above the prompt is.
@@ -600,7 +595,7 @@ const svg = (W: number, H: number, body: string): string =>
 const headerSvg = (W: number, title: string, t: ReturnType<typeof totals>): string => {
   const s = tr()
   const gap = 6
-  const tw = (W - gap * 2) / 3
+  const tw = (W - gap) / 2
   const top = title ? 28 : 0
   const tile = (i: number, k: string, v: string) =>
     `<rect class="tile" x="${i * (tw + gap)}" y="${top}" width="${tw}" height="40" rx="8"/>
@@ -610,7 +605,7 @@ const headerSvg = (W: number, title: string, t: ReturnType<typeof totals>): stri
     W,
     headerHeight(title),
     `${title ? `<text class="t" x="0" y="15" font-family="${FONT}" font-size="14" font-weight="600">${xml(fitText(title, 14, W))}</text>` : ''}
-${tile(0, s.cost, '≈' + fmtCost(t.cost))}${tile(1, s.tokens, fmtTokens(t.tokens))}${tile(2, s.time, fmtTime(t.time))}`,
+${tile(0, s.tokens, fmtTokens(t.tokens))}${tile(1, s.time, fmtTime(t.time))}`,
   )
 }
 
@@ -636,7 +631,7 @@ const agentSvg = (W: number, a: AgentRun, at: number): string => {
   if (a.status === 'failed') meta.push(s.failed)
   const barW = textW
   const progress = progressOf(a)
-  const stats = `ctx ${ctx}% · ${fmtTokens(a.contextTokens)}  ≈${fmtCost(a.costUsd)}  ${fmtTime(elapsed(a, at))}`
+  const stats = `ctx ${ctx}% · ${fmtTokens(a.contextTokens)}  ${fmtTime(elapsed(a, at))}`
   const steps = a.stepTotal ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' · ' + a.stepNote : ''}` : ''
   const stepsW = Math.max(0, barW - textWidth(stats, 11) - 12)
   // Without reported steps the bar falls back to the context, drawn grey.
@@ -689,7 +684,7 @@ const compactSvg = (W: number, list: AgentRun[], planned: Planned[], t: ReturnTy
     W,
     32,
     `${body}${more ? `<text class="s" x="${x}" y="21" font-family="${FONT}" font-size="12">+${more}</text>` : ''}
-<text class="s" x="${W}" y="21" text-anchor="end" font-family="${FONT}" font-size="12" font-variant-numeric="tabular-nums">≈${fmtCost(t.cost)} · ${fmtTokens(t.tokens)} · ${fmtTime(t.time)}</text>`,
+<text class="s" x="${W}" y="21" text-anchor="end" font-family="${FONT}" font-size="12" font-variant-numeric="tabular-nums">${fmtTokens(t.tokens)} · ${fmtTime(t.time)}</text>`,
   )
 }
 
@@ -994,7 +989,7 @@ export const register: Register = (on, options) => {
       />
     )
     const isEmpty = list.length === 0 && planned.length === 0
-    const summary = `≈${fmtCost(t.cost)}, ${fmtTokens(t.tokens)} ${s.tokensWord}, ${fmtTime(t.time)}`
+    const summary = `${fmtTokens(t.tokens)} ${s.tokensWord}, ${fmtTime(t.time)}`
 
     if (e.surface === 'desktop' && 'Svg' in ui) {
       const { Svg } = ui
@@ -1064,7 +1059,7 @@ export const register: Register = (on, options) => {
             {progress === null ? <Text dimColor>{ctxBar(ctx, barW)}</Text> : <Text color={color}>{ctxBar(progress * 100, barW)}</Text>}
             <Text dimColor>
               {' '}
-              {steps}ctx {ctx}% · {fmtTokens(a.contextTokens)} ≈{fmtCost(a.costUsd)} {fmtTime(elapsed(a, at))}
+              {steps}ctx {ctx}% · {fmtTokens(a.contextTokens)} {fmtTime(elapsed(a, at))}
             </Text>
           </Text>
         </Box>
@@ -1080,7 +1075,7 @@ export const register: Register = (on, options) => {
           {toggleCompact}
         </Box>
         <Text dimColor>
-          ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {s.tokensWord} · {fmtTime(t.time)}
+          {fmtTokens(t.tokens)} {s.tokensWord} · {fmtTime(t.time)}
         </Text>
         {p.isCompact ? (
           <Text wrap="truncate-end">

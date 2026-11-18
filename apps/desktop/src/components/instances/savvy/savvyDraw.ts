@@ -20,7 +20,6 @@ export interface DrawCtx {
 export const STRINGS = {
   en: {
     pane: 'Agents',
-    cost: 'Cost',
     tokens: 'Tokens',
     time: 'Time',
     collapse: 'Collapse',
@@ -46,7 +45,6 @@ export const STRINGS = {
   },
   ru: {
     pane: 'Агенты',
-    cost: 'Стоимость',
     tokens: 'Токены',
     time: 'Время',
     collapse: 'Свернуть',
@@ -235,8 +233,6 @@ const norm = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, 
 export const fmtTokens = (n: number): string =>
   n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : `${Math.round(n)}`;
 
-export const fmtCost = (usd: number): string => `$${usd < 10 ? usd.toFixed(2) : usd.toFixed(1)}`;
-
 export const fmtTime = (ms: number): string => {
   const s = Math.max(0, Math.round(ms / 1000));
   const h = Math.floor(s / 3600);
@@ -256,17 +252,15 @@ export const plannedOf = (f: SavvyFlow | null, list: SavvyAgentRun[]): Planned[]
 };
 
 export interface Totals {
-  cost: number;
   tokens: number;
   time: number;
 }
 
 export const totals = (list: SavvyAgentRun[], at: number): Totals => {
-  const cost = list.reduce((s, a) => s + a.costUsd, 0);
   const tokens = list.reduce((s, a) => s + a.tokens, 0);
   const start = Math.min(...list.map((a) => a.startedAt));
   const end = Math.max(...list.map((a) => a.endedAt ?? Math.max(at, a.startedAt)));
-  return { cost, tokens, time: list.length ? end - start : 0 };
+  return { tokens, time: list.length ? end - start : 0 };
 };
 
 const paneCss = (dark: boolean): string =>
@@ -428,7 +422,7 @@ export const headerHeight = (title: string): number => (title ? 72 : 44);
 export const headerSvg = (ctx: DrawCtx, W: number, title: string, t: Totals): string => {
   const s = STRINGS[ctx.lang];
   const gap = 6;
-  const tw = (W - gap * 2) / 3;
+  const tw = (W - gap) / 2;
   const top = title ? 28 : 0;
   const tile = (i: number, k: string, v: string) =>
     `<rect class="tile" x="${i * (tw + gap)}" y="${top}" width="${tw}" height="40" rx="8"/>
@@ -439,7 +433,7 @@ export const headerSvg = (ctx: DrawCtx, W: number, title: string, t: Totals): st
     W,
     headerHeight(title),
     `${title ? `<text class="t" x="0" y="15" font-family="${FONT}" font-size="14" font-weight="600">${xml(fitText(title, 14, W))}</text>` : ''}
-${tile(0, s.cost, '≈' + fmtCost(t.cost))}${tile(1, s.tokens, fmtTokens(t.tokens))}${tile(2, s.time, fmtTime(t.time))}`,
+${tile(0, s.tokens, fmtTokens(t.tokens))}${tile(1, s.time, fmtTime(t.time))}`,
   );
 };
 
@@ -468,7 +462,7 @@ export const agentSvg = (ctx: DrawCtx, W: number, a: SavvyAgentRun, at: number):
   if (a.status === 'failed') meta.push(s.failed);
   const barW = textW;
   const progress = progressOf(a);
-  const stats = `ctx ${ctxPct}% · ${fmtTokens(a.contextTokens)}  ≈${fmtCost(a.costUsd)}  ${fmtTime(elapsed(a, at))}`;
+  const stats = `ctx ${ctxPct}% · ${fmtTokens(a.contextTokens)}  ${fmtTime(elapsed(a, at))}`;
   const steps = a.stepTotal ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' · ' + a.stepNote : ''}` : '';
   const stepsW = Math.max(0, barW - textWidth(stats, 11) - 12);
   // Without reported steps the bar falls back to the context, drawn grey.
@@ -528,7 +522,7 @@ export const compactSvg = (ctx: DrawCtx, W: number, list: SavvyAgentRun[], plann
     W,
     COMPACT_H,
     `${body}${more ? `<text class="s" x="${x}" y="21" font-family="${FONT}" font-size="12">+${more}</text>` : ''}
-<text class="s" x="${W}" y="21" text-anchor="end" font-family="${FONT}" font-size="12" font-variant-numeric="tabular-nums">≈${fmtCost(t.cost)} · ${fmtTokens(t.tokens)} · ${fmtTime(t.time)}</text>`,
+<text class="s" x="${W}" y="21" text-anchor="end" font-family="${FONT}" font-size="12" font-variant-numeric="tabular-nums">${fmtTokens(t.tokens)} · ${fmtTime(t.time)}</text>`,
   );
 };
 
