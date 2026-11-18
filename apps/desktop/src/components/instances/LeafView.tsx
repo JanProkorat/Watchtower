@@ -1,9 +1,9 @@
-import { Fragment, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { Box, Typography, IconButton, Menu, MenuItem, Tooltip } from '@mui/material';
+import { Fragment } from 'react';
+import { Box, Typography, IconButton, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { PaneCard } from './PaneCard.js';
+import { HiddenSessionsButton } from './HiddenSessionsButton.js';
 import { EmptyWorkspace } from './EmptyWorkspace.js';
 import type { TabRecord } from '@watchtower/shared/layout.js';
 import { ACTION_NEEDED_STATUSES } from '@watchtower/shared/tabAttention.js';
@@ -48,8 +48,6 @@ export function LeafView({
   onSetTask,
   dashboardOnNew,
 }: Props) {
-  const [hiddenAnchor, setHiddenAnchor] = useState<HTMLElement | null>(null);
-
   if (tab.kind === 'dashboard') {
     return (
       <Box
@@ -77,70 +75,21 @@ export function LeafView({
     return { id, status: inst?.status ?? 'unknown', kind: inst?.kind ?? ('claude' as const), taskId: inst?.taskId ?? null, cwd: inst?.cwd ?? '', title: inst?.title ?? null };
   });
 
-  // Leaf-level actions cluster — floats at the top-left, opposite the per-card
-  // chrome (top-right). Holds "new session" and, when there are hidden sessions,
-  // the tray that brings them back (the only path to un-hide).
+  // Brings hidden sessions back (the only path to un-hide). With panes showing it
+  // sits in the first pane's title bar, before the name, so it never covers it.
+  const hiddenButton = <HiddenSessionsButton sessions={hiddenSessionInfos} onUnhide={onUnhideSession} />;
+
+  // Empty leaf only: floats at the top-left with "new session" + the hidden chip.
+  // Once panes exist, each pane's chrome carries the add buttons (which insert
+  // positionally).
   const leafActions = (
-    <Box
-      sx={{
-        position: 'absolute',
-        top: 8,
-        left: 8,
-        zIndex: 6,
-        display: 'flex',
-        gap: 0.5,
-        opacity: 0.55,
-        transition: 'opacity 120ms ease',
-        ':hover': { opacity: 1 },
-      }}
-    >
-      {/* The "+" only seeds the FIRST instance of an empty leaf — once panes
-          exist, each pane's chrome carries the terminal/claude add buttons
-          (which insert positionally). */}
-      {tab.columnOrder.length === 0 && (
-        <Tooltip title="New session in this project" placement="bottom-start">
-          <IconButton
-            aria-label="new session"
-            size="small"
-            onClick={onAddSession}
-            sx={LEAF_BTN_SX}
-          >
-            <AddIcon sx={{ fontSize: 15 }} />
-          </IconButton>
-        </Tooltip>
-      )}
-      {hiddenSessionInfos.length > 0 && (
-        <Tooltip title={`${hiddenSessionInfos.length} hidden session${hiddenSessionInfos.length === 1 ? '' : 's'}`} placement="bottom-start">
-          <IconButton
-            aria-label={`show ${hiddenSessionInfos.length} hidden session${hiddenSessionInfos.length === 1 ? '' : 's'}`}
-            size="small"
-            onClick={(e: ReactMouseEvent<HTMLElement>) => setHiddenAnchor(e.currentTarget)}
-            sx={{ ...LEAF_BTN_SX, width: 'auto', px: 0.75, gap: 0.5, fontSize: 11, fontWeight: 600 }}
-          >
-            <VisibilityOffIcon sx={{ fontSize: 14 }} />
-            {hiddenSessionInfos.length}
-          </IconButton>
-        </Tooltip>
-      )}
-      <Menu
-        open={Boolean(hiddenAnchor)}
-        anchorEl={hiddenAnchor}
-        onClose={() => setHiddenAnchor(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-      >
-        {hiddenSessionInfos.map((s, i) => (
-          <MenuItem
-            key={s.id}
-            onClick={() => {
-              onUnhideSession(s.id);
-              setHiddenAnchor(null);
-            }}
-          >
-            Show hidden session {i + 1}
-          </MenuItem>
-        ))}
-      </Menu>
+    <Box sx={{ position: 'absolute', top: 8, left: 8, zIndex: 6, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Tooltip title="New session in this project" placement="bottom-start">
+        <IconButton aria-label="new session" size="small" onClick={onAddSession} sx={LEAF_BTN_SX}>
+          <AddIcon sx={{ fontSize: 15 }} />
+        </IconButton>
+      </Tooltip>
+      {hiddenButton}
     </Box>
   );
 
@@ -176,7 +125,6 @@ export function LeafView({
     // Outer gutter so the instance cards float clear of the edges; the
     // transparent resize handles become the inter-card gaps.
     <Box sx={{ flex: 1, minHeight: 0, position: 'relative', p: '8px' }}>
-      {leafActions}
       <PanelGroup direction="horizontal" autoSaveId={`columns-${tab.id}`}>
         {tab.columnOrder.map((instanceId, idx) => {
           const s = sessionInfos[idx]!;
@@ -200,6 +148,7 @@ export function LeafView({
                   taskId={s.taskId}
                   cwd={s.cwd}
                   title={s.title}
+                  leading={idx === 0 ? hiddenButton : undefined}
                   focused={focused && tab.focusedInstanceId === instanceId}
                   attention={ACTION_NEEDED_STATUSES.has(s.status)}
                   accent={accent}

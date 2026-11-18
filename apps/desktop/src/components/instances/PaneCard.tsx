@@ -40,6 +40,8 @@ interface Props {
   cwd: string;
   /** The session's generated name; null until its first prompt. */
   title?: string | null;
+  /** Drawn at the start of the title bar, before the name (the leaf's hidden-sessions chip). */
+  leading?: ReactNode;
   focused: boolean;
   /** This instance is blocked on the user (waiting-permission/input, crashed). */
   attention: boolean;
@@ -70,6 +72,7 @@ export function PaneCard({
   taskId,
   cwd,
   title,
+  leading,
   focused,
   attention,
   accent,
@@ -170,6 +173,7 @@ export function PaneCard({
             }}
           />
         )}
+        {leading}
         {title && (
           <Tooltip title={title} placement="bottom-start" enterDelay={600}>
             <Typography
