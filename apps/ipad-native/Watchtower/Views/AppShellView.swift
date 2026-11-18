@@ -16,7 +16,6 @@ struct AppShellView: View {
             AmbientBackground()
             HStack(spacing: 0) {
                 RailView(store: store)
-                Divider().overlay(Color.white.opacity(0.08))
                 detail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }

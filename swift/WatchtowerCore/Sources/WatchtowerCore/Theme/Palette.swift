@@ -58,6 +58,19 @@ public enum Palette {
     public static let ambientCyan = Color(hex: "#22d3ee").opacity(0.20)
     public static let ambientOcean = Color(hex: "#0284c7").opacity(0.24)
 
+    // MARK: - glassCard / dataPanel tokens (design-align T1)
+    //
+    // `glass.ts`'s `glassCard()` calls `glassPanel({ ... })` WITHOUT overriding
+    // `fill`, so it inherits `glassFill` (the rail/tab-strip default) — NOT
+    // `glassFillStrong`. That's the exact fill KPI tiles, contract cards, and
+    // top-projects rows render on in the original apps/ipad.
+    public static let glassCardFill = Color(hex: "#2c364a").opacity(0.34)
+
+    /// Dense-data panel fill — mirrors glass.ts `dataPanelFill` exactly. Same
+    /// numeric value as `contentFill` above; named alias for call-site clarity
+    /// at `dataPanel()` use sites (worklog ledger, task grid, board).
+    public static let dataPanelFill = contentFill
+
     /// Connection state used to color status pills/badges across the app.
     public enum ConnState {
         case connected, connecting, disconnected, authBlock

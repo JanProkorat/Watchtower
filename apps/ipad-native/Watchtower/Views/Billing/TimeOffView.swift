@@ -27,27 +27,33 @@ private func kindLabel(_ kind: TimeOffKind) -> String {
     }
 }
 
-/// iPad port of the iPhone `TimeOffView` — same derivation
-/// (`buildTimeOffModel`), same day-off toggle (tap a day cell to cycle
-/// none → vacation → sick → other → none, via `setDayOff`/`clearDayOff`;
-/// the 3-tier `sync_id` resolution lives entirely in `RecordsFeature`, the
-/// view just sends the action), and the same "Upcoming" list.
+/// Records → "Time off" — ported from the ORIGINAL
+/// `packages/module-timetracker/src/billing/records/TimeOffView.tsx` (NOT
+/// iphone-native): same derivation (`buildTimeOffModel`), same sticky glass
+/// toolbar (stepper + Today + kind legend), same 3-months-side-by-side
+/// `glassCard(12)` calendar strip, and the same "Upcoming" list of
+/// individually-`glassCard(10)`'d rows.
 ///
-/// `buildTimeOffModel` always returns `months: [prev, focus, next]`. The
-/// iPhone view renders only `model.months[1]` (the single focused month —
-/// narrow width has no room for more). iPad has the width, so this is the
-/// one real adaptation: all 3 months render side by side as a horizontal
-/// strip (`monthStrip`), and the header stepper still moves the focus month
-/// (which shifts the whole strip).
+/// `buildTimeOffModel` always returns `months: [prev, focus, next]`. The web
+/// original stacks all 3 on iPad width (it only narrows to a single month
+/// below its own `isNarrow` breakpoint) — this view always has iPad's width,
+/// so all 3 render side by side as a horizontal strip (`monthStrip`); the
+/// header stepper still moves the focus month (which shifts the whole strip).
 ///
-/// Cards use the iPad design system's `contentCard()` instead of
-/// `GlassCard`/`.ultraThinMaterial`. Adds explicit `canEdit` gating the
-/// iPhone reference doesn't have at the view layer (it only relies on the
-/// reducer's internal guard): day cells become untappable whenever
-/// `!canEdit(billing.loadState)` — mirrors `WorklogListView`/`TaskListView`.
+/// Day tap opens a kind-picker (`.confirmationDialog`, the native-idiomatic
+/// stand-in for the web's `BottomSheet`) offering Vacation / Sick / Other /
+/// Delete record — 1:1 with the web original's picker, not the iPhone
+/// reference's tap-to-cycle. Gated by `editable` (`canEdit(billing.loadState)`)
+/// — the web original relies solely on the reducer's internal guard; this
+/// view is explicit, mirroring `WorklogListView`/`TaskListView`.
 struct TimeOffView: View {
     let billing: StoreOf<BillingFeature>
     let records: StoreOf<RecordsFeature>
+
+    /// The date of the day cell whose kind-picker is open, or `nil` when
+    /// closed. Local view state only — mirrors the web original's
+    /// `useState<{date, anchor}>`; the reducer has no "picker open" concept.
+    @State private var pickerDate: String?
 
     // UTC calendar for the "today" date string — matches WatchtowerCore's
     // date-arithmetic convention (never the local time zone).
@@ -105,6 +111,22 @@ struct TimeOffView: View {
                 }
             }
         }
+        .confirmationDialog(
+            pickerDate.map { CzFormat.dateCz($0) } ?? "",
+            isPresented: Binding(
+                get: { pickerDate != nil },
+                set: { if !$0 { pickerDate = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let date = pickerDate {
+                Button("Vacation") { records.send(.setDayOff(date: date, kind: "vacation")) }
+                Button("Sick") { records.send(.setDayOff(date: date, kind: "sick")) }
+                Button("Other") { records.send(.setDayOff(date: date, kind: "other")) }
+                Button("Delete record", role: .destructive) { records.send(.clearDayOff(date: date)) }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
     // MARK: - Header (month stepper + kind legend)
@@ -140,6 +162,8 @@ struct TimeOffView: View {
                 .foregroundStyle(Palette.accentIcon)
                 .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
 
+                todayButton
+
                 Spacer()
             }
 
@@ -147,9 +171,35 @@ struct TimeOffView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .contentCard(cornerRadius: 16)
+        .glassCard(cornerRadius: 16)
         .padding(.horizontal, 16)
         .padding(.top, 12)
+    }
+
+    private var todayButton: some View {
+        Button("Today") {
+            records.send(.timeOffFocusStepped(Self.monthIndex(today.prefix(7).description) - Self.monthIndex(records.timeOffFocus)))
+        }
+        .buttonStyle(.plain)
+        .font(.system(size: 12.5, weight: .semibold))
+        .foregroundStyle(Palette.textSecondary)
+        .padding(.horizontal, 14)
+        .frame(height: 34)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    /// `"YYYY-MM"` → an absolute month index (`year*12 + month-1`), so two
+    /// month strings can be diffed into a single `timeOffFocusStepped` delta.
+    /// There's no dedicated "jump to current month" reducer action, same as
+    /// `WorklogListView`'s `monthIndex`.
+    private static func monthIndex(_ month: String) -> Int {
+        let p = month.split(separator: "-")
+        guard p.count == 2, let y = Int(p[0]), let m = Int(p[1]) else { return 0 }
+        return y * 12 + (m - 1)
     }
 
     private var legend: some View {
@@ -161,6 +211,11 @@ struct TimeOffView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Palette.textMuted)
                 }
+            }
+            if !editable {
+                Text("read-only offline")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.textMuted)
             }
         }
     }
@@ -208,35 +263,24 @@ struct TimeOffView: View {
             }
         }
         .padding(12)
-        .contentCard()
+        .glassCard(cornerRadius: 12)
         .frame(maxWidth: .infinity)
     }
 
-    /// Tap-to-cycle a day cell through the user-settable kinds: none → vacation
-    /// → sick → other → none (`clearDayOff`). `.holiday` is a computed Czech
-    /// public holiday, not a `days_off` row — it isn't user-editable, so a
-    /// holiday cell (and pad cells outside the month) don't respond to taps.
-    /// Also gated by `editable` (`canEdit(billing.loadState)`) — the iPhone
-    /// reference relies solely on the reducer's internal guard.
+    /// Tapping a day (any kind, including holiday — matching the web
+    /// original's `onClick` which only guards on `editable && c.date`) opens
+    /// the kind-picker `.confirmationDialog`. Pad cells outside the month
+    /// (`day.date == nil`) don't respond. Also gated by `editable`
+    /// (`canEdit(billing.loadState)`) — the web original relies solely on
+    /// the reducer's internal guard.
     @ViewBuilder
     private func dayCell(_ day: CalDay) -> some View {
         let dayNumber = day.date.flatMap { Int($0.suffix(2)) }
-        let isEditable = day.date != nil && day.kind != .holiday && editable
+        let isEditable = day.date != nil && editable
 
         Button {
             guard let date = day.date else { return }
-            switch day.kind {
-            case nil:
-                records.send(.setDayOff(date: date, kind: "vacation"))
-            case .vacation:
-                records.send(.setDayOff(date: date, kind: "sick"))
-            case .sick:
-                records.send(.setDayOff(date: date, kind: "other"))
-            case .other:
-                records.send(.clearDayOff(date: date))
-            case .holiday:
-                break
-            }
+            pickerDate = date
         } label: {
             Text(dayNumber.map(String.init) ?? "")
                 .font(.system(size: 11, weight: day.kind != nil ? .bold : .regular))
@@ -245,6 +289,7 @@ struct TimeOffView: View {
                 .aspectRatio(1, contentMode: .fit)
                 .background(dayCellBackground(day))
                 .overlay(dayCellBorder(day))
+                .overlay(daySelectionRing(day))
         }
         .buttonStyle(.plain)
         .disabled(!isEditable)
@@ -277,26 +322,35 @@ struct TimeOffView: View {
         }
     }
 
+    /// Highlight ring on the cell whose picker is currently open — mirrors
+    /// the web original's `boxShadow: 'inset 0 0 0 2px #7dd3fc'`.
+    @ViewBuilder
+    private func daySelectionRing(_ day: CalDay) -> some View {
+        if day.date != nil, day.date == pickerDate {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(hex: "#7dd3fc"), lineWidth: 2)
+        }
+    }
+
     // MARK: - Upcoming
 
     private var upcomingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "Upcoming")
+            SectionHeaderLabel("Upcoming")
 
             if model.upcoming.isEmpty {
                 Text("nothing upcoming")
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.textMuted)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(model.upcoming.enumerated()), id: \.element.date) { index, item in
+                // Individual `glassCard(10)` per row with a 6pt gap — matches
+                // `TimeOffView.tsx`'s per-row `glassCard(10)` rows in a
+                // `gap: 6` column, NOT a single grouped card with dividers.
+                VStack(spacing: 6) {
+                    ForEach(model.upcoming, id: \.date) { item in
                         upcomingRow(item)
-                        if index < model.upcoming.count - 1 {
-                            Divider().overlay(Palette.hairline)
-                        }
                     }
                 }
-                .contentCard()
             }
         }
     }
@@ -315,7 +369,8 @@ struct TimeOffView: View {
                 .truncationMode(.tail)
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 4)
+        .padding(.vertical, 9)
+        .padding(.horizontal, 12)
+        .glassCard(cornerRadius: 10)
     }
 }

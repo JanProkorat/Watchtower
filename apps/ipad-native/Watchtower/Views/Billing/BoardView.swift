@@ -10,9 +10,12 @@ import WatchtowerCore
 /// there, and stay dropped here too (deferred to a later phase): no drag, no
 /// card taps, no sync/upload buttons — purely a filtered read.
 ///
-/// Cards use the iPad design system's `contentCard()` instead of
-/// `GlassCard`/`.ultraThinMaterial`; columns render as fixed-width
-/// horizontally-scrolling `ScrollView`s, same as the iPhone reference.
+/// Toolbar uses `glassCard()` (matches `BoardView.tsx`'s sticky
+/// `glassPanel` filter bar); columns use `dataPanel()` — a near-solid,
+/// non-frosted fill matching the web original's `dataPanelFill` column
+/// background — rather than `contentCard()`/`.ultraThinMaterial`. Columns
+/// render as fixed-width horizontally-scrolling `ScrollView`s, same as the
+/// iPhone reference.
 struct BoardView: View {
     let records: StoreOf<RecordsFeature>
     let billing: StoreOf<BillingFeature>
@@ -72,7 +75,7 @@ struct BoardView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .contentCard(cornerRadius: 16)
+        .glassCard(cornerRadius: 16)
         .padding(.horizontal, 16)
         .padding(.top, 12)
     }
@@ -145,7 +148,7 @@ struct BoardView: View {
         }
         .frame(width: 240)
         .frame(maxHeight: .infinity)
-        .contentCard(cornerRadius: 12)
+        .dataPanel(cornerRadius: 12)
     }
 
     private func columnHeader(_ column: BoardColumn, count: Int) -> some View {
